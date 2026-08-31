@@ -1,4 +1,5 @@
-import { isServerOnlyEvent } from '@shop/core';
+import { isServerOnlyEvent, requiresConsent } from '@shop/core';
+import { getSessionUser } from '@shop/auth/session';
 import { eventBatchSchema, type EventBatchResponse } from '@shop/contract';
 import { NextResponse } from 'next/server';
 import {
@@ -62,15 +63,29 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  // 요청 본문의 userId 는 절대 쓰지 않는다. 세션이 말하는 사람만 믿는다.
+  const sessionUser = await getSessionUser(request.headers);
+
   const ctx: CollectionContext = {
-    // 인증이 붙으면 세션에서 읽는다. 요청 본문의 userId 는 절대 쓰지 않는다.
-    userId: null,
+    userId: sessionUser?.id ?? null,
     ipHash: hashIp(clientIp(request)),
     deviceType: deviceTypeOf(request.headers.get('user-agent')),
   };
 
+  // 브라우저 트래커도 동의를 확인하지만 서버에서 한 번 더 막는다.
+  // 클라이언트 게이트만 믿으면 트래커를 우회한 요청이 그대로 들어온다.
+  const allowed =
+    sessionUser !== null && !sessionUser.analyticsConsent
+      ? parsed.data.events.filter((e) => !requiresConsent(e.name))
+      : parsed.data.events;
+
+  if (allowed.length === 0) {
+    const none: EventBatchResponse = { accepted: 0, rejected: parsed.data.events.length };
+    return NextResponse.json(none, { status: 202 });
+  }
+
   try {
-    await recordEvents(parsed.data.events.map((e) => toTrackedEvent(e, ctx)));
+    await recordEvents(allowed.map((e) => toTrackedEvent(e, ctx)));
   } catch (error) {
     // fanOut 이 이미 삼키지만 어댑터 밖의 실패까지 막는다.
     console.error('[analytics] 이벤트 적재 실패', error);
@@ -78,7 +93,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(failed, { status: 202 });
   }
 
-  const response: EventBatchResponse = { accepted: parsed.data.events.length, rejected: 0 };
+  const response: EventBatchResponse = {
+    accepted: allowed.length,
+    rejected: parsed.data.events.length - allowed.length,
+  };
   return NextResponse.json(response, { status: 202 });
 }
 

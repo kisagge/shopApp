@@ -1,0 +1,85 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const getSession = vi.hoisted(() => vi.fn());
+vi.mock('../src/index', () => ({ auth: { api: { getSession } } }));
+
+const { getSessionUser, getActor, normalizeRole } = await import('../src/session-user');
+
+beforeEach(() => getSession.mockReset());
+
+describe('역할 정규화', () => {
+  it('알려진 역할은 그대로 둔다', () => {
+    expect(normalizeRole('SUPER_ADMIN')).toBe('SUPER_ADMIN');
+    expect(normalizeRole('MERCHANT')).toBe('MERCHANT');
+  });
+
+  it.each([
+    ['알 수 없는 문자열', 'GOD_MODE'],
+    ['소문자', 'admin'],
+    ['숫자', 3],
+    ['객체', { role: 'ADMIN' }],
+    ['null', null],
+    ['undefined', undefined],
+  ])('%s 는 CUSTOMER 로 떨어뜨린다 — 권한은 올라가는 쪽으로 기울면 안 된다', (_l, v) => {
+    expect(normalizeRole(v)).toBe('CUSTOMER');
+  });
+});
+
+describe('getSessionUser', () => {
+  it('세션이 없으면 null 이다', async () => {
+    getSession.mockResolvedValue(null);
+    expect(await getSessionUser(new Headers())).toBeNull();
+  });
+
+  it('세션에서 우리가 쓰는 값만 뽑는다', async () => {
+    getSession.mockResolvedValue({
+      user: {
+        id: 'u-1', email: 'a@b.test', name: '홍길동',
+        role: 'MERCHANT', merchantId: 'm-1', analyticsConsent: true,
+        image: null, someInternalField: 'x',
+      },
+    });
+    const u = await getSessionUser(new Headers());
+    expect(u).toEqual({
+      id: 'u-1', email: 'a@b.test', name: '홍길동',
+      role: 'MERCHANT', merchantId: 'm-1', analyticsConsent: true,
+    });
+  });
+
+  it('merchantId 가 문자열이 아니면 null 로 둔다', async () => {
+    getSession.mockResolvedValue({
+      user: { id: 'u', email: 'a@b', name: 'n', role: 'MERCHANT', merchantId: 123 },
+    });
+    expect((await getSessionUser(new Headers()))?.merchantId).toBeNull();
+  });
+
+  it('동의 값이 명시적 true 가 아니면 false 다', async () => {
+    for (const v of [undefined, null, 'true', 1, 0]) {
+      getSession.mockResolvedValue({
+        user: { id: 'u', email: 'a@b', name: 'n', role: 'CUSTOMER', analyticsConsent: v },
+      });
+      expect((await getSessionUser(new Headers()))?.analyticsConsent).toBe(false);
+    }
+  });
+});
+
+describe('getActor', () => {
+  it('권한 판정에 필요한 세 값만 넘긴다 — 이메일·이름이 정책에 새면 안 된다', async () => {
+    getSession.mockResolvedValue({
+      user: { id: 'u-1', email: 'a@b.test', name: '홍길동', role: 'ADMIN', merchantId: null },
+    });
+    expect(await getActor(new Headers())).toEqual({
+      id: 'u-1', role: 'ADMIN', merchantId: null,
+    });
+  });
+
+  it('비로그인은 null — 호출부가 익명을 명시적으로 다루게 한다', async () => {
+    getSession.mockResolvedValue(null);
+    expect(await getActor(new Headers())).toBeNull();
+  });
+
+  it('역할이 손상돼 있어도 CUSTOMER 로 내려간다', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u', email: 'a@b', name: 'n', role: 'ROOT' } });
+    expect((await getActor(new Headers()))?.role).toBe('CUSTOMER');
+  });
+});

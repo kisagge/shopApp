@@ -47,6 +47,8 @@ model User {
   emailVerified Boolean     @default(false)
   name          String
   phone         String?
+  /// Better Auth 가 요구하는 필드. 프로필 이미지 URL.
+  image         String?
   role          UserRole    @default(CUSTOMER)
   grade         MemberGrade @default(BASIC)
 
@@ -72,6 +74,8 @@ model User {
   restockAlerts  RestockNotification[]
   events         EventLog[]
   auditLogs      AdminAuditLog[]        @relation("AuditActor")
+  sessions       Session[]
+  accounts       Account[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -789,4 +793,71 @@ model AdminAuditLog {
   @@index([targetType, targetId, createdAt])
   @@index([action, createdAt])
   @@map("admin_audit_logs")
+}
+
+// ─────────────────────────────────────────── 인증 (Better Auth)
+//
+// 아래 세 모델의 필드 이름과 타입은 Better Auth 가 요구하는 그대로다.
+// 임의로 바꾸면 어댑터가 찾지 못한다. User 는 우리 모델을 그대로 쓰되
+// Better Auth 가 요구하는 image 만 추가했다.
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  expiresAt DateTime
+  /// 세션 탈취 탐지에 쓴다. 이벤트 로그와 달리 여기서는 원본을 보관한다 —
+  /// 수상한 로그인을 사용자에게 보여 주려면 실제 값이 필요하다.
+  ipAddress String?
+  userAgent String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Account {
+  id         String @id @default(cuid())
+  issuer     String
+  accountId  String
+  providerId String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// 소셜 로그인 토큰. 이메일 가입이면 password 만 채워진다.
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  /// Better Auth 가 해시해서 넣는다. 평문이 들어올 일은 없다.
+  password              String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([identifier])
+  @@index([expiresAt])
+  @@map("verifications")
 }

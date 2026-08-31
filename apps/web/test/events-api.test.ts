@@ -7,6 +7,10 @@ vi.mock('~/lib/analytics/server', async (importOriginal) => {
   return { ...actual, recordEvents };
 });
 
+// 세션도 갈아 끼운다. 라우트가 세션을 어떻게 쓰는지가 이 테스트의 관심사다.
+const getSessionUser = vi.hoisted(() => vi.fn(() => Promise.resolve(null as unknown)));
+vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+
 const { POST } = await import('~/app/api/events/route');
 
 const envelope = {
@@ -25,7 +29,10 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     }),
   );
 
-beforeEach(() => recordEvents.mockClear());
+beforeEach(() => {
+  recordEvents.mockClear();
+  getSessionUser.mockResolvedValue(null);
+});
 
 describe('POST /api/events — 정상 수집', () => {
   it('유효한 배치를 받아 202 로 답한다', async () => {
@@ -40,10 +47,57 @@ describe('POST /api/events — 정상 수집', () => {
     expect(recordEvents).toHaveBeenCalledOnce();
   });
 
-  it('userId 는 요청 본문이 아니라 서버가 정한다 — 남의 계정으로 이벤트를 심을 수 없다', async () => {
-    await post({ events: [{ ...envelope, name: 'page_view', userId: 'victim-user-id' }] });
+  it('비로그인이면 userId 가 비어 있다', async () => {
+    await post({ events: [{ ...envelope, name: 'page_view' }] });
     const [events] = recordEvents.mock.calls[0]!;
     expect(events[0].userId).toBeNull();
+  });
+
+  it('로그인 상태면 세션의 userId 를 붙인다', async () => {
+    getSessionUser.mockResolvedValue({
+      id: 'u-real', email: 'a@b.test', name: 'n',
+      role: 'CUSTOMER', merchantId: null, analyticsConsent: true,
+    });
+    await post({ events: [{ ...envelope, name: 'page_view' }] });
+    const [events] = recordEvents.mock.calls[0]!;
+    expect(events[0].userId).toBe('u-real');
+  });
+
+  it('요청 본문의 userId 는 무시한다 — 남의 계정으로 이벤트를 심을 수 없다', async () => {
+    getSessionUser.mockResolvedValue({
+      id: 'u-real', email: 'a@b.test', name: 'n',
+      role: 'CUSTOMER', merchantId: null, analyticsConsent: true,
+    });
+    await post({ events: [{ ...envelope, name: 'page_view', userId: 'victim-user-id' }] });
+    const [events] = recordEvents.mock.calls[0]!;
+    expect(events[0].userId).toBe('u-real');
+  });
+
+  it('동의하지 않은 사용자의 분석 이벤트는 서버에서도 버린다 — 트래커 우회를 막는다', async () => {
+    getSessionUser.mockResolvedValue({
+      id: 'u-1', email: 'a@b.test', name: 'n',
+      role: 'CUSTOMER', merchantId: null, analyticsConsent: false,
+    });
+    const res = await post({
+      events: [
+        { ...envelope, name: 'view_item', productId: 'p-1' },
+        { ...envelope, name: 'login' },
+      ],
+    });
+    expect(await res.json()).toEqual({ accepted: 1, rejected: 1 });
+    const [events] = recordEvents.mock.calls[0]!;
+    // 필수 이벤트(login)만 남는다
+    expect(events.map((e: { name: string }) => e.name)).toEqual(['login']);
+  });
+
+  it('동의하지 않은 사용자가 분석 이벤트만 보내면 아무것도 적재하지 않는다', async () => {
+    getSessionUser.mockResolvedValue({
+      id: 'u-1', email: 'a@b.test', name: 'n',
+      role: 'CUSTOMER', merchantId: null, analyticsConsent: false,
+    });
+    const res = await post({ events: [{ ...envelope, name: 'page_view' }] });
+    expect(await res.json()).toEqual({ accepted: 0, rejected: 1 });
+    expect(recordEvents).not.toHaveBeenCalled();
   });
 
   it('IP 를 원본으로 저장하지 않고 해시한다', async () => {

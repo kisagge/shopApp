@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@11.24.0",
-  "engines": { "node": ">=24.0.0" },
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
@@ -14,7 +16,7 @@
     "db:down": "docker compose -f tooling/docker-compose.yml down",
     "db:push": "pnpm --filter @shop/db exec prisma db push",
     "db:studio": "pnpm --filter @shop/db exec prisma studio",
-    "db:seed": "pnpm --filter @shop/db run seed",
+    "db:seed": "pnpm --filter @shop/db run seed && pnpm --filter @shop/auth run seed",
     "mobile:sync": "pnpm --filter @shop/mobile run sync"
   },
   "devDependencies": {

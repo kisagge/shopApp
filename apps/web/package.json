@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@shop/auth": "workspace:*",
     "@shop/db": "workspace:*",
     "@shop/core": "workspace:*",
     "@shop/ui": "workspace:*",

@@ -1,0 +1,28 @@
+{
+  "name": "@shop/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./session": "./src/session-user.ts",
+    "./client": "./src/client.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "seed": "tsx src/seed-users.ts"
+  },
+  "dependencies": {
+    "@shop/core": "workspace:*",
+    "@shop/db": "workspace:*",
+    "better-auth": "1.7.2"
+  },
+  "devDependencies": {
+    "@shop/config": "workspace:*",
+    "typescript": "7.0.2",
+    "vitest": "4.1.11",
+    "dotenv": "17.2.3",
+    "tsx": "4.23.13"
+  }
+}

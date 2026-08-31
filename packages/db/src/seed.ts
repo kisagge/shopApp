@@ -311,51 +311,8 @@ async function main(): Promise<void> {
   });
   console.log('  쿠폰 2개');
 
-  // ── 데모 계정
-  const user = await prisma.user.upsert({
-    where: { email: 'demo@plain.test' },
-    update: {},
-    create: {
-      email: 'demo@plain.test', name: '데모 사용자', phone: '010-0000-0000',
-      grade: 'GOLD', pointBalance: 3_240, emailVerified: true,
-    },
-  });
-  await prisma.address.upsert({
-    where: { id: `${user.id}-default` },
-    update: {},
-    create: {
-      id: `${user.id}-default`, userId: user.id, label: '집',
-      recipient: '데모 사용자', phone: '010-0000-0000',
-      postalCode: '04766', address1: '서울 성동구 왕십리로 000',
-      address2: '101동 1102호', isDefault: true,
-    },
-  });
-  // ── 역할별 계정. 비밀번호는 인증(Better Auth)이 붙을 때 넣는다.
-  await prisma.user.upsert({
-    where: { email: 'super@plain.test' },
-    update: { role: 'SUPER_ADMIN' },
-    create: { email: 'super@plain.test', name: '슈퍼관리자', role: 'SUPER_ADMIN', emailVerified: true },
-  });
-  await prisma.user.upsert({
-    where: { email: 'admin@plain.test' },
-    update: { role: 'ADMIN' },
-    create: { email: 'admin@plain.test', name: '운영 관리자', role: 'ADMIN', emailVerified: true },
-  });
-  for (const m of MERCHANTS) {
-    const merchant = await prisma.merchant.findUniqueOrThrow({
-      where: { businessNumber: m.businessNumber },
-    });
-    await prisma.user.upsert({
-      where: { email: m.contactEmail },
-      update: { role: 'MERCHANT', merchantId: merchant.id },
-      create: {
-        email: m.contactEmail, name: `${m.name} 담당자`,
-        role: 'MERCHANT', merchantId: merchant.id, emailVerified: true,
-      },
-    });
-  }
-  console.log(`  계정 ${MERCHANTS.length + 3}개 — 고객 1 / 가맹점 ${MERCHANTS.length} / 관리자 1 / 슈퍼관리자 1`);
-
+  // 계정은 @shop/auth 의 시드가 만든다. 비밀번호 해시를 여기서 흉내 내지 않고
+  // 실제 가입 API 를 호출하기 위해서다. pnpm db:seed 가 두 단계를 이어서 돌린다.
 
   console.log('시드 완료');
 }
