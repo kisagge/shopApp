@@ -1,0 +1,591 @@
+// PLAIN 커머스 스키마
+//
+// 두 가지 원칙이 전체를 관통한다.
+//
+// 1) 금액은 전부 Int, 원 단위다. Decimal도 Float도 쓰지 않는다.
+//    packages/core 의 Won 브랜드 타입과 같은 표현이라 경계에서 변환이 필요 없다.
+//
+// 2) 주문은 그 시점의 사실을 스냅샷으로 박는다. 상품명·브랜드·옵션·가격이
+//    나중에 바뀌어도 이미 발생한 주문 내역은 변하지 않아야 한다.
+//    주문 테이블에서 Product를 조인해 이름을 가져오면 안 된다.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────── 회원
+
+enum MemberGrade {
+  BASIC
+  SILVER
+  GOLD
+  VIP
+}
+
+model User {
+  id            String      @id @default(cuid())
+  email         String      @unique
+  emailVerified Boolean     @default(false)
+  name          String
+  phone         String?
+  grade         MemberGrade @default(BASIC)
+
+  /// 포인트 잔액 캐시. 진실은 PointTransaction 원장이고 이 값은 그 합계다.
+  /// 매번 합계를 구하면 마이페이지가 느려져서 캐시하되, 정합성은 배치로 검증한다.
+  pointBalance Int @default(0)
+
+  addresses      Address[]
+  orders         Order[]
+  cartItems      CartItem[]
+  reviews        Review[]
+  wishlist       WishlistItem[]
+  coupons        UserCoupon[]
+  pointHistory   PointTransaction[]
+  restockAlerts  RestockNotification[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Address {
+  id           String  @id @default(cuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  label        String? // "집", "회사"
+  recipient    String
+  phone        String
+  postalCode   String
+  address1     String
+  address2     String?
+  /// 제주·도서산간 여부. 배송비 추가 판정에 쓴다.
+  isRemoteArea Boolean @default(false)
+  isDefault    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, isDefault])
+  @@map("addresses")
+}
+
+// ─────────────────────────────────────────── 상품
+
+model Brand {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  slug     String    @unique
+  logoUrl  String?
+  products Product[]
+
+  createdAt DateTime @default(now())
+
+  @@map("brands")
+}
+
+model Category {
+  id       String     @id @default(cuid())
+  name     String
+  slug     String     @unique
+  /// 자기참조 트리. 아우터 > 코트 같은 2~3단 구조를 담는다.
+  parentId String?
+  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryTree")
+  sortOrder Int       @default(0)
+  products Product[]
+
+  createdAt DateTime @default(now())
+
+  @@index([parentId, sortOrder])
+  @@map("categories")
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  SOLD_OUT
+  HIDDEN
+}
+
+model Product {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  name        String
+  description String        @default("")
+  status      ProductStatus @default(DRAFT)
+
+  brandId    String
+  brand      Brand    @relation(fields: [brandId], references: [id])
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id])
+
+  /// 정가. 실제 판매가는 variant가 덮어쓸 수 있다.
+  listPrice       Int
+  /// 상품 단위 할인율(%). variant별 할인은 두지 않는다 — 국내 커머스 관행상
+  /// 옵션마다 할인율이 다르면 고객이 이해하지 못한다.
+  discountPercent Int @default(0)
+
+  /// 목록 정렬·필터에 쓰는 집계값. 리뷰/주문 발생 시 갱신한다.
+  ratingSum   Int @default(0)
+  reviewCount Int @default(0)
+  soldCount   Int @default(0)
+
+  images      ProductImage[]
+  optionGroups ProductOptionGroup[]
+  variants    ProductVariant[]
+  reviews     Review[]
+  wishedBy    WishlistItem[]
+
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  @@index([status, publishedAt])
+  @@index([categoryId, status])
+  @@index([brandId, status])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  /// 비워 두지 말 것. 스크린리더가 읽는 유일한 설명이다.
+  alt       String
+  sortOrder Int     @default(0)
+
+  @@index([productId, sortOrder])
+  @@map("product_images")
+}
+
+model ProductOptionGroup {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String // "색상", "사이즈"
+  sortOrder Int     @default(0)
+
+  values ProductOptionValue[]
+
+  @@unique([productId, name])
+  @@map("product_option_groups")
+}
+
+model ProductOptionValue {
+  id        String             @id @default(cuid())
+  groupId   String
+  group     ProductOptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  value     String // "오트밀", "M"
+  /// 색상 옵션의 스와치 색. 그 외에는 null.
+  swatchHex String?
+  sortOrder Int                @default(0)
+
+  variants ProductVariant[]
+
+  @@unique([groupId, value])
+  @@map("product_option_values")
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  sku       String  @unique
+
+  optionValues ProductOptionValue[]
+
+  /// 화면·주문 스냅샷에 쓰는 조합 라벨. "오트밀 / M"
+  /// 옵션 조합을 매번 조인해 조립하면 목록 쿼리가 무거워진다.
+  label String
+
+  /// 옵션별 가격 차이가 있을 때만 채운다. null이면 product.listPrice를 쓴다.
+  priceOverride Int?
+  stock         Int  @default(0)
+  isActive      Boolean @default(true)
+
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  restockAlerts RestockNotification[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([productId, isActive])
+  @@map("product_variants")
+}
+
+// ─────────────────────────────────────────── 장바구니
+
+model CartItem {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  quantity  Int            @default(1)
+  selected  Boolean        @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// 같은 옵션을 두 줄로 담지 않는다. 다시 담으면 수량만 올린다.
+  @@unique([userId, variantId])
+  @@index([userId])
+  @@map("cart_items")
+}
+
+// ─────────────────────────────────────────── 주문
+
+/// packages/core 의 ORDER_STATUS 와 값이 정확히 일치해야 한다.
+/// 어긋나면 상태 전이 규칙이 DB에 반영되지 않는다 — 테스트로 강제한다.
+enum OrderStatus {
+  PENDING
+  PAID
+  PREPARING
+  SHIPPED
+  DELIVERED
+  CONFIRMED
+  CANCELLED
+  RETURN_REQUESTED
+  RETURNED
+  REFUNDED
+}
+
+model Order {
+  id      String      @id @default(cuid())
+  /// 고객에게 보여 주는 주문번호. "20260831-8842713"
+  orderNo String      @unique
+  userId  String
+  user    User        @relation(fields: [userId], references: [id])
+  status  OrderStatus @default(PENDING)
+
+  // ── 금액 스냅샷. 계산은 packages/core 가 하고 결과만 박는다.
+  listTotal        Int
+  productDiscount  Int
+  couponDiscount   Int @default(0)
+  pointsUsed       Int @default(0)
+  shippingFee      Int @default(0)
+  /// 실제 결제 금액. 위 값들의 계산 결과이지만 별도로 저장한다 —
+  /// 정책이 바뀌어도 과거 주문의 결제액은 그대로여야 한다.
+  payable          Int
+  rewardPoints     Int @default(0)
+
+  // ── 배송지 스냅샷. Address를 참조만 하면 고객이 주소를 고칠 때
+  //    과거 주문의 배송지까지 바뀐다.
+  recipient      String
+  recipientPhone String
+  postalCode     String
+  address1       String
+  address2       String?
+  isRemoteArea   Boolean @default(false)
+  deliveryMemo   String?
+
+  usedCouponId String?
+  usedCoupon   UserCoupon? @relation(fields: [usedCouponId], references: [id])
+
+  items      OrderItem[]
+  payment    Payment?
+  shipment   Shipment?
+  statusLogs OrderStatusLog[]
+  pointTxns  PointTransaction[]
+
+  placedAt    DateTime  @default(now())
+  paidAt      DateTime?
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  confirmedAt DateTime?
+  canceledAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, placedAt])
+  @@index([status, placedAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// 재고 복원·재구매에 쓴다. 상품이 삭제돼도 주문 내역은 남아야 하므로
+  /// onDelete를 걸지 않고 참조만 유지한다.
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  // ── 주문 시점 스냅샷
+  productName  String
+  brandName    String
+  optionLabel  String
+  imageUrl     String?
+  listPrice    Int
+  discountPercent Int
+  /// 할인 적용 후 단가
+  unitPrice    Int
+  quantity     Int
+  /// unitPrice * quantity
+  subtotal     Int
+
+  /// 부분 취소·부분 반품을 지원하려면 줄 단위 상태가 필요하다.
+  status OrderStatus @default(PENDING)
+
+  review Review?
+
+  @@index([orderId])
+  @@index([variantId])
+  @@map("order_items")
+}
+
+model OrderStatusLog {
+  id      String       @id @default(cuid())
+  orderId String
+  order   Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  from    OrderStatus?
+  to      OrderStatus
+  /// 누가 바꿨는지. 어드민 계정 id이거나 "system"(웹훅·배치).
+  actor   String
+  note    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@map("order_status_logs")
+}
+
+// ─────────────────────────────────────────── 결제
+
+enum PaymentMethod {
+  CARD
+  TRANSFER
+  VIRTUAL_ACCOUNT
+  EASY_PAY
+}
+
+/// 토스페이먼츠 결제 상태를 그대로 따른다. PG 상태를 우리 말로 번역하면
+/// 웹훅을 대조할 때 매번 매핑 표를 봐야 한다.
+enum PaymentStatus {
+  READY
+  IN_PROGRESS
+  WAITING_FOR_DEPOSIT
+  DONE
+  CANCELED
+  PARTIAL_CANCELED
+  ABORTED
+  EXPIRED
+  FAILED
+}
+
+model Payment {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  method PaymentMethod
+  status PaymentStatus @default(READY)
+  amount Int
+
+  /// PG가 발급한 키. 취소·조회에 쓴다.
+  pgProvider      String  @default("toss")
+  pgPaymentKey    String? @unique
+  pgApprovalNo    String?
+  /// 가상계좌 정보
+  virtualAccount  String?
+  virtualBank     String?
+  virtualDueDate  DateTime?
+
+  /// 환불 누계. 부분 취소가 여러 번 일어날 수 있다.
+  refundedAmount Int @default(0)
+
+  /// PG 응답 원문. 대사(reconciliation)와 장애 분석에 필요하다.
+  rawResponse Json?
+
+  requestedAt DateTime  @default(now())
+  approvedAt  DateTime?
+  canceledAt  DateTime?
+
+  @@index([status, requestedAt])
+  @@map("payments")
+}
+
+// ─────────────────────────────────────────── 배송
+
+model Shipment {
+  id      String @id @default(cuid())
+  orderId String @unique
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  carrier        String? // "CJ대한통운"
+  trackingNumber String?
+
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([trackingNumber])
+  @@map("shipments")
+}
+
+// ─────────────────────────────────────────── 쿠폰 · 포인트
+
+enum CouponKind {
+  AMOUNT
+  PERCENT
+}
+
+model Coupon {
+  id   String     @id @default(cuid())
+  code String     @unique
+  name String
+  kind CouponKind
+
+  /// AMOUNT면 할인액, PERCENT면 사용하지 않는다.
+  value Int @default(0)
+  /// PERCENT일 때 할인율. AMOUNT면 0.
+  percent Int @default(0)
+  /// PERCENT 쿠폰의 할인 상한. null이면 상한 없음.
+  maxDiscount Int?
+  minimumOrder Int @default(0)
+
+  /// 발급 총량. null이면 무제한.
+  issueLimit  Int?
+  issuedCount Int  @default(0)
+
+  startsAt DateTime
+  endsAt   DateTime
+  isActive Boolean  @default(true)
+
+  issued UserCoupon[]
+
+  createdAt DateTime @default(now())
+
+  @@index([isActive, startsAt, endsAt])
+  @@map("coupons")
+}
+
+model UserCoupon {
+  id       String @id @default(cuid())
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  couponId String
+  coupon   Coupon @relation(fields: [couponId], references: [id])
+
+  usedAt    DateTime?
+  expiresAt DateTime
+  orders    Order[]
+
+  issuedAt DateTime @default(now())
+
+  /// 같은 쿠폰을 한 사람이 두 번 받지 않는다.
+  @@unique([userId, couponId])
+  @@index([userId, usedAt])
+  @@map("user_coupons")
+}
+
+/// 포인트는 잔액만 두면 왜 그렇게 됐는지 설명할 수 없다.
+/// 증감을 원장으로 남기고 User.pointBalance 는 그 합계 캐시로 둔다.
+enum PointReason {
+  EARN_PURCHASE
+  USE_PURCHASE
+  EARN_REVIEW
+  EARN_SIGNUP
+  CANCEL_REFUND
+  EXPIRE
+  ADMIN_ADJUST
+}
+
+model PointTransaction {
+  id     String      @id @default(cuid())
+  userId String
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// 적립은 양수, 사용은 음수. 부호로 방향을 표현해 합계가 곧 잔액이 된다.
+  amount Int
+  reason PointReason
+  note   String?
+
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
+
+  /// 적립 포인트의 소멸 예정일. 사용/소멸 건은 null.
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@map("point_transactions")
+}
+
+// ─────────────────────────────────────────── 리뷰 · 찜 · 재입고
+
+model Review {
+  id        String @id @default(cuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// 구매한 사람만 쓸 수 있다. 주문 항목 하나당 리뷰 하나.
+  orderItemId String    @unique
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id])
+
+  rating  Int // 1~5
+  content String
+  /// "정사이즈" / "큼" / "작음" — 상세 화면의 사이즈 분포에 쓴다.
+  sizeFit String?
+  /// 리뷰어 체형. 사이즈 판단에 실제로 도움이 되는 정보다.
+  height  Int?
+  weight  Int?
+
+  imageUrls String[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([productId, createdAt])
+  @@index([userId])
+  @@map("reviews")
+}
+
+model WishlistItem {
+  id        String  @id @default(cuid())
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, productId])
+  @@index([userId, createdAt])
+  @@map("wishlist_items")
+}
+
+model RestockNotification {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  variantId String
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  notifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, variantId])
+  @@index([variantId, notifiedAt])
+  @@map("restock_notifications")
+}

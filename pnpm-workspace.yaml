@@ -1,3 +1,13 @@
 packages:
   - apps/*
   - packages/*
+
+allowBuilds:
+  '@prisma/engines': set this to true or false
+  prisma: set this to true or false
+
+# pnpm은 postinstall 스크립트를 기본 차단한다. 공급망 공격 표면이라
+# 실제로 필요한 것만 이름을 적어 허용한다.
+onlyBuiltDependencies:
+  - prisma
+  - '@prisma/engines'

@@ -51,3 +51,6 @@ design/plain-commerce-design.html
 *.log
 npm-debug.log*
 pnpm-debug.log*
+
+# Prisma 생성물 (prisma generate 로 재생성)
+packages/db/src/generated/

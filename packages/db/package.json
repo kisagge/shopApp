@@ -1,0 +1,31 @@
+{
+  "name": "@shop/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "prisma generate",
+    "generate": "prisma generate",
+    "push": "prisma db push",
+    "migrate": "prisma migrate dev",
+    "studio": "prisma studio",
+    "seed": "node --experimental-strip-types src/seed.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@shop/core": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0"
+  },
+  "devDependencies": {
+    "@shop/config": "workspace:*",
+    "prisma": "7.10.0",
+    "typescript": "7.0.2",
+    "dotenv": "17.2.3",
+    "vitest": "4.1.11"
+  }
+}
