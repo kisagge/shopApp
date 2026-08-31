@@ -5,7 +5,6 @@ import { auth } from './index';
 export interface SessionUser extends Actor {
   readonly email: string;
   readonly name: string;
-  readonly analyticsConsent: boolean;
 }
 
 /**
@@ -26,7 +25,7 @@ export async function getSessionUser(headers: Headers): Promise<SessionUser | nu
 
   const u = session.user as {
     id: string; email: string; name: string;
-    role?: unknown; merchantId?: unknown; analyticsConsent?: unknown;
+    role?: unknown; merchantId?: unknown;
   };
 
   return {
@@ -35,7 +34,6 @@ export async function getSessionUser(headers: Headers): Promise<SessionUser | nu
     name: u.name,
     role: toRole(u.role),
     merchantId: typeof u.merchantId === 'string' ? u.merchantId : null,
-    analyticsConsent: u.analyticsConsent === true,
   };
 }
 

@@ -40,12 +40,16 @@ export const auth = betterAuth({
      *
      * input: false 가 핵심이다. 이게 없으면 회원가입 요청 본문에
      * `role: "SUPER_ADMIN"` 을 넣어서 스스로 슈퍼관리자가 될 수 있다.
+     *
+     * analyticsConsent 는 여기 두지 않는다. Better Auth 의 필드 매핑이
+     * nullable enum 을 그대로 실어 나르지 못해 "미결정" 과 "거부" 가 뭉개진다.
+     * 값이 바뀌는 성격이라 세션 캐시(5분)에 두기에도 맞지 않아, 필요할 때
+     * DB 에서 직접 읽는다 — 포인트 잔액과 같은 이유다.
      */
     additionalFields: {
       role: { type: 'string', required: false, defaultValue: 'CUSTOMER', input: false },
       merchantId: { type: 'string', required: false, input: false },
       phone: { type: 'string', required: false, input: true },
-      analyticsConsent: { type: 'boolean', required: false, defaultValue: false, input: true },
     },
   },
 

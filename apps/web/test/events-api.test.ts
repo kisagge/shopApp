@@ -11,6 +11,10 @@ vi.mock('~/lib/analytics/server', async (importOriginal) => {
 const getSessionUser = vi.hoisted(() => vi.fn(() => Promise.resolve(null as unknown)));
 vi.mock('@shop/auth/session', () => ({ getSessionUser }));
 
+// 동의는 세션이 아니라 DB 에서 읽는다
+const findUniqueUser = vi.hoisted(() => vi.fn(() => Promise.resolve({ analyticsConsent: null })));
+vi.mock('@shop/db', () => ({ prisma: { user: { findUnique: findUniqueUser } } }));
+
 const { POST } = await import('~/app/api/events/route');
 
 const envelope = {
@@ -29,9 +33,14 @@ const post = (body: unknown, headers: Record<string, string> = {}) =>
     }),
   );
 
+const session = (over: Record<string, unknown> = {}) => ({
+  id: 'u-1', email: 'a@b.test', name: 'n', role: 'CUSTOMER', merchantId: null, ...over,
+});
+
 beforeEach(() => {
   recordEvents.mockClear();
   getSessionUser.mockResolvedValue(null);
+  findUniqueUser.mockClear().mockResolvedValue({ analyticsConsent: null });
 });
 
 describe('POST /api/events — 정상 수집', () => {
@@ -54,30 +63,48 @@ describe('POST /api/events — 정상 수집', () => {
   });
 
   it('로그인 상태면 세션의 userId 를 붙인다', async () => {
-    getSessionUser.mockResolvedValue({
-      id: 'u-real', email: 'a@b.test', name: 'n',
-      role: 'CUSTOMER', merchantId: null, analyticsConsent: true,
-    });
+    getSessionUser.mockResolvedValue(session({ id: 'u-real' }));
     await post({ events: [{ ...envelope, name: 'page_view' }] });
     const [events] = recordEvents.mock.calls[0]!;
     expect(events[0].userId).toBe('u-real');
   });
 
   it('요청 본문의 userId 는 무시한다 — 남의 계정으로 이벤트를 심을 수 없다', async () => {
-    getSessionUser.mockResolvedValue({
-      id: 'u-real', email: 'a@b.test', name: 'n',
-      role: 'CUSTOMER', merchantId: null, analyticsConsent: true,
-    });
+    getSessionUser.mockResolvedValue(session({ id: 'u-real' }));
     await post({ events: [{ ...envelope, name: 'page_view', userId: 'victim-user-id' }] });
     const [events] = recordEvents.mock.calls[0]!;
     expect(events[0].userId).toBe('u-real');
   });
 
-  it('동의하지 않은 사용자의 분석 이벤트는 서버에서도 버린다 — 트래커 우회를 막는다', async () => {
-    getSessionUser.mockResolvedValue({
-      id: 'u-1', email: 'a@b.test', name: 'n',
-      role: 'CUSTOMER', merchantId: null, analyticsConsent: false,
-    });
+  it('아직 동의를 결정하지 않은(null) 사용자는 익명과 같게 취급한다', async () => {
+    // null 을 거부로 뭉뚱그리면 로그인하는 순간 추적이 줄어든다
+    getSessionUser.mockResolvedValue(session());
+    findUniqueUser.mockResolvedValue({ analyticsConsent: null });
+    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    expect(await res.json()).toEqual({ accepted: 1, rejected: 0 });
+  });
+
+  it('동의(GRANTED)한 사용자의 이벤트를 받는다', async () => {
+    getSessionUser.mockResolvedValue(session());
+    findUniqueUser.mockResolvedValue({ analyticsConsent: 'GRANTED' });
+    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    expect(await res.json()).toEqual({ accepted: 1, rejected: 0 });
+  });
+
+  it('필수 이벤트만 있으면 동의를 조회하지도 않는다', async () => {
+    getSessionUser.mockResolvedValue(session());
+    await post({ events: [{ ...envelope, name: 'login' }] });
+    expect(findUniqueUser).not.toHaveBeenCalled();
+  });
+
+  it('비로그인이면 동의를 조회하지 않는다', async () => {
+    await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    expect(findUniqueUser).not.toHaveBeenCalled();
+  });
+
+  it('명시적으로 거부(DENIED)한 사용자의 분석 이벤트는 서버에서도 버린다 — 트래커 우회를 막는다', async () => {
+    getSessionUser.mockResolvedValue(session());
+    findUniqueUser.mockResolvedValue({ analyticsConsent: 'DENIED' });
     const res = await post({
       events: [
         { ...envelope, name: 'view_item', productId: 'p-1' },
@@ -90,11 +117,9 @@ describe('POST /api/events — 정상 수집', () => {
     expect(events.map((e: { name: string }) => e.name)).toEqual(['login']);
   });
 
-  it('동의하지 않은 사용자가 분석 이벤트만 보내면 아무것도 적재하지 않는다', async () => {
-    getSessionUser.mockResolvedValue({
-      id: 'u-1', email: 'a@b.test', name: 'n',
-      role: 'CUSTOMER', merchantId: null, analyticsConsent: false,
-    });
+  it('거부한 사용자가 분석 이벤트만 보내면 아무것도 적재하지 않는다', async () => {
+    getSessionUser.mockResolvedValue(session());
+    findUniqueUser.mockResolvedValue({ analyticsConsent: 'DENIED' });
     const res = await post({ events: [{ ...envelope, name: 'page_view' }] });
     expect(await res.json()).toEqual({ accepted: 0, rejected: 1 });
     expect(recordEvents).not.toHaveBeenCalled();

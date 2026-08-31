@@ -1,5 +1,6 @@
 import { isServerOnlyEvent, requiresConsent } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
+import { prisma } from '@shop/db';
 import { eventBatchSchema, type EventBatchResponse } from '@shop/contract';
 import { NextResponse } from 'next/server';
 import {
@@ -74,10 +75,27 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // 브라우저 트래커도 동의를 확인하지만 서버에서 한 번 더 막는다.
   // 클라이언트 게이트만 믿으면 트래커를 우회한 요청이 그대로 들어온다.
-  const allowed =
-    sessionUser !== null && !sessionUser.analyticsConsent
-      ? parsed.data.events.filter((e) => !requiresConsent(e.name))
-      : parsed.data.events;
+  //
+  // **명시적으로 거부한 경우에만** 버린다. null(미결정)은 익명 사용자와 같게
+  // 취급한다 — 그러지 않으면 로그인하는 순간 추적이 줄어든다.
+  //
+  // 동의는 세션이 아니라 DB 에서 읽는다. 세션 캐시가 5분이라 방금 바꾼 설정이
+  // 반영되지 않고, 동의 철회는 즉시 듣는 게 맞다. 필수 이벤트만 들어온
+  // 배치에서는 조회 자체를 건너뛴다.
+  const needsConsent = parsed.data.events.some((e) => requiresConsent(e.name));
+  const declined =
+    sessionUser !== null &&
+    needsConsent &&
+    (
+      await prisma.user.findUnique({
+        where: { id: sessionUser.id },
+        select: { analyticsConsent: true },
+      })
+    )?.analyticsConsent === 'DENIED';
+
+  const allowed = declined
+    ? parsed.data.events.filter((e) => !requiresConsent(e.name))
+    : parsed.data.events;
 
   if (allowed.length === 0) {
     const none: EventBatchResponse = { accepted: 0, rejected: parsed.data.events.length };

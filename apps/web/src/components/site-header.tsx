@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTopCategories } from '~/lib/queries/products';
 import { SessionNav } from './session-nav';
+import { CartBadge } from './cart-badge';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
 export async function SiteHeader() {
@@ -28,7 +29,10 @@ export async function SiteHeader() {
           </ul>
         </nav>
 
-        <SessionNav />
+        <span className="flex items-center gap-4">
+          <SessionNav />
+          <CartBadge />
+        </span>
       </div>
     </header>
   );

@@ -35,14 +35,14 @@ describe('getSessionUser', () => {
     getSession.mockResolvedValue({
       user: {
         id: 'u-1', email: 'a@b.test', name: '홍길동',
-        role: 'MERCHANT', merchantId: 'm-1', analyticsConsent: true,
+        role: 'MERCHANT', merchantId: 'm-1',
         image: null, someInternalField: 'x',
       },
     });
     const u = await getSessionUser(new Headers());
     expect(u).toEqual({
       id: 'u-1', email: 'a@b.test', name: '홍길동',
-      role: 'MERCHANT', merchantId: 'm-1', analyticsConsent: true,
+      role: 'MERCHANT', merchantId: 'm-1',
     });
   });
 
@@ -53,14 +53,6 @@ describe('getSessionUser', () => {
     expect((await getSessionUser(new Headers()))?.merchantId).toBeNull();
   });
 
-  it('동의 값이 명시적 true 가 아니면 false 다', async () => {
-    for (const v of [undefined, null, 'true', 1, 0]) {
-      getSession.mockResolvedValue({
-        user: { id: 'u', email: 'a@b', name: 'n', role: 'CUSTOMER', analyticsConsent: v },
-      });
-      expect((await getSessionUser(new Headers()))?.analyticsConsent).toBe(false);
-    }
-  });
 });
 
 describe('getActor', () => {

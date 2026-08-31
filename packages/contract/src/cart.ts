@@ -1,55 +1,71 @@
 import { z } from 'zod';
-// discountPercentSchema 는 쿠폰의 정률 할인에 계속 쓴다.
-// 상품 가격은 판매가를 저장하는 쪽으로 바뀌었지만 쿠폰은 여전히 비율이다.
 import { cuidSchema, discountPercentSchema, quantitySchema, wonSchema } from './common';
 
-export const cartLineInputSchema = z
-  .object({
-    variantId: cuidSchema,
-    productName: z.string().min(1),
-    /** 정가 */
-    listPrice: wonSchema,
-    /** 실제 판매 단가. 할인이 없으면 listPrice 와 같다. */
-    salePrice: wonSchema,
-    quantity: quantitySchema,
-  })
-  .refine((l) => l.salePrice <= l.listPrice, {
-    message: '판매가가 정가보다 클 수 없습니다',
-    path: ['salePrice'],
-  });
-export type CartLineInput = z.infer<typeof cartLineInputSchema>;
+/**
+ * 장바구니 견적 계약.
+ *
+ * **요청에는 금액이 없다.** 클라이언트는 "무엇을 몇 개" 만 말하고, 가격·재고·
+ * 쿠폰은 전부 서버가 DB 에서 조회한다. 가격을 요청에 실으면 조작할 수 있고,
+ * 담아 둔 사이에 값이 바뀌었는지도 알 수 없다.
+ */
 
-export const couponInputSchema = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('amount'),
-    code: z.string().min(1),
-    value: wonSchema,
-    minimumOrder: wonSchema,
-  }),
-  z.object({
-    kind: z.literal('percent'),
-    code: z.string().min(1),
-    percent: discountPercentSchema,
-    maxDiscount: wonSchema.nullable(),
-    minimumOrder: wonSchema,
-  }),
-]);
-export type CouponInput = z.infer<typeof couponInputSchema>;
+export const cartLineInputSchema = z.object({
+  variantId: cuidSchema,
+  quantity: quantitySchema,
+});
+export type CartLineInput = z.infer<typeof cartLineInputSchema>;
 
 export const cartQuoteRequestSchema = z.object({
   lines: z.array(cartLineInputSchema).min(1, '주문할 상품이 없습니다').max(100),
-  coupon: couponInputSchema.optional(),
+  /** 쿠폰도 코드만 받는다. 할인 조건은 서버가 안다. */
+  couponCode: z.string().trim().min(1).max(64).optional(),
   pointsToUse: wonSchema.optional(),
   isRemoteArea: z.boolean().default(false),
 });
 export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;
 
+/** 담아 둔 사이에 생긴 문제. 화면이 사용자에게 알려 줘야 한다. */
+export const LINE_ISSUE = ['NOT_FOUND', 'INACTIVE', 'SOLD_OUT', 'STOCK_REDUCED'] as const;
+export type LineIssue = (typeof LINE_ISSUE)[number];
+
+export const LINE_ISSUE_MESSAGE: Readonly<Record<LineIssue, string>> = {
+  NOT_FOUND: '판매가 종료된 상품입니다',
+  INACTIVE: '판매가 중지된 옵션입니다',
+  SOLD_OUT: '품절되었습니다',
+  STOCK_REDUCED: '재고가 부족해 수량을 줄였습니다',
+};
+
+export const cartQuoteLineSchema = z.object({
+  variantId: cuidSchema,
+  productSlug: z.string(),
+  productName: z.string(),
+  brandName: z.string(),
+  optionLabel: z.string(),
+  listPrice: wonSchema,
+  /** 할인 적용 후 단가 */
+  unitPrice: wonSchema,
+  /** 표시용 할인율. 서버가 계산한다. */
+  discountPercent: discountPercentSchema,
+  /** 실제로 견적에 반영된 수량. 재고가 모자라면 줄어든다. */
+  quantity: z.int().min(0),
+  /** 요청한 수량. 화면이 "3개 요청했지만 2개만 가능" 을 보여 줄 수 있다. */
+  requestedQuantity: quantitySchema,
+  subtotal: wonSchema,
+  stock: z.int().min(0),
+  issue: z.enum(LINE_ISSUE).nullable(),
+});
+export type CartQuoteLine = z.infer<typeof cartQuoteLineSchema>;
+
 export const cartQuoteResponseSchema = z.object({
+  lines: z.array(cartQuoteLineSchema),
   listTotal: wonSchema,
   productDiscount: wonSchema,
   merchandiseTotal: wonSchema,
   couponDiscount: wonSchema,
+  /** 적용된 쿠폰 이름. 코드가 유효하지 않으면 null */
+  couponName: z.string().nullable(),
   pointsUsed: wonSchema,
+  pointsAvailable: wonSchema,
   shippingFee: wonSchema,
   isFreeShipping: z.boolean(),
   remainingForFreeShipping: wonSchema,

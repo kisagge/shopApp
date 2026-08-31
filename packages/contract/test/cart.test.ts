@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { cartQuoteRequestSchema, couponInputSchema, wonSchema } from '../src';
+import {
+  cartQuoteRequestSchema, cartLineInputSchema, wonSchema,
+  LINE_ISSUE, LINE_ISSUE_MESSAGE,
+} from '../src';
 
 describe('wonSchema', () => {
   it.each([
@@ -16,14 +19,35 @@ describe('wonSchema', () => {
   });
 });
 
+describe('cartLineInputSchema — 요청에 금액이 없다', () => {
+  it('변형 id 와 수량만 받는다', () => {
+    const r = cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 2 });
+    expect(r.success).toBe(true);
+    expect(r.success && Object.keys(r.data).toSorted()).toEqual(['quantity', 'variantId']);
+  });
+
+  it('가격을 실어 보내도 결과에 담기지 않는다 — 서버가 DB 에서 조회한다', () => {
+    const r = cartLineInputSchema.safeParse({
+      variantId: 'v-1', quantity: 1, listPrice: 1, salePrice: 1, unitPrice: 1,
+    });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data).toEqual({ variantId: 'v-1', quantity: 1 });
+  });
+
+  it('수량 0 은 거부한다', () => {
+    expect(cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 0 }).success).toBe(false);
+  });
+
+  it('한 번에 담을 수 있는 수량 상한이 있다', () => {
+    expect(cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 100 }).success).toBe(false);
+  });
+});
+
 describe('cartQuoteRequestSchema', () => {
-  const line = {
-    variantId: 'v-1', productName: '코트', listPrice: 413_000, salePrice: 289_000, quantity: 1,
-  };
+  const line = { variantId: 'v-1', quantity: 1 };
 
   it('isRemoteArea 는 생략하면 false 로 채운다', () => {
-    const parsed = cartQuoteRequestSchema.parse({ lines: [line] });
-    expect(parsed.isRemoteArea).toBe(false);
+    expect(cartQuoteRequestSchema.parse({ lines: [line] }).isRemoteArea).toBe(false);
   });
 
   it('빈 배열은 사람이 읽을 수 있는 메시지로 거부한다', () => {
@@ -32,8 +56,8 @@ describe('cartQuoteRequestSchema', () => {
     expect(r.error?.issues[0]?.message).toBe('주문할 상품이 없습니다');
   });
 
-  it('한 번에 담을 수 있는 줄 수를 제한한다', () => {
-    const many = Array.from({ length: 101 }, (_, i) => ({ ...line, variantId: `v-${i}` }));
+  it('줄 수를 제한한다', () => {
+    const many = Array.from({ length: 101 }, () => line);
     expect(cartQuoteRequestSchema.safeParse({ lines: many }).success).toBe(false);
   });
 
@@ -43,45 +67,22 @@ describe('cartQuoteRequestSchema', () => {
     expect(r.error?.issues[0]?.path).toEqual(['lines', 1, 'quantity']);
   });
 
-  it('판매가가 정가보다 크면 거부한다', () => {
-    const r = cartQuoteRequestSchema.safeParse({
-      lines: [{ ...line, salePrice: 500_000 }],
-    });
-    expect(r.success).toBe(false);
-    expect(r.error?.issues[0]?.path).toEqual(['lines', 0, 'salePrice']);
+  it('쿠폰은 코드만 받는다 — 할인 조건은 서버가 안다', () => {
+    const r = cartQuoteRequestSchema.safeParse({ lines: [line], couponCode: '  WELCOME10000  ' });
+    expect(r.success).toBe(true);
+    expect(r.success && r.data.couponCode).toBe('WELCOME10000');
   });
 
-  it('할인이 없으면 판매가와 정가가 같다', () => {
-    const r = cartQuoteRequestSchema.safeParse({
-      lines: [{ ...line, listPrice: 129_000, salePrice: 129_000 }],
-    });
-    expect(r.success).toBe(true);
+  it('쿠폰 코드 길이를 제한한다', () => {
+    const r = cartQuoteRequestSchema.safeParse({ lines: [line], couponCode: 'x'.repeat(100) });
+    expect(r.success).toBe(false);
   });
 });
 
-describe('couponInputSchema', () => {
-  it('정액 쿠폰을 파싱한다', () => {
-    const r = couponInputSchema.safeParse({
-      kind: 'amount', code: 'WELCOME', value: 10_000, minimumOrder: 30_000,
-    });
-    expect(r.success).toBe(true);
-  });
-
-  it('정률 쿠폰의 maxDiscount 는 null 을 허용한다 — 상한 없는 쿠폰', () => {
-    const r = couponInputSchema.safeParse({
-      kind: 'percent', code: 'A', percent: 20, maxDiscount: null, minimumOrder: 0,
-    });
-    expect(r.success).toBe(true);
-  });
-
-  it('알 수 없는 kind 는 거부한다', () => {
-    expect(couponInputSchema.safeParse({ kind: 'bogo', code: 'X' }).success).toBe(false);
-  });
-
-  it('정액 쿠폰에 percent 를 섞어 보내도 kind 에 맞는 필드만 본다', () => {
-    const r = couponInputSchema.safeParse({
-      kind: 'amount', code: 'A', value: 5_000, minimumOrder: 0, percent: 50,
-    });
-    expect(r.success).toBe(true);
+describe('담아 둔 사이에 생긴 문제', () => {
+  it('모든 문제 유형에 사람이 읽을 메시지가 있다', () => {
+    for (const issue of LINE_ISSUE) {
+      expect(LINE_ISSUE_MESSAGE[issue]).toBeTruthy();
+    }
   });
 });

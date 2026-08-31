@@ -28,6 +28,11 @@ enum MemberGrade {
   VIP
 }
 
+enum AnalyticsConsent {
+  GRANTED
+  DENIED
+}
+
 /// 권한 계층. packages/core 의 authz 와 값이 정확히 일치해야 한다.
 ///
 /// CUSTOMER    자기 주문·리뷰·장바구니만
@@ -52,8 +57,15 @@ model User {
   role          UserRole    @default(CUSTOMER)
   grade         MemberGrade @default(BASIC)
 
-  /// 분석 이벤트 수집 동의. 기본은 false — 동의 전에는 필수 이벤트만 기록한다.
-  analyticsConsent Boolean @default(false)
+  /// 분석 이벤트 수집 동의.
+  ///
+  /// **null 은 "아직 결정하지 않음"** 이고 DENIED 와 다르다.
+  /// null 이면 익명 사용자와 같은 기본값을 따르고, DENIED 는 사용자가 명시적으로
+  /// 거부한 것이라 반드시 존중한다. 둘을 합치면 로그인하는 순간 추적이 줄어든다.
+  ///
+  /// Boolean? 이 아니라 enum 인 이유: Better Auth 가 세션으로 실어 나를 때
+  /// nullable boolean 을 false 로 강제 변환해서 "미결정" 과 "거부" 를 구분할 수 없다.
+  analyticsConsent AnalyticsConsent?
 
   /// MERCHANT 역할일 때만 채운다. 이 값이 그 사용자가 볼 수 있는 범위를 정한다.
   /// role 이 MERCHANT 인데 여기가 비어 있으면 아무것도 볼 수 없다 — 의도된 안전 기본값이다.
