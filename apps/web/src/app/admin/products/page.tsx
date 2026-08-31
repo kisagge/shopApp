@@ -4,6 +4,7 @@ import { Badge } from '@shop/ui';
 import { format, discountRateOf, hasPermission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin';
+import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
@@ -15,10 +16,20 @@ const STATUS_TONE: Record<string, 'success' | 'danger' | 'neutral'> = {
   ACTIVE: 'success', SOLD_OUT: 'danger', HIDDEN: 'neutral', DRAFT: 'neutral',
 };
 
-export default async function AdminProductsPage() {
+export default async function AdminProductsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ cursor?: string }>;
+}) {
   const actor = await requireAdmin('product:read');
-  const products = await getAdminProducts(actor);
+  const { cursor } = await searchParams;
+  const page = await getAdminProducts(actor, { cursor });
+  const products = page.rows;
   const canWrite = hasPermission(actor, 'product:write');
+
+  const nextHref = page.nextCursor
+    ? { pathname: '/admin/products' as const, query: { cursor: page.nextCursor } }
+    : null;
 
   return (
     <>
@@ -26,7 +37,7 @@ export default async function AdminProductsPage() {
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">상품 관리</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            <span className="tnum font-semibold text-[var(--fg-secondary)]">{products.length}</span>개
+            <span className="tnum font-semibold text-[var(--fg-secondary)]">{page.total}</span>개
             {actor.merchantId && ' · 내 브랜드만'}
           </p>
         </div>
@@ -110,6 +121,9 @@ export default async function AdminProductsPage() {
               </tbody>
             </table>
           )}
+        </div>
+        <div className="mt-5">
+          <Pager href={nextHref} label="이전 상품 더 보기" hasRows={products.length > 0} />
         </div>
       </main>
     </>

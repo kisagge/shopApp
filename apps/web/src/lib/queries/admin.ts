@@ -263,40 +263,70 @@ export interface AdminOrderRow {
   readonly firstItemName: string;
 }
 
+/**
+ * 목록 한 쪽.
+ *
+ * 커서로 넘긴다. 어드민 목록은 계속 자라고, offset 은 뒤로 갈수록 느려질 뿐
+ * 아니라 보는 사이 앞에 행이 끼어들면 같은 행을 두 번 보여 준다.
+ * total 은 따로 센다 — 화면 상단의 "N건" 이 한 쪽 크기가 되면 안 된다.
+ */
+export interface Paged<T> {
+  readonly rows: readonly T[];
+  readonly nextCursor: string | null;
+  readonly total: number;
+}
+
+const PAGE_SIZE = 25;
+const MAX_PAGE_SIZE = 50;
+
 export async function getAdminOrders(
   actor: Actor,
-  status?: OrderStatus,
-  take = 50,
-): Promise<AdminOrderRow[]> {
+  query: { status?: OrderStatus | undefined; cursor?: string | undefined; take?: number } = {},
+): Promise<Paged<AdminOrderRow>> {
   const scope = scopeOf(actor);
+  const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
-  const rows = await prisma.order.findMany({
-    where: {
-      ...(status ? { status } : {}),
-      ...(scope ? { items: { some: { merchantId: scope } } } : {}),
-    },
-    orderBy: { placedAt: 'desc' },
-    take,
-    select: {
-      orderNo: true, status: true, placedAt: true, payable: true,
-      user: { select: { name: true } },
-      items: {
-        // 가맹점에게는 자기 줄만 보여 준다
-        ...(scope ? { where: { merchantId: scope } } : {}),
-        select: { productName: true, subtotal: true },
+  const where = {
+    ...(query.status ? { status: query.status } : {}),
+    ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.order.findMany({
+      where,
+      // 같은 시각에 들어온 주문의 순서가 흔들리면 커서가 행을 건너뛴다
+      orderBy: [{ placedAt: 'desc' }, { id: 'desc' }],
+      take: take + 1,
+      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      select: {
+        id: true, orderNo: true, status: true, placedAt: true, payable: true,
+        user: { select: { name: true } },
+        items: {
+          // 가맹점에게는 자기 줄만 보여 준다
+          ...(scope ? { where: { merchantId: scope } } : {}),
+          select: { productName: true, subtotal: true },
+        },
       },
-    },
-  });
+    }),
+    prisma.order.count({ where }),
+  ]);
 
-  return rows.map((o) => ({
-    orderNo: o.orderNo,
-    status: o.status,
-    placedAt: o.placedAt,
-    amount: won(scope ? o.items.reduce((s, i) => s + i.subtotal, 0) : o.payable),
-    buyerName: maskName(o.user.name),
-    itemCount: o.items.length,
-    firstItemName: o.items[0]?.productName ?? '(상품 없음)',
-  }));
+  const hasMore = rows.length > take;
+  const page = hasMore ? rows.slice(0, take) : rows;
+
+  return {
+    rows: page.map((o) => ({
+      orderNo: o.orderNo,
+      status: o.status,
+      placedAt: o.placedAt,
+      amount: won(scope ? o.items.reduce((s, i) => s + i.subtotal, 0) : o.payable),
+      buyerName: maskName(o.user.name),
+      itemCount: o.items.length,
+      firstItemName: o.items[0]?.productName ?? '(상품 없음)',
+    })),
+    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
+  };
 }
 
 export async function getAdminOrder(actor: Actor, orderNo: string) {
@@ -359,16 +389,24 @@ export interface AdminProductRow {
   readonly createdAt: Date;
 }
 
-export async function getAdminProducts(actor: Actor, take = 50): Promise<AdminProductRow[]> {
+export async function getAdminProducts(
+  actor: Actor,
+  query: { cursor?: string | undefined; take?: number } = {},
+): Promise<Paged<AdminProductRow>> {
   const scope = scopeOf(actor);
+  const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
-  const rows = await prisma.product.findMany({
-    where: {
-      deletedAt: null,
-      ...(scope ? { brand: { merchantId: scope } } : {}),
-    },
-    orderBy: { createdAt: 'desc' },
-    take,
+  const where = {
+    deletedAt: null,
+    ...(scope ? { brand: { merchantId: scope } } : {}),
+  };
+
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+    where,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     select: {
       id: true, slug: true, name: true, listPrice: true, salePrice: true,
       status: true, createdAt: true,
@@ -376,21 +414,27 @@ export async function getAdminProducts(actor: Actor, take = 50): Promise<AdminPr
       category: { select: { name: true } },
       variants: { select: { stock: true }, where: { isActive: true } },
     },
-  });
+    }),
+    prisma.product.count({ where }),
+  ]);
 
-  return rows.map((p) => {
-    const totalStock = p.variants.reduce((s, v) => s + v.stock, 0);
-    return {
+  const hasMore = rows.length > take;
+  const page = hasMore ? rows.slice(0, take) : rows;
+
+  return {
+    rows: page.map((p) => ({
       id: p.id, slug: p.slug, name: p.name,
       brandName: p.brand.name, categoryName: p.category.name,
       listPrice: won(p.listPrice),
       salePrice: p.salePrice === null ? null : won(p.salePrice),
       status: p.status,
-      totalStock,
+      totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
       lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= 5),
       createdAt: p.createdAt,
-    };
-  });
+    })),
+    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
+  };
 }
 
 // ── 정산 ──────────────────────────────────────────────────────

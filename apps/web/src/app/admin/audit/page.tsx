@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { USER_ROLE_LABEL, type UserRole } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAuditLogs } from '~/lib/queries/audit-log';
+import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '감사 로그' };
 export const dynamic = 'force-dynamic';
@@ -212,20 +213,7 @@ export default async function AdminAuditPage({
           )}
         </div>
 
-        <nav aria-label="페이지 이동" className="flex justify-center">
-          {nextHref ? (
-            <Link
-              href={nextHref}
-              className="inline-flex h-11 items-center rounded-sm border border-n-300 px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
-            >
-              이전 기록 더 보기
-            </Link>
-          ) : (
-            page.rows.length > 0 && (
-              <p className="text-[12px] text-[var(--fg-muted)]">마지막 기록입니다.</p>
-            )
-          )}
-        </nav>
+        <Pager href={nextHref} label="이전 기록 더 보기" hasRows={page.rows.length > 0} />
       </main>
     </>
   );

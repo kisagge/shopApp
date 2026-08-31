@@ -5,6 +5,7 @@ import { format, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin';
 import { isOrderStatus } from '~/lib/queries/mypage';
+import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '주문 관리' };
 export const dynamic = 'force-dynamic';
@@ -16,12 +17,20 @@ const FILTERS: readonly OrderStatus[] = [
 export default async function AdminOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; cursor?: string }>;
 }) {
   const actor = await requireAdmin('order:read');
-  const { status } = await searchParams;
+  const { status, cursor } = await searchParams;
   const filter = status && isOrderStatus(status) ? status : undefined;
-  const orders = await getAdminOrders(actor, filter);
+  const page = await getAdminOrders(actor, { status: filter, cursor });
+  const orders = page.rows;
+
+  const nextHref = page.nextCursor
+    ? {
+        pathname: '/admin/orders' as const,
+        query: { ...(filter ? { status: filter } : {}), cursor: page.nextCursor },
+      }
+    : null;
 
   return (
     <>
@@ -29,7 +38,7 @@ export default async function AdminOrdersPage({
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">주문 관리</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            <span className="tnum font-semibold text-[var(--fg-secondary)]">{orders.length}</span>건
+            <span className="tnum font-semibold text-[var(--fg-secondary)]">{page.total}</span>건
             {actor.merchantId && ' · 내 가맹점 상품이 포함된 주문만'}
           </p>
         </div>
@@ -115,9 +124,9 @@ export default async function AdminOrdersPage({
             </table>
           )}
         </div>
-        <p className="mt-3 text-[11px] text-[var(--fg-muted)]">
-          최근 {orders.length}건 · 페이지네이션은 아직 붙지 않았습니다
-        </p>
+        <div className="mt-5">
+          <Pager href={nextHref} label="이전 주문 더 보기" hasRows={orders.length > 0} />
+        </div>
       </main>
     </>
   );
