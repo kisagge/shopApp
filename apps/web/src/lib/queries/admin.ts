@@ -435,39 +435,6 @@ export async function getSettlements(actor: Actor): Promise<SettlementRow[]> {
   }));
 }
 
-/**
- * 아직 정산되지 않은 기간의 예상 금액.
- *
- * Settlement 레코드를 만드는 배치가 아직 없어서, 화면에는 구매확정된 주문에서
- * 실시간으로 계산한 값을 보여 준다. 확정 절차가 붙으면 이 값이 Settlement 로
- * 굳는다.
- */
-export async function getPendingSettlement(actor: Actor) {
-  const scope = scopeOf(actor);
-  if (!scope) return null;
-
-  const merchant = await prisma.merchant.findUnique({
-    where: { id: scope },
-    select: { name: true, commissionPercent: true },
-  });
-  if (!merchant) return null;
-
-  const agg = await prisma.orderItem.aggregate({
-    where: { merchantId: scope, order: { status: 'CONFIRMED' } },
-    _sum: { subtotal: true },
-  });
-
-  const gross = agg._sum.subtotal ?? 0;
-  const commission = Math.floor((gross * merchant.commissionPercent) / 100);
-
-  return {
-    merchantName: merchant.name,
-    commissionPercent: merchant.commissionPercent,
-    gross: won(gross),
-    commission: won(commission),
-    net: won(gross - commission),
-  };
-}
 
 // ── 상품 상세 (수정 화면) ──────────────────────────────────────
 

@@ -1,0 +1,55 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { ForbiddenError, SettlementError } from '@shop/core';
+import { getActor } from '@shop/auth/session';
+import { closeSettlements, SettlementCloseError } from '~/lib/admin/close-settlement';
+import { recordAudit } from '~/lib/audit';
+
+const bodySchema = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) });
+
+/** 정산 기간 확정. 여러 번 눌러도 결과가 같다. */
+export async function POST(request: Request): Promise<NextResponse> {
+  const actor = await getActor(request.headers);
+  if (!actor) {
+    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+  }
+
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { code: 'VALIDATION_FAILED', message: '정산 기간을 확인해 주세요.' },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const result = await closeSettlements(actor, parsed.data.yearMonth);
+    await recordAudit({
+      actor,
+      action: 'settlement.close',
+      targetType: 'settlement',
+      targetId: parsed.data.yearMonth,
+      after: result,
+      request,
+    });
+    return NextResponse.json(result);
+  } catch (error) {
+    if (error instanceof SettlementCloseError) {
+      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+    }
+    if (error instanceof SettlementError) {
+      return NextResponse.json({ code: 'INVALID_PERIOD', message: error.message }, { status: 400 });
+    }
+    if (error instanceof ForbiddenError) {
+      return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    }
+    throw error;
+  }
+}
