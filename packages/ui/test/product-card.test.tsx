@@ -1,3 +1,4 @@
+import type React from 'react';
 import { render, screen } from '@testing-library/react';
 import { won } from '@shop/core';
 import { describe, it, expect } from 'vitest';
@@ -54,6 +55,23 @@ describe('ProductCard', () => {
     render(<ProductCard {...base} rating={4.8} reviewCount={1204} />);
     expect(screen.getByText('1,204')).toBeInTheDocument();
     expect(screen.getByText('4.8')).toBeInTheDocument();
+  });
+
+  it('기본은 평범한 a 태그다 — packages/ui 는 라우터를 모른다', () => {
+    render(<ProductCard {...base} />);
+    expect(screen.getByRole('link').tagName).toBe('A');
+  });
+
+  it('linkComponent 를 넘기면 그것으로 렌더한다', () => {
+    const Spy = ({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) => (
+      <a href={href} className={className} data-router="next">
+        {children}
+      </a>
+    );
+    render(<ProductCard {...base} linkComponent={Spy} />);
+    const link = screen.getByRole('link');
+    expect(link).toHaveAttribute('data-router', 'next');
+    expect(link).toHaveAttribute('href', base.href);
   });
 
   it('접근성 위반이 없다', async () => {

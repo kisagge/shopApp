@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from 'next';
 import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
+import { SiteHeader } from '~/components/site-header';
+import { SiteFooter } from '~/components/site-footer';
 
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
@@ -44,7 +46,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         >
           본문 바로가기
         </a>
-        {children}
+        <div className="flex min-h-dvh flex-col">
+          <SiteHeader />
+          <main id="main" className="flex-1">
+            {children}
+          </main>
+          <SiteFooter />
+        </div>
         <AnalyticsProvider />
       </body>
     </html>

@@ -4,11 +4,11 @@ import { useCartStore, MAX_QUANTITY, selectSelectedItems, selectAllSelected } fr
 
 const coat = {
   variantId: 'v-coat-m', productId: 'p-coat', productName: '오버사이즈 울 블렌드 코트',
-  brand: 'STUDIO NOON', optionLabel: '오트밀 / M', listPrice: 413_000, discountPercent: 30,
+  brand: 'STUDIO NOON', optionLabel: '오트밀 / M', listPrice: 413_000, salePrice: 289_000,
 };
 const knit = {
   variantId: 'v-knit-l', productId: 'p-knit', productName: '램스울 크루넥 니트',
-  brand: 'ATELIER K', optionLabel: '차콜 / L', listPrice: 129_000, discountPercent: 0,
+  brand: 'ATELIER K', optionLabel: '차콜 / L', listPrice: 129_000, salePrice: 129_000,
 };
 
 const items = () => useCartStore.getState().items;

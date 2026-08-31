@@ -7,8 +7,10 @@ export interface CartItem {
   readonly productName: string;
   readonly brand: string;
   readonly optionLabel: string;
+  /** 정가. 취소선 표시용 */
   readonly listPrice: number;
-  readonly discountPercent: number;
+  /** 담을 당시의 판매 단가. 표시용이고, 결제 금액은 서버가 다시 계산한다. */
+  readonly salePrice: number;
   quantity: number;
   selected: boolean;
 }

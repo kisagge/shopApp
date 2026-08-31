@@ -120,3 +120,122 @@ export async function getTopCategories(): Promise<{ slug: string; name: string }
     select: { slug: true, name: true },
   });
 }
+
+// ── 상세 ──────────────────────────────────────────────────────
+
+export interface ProductOptionValue {
+  readonly id: string;
+  readonly value: string;
+  readonly swatchHex: string | null;
+}
+
+export interface ProductOptionGroup {
+  readonly id: string;
+  readonly name: string;
+  readonly values: readonly ProductOptionValue[];
+}
+
+export interface ProductVariantView {
+  readonly id: string;
+  readonly sku: string;
+  readonly label: string;
+  readonly stock: number;
+  /** 이 변형을 고르는 데 필요한 옵션 값 id 들 */
+  readonly optionValueIds: readonly string[];
+  readonly price: Won;
+}
+
+export interface ProductDetail {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly description: string;
+  readonly brand: string;
+  readonly brandSlug: string;
+  readonly categoryName: string;
+  readonly categorySlug: string;
+  readonly listPrice: Won;
+  readonly price: Won;
+  readonly discountPercent: number;
+  readonly rating: number | undefined;
+  readonly reviewCount: number;
+  readonly soldOut: boolean;
+  readonly optionGroups: readonly ProductOptionGroup[];
+  readonly variants: readonly ProductVariantView[];
+  readonly images: readonly { url: string; alt: string }[];
+}
+
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+  const p = await prisma.product.findFirst({
+    where: { slug, deletedAt: null, publishedAt: { not: null } },
+    select: {
+      id: true, slug: true, name: true, description: true,
+      listPrice: true, salePrice: true, ratingSum: true, reviewCount: true,
+      brand: { select: { name: true, slug: true } },
+      category: { select: { name: true, slug: true } },
+      images: { select: { url: true, alt: true }, orderBy: { sortOrder: 'asc' } },
+      optionGroups: {
+        orderBy: { sortOrder: 'asc' },
+        select: {
+          id: true, name: true,
+          values: {
+            orderBy: { sortOrder: 'asc' },
+            select: { id: true, value: true, swatchHex: true },
+          },
+        },
+      },
+      variants: {
+        where: { isActive: true },
+        select: {
+          id: true, sku: true, label: true, stock: true, priceOverride: true,
+          optionValues: { select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!p) return null;
+
+  const listPrice = won(p.listPrice);
+  const price = p.salePrice === null ? listPrice : won(p.salePrice);
+
+  return {
+    id: p.id, slug: p.slug, name: p.name, description: p.description,
+    brand: p.brand.name, brandSlug: p.brand.slug,
+    categoryName: p.category.name, categorySlug: p.category.slug,
+    listPrice,
+    price,
+    discountPercent: discountRateOf(listPrice, price),
+    rating: p.reviewCount > 0 ? p.ratingSum / p.reviewCount : undefined,
+    reviewCount: p.reviewCount,
+    soldOut: p.variants.length > 0 && p.variants.every((v) => v.stock <= 0),
+    optionGroups: p.optionGroups,
+    variants: p.variants.map((v) => ({
+      id: v.id, sku: v.sku, label: v.label, stock: v.stock,
+      optionValueIds: v.optionValues.map((o) => o.id),
+      // 옵션별 가격 차이가 있으면 그 값을, 없으면 상품 판매가를 쓴다
+      price: v.priceOverride === null ? price : won(v.priceOverride),
+    })),
+    images: p.images,
+  };
+}
+
+/** 상세 페이지의 정적 경로 생성에 쓴다 */
+export async function getAllProductSlugs(): Promise<string[]> {
+  const rows = await prisma.product.findMany({
+    where: { deletedAt: null, publishedAt: { not: null } },
+    select: { slug: true },
+  });
+  return rows.map((r) => r.slug);
+}
+
+/** 카테고리 트리 — 목록 페이지의 사이드바 */
+export async function getCategoryWithChildren(slug: string) {
+  return prisma.category.findUnique({
+    where: { slug },
+    select: {
+      id: true, name: true, slug: true,
+      parent: { select: { name: true, slug: true } },
+      children: { select: { name: true, slug: true }, orderBy: { sortOrder: 'asc' } },
+    },
+  });
+}

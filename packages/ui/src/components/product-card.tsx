@@ -1,7 +1,28 @@
+import type { ComponentType, ReactNode } from 'react';
 import type { Won } from '@shop/core';
 import { cn } from '../lib/cn';
 import { Badge } from './badge';
 import { Price } from './price';
+
+/**
+ * 링크 컴포넌트의 최소 계약.
+ *
+ * packages/ui 는 next 에 의존하지 않는다 — 그러면 Storybook·Vitest·다른 앱에서
+ * 쓸 수 없게 된다. 대신 이 모양을 만족하는 컴포넌트를 받는다.
+ * Next 앱은 next/link 를, 그 밖에서는 기본값인 <a> 를 쓴다.
+ */
+export interface LinkLikeProps {
+  readonly href: string;
+  readonly className?: string;
+  readonly children: ReactNode;
+}
+export type LinkLike = ComponentType<LinkLikeProps>;
+
+const DefaultLink: LinkLike = ({ href, className, children }) => (
+  <a href={href} className={className}>
+    {children}
+  </a>
+);
 
 export interface ProductCardProps {
   readonly href: string;
@@ -17,6 +38,11 @@ export interface ProductCardProps {
   /** 상품 이미지. 없으면 톤 블록 플레이스홀더가 들어간다 */
   readonly image?: { readonly src: string; readonly alt: string } | undefined;
   readonly placeholderTone?: 'sand' | 'stone' | 'clay' | 'olive' | 'mist';
+  /**
+   * 라우팅을 담당할 컴포넌트. 기본은 평범한 <a> 라 전체 페이지 이동이 난다.
+   * Next 앱에서는 next/link 를 넘겨 클라이언트 내비게이션과 프리페치를 쓴다.
+   */
+  readonly linkComponent?: LinkLike;
   readonly className?: string;
 }
 
@@ -33,11 +59,12 @@ const TONE = {
 export function ProductCard({
   href, brand, name, price, listPrice, discountPercent,
   rating, reviewCount, soldOut = false, isNew = false,
-  image, placeholderTone = 'sand', className,
+  image, placeholderTone = 'sand', linkComponent, className,
 }: ProductCardProps) {
+  const Link = linkComponent ?? DefaultLink;
   return (
     <article className={cn('relative flex flex-col gap-2.5', className)}>
-      <a href={href} className="flex flex-col gap-2.5 no-underline">
+      <Link href={href} className="flex flex-col gap-2.5 no-underline">
         <div
           className={cn(
             'relative flex aspect-4/5 items-center justify-center overflow-hidden rounded-sm',
@@ -100,7 +127,7 @@ export function ProductCard({
             </p>
           )}
         </div>
-      </a>
+      </Link>
     </article>
   );
 }
