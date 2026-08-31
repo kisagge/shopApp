@@ -1,0 +1,52 @@
+# 의존성
+node_modules/
+.pnpm-store/
+
+# 빌드 산출물
+.next/
+out/
+dist/
+build/
+.turbo/
+*.tsbuildinfo
+
+# 환경변수 (절대 커밋 금지)
+.env
+.env.*
+!.env.example
+
+# Capacitor 네이티브 프로젝트 — 생성물은 제외, 설정은 추적
+apps/mobile/ios/App/Pods/
+apps/mobile/ios/App/build/
+apps/mobile/ios/App/App/public/
+apps/mobile/android/.gradle/
+apps/mobile/android/build/
+apps/mobile/android/app/build/
+apps/mobile/android/app/src/main/assets/public/
+apps/mobile/android/local.properties
+*.xcuserstate
+xcuserdata/
+
+# Prisma
+packages/db/prisma/*.db
+packages/db/prisma/*.db-journal
+
+# 테스트
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+
+# 디자인 캔버스 — 시드된 산출물(2.8MB). 아트보드 소스와 build.sh로 재생성됨
+design/plain-commerce-design.html
+
+# 에디터 · OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+
+# 로그
+*.log
+npm-debug.log*
+pnpm-debug.log*

@@ -1,0 +1,36 @@
+{
+  "pages": [
+    { "id": "page-1", "name": "디자인 시스템" },
+    { "id": "page-2", "name": "고객 화면 · 모바일" },
+    { "id": "page-3", "name": "고객 화면 · PC" },
+    { "id": "page-4", "name": "어드민" }
+  ],
+  "artboards": [
+    { "file": "Main.dc.html", "page": "page-1", "x": 0, "y": 0, "w": 1120, "h": 4800, "title": "PLAIN 디자인 시스템" },
+
+    { "file": "HomeMobile.dc.html",    "page": "page-2", "x": 0,    "y": 0, "w": 375, "h": 1800, "title": "홈" },
+    { "file": "ProductList.dc.html",   "page": "page-2", "x": 455,  "y": 0, "w": 375, "h": 1400, "title": "상품 목록" },
+    { "file": "ProductDetail.dc.html", "page": "page-2", "x": 910,  "y": 0, "w": 375, "h": 2050, "title": "상품 상세 (사이즈 선택 동작)", "is_interactive": true },
+    { "file": "Cart.dc.html",          "page": "page-2", "x": 1365, "y": 0, "w": 375, "h": 1000, "title": "장바구니" },
+    { "file": "Checkout.dc.html",      "page": "page-2", "x": 1820, "y": 0, "w": 375, "h": 1880, "title": "주문 / 결제" },
+    { "file": "OrderComplete.dc.html", "page": "page-2", "x": 2275, "y": 0, "w": 375, "h": 1360, "title": "주문 완료" },
+    { "file": "MyPage.dc.html",        "page": "page-2", "x": 2730, "y": 0, "w": 375, "h": 1450, "title": "마이페이지" },
+
+    { "file": "HomeDesktop.dc.html",          "page": "page-3", "x": 0,    "y": 0, "w": 1440, "h": 2700, "title": "홈 · PC" },
+    { "file": "ProductListDesktop.dc.html",   "page": "page-3", "x": 1560, "y": 0, "w": 1440, "h": 1950, "title": "상품 목록 · PC" },
+    { "file": "ProductDetailDesktop.dc.html", "page": "page-3", "x": 3120, "y": 0, "w": 1440, "h": 1950, "title": "상품 상세 · PC" },
+    { "file": "CheckoutDesktop.dc.html",      "page": "page-3", "x": 4680, "y": 0, "w": 1440, "h": 1400, "title": "주문 / 결제 · PC" },
+
+    { "file": "AdminDashboard.dc.html",   "page": "page-4", "x": 0,    "y": 0, "w": 1440, "h": 1150, "title": "어드민 · 대시보드" },
+    { "file": "AdminProducts.dc.html",    "page": "page-4", "x": 1560, "y": 0, "w": 1440, "h": 1180, "title": "어드민 · 상품 관리" },
+    { "file": "AdminOrderDetail.dc.html", "page": "page-4", "x": 3120, "y": 0, "w": 1440, "h": 1180, "title": "어드민 · 주문 상세" }
+  ],
+  "annotations": [
+    { "id": "note-system", "page": "page-1", "x": 1200, "y": 0, "w": 300, "text": "PLAIN은 작업용 브랜드명입니다 — 실제 이름으로 바꾸세요.\n\n컬러는 oklch로 설계하고 hex로 굳혔습니다. 09번 명도대비 표의 값은 눈대중이 아니라 계산해서 넣은 것이고, 처음 잡았던 #837F7A / #CA8A10 / #258651 세 개는 AA를 통과 못 해서 실제로 교체했습니다." },
+    { "id": "note-mobile", "page": "page-2", "x": 0, "y": -150, "w": 460, "text": "모바일 화면은 스크롤 전체를 펼쳐 놓은 것이라 실제 기기 높이(812)보다 깁니다.\n\niOS 상태바와 홈 인디케이터는 일부러 그리지 않았습니다 — 실제 기기에서는 OS가 그 자리를 덮어 그리기 때문입니다." },
+    { "id": "note-pdp", "page": "page-2", "x": 910, "y": -150, "w": 375, "text": "상품 상세만 실제로 눌러볼 수 있습니다. 사이즈를 고르면 하단 CTA가 활성화되고 선택 옵션 요약이 나타납니다. L은 품절 상태라 눌리지 않습니다." },
+    { "id": "note-pc", "page": "page-3", "x": 0, "y": -150, "w": 520, "text": "같은 화면의 PC 레이아웃입니다. 브레이크포인트별 전환 규칙은 디자인 시스템 보드 10번 표에 정리해 뒀습니다.\n\n상품 상세는 xl에서 썸네일 + 갤러리 + 정보 3열, lg에서는 갤러리 + 정보 2열로 접힙니다." },
+    { "id": "note-admin", "page": "page-4", "x": 0, "y": -150, "w": 520, "text": "어드민은 1024px 미만을 지원하지 않습니다.\n\n매출 추이는 단일 시리즈라 범례 없이 제목이 시리즈를 설명하고, 막대는 베이스라인에 고정한 채 위쪽만 4px 라운드했습니다. 오늘 막대는 집계가 진행 중이라 톤을 낮추고 '진행 중' 라벨을 붙였습니다 — 색만으로 구분하지 않기 위해서입니다. 스크린리더용 데이터 표가 SVG 옆에 숨겨져 있습니다." }
+  ],
+  "launch": { "view": "canvas", "page": "page-1" }
+}

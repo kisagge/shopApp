@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@300;400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #FEFDFC; color: #181613;
+           font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+           -webkit-font-smoothing: antialiased; text-wrap: pretty; }
+    h1, h2, h3, h4, p, figure, blockquote { margin: 0; }
+    ul, ol { margin: 0; padding: 0; list-style: none; }
+    button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; text-align: inherit; }
+    table { border-collapse: collapse; width: 100%; }
+    th { text-align: left; font-weight: 500; }
+    :where(a, button, [tabindex]):focus-visible { outline: 2px solid #181613; outline-offset: 2px; border-radius: 2px; }
+    .serif { font-family: 'Hahmlet', 'Apple SD Gothic Neo', Georgia, serif; }
+    a { color: #BD413F; text-decoration: none; } a:hover { color: #A5292B; }
+    .mono { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+    .hide-sb::-webkit-scrollbar { display: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+               overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  </style>
+</helmet>
+<div style="width: 1440px; background: #F8F6F4; display: flex; flex-direction: column; min-height: 1000px;">
+  <a href="#main" style="position: absolute; left: -9999px;">본문 바로가기</a>
+
+  <header style="background: #FEFDFC; border-bottom: 1px solid #E2DFDB;">
+    <div style="max-width: 1180px; margin: 0 auto; padding: 0 40px; height: 76px; display: flex; align-items: center; justify-content: space-between;">
+      <p class="serif" style="font-size: 23px; font-weight: 500; letter-spacing: 0.18em;"><a href="#" style="color: #181613; text-decoration: none;">PLAIN</a></p>
+      <h1 style="font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">주문 / 결제</h1>
+      <p style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #615D58;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#615D58" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18"/></svg> 안전 결제</p>
+    </div>
+  </header>
+
+  <main id="main" style="max-width: 1180px; margin: 0 auto; padding: 32px 40px 72px; width: 100%; box-sizing: border-box;">
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 32px; align-items: start;">
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+
+        <section aria-labelledby="daddr" style="background: #FEFDFC; border-radius: 8px; padding: 28px 32px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;">
+            <h2 id="daddr" style="font-size: 17px; font-weight: 600;">배송지</h2>
+            <button type="button" style="height: 36px; padding: 0 14px; border: 1px solid #CFCBC7; border-radius: 4px; font-size: 13px;">배송지 변경</button>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+            <div>
+              <label for="dc-name" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">받는 분</label>
+              <p id="dc-name" style="height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; padding: 0 14px; display: flex; align-items: center; font-size: 14px;">장병윤</p>
+            </div>
+            <div>
+              <label for="dc-tel" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">연락처</label>
+              <p id="dc-tel" class="mono" style="height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; padding: 0 14px; display: flex; align-items: center; font-size: 14px;">010-2345-6789</p>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label for="dc-addr" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">주소</label>
+              <p id="dc-addr" style="min-height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; padding: 14px; display: flex; align-items: center; font-size: 14px; line-height: 1.6;">서울 성동구 왕십리로 000, 101동 1102호 <span class="mono" style="color: #726E69; margin-left: 6px;">(04766)</span></p>
+            </div>
+            <div style="grid-column: 1 / -1;">
+              <label for="dc-memo" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">배송 요청사항</label>
+              <button type="button" id="dc-memo" aria-haspopup="listbox" style="width: 100%; height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; background: #FEFDFC; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; font-size: 14px;">부재 시 문 앞에 놓아주세요 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#726E69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="ditems" style="background: #FEFDFC; border-radius: 8px; padding: 28px 32px;">
+          <h2 id="ditems" style="font-size: 17px; font-weight: 600; margin-bottom: 20px;">주문 상품 <span class="mono" style="color: #726E69; font-weight: 400;">2</span></h2>
+          <ul style="display: flex; flex-direction: column;">
+            <li style="padding-bottom: 20px;">
+              <article style="display: flex; align-items: center; gap: 18px;">
+                <div role="img" aria-label="오버사이즈 울 블렌드 코트 상품 이미지" style="width: 84px; height: 105px; background: #E6DFD3; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;"><svg width="56" height="73" viewBox="0 0 100 130" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 18 L18 28 L12 66 L25 70 M64 18 L82 28 L88 66 L75 70 M36 18 L50 31 L64 18 L76 26 L76 116 L24 116 L24 26 Z M50 31 L50 116"/></svg></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                  <p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">STUDIO NOON</p>
+                  <h3 style="font-size: 15px; font-weight: 400;">오버사이즈 울 블렌드 코트</h3>
+                  <p style="font-size: 12px; color: #726E69;">오트밀 / M · 수량 <span class="mono">1</span>개</p>
+                </div>
+                <p style="text-align: right; display: flex; flex-direction: column; gap: 3px; flex: 0 0 auto;">
+                  <span class="mono" style="font-size: 12px; color: #726E69;"><s>413,000</s></span>
+                  <span class="mono" style="font-size: 17px; font-weight: 600;">289,000원</span>
+                </p>
+              </article>
+            </li>
+            <li style="border-top: 1px solid #F8F6F4; padding-top: 20px;">
+              <article style="display: flex; align-items: center; gap: 18px;">
+                <div role="img" aria-label="램스울 크루넥 니트 상품 이미지" style="width: 84px; height: 105px; background: #D6D9DD; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;"><svg width="58" height="70" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 20 L20 28 L14 58 L27 62 L29 102 L71 102 L73 62 L86 58 L80 28 L64 20 C58 27 42 27 36 20 Z"/></svg></div>
+                <div style="flex: 1; display: flex; flex-direction: column; gap: 5px;">
+                  <p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">ATELIER K</p>
+                  <h3 style="font-size: 15px; font-weight: 400;">램스울 크루넥 니트</h3>
+                  <p style="font-size: 12px; color: #726E69;">차콜 / L · 수량 <span class="mono">1</span>개</p>
+                </div>
+                <p class="mono" style="font-size: 17px; font-weight: 600; flex: 0 0 auto;">129,000원</p>
+              </article>
+            </li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="ddisc" style="background: #FEFDFC; border-radius: 8px; padding: 28px 32px;">
+          <h2 id="ddisc" style="font-size: 17px; font-weight: 600; margin-bottom: 20px;">할인</h2>
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;">
+            <div>
+              <label for="dc-coupon" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">쿠폰</label>
+              <button type="button" id="dc-coupon" aria-haspopup="listbox" style="width: 100%; height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; background: #FEFDFC; padding: 0 14px; display: flex; align-items: center; justify-content: space-between; font-size: 14px;"><span>신규회원 <span class="mono">10,000</span>원 할인</span> <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#726E69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9l6 6 6-6"/></svg></button>
+            </div>
+            <div>
+              <label for="dc-point" style="display: block; font-size: 13px; font-weight: 500; margin-bottom: 8px;">포인트 <span style="font-weight: 400; color: #726E69;">보유 <span class="mono">3,240</span>P</span></label>
+              <div style="display: flex; gap: 8px;">
+                <p id="dc-point" class="mono" style="flex: 1; height: 48px; border: 1px solid #CFCBC7; border-radius: 4px; padding: 0 14px; display: flex; align-items: center; justify-content: flex-end; font-size: 14px;">3,000</p>
+                <button type="button" style="width: 92px; height: 48px; border: 1px solid #181613; border-radius: 4px; font-size: 13px; font-weight: 500;">전액사용</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="dmethod" style="background: #FEFDFC; border-radius: 8px; padding: 28px 32px;">
+          <h2 id="dmethod" style="font-size: 17px; font-weight: 600; margin-bottom: 20px;">결제 수단</h2>
+          <ul role="radiogroup" aria-labelledby="dmethod" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px;">
+            <li><button type="button" role="radio" aria-checked="true" style="width: 100%; height: 52px; border: 1px solid #181613; background: #181613; color: #FEFDFC; border-radius: 4px; font-size: 14px; font-weight: 500;">신용·체크카드</button></li>
+            <li><button type="button" role="radio" aria-checked="false" style="width: 100%; height: 52px; border: 1px solid #CFCBC7; border-radius: 4px; font-size: 14px;">계좌이체</button></li>
+            <li><button type="button" role="radio" aria-checked="false" style="width: 100%; height: 52px; border: 1px solid #CFCBC7; border-radius: 4px; font-size: 14px;">가상계좌</button></li>
+            <li><button type="button" role="radio" aria-checked="false" style="width: 100%; height: 52px; border: 1px solid #CFCBC7; border-radius: 4px; font-size: 14px;">간편결제</button></li>
+          </ul>
+          <p style="margin-top: 16px; padding: 16px; background: #F8F6F4; border-radius: 4px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #615D58; line-height: 1.6;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#615D58" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18"/></svg> 토스페이먼츠 <span style="color: #726E69;">·</span> 테스트 모드로 연동되어 실제 결제는 발생하지 않습니다</p>
+        </section>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <section aria-labelledby="dsummary" style="background: #FEFDFC; border-radius: 8px; padding: 28px;">
+          <h2 id="dsummary" style="font-size: 17px; font-weight: 600; margin-bottom: 20px;">결제 금액</h2>
+          <dl style="display: flex; flex-direction: column; gap: 12px;">
+            <div style="display: flex; justify-content: space-between;"><dt style="font-size: 14px; color: #615D58;">상품 금액</dt><dd class="mono" style="font-size: 14px;">542,000원</dd></div>
+            <div style="display: flex; justify-content: space-between;"><dt style="font-size: 14px; color: #615D58;">상품 할인</dt><dd class="mono" style="font-size: 14px; color: #BD413F;">-124,000원</dd></div>
+            <div style="display: flex; justify-content: space-between;"><dt style="font-size: 14px; color: #615D58;">쿠폰 할인</dt><dd class="mono" style="font-size: 14px; color: #BD413F;">-10,000원</dd></div>
+            <div style="display: flex; justify-content: space-between;"><dt style="font-size: 14px; color: #615D58;">포인트 사용</dt><dd class="mono" style="font-size: 14px; color: #BD413F;">-3,000원</dd></div>
+            <div style="display: flex; justify-content: space-between;"><dt style="font-size: 14px; color: #615D58;">배송비</dt><dd class="mono" style="font-size: 14px;">0원</dd></div>
+            <div style="display: flex; align-items: baseline; justify-content: space-between; border-top: 1px solid #E2DFDB; padding-top: 18px; margin-top: 6px;">
+              <dt style="font-size: 16px; font-weight: 600;">최종 결제 금액</dt>
+              <dd class="mono" style="font-size: 26px; font-weight: 600;">405,000<span style="font-size: 18px;">원</span></dd>
+            </div>
+          </dl>
+          <p style="margin-top: 12px; font-size: 12px; color: #726E69; text-align: right;">구매 확정 시 <span class="mono">4,050</span>P 적립</p>
+
+          <div style="margin-top: 22px; padding-top: 20px; border-top: 1px solid #EFECE9;">
+            <button type="button" role="checkbox" aria-checked="true" style="display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left;">
+              <span aria-hidden="true" style="width: 20px; height: 20px; margin-top: 1px; border-radius: 3px; background: #181613; display: flex; align-items: center; justify-content: center; flex: 0 0 auto;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#FEFDFC" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 12.5l5.5 5.5L20 7"/></svg></span>
+              <span style="font-size: 13px; line-height: 1.6;">주문 내용을 확인했으며 개인정보 수집·이용 및 결제대행 서비스 약관에 동의합니다</span>
+            </button>
+          </div>
+
+          <button type="button" style="width: 100%; height: 56px; margin-top: 20px; border-radius: 4px; background: #181613; color: #FEFDFC; font-size: 16px; font-weight: 600;"><span class="mono">405,000</span>원 결제하기</button>
+        </section>
+
+        <p style="font-size: 12px; line-height: 1.7; color: #726E69; padding: 0 4px;">주문 내용을 확인했으며, 정보 제공 및 결제에 동의합니다. PLAIN은 통신판매중개자로서 통신판매의 당사자가 아니며 상품 정보와 거래에 대한 책임은 판매자에게 있습니다.</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+</x-dc>
+</body>
+</html>

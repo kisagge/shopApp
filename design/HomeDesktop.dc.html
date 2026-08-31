@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@300;400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; background: #FEFDFC; color: #181613;
+           font-family: 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+           -webkit-font-smoothing: antialiased; text-wrap: pretty; }
+    h1, h2, h3, h4, p, figure, blockquote { margin: 0; }
+    ul, ol { margin: 0; padding: 0; list-style: none; }
+    button { font: inherit; color: inherit; border: 0; background: none; padding: 0; cursor: pointer; text-align: inherit; }
+    table { border-collapse: collapse; width: 100%; }
+    th { text-align: left; font-weight: 500; }
+    :where(a, button, [tabindex]):focus-visible { outline: 2px solid #181613; outline-offset: 2px; border-radius: 2px; }
+    .serif { font-family: 'Hahmlet', 'Apple SD Gothic Neo', Georgia, serif; }
+    a { color: #BD413F; text-decoration: none; } a:hover { color: #A5292B; }
+    .mono { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+    .hide-sb::-webkit-scrollbar { display: none; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+               overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+  </style>
+</helmet>
+<div style="width: 1440px; background: #FEFDFC; display: flex; flex-direction: column;">
+  <a href="#main" style="position: absolute; left: -9999px;">본문 바로가기</a>
+  <div style="border-bottom: 1px solid #EFECE9; background: #FEFDFC;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; height: 36px; display: flex; align-items: center; justify-content: flex-end; gap: 18px;">
+      <a href="#" style="font-size: 12px; color: #726E69;">고객센터</a>
+      <a href="#" style="font-size: 12px; color: #726E69;">브랜드 입점</a>
+      <a href="#" style="font-size: 12px; color: #302D29; font-weight: 500;">로그인</a>
+    </div>
+  </div>
+  <header style="border-bottom: 1px solid #E2DFDB; background: #FEFDFC;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; height: 76px; display: flex; align-items: center; gap: 40px;">
+      <p class="serif" style="font-size: 25px; font-weight: 500; letter-spacing: 0.18em; flex: 0 0 auto;"><a href="#" style="color: #181613; text-decoration: none;">PLAIN</a></p>
+      <nav aria-label="주요 카테고리" style="flex: 1;">
+        <ul style="display: flex; margin-left: -18px;">
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 400; color: #302D29; text-decoration: none; box-shadow: none;">신상품</a></li>
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 400; color: #302D29; text-decoration: none; box-shadow: none;">아우터</a></li>
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 400; color: #302D29; text-decoration: none; box-shadow: none;">니트</a></li>
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 400; color: #302D29; text-decoration: none; box-shadow: none;">팬츠</a></li>
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 400; color: #302D29; text-decoration: none; box-shadow: none;">슈즈</a></li>
+        <li><a href="#" style="height: 76px; display: inline-flex; align-items: center; padding: 0 18px; font-size: 15px; font-weight: 600; color: #BD413F; text-decoration: none; box-shadow: none;">세일</a></li>
+        </ul>
+      </nav>
+      <div style="display: flex; align-items: center; gap: 12px; flex: 0 0 auto;">
+        <div style="width: 232px; height: 40px; border: 1px solid #CFCBC7; border-radius: 999px; display: flex; align-items: center; gap: 8px; padding: 0 14px;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#726E69" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 11a7 7 0 1 1-14 0 7 7 0 0 1 14 0zM16.2 16.2 21 21"/></svg><span style="font-size: 13px; color: #726E69;">브랜드, 상품 검색</span>
+        </div>
+        <a href="#" aria-label="좋아요" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#181613" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></a>
+        <a href="#" aria-label="장바구니, 상품 2개" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; position: relative;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#181613" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h2.2l2.4 11.4a2 2 0 0 0 2 1.6h7.9a2 2 0 0 0 2-1.5L21 8H6M11.2 20a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0zM19.2 20a1.2 1.2 0 1 1-2.4 0 1.2 1.2 0 0 1 2.4 0z"/></svg><span aria-hidden="true" class="mono" style="position: absolute; top: 2px; right: 0; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: #181613; color: #FEFDFC; font-size: 10px; font-weight: 600; display: flex; align-items: center; justify-content: center;">2</span></a>
+        <a href="#" aria-label="마이페이지" style="width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#181613" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.6 8a3.6 3.6 0 1 1-7.2 0 3.6 3.6 0 0 1 7.2 0zM4.5 20.5a7.5 7.5 0 0 1 15 0"/></svg></a>
+      </div>
+    </div>
+  </header>
+  <main id="main">
+    <h1 class="sr-only">PLAIN 온라인 스토어</h1>
+
+
+    <section aria-labelledby="dhero-title" style="position: relative; height: 560px; background: #E6DFD3; overflow: hidden;">
+      <div style="max-width: 1280px; margin: 0 auto; padding: 0 40px; height: 100%; display: grid; grid-template-columns: 1fr 1fr; align-items: center; gap: 40px;">
+        <div style="display: flex; flex-direction: column; gap: 20px; max-width: 460px;">
+          <p style="font-size: 12px; font-weight: 500; letter-spacing: 0.18em; color: #726E69;">EDITORIAL · 01</p>
+          <h2 id="dhero-title" class="serif" style="font-size: 56px; font-weight: 500; line-height: 1.2; letter-spacing: -0.02em; color: #181613;">겨울을 오래<br>입는 방법</h2>
+          <p style="font-size: 15px; line-height: 1.8; color: #45423E;">한 벌로 계절을 나는 아우터 12선. 소재와 무게, 그리고 오래 두고 입을 만한 실루엣을 기준으로 골랐습니다.</p>
+          <a href="#" style="align-self: flex-start; margin-top: 8px; height: 52px; padding: 0 32px; border-radius: 4px; background: #181613; color: #FEFDFC; font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; text-decoration: none;">기획전 보기</a>
+        </div>
+        <div role="img" aria-label="겨울 아우터 기획전 대표 이미지" style="display: flex; align-items: center; justify-content: center;"><svg width="340" height="442" viewBox="0 0 100 130" fill="none" stroke="#C4B9A6" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 18 L18 28 L12 66 L25 70 M64 18 L82 28 L88 66 L75 70 M36 18 L50 31 L64 18 L76 26 L76 116 L24 116 L24 26 Z M50 31 L50 116"/></svg></div>
+      </div>
+      <ul aria-label="기획전 슬라이드" style="position: absolute; left: 50%; transform: translateX(-50%); bottom: 28px; display: flex; gap: 6px;">
+        <li aria-current="true" style="width: 26px; height: 3px; border-radius: 2px; background: #45423E;"></li>
+        <li style="width: 9px; height: 3px; border-radius: 2px; background: rgba(69,66,62,0.32);"></li>
+        <li style="width: 9px; height: 3px; border-radius: 2px; background: rgba(69,66,62,0.32);"></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="dtrend-title" style="max-width: 1280px; margin: 0 auto; padding: 80px 40px 0;">
+      <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; margin-bottom: 28px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <p style="font-size: 11px; font-weight: 500; letter-spacing: 0.18em; color: #726E69;">TRENDING NOW</p>
+          <h2 id="dtrend-title" style="font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">지금 많이 보는 것</h2>
+        </div>
+        <a href="#" style="font-size: 13px; color: #302D29; text-decoration: underline; text-underline-offset: 4px;">전체보기</a>
+      </div>
+      <ul style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px;">
+        <li><article style="display: flex; flex-direction: column; gap: 14px; position: relative;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="오버사이즈 울 블렌드 코트 상품 이미지" style="position: relative; aspect-ratio: 4 / 5; background: #E6DFD3; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><svg width="132" height="172" viewBox="0 0 100 130" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 18 L18 28 L12 66 L25 70 M64 18 L82 28 L88 66 L75 70 M36 18 L50 31 L64 18 L76 26 L76 116 L24 116 L24 26 Z M50 31 L50 116"/></svg><span style="position: absolute; top: 12px; left: 12px; height: 22px; padding: 0 7px; border-radius: 3px; background: #BD413F; color: #FEFDFC; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;">30%<span class="sr-only"> 할인</span></span></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">STUDIO NOON</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">오버사이즈 울 블렌드 코트</h3><p style="display: flex; align-items: baseline; gap: 6px;"><span class="mono" style="font-size: 15px; font-weight: 600; color: #BD413F;">30%</span><span class="mono" style="font-size: 15px; font-weight: 600;">289,000<span class="sr-only">원</span></span></p><p style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #726E69;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B97A00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.4 5.9.85-4.25 4.15 1 5.9L12 17.05 6.75 19.8l1-5.9L3.5 9.75l5.9-.85z"/></svg> <span class="mono">4.8</span> · <span class="mono">1,204</span></p></div></a><button type="button" aria-label="오버사이즈 울 블렌드 코트 좋아요" aria-pressed="false" style="position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45423E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></button></article></li>
+        <li><article style="display: flex; flex-direction: column; gap: 14px; position: relative;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="램스울 크루넥 니트 상품 이미지" style="position: relative; aspect-ratio: 4 / 5; background: #D6D9DD; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><svg width="132" height="158" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 20 L20 28 L14 58 L27 62 L29 102 L71 102 L73 62 L86 58 L80 28 L64 20 C58 27 42 27 36 20 Z"/></svg></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">ATELIER K</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">램스울 크루넥 니트</h3><p class="mono" style="font-size: 15px; font-weight: 600;">129,000<span class="sr-only">원</span></p><p style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #726E69;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B97A00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.4 5.9.85-4.25 4.15 1 5.9L12 17.05 6.75 19.8l1-5.9L3.5 9.75l5.9-.85z"/></svg> <span class="mono">4.9</span> · <span class="mono">876</span></p></div></a><button type="button" aria-label="램스울 크루넥 니트 좋아요" aria-pressed="false" style="position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45423E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></button></article></li>
+        <li><article style="display: flex; flex-direction: column; gap: 14px; position: relative;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="코튼 트윌 와이드 팬츠 상품 이미지" style="position: relative; aspect-ratio: 4 / 5; background: #E2CCC2; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><svg width="124" height="149" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M30 16 L70 16 L75 62 L71 112 L56 112 L50 66 L44 112 L29 112 L25 62 Z"/></svg><span style="position: absolute; top: 12px; left: 12px; height: 22px; padding: 0 7px; border-radius: 3px; background: #BD413F; color: #FEFDFC; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;">20%<span class="sr-only"> 할인</span></span></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">MOOR</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">코튼 트윌 와이드 팬츠</h3><p style="display: flex; align-items: baseline; gap: 6px;"><span class="mono" style="font-size: 15px; font-weight: 600; color: #BD413F;">20%</span><span class="mono" style="font-size: 15px; font-weight: 600;">71,200<span class="sr-only">원</span></span></p><p style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #726E69;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B97A00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.4 5.9.85-4.25 4.15 1 5.9L12 17.05 6.75 19.8l1-5.9L3.5 9.75l5.9-.85z"/></svg> <span class="mono">4.6</span> · <span class="mono">2,318</span></p></div></a><button type="button" aria-label="코튼 트윌 와이드 팬츠 좋아요 취소" aria-pressed="true" style="position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="#BD413F" stroke="#BD413F" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></button></article></li>
+        <li><article style="display: flex; flex-direction: column; gap: 14px; position: relative;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="헤비 코튼 후디 상품 이미지" style="position: relative; aspect-ratio: 4 / 5; background: #35322E; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><svg width="132" height="158" viewBox="0 0 100 120" fill="none" stroke="#615D58" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 20 L20 28 L14 58 L27 62 L29 102 L71 102 L73 62 L86 58 L80 28 L64 20 C58 27 42 27 36 20 Z"/></svg></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">PLAIN LABEL</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">헤비 코튼 후디 · 차콜</h3><p class="mono" style="font-size: 15px; font-weight: 600;">98,000<span class="sr-only">원</span></p><p style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #726E69;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B97A00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.4 5.9.85-4.25 4.15 1 5.9L12 17.05 6.75 19.8l1-5.9L3.5 9.75l5.9-.85z"/></svg> <span class="mono">4.7</span> · <span class="mono">1,041</span></p></div></a><button type="button" aria-label="헤비 코튼 후디 좋아요" aria-pressed="false" style="position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45423E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></button></article></li>
+        <li><article style="display: flex; flex-direction: column; gap: 14px; position: relative;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="케이블 니트 머플러 상품 이미지" style="position: relative; aspect-ratio: 4 / 5; background: #DAE3E3; border-radius: 4px; display: flex; align-items: center; justify-content: center;"><svg width="132" height="158" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M30 16 C30 40 42 46 42 62 L42 106 L58 106 L58 62 C58 46 70 40 70 16 Z M30 30 L70 30 M42 78 L58 78"/></svg><span style="position: absolute; top: 12px; left: 12px; height: 22px; padding: 0 7px; border-radius: 3px; background: #181613; color: #FEFDFC; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;">NEW</span></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">MOOR</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">케이블 니트 머플러</h3><p class="mono" style="font-size: 15px; font-weight: 600;">68,000<span class="sr-only">원</span></p><p style="display: flex; align-items: center; gap: 4px; font-size: 11px; color: #726E69;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#B97A00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3.5l2.6 5.4 5.9.85-4.25 4.15 1 5.9L12 17.05 6.75 19.8l1-5.9L3.5 9.75l5.9-.85z"/></svg> <span class="mono">4.5</span> · <span class="mono">327</span></p></div></a><button type="button" aria-label="케이블 니트 머플러 좋아요" aria-pressed="false" style="position: absolute; top: 6px; right: 6px; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#45423E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l8.8 8.8 8.8-8.8a5.5 5.5 0 0 0 0-7.8z"/></svg></button></article></li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="dsale-title" style="max-width: 1280px; margin: 72px auto 0; padding: 0 40px;">
+      <div style="border-radius: 8px; background: #181613; padding: 40px 48px; display: flex; align-items: center; justify-content: space-between; gap: 40px;">
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <p style="font-size: 11px; font-weight: 500; letter-spacing: 0.18em; color: #E66E68;">TIME SALE</p>
+          <h2 id="dsale-title" class="serif" style="font-size: 32px; font-weight: 500; color: #FEFDFC; letter-spacing: -0.01em;">오늘 자정까지 추가 15%</h2>
+          <p style="font-size: 14px; color: #726E69;">아우터 · 니트 전 품목 · 쿠폰 자동 적용</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 28px;">
+          <p class="mono" style="display: flex; gap: 6px; align-items: center;">
+            <span class="sr-only">남은 시간 4시간 28분 11초</span>
+            <span aria-hidden="true" style="width: 52px; height: 58px; border-radius: 6px; background: #302D29; color: #FEFDFC; font-size: 25px; font-weight: 600; display: flex; align-items: center; justify-content: center;">04</span>
+            <span aria-hidden="true" style="color: #615D58; font-size: 20px;">:</span>
+            <span aria-hidden="true" style="width: 52px; height: 58px; border-radius: 6px; background: #302D29; color: #FEFDFC; font-size: 25px; font-weight: 600; display: flex; align-items: center; justify-content: center;">28</span>
+            <span aria-hidden="true" style="color: #615D58; font-size: 20px;">:</span>
+            <span aria-hidden="true" style="width: 52px; height: 58px; border-radius: 6px; background: #302D29; color: #FEFDFC; font-size: 25px; font-weight: 600; display: flex; align-items: center; justify-content: center;">11</span>
+          </p>
+          <a href="#" style="height: 52px; padding: 0 30px; border-radius: 4px; background: #BD413F; color: #FEFDFC; font-size: 15px; font-weight: 500; display: inline-flex; align-items: center; text-decoration: none;">지금 보기</a>
+        </div>
+      </div>
+    </section>
+
+    <section aria-labelledby="dpick-title" style="max-width: 1280px; margin: 0 auto; padding: 80px 40px 0;">
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 28px;">
+        <p style="font-size: 11px; font-weight: 500; letter-spacing: 0.18em; color: #726E69;">EDITOR&#39;S PICK</p>
+        <h2 id="dpick-title" style="font-size: 28px; font-weight: 600; letter-spacing: -0.02em;">에디터가 고른 것</h2>
+      </div>
+      <div style="display: grid; grid-template-columns: 1.25fr 1fr 1fr; gap: 24px;">
+        <article style="display: flex; flex-direction: column; gap: 16px;">
+          <a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 16px;">
+            <div role="img" aria-label="숏 패딩 블루종 상품 이미지" style="position: relative; height: 480px; background: #D5DACA; border-radius: 6px; display: flex; align-items: center; justify-content: center;"><svg width="230" height="299" viewBox="0 0 100 130" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M36 18 L18 28 L12 66 L25 70 M64 18 L82 28 L88 66 L75 70 M36 18 L50 31 L64 18 L76 26 L76 116 L24 116 L24 26 Z M50 31 L50 116"/></svg><span style="position: absolute; top: 14px; left: 14px; height: 24px; padding: 0 9px; border-radius: 3px; background: #181613; color: #FEFDFC; font-size: 11px; font-weight: 600; display: inline-flex; align-items: center;">NEW</span></div>
+            <div style="display: flex; flex-direction: column; gap: 7px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">STUDIO NOON</p><h3 style="font-size: 17px; font-weight: 500; line-height: 1.45;">숏 패딩 블루종</h3><p style="font-size: 13px; line-height: 1.7; color: #615D58;">가벼운 구스 충전재에 짧은 기장. 슬랙스에도 무리 없이 어울립니다.</p><p class="mono" style="font-size: 17px; font-weight: 600;">198,000<span class="sr-only">원</span></p></div>
+          </a>
+        </article>
+        <article style="display: flex; flex-direction: column; gap: 14px;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="워시드 데님 스트레이트 상품 이미지" style="aspect-ratio: 4 / 5; background: #E2CCC2; border-radius: 6px; display: flex; align-items: center; justify-content: center;"><svg width="160" height="192" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M30 16 L70 16 L75 62 L71 112 L56 112 L50 66 L44 112 L29 112 L25 62 Z"/></svg></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">PLAIN LABEL</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">워시드 데님 스트레이트</h3><p class="mono" style="font-size: 15px; font-weight: 600;">112,000<span class="sr-only">원</span></p></div></a></article>
+        <article style="display: flex; flex-direction: column; gap: 14px;"><a href="#" style="text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 14px;"><div role="img" aria-label="스웨이드 첼시 부츠 상품 이미지" style="aspect-ratio: 4 / 5; background: #E6DFD3; border-radius: 6px; display: flex; align-items: center; justify-content: center;"><svg width="160" height="192" viewBox="0 0 100 120" fill="none" stroke="#A8A49F" stroke-width="1.2" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M38 14 L60 14 L60 56 C60 66 66 71 76 75 L84 79 L84 92 L32 92 L32 60 Z M38 30 L60 30"/></svg></div><div style="display: flex; flex-direction: column; gap: 6px;"><p style="font-size: 11px; font-weight: 500; letter-spacing: 0.08em; color: #726E69;">ATELIER K</p><h3 style="font-size: 14px; font-weight: 400; line-height: 1.45;">스웨이드 첼시 부츠</h3><p class="mono" style="font-size: 15px; font-weight: 600;">235,000<span class="sr-only">원</span></p></div></a></article>
+      </div>
+    </section>
+  </main>
+  <footer style="border-top: 1px solid #E2DFDB; background: #F8F6F4; margin-top: 80px;">
+    <div style="max-width: 1280px; margin: 0 auto; padding: 44px 40px 52px; display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 40px;">
+      <div style="display: flex; flex-direction: column; gap: 14px;">
+        <p class="serif" style="font-size: 21px; font-weight: 500; letter-spacing: 0.18em;">PLAIN</p>
+        <p style="font-size: 12px; line-height: 1.8; color: #726E69;">[사업자 정보는 실제 값으로 교체]<br>대표 [대표자명] · 사업자등록번호 [번호]<br>통신판매업 신고 [번호]</p>
+      </div>
+      <nav aria-labelledby="f-shop"><h2 id="f-shop" style="font-size: 13px; font-weight: 600; margin-bottom: 14px;">쇼핑</h2><ul style="display: flex; flex-direction: column; gap: 10px;"><li><a href="#" style="font-size: 12px; color: #615D58;">신상품</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">베스트</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">기획전</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">브랜드</a></li></ul></nav>
+      <nav aria-labelledby="f-help"><h2 id="f-help" style="font-size: 13px; font-weight: 600; margin-bottom: 14px;">고객지원</h2><ul style="display: flex; flex-direction: column; gap: 10px;"><li><a href="#" style="font-size: 12px; color: #615D58;">자주 묻는 질문</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">배송 안내</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">교환·반품</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">1:1 문의</a></li></ul></nav>
+      <nav aria-labelledby="f-app"><h2 id="f-app" style="font-size: 13px; font-weight: 600; margin-bottom: 14px;">앱</h2><ul style="display: flex; flex-direction: column; gap: 10px;"><li><a href="#" style="font-size: 12px; color: #615D58;">App Store</a></li><li><a href="#" style="font-size: 12px; color: #615D58;">Google Play</a></li></ul></nav>
+    </div>
+    <div style="border-top: 1px solid #E2DFDB;"><div style="max-width: 1280px; margin: 0 auto; padding: 18px 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px;"><p style="font-size: 11px; color: #726E69;">© 2026 PLAIN. 포트폴리오 목적으로 제작된 화면입니다.</p><ul style="display: flex; gap: 16px;"><li><a href="#" style="font-size: 11px; color: #615D58;">이용약관</a></li><li><a href="#" style="font-size: 11px; color: #615D58; font-weight: 600;">개인정보처리방침</a></li></ul></div></div>
+  </footer>
+</div>
+
+</x-dc>
+</body>
+</html>
