@@ -1,5 +1,6 @@
 import { ProductCard } from '@shop/ui';
 import { getFeaturedProducts, getTopCategories } from '~/lib/queries/products';
+import { TrackedProductList } from '~/components/tracked-product-list';
 
 /** 상품 이미지가 아직 없어 톤 블록으로 대체한다. 실제 이미지가 붙으면 사라질 코드. */
 const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
@@ -78,9 +79,10 @@ export default async function HomePage() {
               에디터가 고른 것
             </h2>
           </div>
+          <TrackedProductList listId="home_editors_pick" itemCount={products.length}>
           <ul className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4 xl:grid-cols-5">
             {products.map((p, i) => (
-              <li key={p.slug}>
+              <li key={p.slug} data-product-id={p.id}>
                 <ProductCard
                   href={`/product/${p.slug}`}
                   brand={p.brand}
@@ -98,6 +100,7 @@ export default async function HomePage() {
               </li>
             ))}
           </ul>
+          </TrackedProductList>
         </section>
       </main>
 

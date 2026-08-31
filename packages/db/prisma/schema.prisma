@@ -50,6 +50,9 @@ model User {
   role          UserRole    @default(CUSTOMER)
   grade         MemberGrade @default(BASIC)
 
+  /// 분석 이벤트 수집 동의. 기본은 false — 동의 전에는 필수 이벤트만 기록한다.
+  analyticsConsent Boolean @default(false)
+
   /// MERCHANT 역할일 때만 채운다. 이 값이 그 사용자가 볼 수 있는 범위를 정한다.
   /// role 이 MERCHANT 인데 여기가 비어 있으면 아무것도 볼 수 없다 — 의도된 안전 기본값이다.
   merchantId String?
@@ -67,6 +70,8 @@ model User {
   coupons        UserCoupon[]
   pointHistory   PointTransaction[]
   restockAlerts  RestockNotification[]
+  events         EventLog[]
+  auditLogs      AdminAuditLog[]        @relation("AuditActor")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -699,4 +704,89 @@ model RestockNotification {
   @@unique([userId, variantId])
   @@index([variantId, notifiedAt])
   @@map("restock_notifications")
+}
+
+// ─────────────────────────────────────────── 이벤트 · 감사
+
+/// 사용자 행동 이벤트.
+///
+/// 자주 집계하는 축만 컬럼으로 뽑고 나머지는 props(Json)에 둔다.
+/// 전부 Json 에 넣으면 집계 쿼리를 못 쓰고, 전부 컬럼으로 빼면 이벤트를
+/// 하나 추가할 때마다 마이그레이션이 필요해진다.
+model EventLog {
+  id   String @id @default(cuid())
+  /// packages/core 의 COMMERCE_EVENT 값. enum 으로 두지 않는 이유는
+  /// 이벤트를 하나 추가할 때마다 DB 마이그레이션을 돌리고 싶지 않아서다.
+  /// 유효성은 수집 API 의 Zod 스키마가 이미 보장한다.
+  name String
+
+  /// 브라우저가 찍은 시각. 기기 시계는 틀리거나 조작되므로 순서 복원에만 쓴다.
+  occurredAt DateTime
+  /// 서버 도착 시각. **집계는 이 값을 기준으로 한다.**
+  receivedAt DateTime @default(now())
+
+  sessionId   String
+  anonymousId String
+  userId      String?
+  user        User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  path     String
+  referrer String?
+
+  // ── 집계 축. 이벤트 종류에 따라 채워지는 것이 다르다.
+  productId  String?
+  variantId  String?
+  orderId    String?
+  merchantId String?
+  /// 금액(원). 서버가 기록하는 purchase·refund 에서만 채워진다.
+  value      Int?
+  quantity   Int?
+
+  /// mobile | tablet | desktop. 원본 User-Agent 는 저장하지 않는다.
+  deviceType String?
+  /// 일별 솔트로 해시한 IP. 원본은 저장하지 않고 봇 판별에만 쓴다.
+  ipHash     String?
+
+  /// 위 컬럼으로 뽑지 않은 나머지 속성
+  props Json @default("{}")
+
+  @@index([name, receivedAt])
+  @@index([sessionId, occurredAt])
+  @@index([userId, receivedAt])
+  @@index([productId, name])
+  @@index([receivedAt])
+  @@map("event_logs")
+}
+
+/// 운영진·가맹점의 쓰기 동작 기록.
+///
+/// 권한을 나눠 놓고 누가 무엇을 했는지 남기지 않으면 절반만 한 것이다.
+/// 환불·권한부여처럼 되돌릴 수 없고 돈이 걸린 동작이 대상이다.
+model AdminAuditLog {
+  id      String @id @default(cuid())
+  actorId String
+  actor   User   @relation("AuditActor", fields: [actorId], references: [id])
+
+  /// **그 시점의** 역할과 소속. 나중에 역할이 바뀌어도 "그때 무슨 권한으로
+  /// 했는지"가 남아야 하므로 조인이 아니라 스냅샷으로 박는다.
+  actorRole  UserRole
+  merchantId String?
+
+  /// 'order.refund', 'user.assignRole' 처럼 <대상>.<동작> 형태
+  action     String
+  targetType String
+  targetId   String
+
+  /// 변경 전후. 민감 필드는 호출부에서 제외하고 넘긴다.
+  before Json?
+  after  Json?
+
+  ipHash String?
+
+  createdAt DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId, createdAt])
+  @@index([action, createdAt])
+  @@map("admin_audit_logs")
 }

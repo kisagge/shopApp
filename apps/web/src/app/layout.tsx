@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
+import { AnalyticsProvider } from '~/components/analytics-provider';
 
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
@@ -44,6 +45,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           본문 바로가기
         </a>
         {children}
+        <AnalyticsProvider />
       </body>
     </html>
   );

@@ -102,6 +102,9 @@ importers:
       '@shop/config':
         specifier: workspace:*
         version: link:../config
+      '@shop/core':
+        specifier: workspace:*
+        version: link:../core
       typescript:
         specifier: 7.0.2
         version: 7.0.2

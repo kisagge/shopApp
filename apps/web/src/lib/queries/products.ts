@@ -8,6 +8,7 @@ import { percentOf, won, type Won } from '@shop/core';
  * 서버-클라이언트 경계를 넘어간다.
  */
 export interface ProductListItem {
+  readonly id: string;
   readonly slug: string;
   readonly brand: string;
   readonly name: string;
@@ -26,6 +27,7 @@ export interface ProductListItem {
 const NEW_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
 const listSelect = {
+  id: true,
   slug: true,
   name: true,
   listPrice: true,
@@ -39,6 +41,7 @@ const listSelect = {
 } as const;
 
 type ListRow = {
+  id: string;
   slug: string; name: string; listPrice: number; discountPercent: number;
   ratingSum: number; reviewCount: number; publishedAt: Date | null;
   brand: { name: string };
@@ -54,6 +57,7 @@ function toListItem(p: ListRow, now: number): ProductListItem {
 
   const image = p.images[0];
   return {
+    id: p.id,
     slug: p.slug,
     brand: p.brand.name,
     name: p.name,

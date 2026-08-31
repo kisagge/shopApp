@@ -1,0 +1,196 @@
+/**
+ * 이벤트 분류와 퍼널 계산.
+ *
+ * 이벤트 이름은 GA4 권장 이커머스 이벤트를 그대로 쓴다. 우리 말로 새로 지으면
+ * 나중에 GA4·PostHog 로 내보낼 때마다 매핑 표를 관리해야 한다.
+ *
+ * 이 파일에는 I/O 가 없다. 정책만 둔다.
+ */
+
+export const COMMERCE_EVENT = [
+  'view_item_list',
+  'view_item',
+  'select_item',
+  'add_to_cart',
+  'remove_from_cart',
+  'view_cart',
+  'begin_checkout',
+  'add_shipping_info',
+  'add_payment_info',
+  'purchase',
+  'refund',
+  'search',
+  'add_to_wishlist',
+  'login',
+  'sign_up',
+  'page_view',
+] as const;
+
+export type CommerceEvent = (typeof COMMERCE_EVENT)[number];
+
+export const isCommerceEvent = (name: string): name is CommerceEvent =>
+  (COMMERCE_EVENT as readonly string[]).includes(name);
+
+/**
+ * 브라우저가 보내면 버리는 이벤트.
+ *
+ * 매출이 걸린 이벤트를 클라이언트에서 받으면 누구나 curl 로 매출을 지어낼 수 있다.
+ * 이 둘은 주문 확정·환불 처리 서버 코드에서만 기록한다.
+ */
+export const SERVER_ONLY_EVENT = ['purchase', 'refund'] as const;
+export type ServerOnlyEvent = (typeof SERVER_ONLY_EVENT)[number];
+
+export const isServerOnlyEvent = (name: string): name is ServerOnlyEvent =>
+  (SERVER_ONLY_EVENT as readonly string[]).includes(name);
+
+/**
+ * 분석 동의 없이도 기록하는 이벤트.
+ * 주문을 처리하고 문제를 추적하는 데 반드시 필요한 것들만 남긴다.
+ */
+export const ESSENTIAL_EVENT = ['purchase', 'refund', 'login', 'sign_up'] as const;
+
+export const requiresConsent = (name: CommerceEvent): boolean =>
+  !(ESSENTIAL_EVENT as readonly string[]).includes(name);
+
+// ── 퍼널 ──────────────────────────────────────────────────────
+
+/** 조회 → 담기 → 체크아웃 → 결제. 순서가 곧 정의다. */
+export const FUNNEL_STEP = ['view_item', 'add_to_cart', 'begin_checkout', 'purchase'] as const;
+export type FunnelStep = (typeof FUNNEL_STEP)[number];
+
+export const FUNNEL_STEP_LABEL: Readonly<Record<FunnelStep, string>> = {
+  view_item: '상품 조회',
+  add_to_cart: '장바구니 담기',
+  begin_checkout: '주문서 진입',
+  purchase: '결제 완료',
+};
+
+export interface SessionEventNames {
+  readonly sessionId: string;
+  readonly names: readonly string[];
+}
+
+export interface FunnelStepResult {
+  readonly step: FunnelStep;
+  readonly label: string;
+  /** 이 단계까지 도달한 세션 수 */
+  readonly sessions: number;
+  /** 첫 단계 대비 비율(%). 소수 첫째 자리까지 */
+  readonly rateFromStart: number;
+  /** 직전 단계 대비 비율(%). 첫 단계는 100 */
+  readonly rateFromPrevious: number;
+  /** 직전 단계에서 여기까지 못 온 세션 수 */
+  readonly droppedFromPrevious: number;
+}
+
+const round1 = (n: number): number => Math.round(n * 10) / 10;
+
+/**
+ * 세션별 이벤트 이름 목록에서 퍼널을 계산한다.
+ *
+ * **앞 단계를 모두 거친 세션만** 다음 단계로 센다(strict).
+ * "그 이벤트가 있으면 도달"로 느슨하게 세면 상품 상세를 안 거치고 바로 장바구니로
+ * 온 세션 때문에 뒤 단계가 앞 단계보다 커져서 전환율이 100%를 넘는 표가 나온다.
+ */
+export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelStepResult[] {
+  let remaining = sessions.map((s) => new Set(s.names));
+  const results: FunnelStepResult[] = [];
+  let startCount = 0;
+  let previousCount = 0;
+
+  for (const [i, step] of FUNNEL_STEP.entries()) {
+    remaining = remaining.filter((names) => names.has(step));
+    const count = remaining.length;
+
+    if (i === 0) {
+      startCount = count;
+      previousCount = count;
+    }
+
+    results.push({
+      step,
+      label: FUNNEL_STEP_LABEL[step],
+      sessions: count,
+      rateFromStart: startCount === 0 ? 0 : round1((count / startCount) * 100),
+      rateFromPrevious: previousCount === 0 ? 0 : round1((count / previousCount) * 100),
+      droppedFromPrevious: previousCount - count,
+    });
+
+    previousCount = count;
+  }
+
+  return results;
+}
+
+// ── 싱크 ──────────────────────────────────────────────────────
+
+export interface TrackedEvent {
+  readonly name: CommerceEvent;
+  /** 브라우저가 찍은 시각. 기기 시계는 틀릴 수 있어 순서 복원에만 쓴다. */
+  readonly occurredAt: Date;
+  readonly sessionId: string;
+  readonly anonymousId: string;
+  readonly userId: string | null;
+  readonly path: string;
+  readonly referrer: string | null;
+  readonly productId: string | null;
+  readonly variantId: string | null;
+  readonly orderId: string | null;
+  readonly merchantId: string | null;
+  /** 금액(원). 서버가 기록하는 이벤트에서만 채워진다. */
+  readonly value: number | null;
+  readonly quantity: number | null;
+  /** mobile | tablet | desktop. 원본 User-Agent 는 저장하지 않는다. */
+  readonly deviceType: string | null;
+  /** 일별 솔트로 해시한 IP. 봇 판별에만 쓴다. */
+  readonly ipHash: string | null;
+  readonly props: Readonly<Record<string, unknown>>;
+}
+
+export interface EventSink {
+  readonly name: string;
+  send(events: readonly TrackedEvent[]): Promise<void>;
+}
+
+/**
+ * 여러 싱크에 동시에 보낸다.
+ *
+ * **일부 실패는 삼키고, 전부 실패하면 던진다.**
+ *
+ * 전부 삼키면 호출부가 "저장됐다"고 응답하는데 실제로는 아무 데도 안 남는 상황을
+ * 알아챌 수 없다. 실제로 그런 일이 있었다 — 스키마를 바꾼 뒤 클라이언트를 다시
+ * 만들지 않아 모든 적재가 실패했는데 API 는 계속 accepted 로 답했다.
+ *
+ * 던지더라도 사용자 요청을 깨뜨리는 건 호출부의 책임이다. 수집 API 는
+ * 이 예외를 잡아 202 로 답하되 본문에는 사실대로 적는다.
+ */
+export class AllSinksFailedError extends Error {
+  constructor(readonly failures: readonly { sink: string; error: unknown }[]) {
+    super(`모든 이벤트 싱크가 실패했습니다: ${failures.map((f) => f.sink).join(', ')}`);
+    this.name = 'AllSinksFailedError';
+  }
+}
+
+export function fanOut(
+  sinks: readonly EventSink[],
+  onError?: (sinkName: string, error: unknown) => void,
+): EventSink {
+  return {
+    name: `fanOut(${sinks.map((s) => s.name).join(', ')})`,
+    async send(events) {
+      if (events.length === 0 || sinks.length === 0) return;
+
+      const results = await Promise.allSettled(sinks.map((s) => s.send(events)));
+      const failures: { sink: string; error: unknown }[] = [];
+
+      results.forEach((r, i) => {
+        if (r.status !== 'rejected') return;
+        const sink = sinks[i]?.name ?? 'unknown';
+        failures.push({ sink, error: r.reason });
+        onError?.(sink, r.reason);
+      });
+
+      if (failures.length === sinks.length) throw new AllSinksFailedError(failures);
+    },
+  };
+}

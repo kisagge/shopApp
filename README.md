@@ -46,8 +46,8 @@ Node 24 LTS와 pnpm 11이 필요하다. `.nvmrc`와 `packageManager` 필드에 �
 | 계층 | 위치 | 무엇을 지키는가 |
 |---|---|---|
 | **UI · 디자인** | `packages/ui/test` | 컴포넌트 렌더링, axe 자동 접근성 검사, **디자인 토큰 명도대비 회귀** |
-| **프론트 로직** | `apps/web/test/cart-store.test.ts` | 장바구니 상태 — 수량 경계, 선택, 영속화 |
-| **백 로직** | `packages/core/test`, `packages/contract/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 입력 검증 |
+| **프론트 로직** | `apps/web/test/cart-store.test.ts`, `analytics-client.test.ts` | 장바구니 상태(수량 경계·선택·영속화), 이벤트 트래커(배치·세션 만료·동의 게이트) |
+| **백 로직** | `packages/core/test`, `packages/contract/test`, `packages/db/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 권한 정책, 이벤트 퍼널, 입력 검증, enum 정합성 |
 
 ```bash
 pnpm test                 # 전체
@@ -93,7 +93,6 @@ WCAG 대비를 계산한다. 실제로 이 프로젝트에서 처음 잡았던 �
 
 ## 아직 안 한 것
 
-- `packages/db` — Prisma 스키마 · 시드
 - `packages/native` — Capacitor 브릿지 파사드
 - `apps/mobile` — Capacitor 셸
 - 인증 (Better Auth)
