@@ -40,6 +40,14 @@ const listSelect = {
   variants: { select: { stock: true }, where: { isActive: true } },
 } as const;
 
+/**
+ * 팔 수 있는 브랜드 — 승인된 가맹점의 것이거나 자사 직매입(가맹점 없음).
+ * 가맹점을 정지시켰는데 상품이 계속 팔리면 처분이 처분이 아니다.
+ */
+function sellableBrand() {
+  return { OR: [{ merchantId: null }, { merchant: { status: 'APPROVED' as const } }] };
+}
+
 type ListRow = {
   id: string;
   slug: string; name: string; listPrice: number; salePrice: number | null;
@@ -77,7 +85,10 @@ function toListItem(p: ListRow, now: number): ProductListItem {
 /** 홈 화면 — 많이 팔린 순 */
 export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]> {
   const rows = await prisma.product.findMany({
-    where: { deletedAt: null, publishedAt: { not: null }, status: { in: ['ACTIVE', 'SOLD_OUT'] } },
+    where: {
+      deletedAt: null, publishedAt: { not: null }, status: { in: ['ACTIVE', 'SOLD_OUT'] },
+      brand: sellableBrand(),
+    },
     orderBy: [{ soldCount: 'desc' }, { publishedAt: 'desc' }],
     take: limit,
     select: listSelect,
@@ -103,6 +114,8 @@ export async function getProductsByCategory(
       deletedAt: null, publishedAt: { not: null },
       status: { in: ['ACTIVE', 'SOLD_OUT'] },
       categoryId: { in: categoryIds },
+      // 정지·해지된 가맹점의 상품은 목록에서 내려간다
+      brand: sellableBrand(),
     },
     orderBy: [{ soldCount: 'desc' }],
     take: limit,
@@ -167,7 +180,10 @@ export interface ProductDetail {
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   const p = await prisma.product.findFirst({
-    where: { slug, deletedAt: null, publishedAt: { not: null } },
+    where: {
+      slug, deletedAt: null, publishedAt: { not: null },
+      brand: sellableBrand(),
+    },
     select: {
       id: true, slug: true, name: true, description: true,
       listPrice: true, salePrice: true, ratingSum: true, reviewCount: true,

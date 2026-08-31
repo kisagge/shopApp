@@ -29,7 +29,9 @@ export async function quoteCart(
         select: {
           slug: true, name: true, listPrice: true, salePrice: true,
           status: true, deletedAt: true,
-          brand: { select: { name: true } },
+          // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면
+          // 정지 처분이 판매를 멈추지 못한다.
+          brand: { select: { name: true, merchant: { select: { status: true } } } },
         },
       },
     },
@@ -43,7 +45,12 @@ export async function quoteCart(
     if (!v || v.product.deletedAt !== null || v.product.status === 'DRAFT') {
       return emptyLine(l.variantId, l.quantity, 'NOT_FOUND');
     }
-    if (!v.isActive || v.product.status === 'HIDDEN') {
+    if (
+      !v.isActive ||
+      v.product.status === 'HIDDEN' ||
+      // 자사 직매입 브랜드는 가맹점이 없다 — 그때는 막지 않는다
+      (v.product.brand.merchant?.status ?? 'APPROVED') !== 'APPROVED'
+    ) {
       return emptyLine(l.variantId, l.quantity, 'INACTIVE', v.product.name, v.label);
     }
 
