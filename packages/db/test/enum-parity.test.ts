@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   ORDER_STATUS, ORDER_STATUS_LABEL, USER_ROLE, USER_ROLE_LABEL,
   PAYMENT_STATUS_CODE, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_CODE,
+  MEMBER_GRADE, MEMBER_GRADE_LABEL,
 } from '@shop/core';
-import { OrderStatus, UserRole, PaymentStatus, PaymentMethod } from '../src/generated/enums';
+import { OrderStatus, UserRole, PaymentStatus, PaymentMethod, MemberGrade } from '../src/generated/enums';
 
 /**
  * DB의 enum 과 도메인 로직의 상수가 어긋나면 규칙이 DB 에 반영되지 않는다.
@@ -40,5 +41,15 @@ describe('결제 enum 정합성', () => {
 
   it('모든 결제 상태에 한글 라벨이 있다', () => {
     for (const s of Object.values(PaymentStatus)) expect(PAYMENT_STATUS_LABEL[s]).toBeTruthy();
+  });
+});
+
+describe('MemberGrade 정합성', () => {
+  it('Prisma enum 과 core 의 MEMBER_GRADE 가 같은 집합이다', () => {
+    expect(Object.values(MemberGrade).toSorted()).toEqual([...MEMBER_GRADE].toSorted());
+  });
+
+  it('모든 등급에 한글 라벨이 있다', () => {
+    for (const g of Object.values(MemberGrade)) expect(MEMBER_GRADE_LABEL[g]).toBeTruthy();
   });
 });

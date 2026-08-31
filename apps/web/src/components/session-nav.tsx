@@ -31,6 +31,9 @@ export function SessionNav() {
 
   return (
     <span className="flex items-center gap-3">
+      <Link href="/mypage" className="text-xs text-[var(--fg-secondary)] no-underline">
+        마이페이지
+      </Link>
       <span className="text-xs text-[var(--fg-secondary)]">
         {data.user.name}
         {role && role !== 'CUSTOMER' && (

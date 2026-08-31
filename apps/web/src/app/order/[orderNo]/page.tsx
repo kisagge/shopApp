@@ -3,7 +3,8 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
-import { format, won, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
+import { format, won, ORDER_STATUS_LABEL, isCancellableByCustomer, type OrderStatus } from '@shop/core';
+import { CancelOrderButton } from '~/components/cancel-order-button';
 import { getOrderForUser } from '~/lib/queries/orders';
 
 export const metadata: Metadata = { title: '주문 완료' };
@@ -93,13 +94,24 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         </p>
       </section>
 
-      <div className="mt-10 flex gap-2">
-        <Link
-          href="/"
-          className="inline-flex h-12 flex-1 items-center justify-center rounded-sm bg-n-900 text-sm font-medium text-n-0 no-underline"
-        >
-          쇼핑 계속하기
-        </Link>
+      <div className="mt-10 flex flex-col gap-3">
+        {isCancellableByCustomer(order.status as OrderStatus) && (
+          <CancelOrderButton orderNo={order.orderNo} />
+        )}
+        <div className="flex gap-2">
+          <Link
+            href="/mypage/orders"
+            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm border border-n-300 text-sm font-medium no-underline"
+          >
+            주문 내역
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm bg-n-900 text-sm font-medium text-n-0 no-underline"
+          >
+            쇼핑 계속하기
+          </Link>
+        </div>
       </div>
     </div>
   );
