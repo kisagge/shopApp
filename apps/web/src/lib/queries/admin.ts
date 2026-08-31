@@ -468,3 +468,64 @@ export async function getPendingSettlement(actor: Actor) {
     net: won(gross - commission),
   };
 }
+
+// ── 상품 상세 (수정 화면) ──────────────────────────────────────
+
+export interface AdminProductDetail {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly description: string;
+  readonly brandId: string;
+  readonly brandName: string;
+  readonly categoryId: string;
+  readonly categoryName: string;
+  readonly listPrice: Won;
+  readonly salePrice: Won | null;
+  readonly status: string;
+  readonly variants: readonly {
+    readonly id: string;
+    readonly sku: string;
+    readonly optionLabel: string;
+    readonly stock: number;
+    readonly isActive: boolean;
+  }[];
+}
+
+export async function getAdminProductDetail(
+  actor: Actor,
+  productId: string,
+): Promise<AdminProductDetail | null> {
+  const scope = scopeOf(actor);
+
+  const p = await prisma.product.findFirst({
+    where: {
+      id: productId,
+      deletedAt: null,
+      ...(scope ? { brand: { merchantId: scope } } : {}),
+    },
+    select: {
+      id: true, slug: true, name: true, description: true,
+      listPrice: true, salePrice: true, status: true,
+      brand: { select: { id: true, name: true } },
+      category: { select: { id: true, name: true } },
+      variants: {
+        orderBy: { sku: 'asc' },
+        select: { id: true, sku: true, label: true, stock: true, isActive: true },
+      },
+    },
+  });
+  if (!p) return null;
+
+  return {
+    id: p.id, slug: p.slug, name: p.name, description: p.description,
+    brandId: p.brand.id, brandName: p.brand.name,
+    categoryId: p.category.id, categoryName: p.category.name,
+    listPrice: won(p.listPrice),
+    salePrice: p.salePrice === null ? null : won(p.salePrice),
+    status: p.status,
+    variants: p.variants.map((v) => ({
+      id: v.id, sku: v.sku, optionLabel: v.label, stock: v.stock, isActive: v.isActive,
+    })),
+  };
+}

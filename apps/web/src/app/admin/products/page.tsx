@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Badge } from '@shop/ui';
-import { format, discountRateOf } from '@shop/core';
+import { format, discountRateOf, hasPermission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin';
 
@@ -17,6 +18,7 @@ const STATUS_TONE: Record<string, 'success' | 'danger' | 'neutral'> = {
 export default async function AdminProductsPage() {
   const actor = await requireAdmin('product:read');
   const products = await getAdminProducts(actor);
+  const canWrite = hasPermission(actor, 'product:write');
 
   return (
     <>
@@ -28,6 +30,15 @@ export default async function AdminProductsPage() {
             {actor.merchantId && ' · 내 브랜드만'}
           </p>
         </div>
+
+        {canWrite && (
+          <Link
+            href="/admin/products/new"
+            className="inline-flex h-10 items-center rounded-sm bg-[var(--brand)] px-4 text-sm font-medium text-[var(--bg)] no-underline hover:bg-[var(--brand-hover)]"
+          >
+            상품 등록
+          </Link>
+        )}
       </header>
 
       <main className="p-8">
@@ -55,7 +66,14 @@ export default async function AdminProductsPage() {
                   return (
                     <tr key={p.id} className="border-b border-[var(--surface-2)] last:border-0">
                       <td className="px-4 py-3">
-                        <span className="block text-[13px]">{p.name}</span>
+                        {/* 행 전체를 클릭 영역으로 만들지 않는다. 링크는 링크로
+                            보여야 키보드 사용자가 순서대로 짚어 갈 수 있다. */}
+                        <Link
+                          href={`/admin/products/${p.id}`}
+                          className="block text-[13px] text-[var(--fg)] no-underline hover:underline"
+                        >
+                          {p.name}
+                        </Link>
                         <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
                       </td>
                       <td className="px-4 py-3 text-xs text-[var(--fg-secondary)]">{p.categoryName}</td>
@@ -93,9 +111,6 @@ export default async function AdminProductsPage() {
             </table>
           )}
         </div>
-        <p className="mt-3 text-[11px] text-[var(--fg-muted)]">
-          상품 등록·수정은 아직 붙지 않았습니다
-        </p>
       </main>
     </>
   );
