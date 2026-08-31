@@ -14,18 +14,28 @@ function createClient(): PrismaClient {
   if (!connectionString) {
     throw new Error('DATABASE_URL 이 설정되지 않았습니다. .env 를 확인하세요.');
   }
-  const adapter = new PrismaPg({ connectionString });
   return new PrismaClient({
-    adapter,
+    adapter: new PrismaPg({ connectionString }),
     log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
   });
 }
 
 // 개발 중 HMR이 돌 때마다 클라이언트를 새로 만들면 커넥션이 쌓인다.
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+const globalForPrisma = globalThis as unknown as { __shopPrisma?: PrismaClient };
 
-export const prisma: PrismaClient = globalForPrisma.prisma ?? createClient();
-
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+/**
+ * 모듈을 불러오는 시점이 아니라 **처음 쓰는 시점**에 연결을 만든다.
+ *
+ * 이유가 두 가지다.
+ * 1) ESM은 import 를 본문보다 먼저 평가한다. 모듈 최상단에서 클라이언트를
+ *    만들면 dotenv 로 .env 를 읽기도 전에 DATABASE_URL 을 찾게 된다.
+ * 2) CI와 Vercel 빌드는 DB 없이 돈다. import 만으로 던지면 DB를 전혀 건드리지
+ *    않는 페이지의 빌드까지 같이 죽는다.
+ */
+export const prisma: PrismaClient = new Proxy({} as PrismaClient, {
+  get(_target, prop, receiver) {
+    globalForPrisma.__shopPrisma ??= createClient();
+    const value = Reflect.get(globalForPrisma.__shopPrisma, prop, receiver);
+    return typeof value === 'function' ? value.bind(globalForPrisma.__shopPrisma) : value;
+  },
+});

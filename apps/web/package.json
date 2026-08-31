@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@shop/db": "workspace:*",
     "@shop/core": "workspace:*",
     "@shop/ui": "workspace:*",
     "@tanstack/react-query": "5.102.8",
@@ -20,7 +21,8 @@
     "react-dom": "19.2.8",
     "zod": "4.5.4",
     "zustand": "5.0.15",
-    "@shop/contract": "workspace:*"
+    "@shop/contract": "workspace:*",
+    "server-only": "0.0.1"
   },
   "devDependencies": {
     "@shop/config": "workspace:*",

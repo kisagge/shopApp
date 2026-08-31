@@ -10,7 +10,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - shop-pgdata:/var/lib/postgresql/data
+      # Postgres 18부터 데이터 디렉토리 규약이 바뀌었다. /var/lib/postgresql/data 가
+      # 아니라 상위 디렉토리를 마운트해야 pg_upgrade --link 가 마운트 경계를 넘지 않는다.
+      # https://github.com/docker-library/postgres/pull/1259
+      - shop-pgdata:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
       interval: 5s

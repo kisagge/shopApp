@@ -1,4 +1,9 @@
-import 'dotenv/config';
+import { resolve } from 'node:path';
+import { config } from 'dotenv';
+
+// 모노레포 루트의 .env 를 읽는다 (cwd 는 packages/db)
+config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
+
 import { prisma } from './client';
 
 /**
@@ -23,6 +28,29 @@ const CATEGORIES = [
   ]},
   { slug: 'shoes', name: '슈즈', children: [] },
   { slug: 'accessory', name: '액세서리', children: [] },
+];
+
+/// 가맹점. PLAIN LABEL 은 자사 브랜드라 가맹점에 속하지 않는다(merchantId = null).
+/// 자사 상품은 가맹점이 건드릴 수 없고 운영진만 다룬다 — authz 의 ownsMerchant 참고.
+const MERCHANTS = [
+  {
+    name: '스튜디오눈', businessName: '주식회사 스튜디오눈',
+    businessNumber: '000-00-00001', representative: '[대표자명]',
+    contactEmail: 'contact@studionoon.test', contactPhone: '02-0000-0001',
+    commissionPercent: 15, brands: ['studio-noon'],
+  },
+  {
+    name: '아뜰리에케이', businessName: '아뜰리에케이',
+    businessNumber: '000-00-00002', representative: '[대표자명]',
+    contactEmail: 'contact@atelierk.test', contactPhone: '02-0000-0002',
+    commissionPercent: 18, brands: ['atelier-k'],
+  },
+  {
+    name: '무어', businessName: '무어컴퍼니',
+    businessNumber: '000-00-00003', representative: '[대표자명]',
+    contactEmail: 'contact@moor.test', contactPhone: '02-0000-0003',
+    commissionPercent: 12, brands: ['moor'],
+  },
 ];
 
 const BRANDS = [
@@ -159,6 +187,21 @@ async function main(): Promise<void> {
     });
   }
   console.log(`  브랜드 ${BRANDS.length}개`);
+  // ── 가맹점 + 브랜드 연결
+  for (const m of MERCHANTS) {
+    const { brands, ...data } = m;
+    const merchant = await prisma.merchant.upsert({
+      where: { businessNumber: m.businessNumber },
+      update: { status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
+      create: { ...data, status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
+    });
+    await prisma.brand.updateMany({
+      where: { slug: { in: brands } },
+      data: { merchantId: merchant.id },
+    });
+  }
+  console.log(`  가맹점 ${MERCHANTS.length}개 (PLAIN LABEL 은 자사 브랜드)`);
+
 
   // ── 상품 · 옵션 · 변형
   let variantCount = 0;
@@ -287,7 +330,32 @@ async function main(): Promise<void> {
       address2: '101동 1102호', isDefault: true,
     },
   });
-  console.log('  데모 계정 1개 (demo@plain.test)');
+  // ── 역할별 계정. 비밀번호는 인증(Better Auth)이 붙을 때 넣는다.
+  await prisma.user.upsert({
+    where: { email: 'super@plain.test' },
+    update: { role: 'SUPER_ADMIN' },
+    create: { email: 'super@plain.test', name: '슈퍼관리자', role: 'SUPER_ADMIN', emailVerified: true },
+  });
+  await prisma.user.upsert({
+    where: { email: 'admin@plain.test' },
+    update: { role: 'ADMIN' },
+    create: { email: 'admin@plain.test', name: '운영 관리자', role: 'ADMIN', emailVerified: true },
+  });
+  for (const m of MERCHANTS) {
+    const merchant = await prisma.merchant.findUniqueOrThrow({
+      where: { businessNumber: m.businessNumber },
+    });
+    await prisma.user.upsert({
+      where: { email: m.contactEmail },
+      update: { role: 'MERCHANT', merchantId: merchant.id },
+      create: {
+        email: m.contactEmail, name: `${m.name} 담당자`,
+        role: 'MERCHANT', merchantId: merchant.id, emailVerified: true,
+      },
+    });
+  }
+  console.log(`  계정 ${MERCHANTS.length + 3}개 — 고객 1 / 가맹점 ${MERCHANTS.length} / 관리자 1 / 슈퍼관리자 1`);
+
 
   console.log('시드 완료');
 }

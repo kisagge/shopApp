@@ -1,0 +1,187 @@
+/**
+ * 권한 정책.
+ *
+ * 화면(어드민 메뉴 노출)과 서버(라우트 가드) 양쪽이 같은 규칙을 봐야 한다.
+ * 한쪽에만 규칙이 있으면 메뉴는 안 보이는데 URL로 직접 치면 되는 구멍이 생긴다.
+ *
+ * 두 층으로 나뉜다.
+ * 1) **역할이 가진 권한** — hasPermission. "가맹점은 상품을 쓸 수 있다"
+ * 2) **그 대상이 자기 것인가** — canManageProduct 등. "그런데 남의 브랜드는 안 된다"
+ * 1번만 통과시키면 가맹점이 남의 상품을 고칠 수 있다. 항상 둘 다 본다.
+ */
+
+export const USER_ROLE = ['CUSTOMER', 'MERCHANT', 'ADMIN', 'SUPER_ADMIN'] as const;
+export type UserRole = (typeof USER_ROLE)[number];
+
+export const USER_ROLE_LABEL: Readonly<Record<UserRole, string>> = {
+  CUSTOMER: '고객',
+  MERCHANT: '가맹점',
+  ADMIN: '관리자',
+  SUPER_ADMIN: '슈퍼관리자',
+};
+
+export interface Actor {
+  readonly id: string;
+  readonly role: UserRole;
+  /** MERCHANT 일 때만 채워진다. 이 값이 볼 수 있는 범위를 정한다. */
+  readonly merchantId: string | null;
+}
+
+export const PERMISSION = [
+  'admin:access',       // 어드민 콘솔 진입
+  'product:read',
+  'product:write',
+  'product:publish',
+  'order:read',
+  'order:fulfill',      // 배송 준비 → 배송중
+  'order:cancel',
+  'order:refund',       // 돈이 나가는 동작
+  'merchant:read',
+  'merchant:write',
+  'merchant:approve',   // 입점 승인
+  'user:read',
+  'user:write',
+  'user:assignRole',    // 권한 부여
+  'coupon:read',
+  'coupon:write',
+  'settlement:read',
+  'settlement:confirm', // 정산 금액 확정
+  'settlement:pay',     // 실제 지급 집행
+  'review:write',
+  'review:moderate',
+] as const;
+export type Permission = (typeof PERMISSION)[number];
+
+const CUSTOMER: readonly Permission[] = ['product:read', 'order:read', 'review:write'];
+
+const MERCHANT: readonly Permission[] = [
+  'admin:access',
+  'product:read', 'product:write', 'product:publish',
+  'order:read', 'order:fulfill',
+  'merchant:read', 'merchant:write',
+  'settlement:read',
+];
+
+/**
+ * 관리자에게 없는 것 셋 — 권한 부여, 가맹점 입점 승인, 정산 지급 집행.
+ * 계정을 만들어 스스로 권한을 올리거나 돈을 빼는 경로를 한 사람이 완결하지
+ * 못하게 나눈 것이다.
+ */
+const ADMIN: readonly Permission[] = [
+  'admin:access',
+  'product:read', 'product:write', 'product:publish',
+  'order:read', 'order:fulfill', 'order:cancel', 'order:refund',
+  'merchant:read', 'merchant:write',
+  'user:read', 'user:write',
+  'coupon:read', 'coupon:write',
+  'settlement:read', 'settlement:confirm',
+  'review:write', 'review:moderate',
+];
+
+const SUPER_ADMIN: readonly Permission[] = PERMISSION;
+
+const ROLE_PERMISSIONS: Readonly<Record<UserRole, readonly Permission[]>> = {
+  CUSTOMER, MERCHANT, ADMIN, SUPER_ADMIN,
+};
+
+export class ForbiddenError extends Error {
+  constructor(readonly actor: Actor, readonly permission: Permission) {
+    super(`${USER_ROLE_LABEL[actor.role]}에게는 ${permission} 권한이 없습니다.`);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export const permissionsOf = (role: UserRole): readonly Permission[] => ROLE_PERMISSIONS[role];
+
+export function hasPermission(actor: Actor, permission: Permission): boolean {
+  // 가맹점인데 소속이 없으면 아무 범위도 없다. 안전한 쪽으로 닫는다.
+  if (actor.role === 'MERCHANT' && actor.merchantId === null) return false;
+  return ROLE_PERMISSIONS[actor.role].includes(permission);
+}
+
+export function assertPermission(actor: Actor, permission: Permission): void {
+  if (!hasPermission(actor, permission)) throw new ForbiddenError(actor, permission);
+}
+
+// ── 범위 판정 ────────────────────────────────────────────────
+
+const isStaff = (actor: Actor): boolean =>
+  actor.role === 'ADMIN' || actor.role === 'SUPER_ADMIN';
+
+/** 그 가맹점의 데이터를 다룰 수 있는가 */
+export function ownsMerchant(actor: Actor, merchantId: string | null): boolean {
+  if (isStaff(actor)) return true;
+  if (actor.role !== 'MERCHANT' || actor.merchantId === null) return false;
+  return actor.merchantId === merchantId;
+}
+
+/**
+ * 상품을 고칠 수 있는가.
+ * merchantId 가 null 인 상품은 자사 직매입이라 운영진만 다룬다.
+ */
+export function canManageProduct(actor: Actor, product: { merchantId: string | null }): boolean {
+  return hasPermission(actor, 'product:write') && ownsMerchant(actor, product.merchantId);
+}
+
+/**
+ * 주문을 볼 수 있는가.
+ * 고객은 자기 주문만, 가맹점은 자기 상품이 한 줄이라도 들어간 주문만 본다.
+ * (한 주문에 여러 가맹점 상품이 섞일 수 있어 줄 단위로 판단한다)
+ */
+export function canViewOrder(
+  actor: Actor,
+  order: { userId: string; itemMerchantIds: readonly (string | null)[] },
+): boolean {
+  if (isStaff(actor)) return hasPermission(actor, 'order:read');
+  if (actor.role === 'CUSTOMER') return actor.id === order.userId;
+  if (actor.role === 'MERCHANT') {
+    if (!hasPermission(actor, 'order:read')) return false;
+    return order.itemMerchantIds.includes(actor.merchantId);
+  }
+  return false;
+}
+
+/** 주문 줄을 출고 처리할 수 있는가 */
+export function canFulfillOrderItem(actor: Actor, item: { merchantId: string | null }): boolean {
+  return hasPermission(actor, 'order:fulfill') && ownsMerchant(actor, item.merchantId);
+}
+
+/** 환불은 돈이 나가는 동작이라 가맹점에게 주지 않는다 */
+export function canRefundOrder(actor: Actor): boolean {
+  return hasPermission(actor, 'order:refund');
+}
+
+export function canViewSettlement(actor: Actor, settlement: { merchantId: string }): boolean {
+  return hasPermission(actor, 'settlement:read') && ownsMerchant(actor, settlement.merchantId);
+}
+
+/**
+ * 권한을 부여할 수 있는가.
+ * 자기 자신의 역할은 바꾸지 못한다 — 스스로 강등해 감사 흔적을 지우거나,
+ * 실수로 마지막 슈퍼관리자를 없애는 일을 막는다.
+ */
+export function canAssignRole(actor: Actor, target: { id: string }, _newRole: UserRole): boolean {
+  if (!hasPermission(actor, 'user:assignRole')) return false;
+  return actor.id !== target.id;
+}
+
+/**
+ * 다른 사용자 계정을 수정할 수 있는가.
+ * 관리자는 슈퍼관리자 계정을 건드리지 못한다.
+ */
+export function canEditUser(actor: Actor, target: { id: string; role: UserRole }): boolean {
+  if (!hasPermission(actor, 'user:write')) return false;
+  if (target.role === 'SUPER_ADMIN' && actor.role !== 'SUPER_ADMIN') return false;
+  return true;
+}
+
+/**
+ * 목록 쿼리에 붙일 가맹점 범위.
+ * null 이면 제한 없음(운영진), 문자열이면 그 가맹점으로 좁힌다.
+ * undefined 면 볼 수 있는 게 없다.
+ */
+export function merchantScope(actor: Actor): string | null | undefined {
+  if (isStaff(actor)) return null;
+  if (actor.role === 'MERCHANT' && actor.merchantId !== null) return actor.merchantId;
+  return undefined;
+}

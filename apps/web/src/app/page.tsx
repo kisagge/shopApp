@@ -1,7 +1,22 @@
 import { ProductCard } from '@shop/ui';
-import { SAMPLE_PRODUCTS } from '~/lib/sample-products';
+import { getFeaturedProducts, getTopCategories } from '~/lib/queries/products';
 
-export default function HomePage() {
+/** 상품 이미지가 아직 없어 톤 블록으로 대체한다. 실제 이미지가 붙으면 사라질 코드. */
+const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
+
+/**
+ * 지금은 매 요청마다 DB를 읽는다.
+ * ISR(revalidate)로 바꾸면 빌드 시점에 DB가 필요해지는데, CI에는 DB가 없어서
+ * 빌드가 깨진다. 캐싱은 CI에 서비스 컨테이너를 붙이면서 같이 손볼 것.
+ */
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  const [products, categories] = await Promise.all([
+    getFeaturedProducts(10),
+    getTopCategories(),
+  ]);
+
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-[1280px] flex-col">
       <header className="safe-t flex h-13 items-center justify-between px-4 md:h-19 md:px-10">
@@ -12,13 +27,13 @@ export default function HomePage() {
         </h1>
         <nav aria-label="주요 카테고리" className="hidden md:block">
           <ul className="flex gap-1">
-            {['신상품', '아우터', '니트', '팬츠', '슈즈'].map((label) => (
-              <li key={label}>
+            {categories.map((c) => (
+              <li key={c.slug}>
                 <a
-                  href="/category"
+                  href={`/category/${c.slug}`}
                   className="inline-flex h-11 items-center px-4 text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
-                  {label}
+                  {c.name}
                 </a>
               </li>
             ))}
@@ -64,7 +79,7 @@ export default function HomePage() {
             </h2>
           </div>
           <ul className="grid grid-cols-2 gap-x-3 gap-y-6 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4 xl:grid-cols-5">
-            {SAMPLE_PRODUCTS.map((p) => (
+            {products.map((p, i) => (
               <li key={p.slug}>
                 <ProductCard
                   href={`/product/${p.slug}`}
@@ -75,9 +90,10 @@ export default function HomePage() {
                   discountPercent={p.discountPercent}
                   rating={p.rating}
                   reviewCount={p.reviewCount}
-                  soldOut={p.soldOut ?? false}
-                  isNew={p.isNew ?? false}
-                  placeholderTone={p.tone}
+                  soldOut={p.soldOut}
+                  isNew={p.isNew}
+                  image={p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined}
+                  placeholderTone={TONES[i % TONES.length] ?? 'sand'}
                 />
               </li>
             ))}
