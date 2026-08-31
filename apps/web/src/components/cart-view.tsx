@@ -100,6 +100,7 @@ export function CartView() {
             onClick={() => {
               if (buyableCount === 0) return;
               track('begin_checkout', { itemCount: buyableCount });
+              window.location.href = '/checkout';
             }}
           >
             {buyableCount === 0
