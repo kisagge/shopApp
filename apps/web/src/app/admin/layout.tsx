@@ -7,7 +7,7 @@ import { AdminSignOut } from '~/components/admin-sign-out';
 export const dynamic = 'force-dynamic';
 
 interface NavItem {
-  readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements';
+  readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit';
   readonly label: string;
   readonly permission: Permission;
 }
@@ -17,6 +17,8 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/orders', label: '주문', permission: 'order:read' },
   { href: '/admin/products', label: '상품', permission: 'product:read' },
   { href: '/admin/settlements', label: '정산', permission: 'settlement:read' },
+  // 가맹점에게는 보이지 않는다. 감사 로그는 운영진을 감시하는 도구다.
+  { href: '/admin/audit', label: '감사 로그', permission: 'user:read' },
 ];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
