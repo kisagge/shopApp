@@ -9,6 +9,7 @@ dist/
 build/
 .turbo/
 *.tsbuildinfo
+apps/web/next-env.d.ts
 
 # 환경변수 (절대 커밋 금지)
 .env

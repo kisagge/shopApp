@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# 같은 브랜치에 연속 푸시하면 이전 실행을 취소한다 — 프라이빗 저장소는 분당 과금이다
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TURBO_TELEMETRY_DISABLED: 1
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  verify:
+    name: 타입체크 · 테스트 · 빌드
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: pnpm 설치
+        uses: pnpm/action-setup@v6
+        # 버전은 package.json 의 packageManager 필드를 따른다
+
+      - name: Node 설치
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: 의존성 설치
+        run: pnpm install --frozen-lockfile
+
+      - name: Turbo 캐시 복원
+        uses: actions/cache@v6
+        with:
+          path: .turbo
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
+
+      - name: 타입체크
+        run: pnpm turbo run typecheck
+
+      - name: 테스트
+        run: pnpm turbo run test
+
+      - name: 빌드
+        run: pnpm turbo run build

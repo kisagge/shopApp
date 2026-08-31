@@ -1,0 +1,6 @@
+@import "@shop/ui/styles.css";
+
+/* Tailwind v4는 CSS 파일 위치를 기준으로 클래스를 스캔한다.
+   워크스페이스 패키지는 범위 밖이라 명시해 줘야 한다. */
+@source "../../../../packages/ui/src";
+@source "../";

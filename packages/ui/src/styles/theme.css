@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/**
+ * PLAIN 디자인 토큰.
+ * 색은 oklch로 설계했다. 뉴트럴은 hue 75 / chroma <= 0.009 —
+ * 순수 회색보다 미세하게 따뜻해서 상품 사진과 부딪히지 않는다.
+ *
+ * 여기 있는 값은 명도대비를 계산해서 검증한 것이다.
+ * 새 색을 즉흥적으로 만들지 말고 이 단계에서 고를 것.
+ */
+@theme {
+  /* ── 뉴트럴 ─────────────────────────────────────── */
+  --color-n-0:   oklch(0.995 0.002 75);
+  --color-n-50:  oklch(0.975 0.004 75);
+  --color-n-100: oklch(0.945 0.005 75);
+  --color-n-200: oklch(0.905 0.006 75);
+  --color-n-300: oklch(0.845 0.007 75);
+  --color-n-400: oklch(0.720 0.008 75);
+  --color-n-500: oklch(0.540 0.009 75);
+  --color-n-600: oklch(0.480 0.009 75);
+  --color-n-700: oklch(0.380 0.008 75);
+  --color-n-800: oklch(0.300 0.008 75);
+  --color-n-900: oklch(0.200 0.007 75);
+  --color-n-950: oklch(0.145 0.006 75);
+
+  /* ── 시맨틱 ─────────────────────────────────────── */
+  /* accent: 세일·가격 강조. 본문 크기에서 5.2:1 */
+  --color-accent:       oklch(0.550 0.160 25);
+  --color-accent-hover: oklch(0.480 0.160 25);
+  --color-accent-soft:  oklch(0.970 0.014 25);
+  /* info: 배송·멤버십. 4.8:1 */
+  --color-info:      oklch(0.520 0.130 250);
+  --color-info-soft: oklch(0.970 0.014 250);
+  /* success: 4.9:1 (0.55에서는 4.49로 AA 미달이라 한 단계 내림) */
+  --color-success:      oklch(0.530 0.120 155);
+  --color-success-soft: oklch(0.970 0.014 155);
+  /* warning: 텍스트용 5.5:1 / 그래픽용 3.5:1 로 분리.
+     하나로 합치면 별점 아이콘이 탁해지거나 경고 문구가 대비 미달이 된다. */
+  --color-warning:         oklch(0.520 0.115 75);
+  --color-warning-graphic: oklch(0.630 0.140 75);
+  --color-warning-soft:    oklch(0.970 0.014 75);
+
+  /* ── 다크 테마 원본값 (아래 @layer에서 매핑) ────────── */
+  --color-dark-bg:       oklch(0.165 0.006 75);
+  --color-dark-surface:  oklch(0.215 0.007 75);
+  --color-dark-surface2: oklch(0.260 0.007 75);
+  --color-dark-border:   oklch(0.320 0.008 75);
+  --color-dark-muted:    oklch(0.660 0.009 75);
+  --color-dark-fg:       oklch(0.945 0.004 75);
+  --color-dark-accent:   oklch(0.680 0.150 25);
+
+  /* ── 상품 이미지 플레이스홀더 톤 ──────────────────── */
+  --color-ph-sand:  oklch(0.905 0.018 80);
+  --color-ph-stone: oklch(0.885 0.006 250);
+  --color-ph-clay:  oklch(0.860 0.028 45);
+  --color-ph-olive: oklch(0.880 0.022 120);
+  --color-ph-mist:  oklch(0.910 0.010 190);
+
+  /* ── 타이포 ─────────────────────────────────────── */
+  --font-sans: var(--font-plex-kr), 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-serif: var(--font-hahmlet), 'Hahmlet', 'Apple SD Gothic Neo', Georgia, serif;
+
+  /* ── 라운드: 8px 위로는 올리지 않는다 ──────────────── */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+
+  /* ── 엘리베이션 ─────────────────────────────────── */
+  --shadow-raised: 0 1px 2px rgb(24 22 19 / 0.06), 0 1px 8px rgb(24 22 19 / 0.04);
+  --shadow-sheet:  0 8px 28px rgb(24 22 19 / 0.13), 0 2px 6px rgb(24 22 19 / 0.06);
+}
+
+/**
+ * 역할 토큰. 컴포넌트는 n-900 같은 단계 이름이 아니라 fg/bg 같은 역할을 쓴다.
+ * 다크 테마는 자동 반전이 아니라 각 역할에 다른 단계를 배정한 것이다.
+ */
+@layer base {
+  :root {
+    --bg: var(--color-n-0);
+    --surface: var(--color-n-50);
+    --surface-2: var(--color-n-100);
+    --border: var(--color-n-200);
+    --border-strong: var(--color-n-300);
+    --fg: var(--color-n-900);
+    --fg-secondary: var(--color-n-700);
+    --fg-muted: var(--color-n-500);
+    --fg-disabled: var(--color-n-400);
+    --brand: var(--color-n-900);
+    --brand-hover: var(--color-n-950);
+    --ring: var(--color-n-900);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: var(--color-dark-bg);
+      --surface: var(--color-dark-surface);
+      --surface-2: var(--color-dark-surface2);
+      --border: var(--color-dark-border);
+      --border-strong: var(--color-dark-border);
+      --fg: var(--color-dark-fg);
+      --fg-secondary: oklch(0.820 0.006 75);
+      --fg-muted: var(--color-dark-muted);
+      --fg-disabled: oklch(0.480 0.008 75);
+      --brand: var(--color-dark-fg);
+      --brand-hover: oklch(1 0 0);
+      --ring: var(--color-dark-fg);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: var(--color-dark-bg);
+    --surface: var(--color-dark-surface);
+    --surface-2: var(--color-dark-surface2);
+    --border: var(--color-dark-border);
+    --border-strong: var(--color-dark-border);
+    --fg: var(--color-dark-fg);
+    --fg-secondary: oklch(0.820 0.006 75);
+    --fg-muted: var(--color-dark-muted);
+    --fg-disabled: oklch(0.480 0.008 75);
+    --brand: var(--color-dark-fg);
+    --brand-hover: oklch(1 0 0);
+    --ring: var(--color-dark-fg);
+  }
+
+  html {
+    /* iOS 사파리에서 가로 회전 시 글자가 커지는 것을 막는다 */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-wrap: pretty;
+  }
+
+  /* 포커스 링은 절대 제거하지 않는다. 마우스 사용자에게만 숨긴다. */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-xs);
+  }
+
+  /* 모션 민감 사용자 존중 */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  /* 금액은 자릿수가 흔들리면 읽기 어렵다 */
+  .tnum { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
+
+  /* Capacitor 웹뷰: OS 상태바·홈 인디케이터가 레이아웃 위에 그려진다 */
+  .safe-t { padding-top: env(safe-area-inset-top, 0px); }
+  .safe-b { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .safe-x {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+}
