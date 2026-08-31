@@ -36,6 +36,11 @@ export const createOrderRequestSchema = z
     deliveryMemo: z.string().trim().max(100).optional(),
     couponCode: z.string().trim().min(1).max(64).optional(),
     pointsToUse: wonSchema.optional(),
+    /** 브라우저 세션 식별자. 퍼널 연결용이라 없어도 주문은 된다. */
+    browserSessionId: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{8,64}$/)
+      .optional(),
     paymentMethod: z.enum(PAYMENT_METHOD),
     /** 약관 동의 없이 주문을 만들지 않는다 */
     agreedToTerms: z.literal(true, '약관에 동의해야 주문할 수 있습니다'),

@@ -297,3 +297,16 @@ describe('주문번호 충돌', () => {
     expect(tx.order.create).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('퍼널 연결', () => {
+  it('브라우저 세션을 주문에 남긴다', async () => {
+    await createOrder(request({ browserSessionId: 'sess_browser01' }), user);
+    expect(tx.order.create.mock.calls[0]![0].data.browserSessionId).toBe('sess_browser01');
+  });
+
+  it('세션이 없어도 주문은 성립한다 — 분석용 필드가 주문을 막으면 안 된다', async () => {
+    const r = await createOrder(request(), user);
+    expect(r.orderNo).toBeTruthy();
+    expect(tx.order.create.mock.calls[0]![0].data.browserSessionId).toBeNull();
+  });
+});

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
-  isCancellableByCustomer, holdsInventory, OrderTransitionError, type OrderStatus,
+  isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -50,5 +50,32 @@ describe('주문 상태 전이', () => {
 
   it('모든 상태에 전이 규칙이 정의돼 있다', () => {
     for (const s of ORDER_STATUS) expect(Array.isArray(nextStatuses(s))).toBe(true);
+  });
+});
+
+describe('slowestFulfillmentStatus — 주문 전체 상태는 가장 뒤처진 줄이 정한다', () => {
+  it('줄마다 다르면 가장 뒤처진 것을 고른다', () => {
+    // 한 가맹점이 출고했다고 주문 전체가 배송중이 되면,
+    // 아직 준비 중인 다른 상품까지 배송중으로 보인다
+    expect(slowestFulfillmentStatus(['SHIPPED', 'PREPARING'])).toBe('PREPARING');
+    expect(slowestFulfillmentStatus(['DELIVERED', 'PAID', 'SHIPPED'])).toBe('PAID');
+  });
+
+  it('전부 같으면 그 상태다', () => {
+    expect(slowestFulfillmentStatus(['SHIPPED', 'SHIPPED'])).toBe('SHIPPED');
+  });
+
+  it('한 줄이면 그 줄의 상태다', () => {
+    expect(slowestFulfillmentStatus(['PREPARING'])).toBe('PREPARING');
+  });
+
+  it('이행 경로 밖의 상태가 섞이면 판단하지 않는다', () => {
+    // 일부만 취소된 주문의 전체 상태는 별도 정책이 필요하다
+    expect(slowestFulfillmentStatus(['SHIPPED', 'CANCELLED'])).toBeNull();
+    expect(slowestFulfillmentStatus(['RETURN_REQUESTED'])).toBeNull();
+  });
+
+  it('빈 목록이면 null 이다', () => {
+    expect(slowestFulfillmentStatus([])).toBeNull();
   });
 });

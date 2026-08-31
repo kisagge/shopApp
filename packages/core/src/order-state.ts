@@ -76,3 +76,47 @@ export const isCancellableByCustomer = (status: OrderStatus): boolean =>
 export const holdsInventory = (status: OrderStatus): boolean =>
   status === 'PENDING' || status === 'PAID' || status === 'PREPARING' ||
   status === 'SHIPPED' || status === 'DELIVERED' || status === 'CONFIRMED';
+
+/**
+ * 이행 경로의 진행 순서.
+ *
+ * 한 주문에 여러 가맹점 상품이 섞이면 줄마다 상태가 달라진다. 그때
+ * **주문 전체의 상태는 가장 뒤처진 줄이 정한다** — 한 가맹점이 출고했다고
+ * 주문 전체가 배송중이 되면, 아직 준비 중인 다른 상품까지 배송중으로 보인다.
+ *
+ * 취소·반품처럼 갈래로 빠진 상태는 이 순서에 넣지 않는다. 일부만 취소된
+ * 주문의 전체 상태는 별도 정책이 필요하고, 순서로 답할 문제가 아니다.
+ */
+const FULFILLMENT_RANK: Readonly<Partial<Record<OrderStatus, number>>> = {
+  PENDING: 0,
+  PAID: 1,
+  PREPARING: 2,
+  SHIPPED: 3,
+  DELIVERED: 4,
+  CONFIRMED: 5,
+};
+
+/**
+ * 여러 줄 중 가장 뒤처진 상태를 돌려준다.
+ *
+ * 이행 경로 밖의 상태(취소·반품 등)가 섞여 있으면 null 이다 —
+ * 그건 순서로 답할 수 없고 호출부가 따로 판단해야 한다.
+ */
+export function slowestFulfillmentStatus(
+  statuses: readonly OrderStatus[],
+): OrderStatus | null {
+  if (statuses.length === 0) return null;
+
+  let slowest: OrderStatus | null = null;
+  let slowestRank = Number.POSITIVE_INFINITY;
+
+  for (const status of statuses) {
+    const rank = FULFILLMENT_RANK[status];
+    if (rank === undefined) return null;
+    if (rank < slowestRank) {
+      slowestRank = rank;
+      slowest = status;
+    }
+  }
+  return slowest;
+}

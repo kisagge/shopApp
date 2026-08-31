@@ -1,0 +1,470 @@
+import 'server-only';
+import { prisma, Prisma } from '@shop/db';
+import {
+  merchantScope, computeFunnel, won, FUNNEL_STEP,
+  type Actor, type Won, type OrderStatus, type FunnelStepResult,
+} from '@shop/core';
+
+/**
+ * 어드민 조회.
+ *
+ * **모든 쿼리가 merchantScope 를 통과한다.** 가맹점은 자기 상품이 들어간
+ * 주문과 자기 브랜드의 상품만 본다. 화면에서 메뉴를 가리는 것으로는 부족하다 —
+ * 데이터를 가져오는 쪽에서 막아야 한다.
+ *
+ * 매출도 마찬가지다. 가맹점의 매출은 주문 총액이 아니라 **그 가맹점 상품 줄의
+ * 합계**다. 한 주문에 여러 가맹점 상품이 섞이기 때문이다.
+ */
+
+/** 매출로 잡는 주문 상태 — 결제가 성립한 것부터 */
+const REVENUE_STATUSES: readonly OrderStatus[] = [
+  'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CONFIRMED',
+];
+
+export class ScopeError extends Error {
+  constructor() {
+    super('조회 권한이 없습니다.');
+    this.name = 'ScopeError';
+  }
+}
+
+/** undefined 면 아무것도 볼 수 없다는 뜻이라 던진다 */
+function scopeOf(actor: Actor): string | null {
+  const scope = merchantScope(actor);
+  if (scope === undefined) throw new ScopeError();
+  return scope;
+}
+
+const startOfToday = (): Date => {
+  // KST 기준 오늘. UTC 로 자르면 한국 시간 오전 9시 전 주문이 어제로 잡힌다.
+  const now = new Date();
+  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  kst.setUTCHours(0, 0, 0, 0);
+  return new Date(kst.getTime() - 9 * 60 * 60 * 1000);
+};
+
+export interface DashboardKpi {
+  readonly revenue: Won;
+  readonly orderCount: number;
+  readonly averageOrderValue: Won;
+}
+
+export interface DashboardTodo {
+  readonly preparing: number;
+  readonly pendingPayment: number;
+  readonly returnRequested: number;
+  readonly lowStock: number;
+}
+
+export interface TopProduct {
+  readonly productName: string;
+  readonly brandName: string;
+  readonly quantity: number;
+  readonly revenue: Won;
+}
+
+export interface RecentOrder {
+  readonly orderNo: string;
+  readonly status: OrderStatus;
+  readonly placedAt: Date;
+  readonly amount: Won;
+  readonly buyerName: string;
+}
+
+export interface DailyRevenue {
+  readonly date: string;
+  readonly revenue: number;
+}
+
+export interface Dashboard {
+  readonly scope: string | null;
+  readonly today: DashboardKpi;
+  readonly todo: DashboardTodo;
+  readonly topProducts: readonly TopProduct[];
+  readonly recentOrders: readonly RecentOrder[];
+  readonly dailyRevenue: readonly DailyRevenue[];
+  /** 전환율 퍼널. 가맹점에게는 주지 않는다 — 전체 트래픽 지표다. */
+  readonly funnel: readonly FunnelStepResult[] | null;
+}
+
+export async function getDashboard(actor: Actor): Promise<Dashboard> {
+  const scope = scopeOf(actor);
+  const since = startOfToday();
+  const sevenDaysAgo = new Date(since.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+  const orderWhere = (from: Date) => ({
+    status: { in: [...REVENUE_STATUSES] },
+    placedAt: { gte: from },
+    ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+  });
+
+  const [todayAgg, todayItems, todo, topRows, recent, daily, funnel] = await Promise.all([
+    prisma.order.aggregate({
+      where: orderWhere(since),
+      _count: { _all: true },
+      _sum: { payable: true },
+    }),
+    // 가맹점 매출은 자기 줄의 합계다
+    scope
+      ? prisma.orderItem.aggregate({
+          where: { merchantId: scope, order: orderWhere(since) },
+          _sum: { subtotal: true },
+        })
+      : Promise.resolve(null),
+    loadTodo(scope),
+    loadTopProducts(scope, sevenDaysAgo),
+    loadRecentOrders(scope),
+    loadDailyRevenue(scope, sevenDaysAgo),
+    scope === null ? loadFunnel(sevenDaysAgo) : Promise.resolve(null),
+  ]);
+
+  const revenue = won(
+    scope ? (todayItems?._sum.subtotal ?? 0) : (todayAgg._sum.payable ?? 0),
+  );
+  const orderCount = todayAgg._count._all;
+
+  return {
+    scope,
+    today: {
+      revenue,
+      orderCount,
+      averageOrderValue: won(orderCount === 0 ? 0 : Math.floor(revenue / orderCount)),
+    },
+    todo,
+    topProducts: topRows,
+    recentOrders: recent,
+    dailyRevenue: daily,
+    funnel,
+  };
+}
+
+async function loadTodo(scope: string | null): Promise<DashboardTodo> {
+  const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
+  const [preparing, pendingPayment, returnRequested, lowStock] = await Promise.all([
+    prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
+    prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
+    prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
+    prisma.productVariant.count({
+      where: {
+        isActive: true,
+        stock: { lte: 5 },
+        ...(scope ? { product: { brand: { merchantId: scope } } } : {}),
+      },
+    }),
+  ]);
+  return { preparing, pendingPayment, returnRequested, lowStock };
+}
+
+async function loadTopProducts(scope: string | null, since: Date): Promise<TopProduct[]> {
+  const rows = await prisma.orderItem.groupBy({
+    by: ['productName', 'brandName'],
+    where: {
+      ...(scope ? { merchantId: scope } : {}),
+      order: { status: { in: [...REVENUE_STATUSES] }, placedAt: { gte: since } },
+    },
+    _sum: { quantity: true, subtotal: true },
+    orderBy: { _sum: { subtotal: 'desc' } },
+    take: 5,
+  });
+
+  return rows.map((r) => ({
+    productName: r.productName,
+    brandName: r.brandName,
+    quantity: r._sum.quantity ?? 0,
+    revenue: won(r._sum.subtotal ?? 0),
+  }));
+}
+
+async function loadRecentOrders(scope: string | null): Promise<RecentOrder[]> {
+  const rows = await prisma.order.findMany({
+    where: scope ? { items: { some: { merchantId: scope } } } : {},
+    orderBy: { placedAt: 'desc' },
+    take: 6,
+    select: {
+      orderNo: true, status: true, placedAt: true, payable: true,
+      user: { select: { name: true } },
+      items: scope ? { where: { merchantId: scope }, select: { subtotal: true } } : false,
+    },
+  });
+
+  return rows.map((o) => ({
+    orderNo: o.orderNo,
+    status: o.status,
+    placedAt: o.placedAt,
+    // 가맹점에게는 자기 줄의 합계만 보여 준다. 다른 가맹점 상품 금액까지
+    // 보여 주면 남의 매출을 유추할 수 있다.
+    amount: won(
+      scope && Array.isArray(o.items)
+        ? o.items.reduce((sum, i) => sum + i.subtotal, 0)
+        : o.payable,
+    ),
+    buyerName: maskName(o.user.name),
+  }));
+}
+
+/** 주문자 이름은 가운데를 가린다. 운영에 필요한 건 식별이지 전체 이름이 아니다. */
+function maskName(name: string): string {
+  if (name.length <= 1) return name;
+  if (name.length === 2) return `${name[0]}○`;
+  return `${name[0]}${'○'.repeat(name.length - 2)}${name.at(-1)}`;
+}
+
+async function loadDailyRevenue(scope: string | null, since: Date): Promise<DailyRevenue[]> {
+  // groupBy 로는 날짜 단위 집계가 안 되므로 raw 를 쓴다.
+  // KST 로 변환해 자르지 않으면 한국 시간 오전 9시 전 주문이 전날에 붙는다.
+  const rows = scope
+    ? await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
+        select to_char((o."placedAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+               sum(i.subtotal)::bigint as revenue
+        from orders o join order_items i on i."orderId" = o.id
+        where i."merchantId" = ${scope}
+          and o.status = any(${REVENUE_STATUSES}::"OrderStatus"[])
+          and o."placedAt" >= ${since}
+        group by 1 order by 1`
+    : await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
+        select to_char((o."placedAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+               sum(o.payable)::bigint as revenue
+        from orders o
+        where o.status = any(${REVENUE_STATUSES}::"OrderStatus"[])
+          and o."placedAt" >= ${since}
+        group by 1 order by 1`;
+
+  return rows.map((r) => ({ date: r.date, revenue: Number(r.revenue) }));
+}
+
+/** 세션별로 어떤 퍼널 단계를 밟았는지 모아 core 의 computeFunnel 에 넘긴다 */
+async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
+  const rows = await prisma.eventLog.findMany({
+    where: { name: { in: [...FUNNEL_STEP] }, receivedAt: { gte: since } },
+    select: { sessionId: true, name: true },
+  });
+
+  const bySession = new Map<string, string[]>();
+  for (const r of rows) {
+    const list = bySession.get(r.sessionId);
+    if (list) list.push(r.name);
+    else bySession.set(r.sessionId, [r.name]);
+  }
+
+  return computeFunnel([...bySession].map(([sessionId, names]) => ({ sessionId, names })));
+}
+
+void Prisma;
+
+// ── 주문 ──────────────────────────────────────────────────────
+
+export interface AdminOrderRow {
+  readonly orderNo: string;
+  readonly status: OrderStatus;
+  readonly placedAt: Date;
+  readonly amount: Won;
+  readonly buyerName: string;
+  readonly itemCount: number;
+  readonly firstItemName: string;
+}
+
+export async function getAdminOrders(
+  actor: Actor,
+  status?: OrderStatus,
+  take = 50,
+): Promise<AdminOrderRow[]> {
+  const scope = scopeOf(actor);
+
+  const rows = await prisma.order.findMany({
+    where: {
+      ...(status ? { status } : {}),
+      ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    },
+    orderBy: { placedAt: 'desc' },
+    take,
+    select: {
+      orderNo: true, status: true, placedAt: true, payable: true,
+      user: { select: { name: true } },
+      items: {
+        // 가맹점에게는 자기 줄만 보여 준다
+        ...(scope ? { where: { merchantId: scope } } : {}),
+        select: { productName: true, subtotal: true },
+      },
+    },
+  });
+
+  return rows.map((o) => ({
+    orderNo: o.orderNo,
+    status: o.status,
+    placedAt: o.placedAt,
+    amount: won(scope ? o.items.reduce((s, i) => s + i.subtotal, 0) : o.payable),
+    buyerName: maskName(o.user.name),
+    itemCount: o.items.length,
+    firstItemName: o.items[0]?.productName ?? '(상품 없음)',
+  }));
+}
+
+export async function getAdminOrder(actor: Actor, orderNo: string) {
+  const scope = scopeOf(actor);
+
+  const order = await prisma.order.findFirst({
+    where: {
+      orderNo,
+      ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    },
+    select: {
+      orderNo: true, status: true, placedAt: true, paidAt: true,
+      listTotal: true, productDiscount: true, couponDiscount: true,
+      pointsUsed: true, shippingFee: true, payable: true, rewardPoints: true,
+      recipient: true, recipientPhone: true, postalCode: true,
+      address1: true, address2: true, deliveryMemo: true,
+      user: { select: { name: true, email: true, grade: true } },
+      payment: { select: { method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true } },
+      items: {
+        ...(scope ? { where: { merchantId: scope } } : {}),
+        select: {
+          productName: true, brandName: true, optionLabel: true,
+          listPrice: true, unitPrice: true, quantity: true, subtotal: true, status: true,
+        },
+      },
+      statusLogs: {
+        orderBy: { createdAt: 'asc' },
+        select: { from: true, to: true, actor: true, note: true, createdAt: true },
+      },
+    },
+  });
+  if (!order) return null;
+
+  return {
+    ...order,
+    // 주문자 개인정보는 가맹점에게 최소한만 준다. 배송에 필요한 건
+    // 이름과 연락처지 이메일이 아니다.
+    user: scope
+      ? { name: maskName(order.user.name), email: null, grade: order.user.grade }
+      : { name: order.user.name, email: order.user.email, grade: order.user.grade },
+    /** 가맹점이 보는 금액은 자기 줄의 합계다 */
+    scopedTotal: won(scope ? order.items.reduce((s, i) => s + i.subtotal, 0) : order.payable),
+    isScoped: scope !== null,
+  };
+}
+
+// ── 상품 ──────────────────────────────────────────────────────
+
+export interface AdminProductRow {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly brandName: string;
+  readonly categoryName: string;
+  readonly listPrice: Won;
+  readonly salePrice: Won | null;
+  readonly status: string;
+  readonly totalStock: number;
+  readonly lowStock: boolean;
+  readonly createdAt: Date;
+}
+
+export async function getAdminProducts(actor: Actor, take = 50): Promise<AdminProductRow[]> {
+  const scope = scopeOf(actor);
+
+  const rows = await prisma.product.findMany({
+    where: {
+      deletedAt: null,
+      ...(scope ? { brand: { merchantId: scope } } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take,
+    select: {
+      id: true, slug: true, name: true, listPrice: true, salePrice: true,
+      status: true, createdAt: true,
+      brand: { select: { name: true } },
+      category: { select: { name: true } },
+      variants: { select: { stock: true }, where: { isActive: true } },
+    },
+  });
+
+  return rows.map((p) => {
+    const totalStock = p.variants.reduce((s, v) => s + v.stock, 0);
+    return {
+      id: p.id, slug: p.slug, name: p.name,
+      brandName: p.brand.name, categoryName: p.category.name,
+      listPrice: won(p.listPrice),
+      salePrice: p.salePrice === null ? null : won(p.salePrice),
+      status: p.status,
+      totalStock,
+      lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= 5),
+      createdAt: p.createdAt,
+    };
+  });
+}
+
+// ── 정산 ──────────────────────────────────────────────────────
+
+export interface SettlementRow {
+  readonly id: string;
+  readonly merchantName: string;
+  readonly periodStart: Date;
+  readonly periodEnd: Date;
+  readonly grossAmount: Won;
+  readonly commissionAmount: Won;
+  readonly refundAmount: Won;
+  readonly netAmount: Won;
+  readonly status: string;
+}
+
+export async function getSettlements(actor: Actor): Promise<SettlementRow[]> {
+  const scope = scopeOf(actor);
+
+  const rows = await prisma.settlement.findMany({
+    where: scope ? { merchantId: scope } : {},
+    orderBy: { periodEnd: 'desc' },
+    take: 24,
+    select: {
+      id: true, periodStart: true, periodEnd: true,
+      grossAmount: true, commissionAmount: true, refundAmount: true, netAmount: true,
+      status: true,
+      merchant: { select: { name: true } },
+    },
+  });
+
+  return rows.map((s) => ({
+    id: s.id,
+    merchantName: s.merchant.name,
+    periodStart: s.periodStart,
+    periodEnd: s.periodEnd,
+    grossAmount: won(s.grossAmount),
+    commissionAmount: won(s.commissionAmount),
+    refundAmount: won(s.refundAmount),
+    netAmount: won(s.netAmount),
+    status: s.status,
+  }));
+}
+
+/**
+ * 아직 정산되지 않은 기간의 예상 금액.
+ *
+ * Settlement 레코드를 만드는 배치가 아직 없어서, 화면에는 구매확정된 주문에서
+ * 실시간으로 계산한 값을 보여 준다. 확정 절차가 붙으면 이 값이 Settlement 로
+ * 굳는다.
+ */
+export async function getPendingSettlement(actor: Actor) {
+  const scope = scopeOf(actor);
+  if (!scope) return null;
+
+  const merchant = await prisma.merchant.findUnique({
+    where: { id: scope },
+    select: { name: true, commissionPercent: true },
+  });
+  if (!merchant) return null;
+
+  const agg = await prisma.orderItem.aggregate({
+    where: { merchantId: scope, order: { status: 'CONFIRMED' } },
+    _sum: { subtotal: true },
+  });
+
+  const gross = agg._sum.subtotal ?? 0;
+  const commission = Math.floor((gross * merchant.commissionPercent) / 100);
+
+  return {
+    merchantName: merchant.name,
+    commissionPercent: merchant.commissionPercent,
+    gross: won(gross),
+    commission: won(commission),
+    net: won(gross - commission),
+  };
+}

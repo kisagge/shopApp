@@ -11,6 +11,7 @@ import {
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
+import { getSessionId } from '~/lib/analytics/session';
 import { useMemo } from 'react';
 
 const METHOD_LABEL: Record<PaymentMethodInput, string> = {
@@ -64,6 +65,8 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
         ...(memo.trim() ? { deliveryMemo: memo.trim() } : {}),
         ...(pointsToUse > 0 ? { pointsToUse } : {}),
         paymentMethod: method,
+        // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다
+        browserSessionId: getSessionId(),
         agreedToTerms: true,
       }),
     });

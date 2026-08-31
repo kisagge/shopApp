@@ -41,7 +41,7 @@ export async function cancelOrder(
   const order = await prisma.order.findFirst({
     where: { orderNo, ...(isStaff ? {} : { userId: actor.id }) },
     select: {
-      id: true, orderNo: true, status: true, userId: true,
+      id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
       pointsUsed: true, payable: true, usedCouponId: true,
       items: { select: { variantId: true, quantity: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
@@ -163,8 +163,8 @@ export async function cancelOrder(
     await recordServerEvent({
       name: 'refund',
       occurredAt: new Date(),
-      sessionId: `order-${order.orderNo}`,
-      anonymousId: `order-${order.orderNo}`,
+      sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
+      anonymousId: order.browserSessionId ?? `order-${order.orderNo}`,
       userId: order.userId,
       path: '/order',
       productId: null, variantId: null,

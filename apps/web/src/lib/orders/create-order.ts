@@ -139,6 +139,7 @@ export async function createOrder(
           address2: shipping.address2,
           isRemoteArea: shipping.isRemoteArea,
           deliveryMemo: shipping.deliveryMemo,
+          browserSessionId: input.browserSessionId ?? null,
           usedCouponId,
           items: {
             create: items.map((i) => ({

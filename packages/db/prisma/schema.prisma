@@ -422,6 +422,13 @@ model Order {
   isRemoteArea   Boolean @default(false)
   deliveryMemo   String?
 
+  /// 주문을 만든 브라우저 세션. 퍼널을 이어 붙이는 데 쓴다.
+  ///
+  /// 이게 없으면 purchase 이벤트가 조회·담기와 다른 세션으로 기록돼
+  /// 전환율이 영원히 0% 로 나온다 — 실제로 그렇게 만들었다가 고쳤다.
+  /// 분석용이라 없어도 주문은 성립한다.
+  browserSessionId String?
+
   usedCouponId String?
   usedCoupon   UserCoupon? @relation(fields: [usedCouponId], references: [id])
 

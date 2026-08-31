@@ -177,3 +177,24 @@ describe('실패', () => {
     spy.mockRestore();
   });
 });
+
+describe('퍼널을 이어 붙인다', () => {
+  it('주문에 담긴 브라우저 세션으로 purchase 를 찍는다', async () => {
+    // 다른 세션으로 찍으면 조회·담기와 이어지지 않아 전환율이 영원히 0% 다
+    db.order.findFirst.mockResolvedValue(order({ browserSessionId: 'sess_browser01' }));
+    await confirmPayment(
+      { orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway(),
+    );
+    expect(recordServerEvent.mock.calls[0]![0]).toMatchObject({
+      name: 'purchase', sessionId: 'sess_browser01', anonymousId: 'sess_browser01',
+    });
+  });
+
+  it('세션을 못 받았으면 주문번호로 대신한다 — 그 건은 퍼널에서 빠진다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ browserSessionId: null }));
+    await confirmPayment(
+      { orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway(),
+    );
+    expect(recordServerEvent.mock.calls[0]![0].sessionId).toBe('order-20260831-1234567');
+  });
+});

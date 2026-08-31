@@ -44,7 +44,7 @@ export async function confirmPayment(
   const order = await prisma.order.findFirst({
     where: { orderNo: input.orderNo, userId: user.id },
     select: {
-      id: true, orderNo: true, status: true, payable: true,
+      id: true, orderNo: true, status: true, payable: true, browserSessionId: true,
       items: { select: { quantity: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true } },
     },
@@ -132,8 +132,10 @@ export async function confirmPayment(
     await recordServerEvent({
       name: 'purchase',
       occurredAt: result.approvedAt ?? new Date(),
-      sessionId: `order-${order.orderNo}`,
-      anonymousId: `order-${order.orderNo}`,
+      // 조회·담기와 **같은 세션**으로 찍어야 퍼널이 이어진다.
+      // 주문 세션을 못 받았을 때만 주문번호로 대신한다(그 건은 퍼널에서 빠진다).
+      sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
+      anonymousId: order.browserSessionId ?? `order-${order.orderNo}`,
       userId: user.id,
       path: '/checkout',
       productId: null, variantId: null,
