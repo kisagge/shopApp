@@ -79,9 +79,35 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
     }
 
     const order = (await res.json()) as CreateOrderResponse;
+    track('add_payment_info', { method });
+
+    /**
+     * 결제 승인.
+     *
+     * 실제로는 여기서 PG 결제창을 띄우고, 창이 돌려준 paymentKey 로 승인을
+     * 요청한다. 아직 결제창을 붙이지 않아 Mock 게이트웨이가 알아보는 키를
+     * 만들어 보낸다 — 서버 쪽 승인 흐름(금액 검증·멱등·상태 전이)은 실제와 같다.
+     */
+    setPending(true);
+    const mockKey = `${method === 'VIRTUAL_ACCOUNT' ? 'mock_va' : 'mock'}_${order.orderNo}`;
+    const confirmRes = await fetch(`/api/orders/${order.orderNo}/confirm`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paymentKey: mockKey, amount: order.payable }),
+    });
+    setPending(false);
+
     // 주문에 들어간 항목만 장바구니에서 뺀다
     for (const i of selected) useCartStore.getState().remove(i.variantId);
-    track('add_payment_info', { method });
+
+    if (!confirmRes.ok) {
+      // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 시도할 수 있다.
+      const body = (await confirmRes.json()) as { message?: string };
+      setError(`${body.message ?? '결제 승인에 실패했습니다.'} 주문 내역에서 다시 시도할 수 있습니다.`);
+      router.push(`/order/${order.orderNo}`);
+      return;
+    }
+
     router.push(`/order/${order.orderNo}`);
   }
 

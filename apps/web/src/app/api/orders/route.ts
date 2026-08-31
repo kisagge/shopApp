@@ -3,7 +3,6 @@ import { getSessionUser } from '@shop/auth/session';
 import { prisma } from '@shop/db';
 import { NextResponse } from 'next/server';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
-import { recordServerEvent } from '~/lib/analytics/server';
 
 /**
  * 주문 생성.
@@ -57,23 +56,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const order = await createOrder(parsed.data, user);
 
-    // purchase 는 서버만 기록한다. 브라우저가 보내면 수집 API 가 거부한다.
-    await recordServerEvent({
-      name: 'purchase',
-      occurredAt: new Date(),
-      // 결제 전이라 브라우저 세션과 이어 붙일 식별자가 없다. 주문번호로 대신한다.
-      sessionId: `order-${order.orderNo}`,
-      anonymousId: `order-${order.orderNo}`,
-      userId: user.id,
-      path: '/checkout',
-      productId: null,
-      variantId: null,
-      orderId: order.orderNo,
-      merchantId: null,
-      value: order.payable,
-      quantity: parsed.data.lines.reduce((sum, l) => sum + l.quantity, 0),
-      props: { paymentMethod: parsed.data.paymentMethod, status: order.status },
-    });
+    // purchase 이벤트는 여기서 찍지 않는다. 주문이 만들어졌을 뿐 결제는
+    // 아직 안 났다. 결제 승인(confirm-payment)이 성립한 순간에만 기록한다 —
+    // 그러지 않으면 결제되지 않은 주문까지 매출로 잡힌다.
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {
