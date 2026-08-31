@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { won, add, subtractToZero, multiply, percentOf, format, formatWithUnit, MoneyError } from '../src/money';
+import { won, add, subtractToZero, multiply, percentOf, discountRateOf, format, formatWithUnit, MoneyError } from '../src/money';
 
 describe('won', () => {
   it('정수만 허용한다', () => {
@@ -40,6 +40,33 @@ describe('multiply', () => {
   it('수량이 음수거나 소수면 거부한다', () => {
     expect(() => multiply(won(1000), -1)).toThrow(MoneyError);
     expect(() => multiply(won(1000), 1.5)).toThrow(MoneyError);
+  });
+});
+
+describe('discountRateOf — 판매가에서 표시 할인율을 만든다', () => {
+  it('시안의 코트: 413,000 → 289,000 은 30%', () => {
+    expect(discountRateOf(won(413_000), won(289_000))).toBe(30);
+  });
+
+  it('내림한다 — 29.98%를 30%로 올려 표시하면 과장이다', () => {
+    // 100,000 → 70,010 은 29.99%
+    expect(discountRateOf(won(100_000), won(70_010))).toBe(29);
+  });
+
+  it('할인이 없으면 0이다', () => {
+    expect(discountRateOf(won(129_000), won(129_000))).toBe(0);
+  });
+
+  it('판매가가 정가보다 크면 0으로 둔다 — 음수 할인율을 만들지 않는다', () => {
+    expect(discountRateOf(won(100_000), won(120_000))).toBe(0);
+  });
+
+  it('정가가 0이면 0으로 나누지 않는다', () => {
+    expect(discountRateOf(won(0), won(0))).toBe(0);
+  });
+
+  it('전액 할인은 100%', () => {
+    expect(discountRateOf(won(50_000), won(0))).toBe(100);
   });
 });
 

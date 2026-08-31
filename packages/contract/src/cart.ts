@@ -1,13 +1,22 @@
 import { z } from 'zod';
+// discountPercentSchema 는 쿠폰의 정률 할인에 계속 쓴다.
+// 상품 가격은 판매가를 저장하는 쪽으로 바뀌었지만 쿠폰은 여전히 비율이다.
 import { cuidSchema, discountPercentSchema, quantitySchema, wonSchema } from './common';
 
-export const cartLineInputSchema = z.object({
-  variantId: cuidSchema,
-  productName: z.string().min(1),
-  listPrice: wonSchema,
-  discountPercent: discountPercentSchema,
-  quantity: quantitySchema,
-});
+export const cartLineInputSchema = z
+  .object({
+    variantId: cuidSchema,
+    productName: z.string().min(1),
+    /** 정가 */
+    listPrice: wonSchema,
+    /** 실제 판매 단가. 할인이 없으면 listPrice 와 같다. */
+    salePrice: wonSchema,
+    quantity: quantitySchema,
+  })
+  .refine((l) => l.salePrice <= l.listPrice, {
+    message: '판매가가 정가보다 클 수 없습니다',
+    path: ['salePrice'],
+  });
 export type CartLineInput = z.infer<typeof cartLineInputSchema>;
 
 export const couponInputSchema = z.discriminatedUnion('kind', [

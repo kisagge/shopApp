@@ -50,6 +50,21 @@ export function percentOf(amount: Won, percent: number): Won {
   return won(Math.floor((amount * percent) / 100));
 }
 
+/**
+ * 표시용 할인율.
+ *
+ * **판매가가 진실이고 할인율은 거기서 나온다.** 반대로 하면 안 된다.
+ * 국내 커머스는 289,000원처럼 딱 떨어지는 판매가를 정하고 할인율을 붙인다.
+ * 할인율(30%)을 저장해 판매가를 계산하면 413,000 × 0.7 = 289,100 이 되고,
+ * 아무도 그런 가격표를 붙이지 않는다.
+ *
+ * 내림한다. 29.98% 를 30% 로 반올림해 표시하면 과장 광고가 된다.
+ */
+export function discountRateOf(listPrice: Won, salePrice: Won): number {
+  if (listPrice <= 0 || salePrice >= listPrice) return 0;
+  return Math.floor(((listPrice - salePrice) / listPrice) * 100);
+}
+
 const KRW = new Intl.NumberFormat('ko-KR');
 
 /** 표시용. "289,000" — 단위는 UI가 붙인다. */

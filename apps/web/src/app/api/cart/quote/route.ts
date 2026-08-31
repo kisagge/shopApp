@@ -40,7 +40,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         variantId: l.variantId,
         productName: l.productName,
         listPrice: won(l.listPrice),
-        discountPercent: l.discountPercent,
+        salePrice: won(l.salePrice),
         quantity: l.quantity,
       })),
       coupon: input.coupon ? toCoupon(input.coupon) : undefined,

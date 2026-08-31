@@ -243,11 +243,15 @@ model Product {
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id])
 
-  /// 정가. 실제 판매가는 variant가 덮어쓸 수 있다.
-  listPrice       Int
-  /// 상품 단위 할인율(%). variant별 할인은 두지 않는다 — 국내 커머스 관행상
-  /// 옵션마다 할인율이 다르면 고객이 이해하지 못한다.
-  discountPercent Int @default(0)
+  /// 정가. 화면에 취소선으로 보여 주는 값.
+  listPrice Int
+  /// 실제 판매가. null 이면 할인 없이 정가로 판다.
+  ///
+  /// **할인율이 아니라 판매가를 저장한다.** 할인율을 저장하고 판매가를 계산하면
+  /// 413,000 의 30% 는 289,100 이 되는데, 국내 커머스는 289,000 처럼 딱 떨어지는
+  /// 값을 판매가로 정하고 할인율은 거기서 계산해 표시한다.
+  /// 표시용 할인율은 packages/core 의 discountRateOf 가 만든다.
+  salePrice Int?
 
   /// 목록 정렬·필터에 쓰는 집계값. 리뷰/주문 발생 시 갱신한다.
   ratingSum   Int @default(0)
@@ -448,9 +452,9 @@ model OrderItem {
   brandName    String
   optionLabel  String
   imageUrl     String?
+  /// 주문 시점의 정가
   listPrice    Int
-  discountPercent Int
-  /// 할인 적용 후 단가
+  /// 주문 시점의 실제 판매 단가. 표시 할인율은 이 둘에서 계산되므로 따로 두지 않는다.
   unitPrice    Int
   quantity     Int
   /// unitPrice * quantity

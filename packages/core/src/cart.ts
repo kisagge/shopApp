@@ -6,10 +6,16 @@ import { calculateShipping, type ShippingPolicy, type ShippingResult } from './s
 export interface CartLine {
   readonly variantId: string;
   readonly productName: string;
-  /** 정가 */
+  /** 정가. 취소선으로 보여 주는 값 */
   readonly listPrice: Won;
-  /** 상품 자체 할인율(%). 0이면 할인 없음 */
-  readonly discountPercent: number;
+  /**
+   * 실제 판매 단가. 할인이 없으면 listPrice 와 같다.
+   *
+   * 할인율이 아니라 판매가를 받는다. 할인율에서 판매가를 계산하면
+   * 413,000 의 30% 는 289,100 이 되는데, 국내 커머스는 289,000 처럼
+   * 딱 떨어지는 값을 판매가로 정하고 할인율을 거기서 표시한다.
+   */
+  readonly salePrice: Won;
   readonly quantity: number;
 }
 
@@ -79,9 +85,17 @@ export function calculateCart(input: CartInput): CartTotals {
     if (line.quantity < 1) {
       throw new MoneyError(`수량은 1개 이상이어야 합니다: ${line.productName}`);
     }
+    if (line.salePrice > line.listPrice) {
+      throw new MoneyError(`판매가가 정가보다 클 수 없습니다: ${line.productName}`);
+    }
     const listSubtotal = multiply(line.listPrice, line.quantity);
-    const discount = percentOf(listSubtotal, line.discountPercent);
-    return { variantId: line.variantId, listSubtotal, discount, subtotal: won(listSubtotal - discount) };
+    const subtotal = multiply(line.salePrice, line.quantity);
+    return {
+      variantId: line.variantId,
+      listSubtotal,
+      discount: won(listSubtotal - subtotal),
+      subtotal,
+    };
   });
 
   const listTotal = add(...lines.map((l) => l.listSubtotal));

@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { percentOf, won, type Won } from '@shop/core';
+import { discountRateOf, won, type Won } from '@shop/core';
 
 /**
  * 화면이 쓰는 모양. Prisma 모델을 그대로 컴포넌트에 넘기지 않는다 —
@@ -31,7 +31,7 @@ const listSelect = {
   slug: true,
   name: true,
   listPrice: true,
-  discountPercent: true,
+  salePrice: true,
   ratingSum: true,
   reviewCount: true,
   publishedAt: true,
@@ -42,7 +42,7 @@ const listSelect = {
 
 type ListRow = {
   id: string;
-  slug: string; name: string; listPrice: number; discountPercent: number;
+  slug: string; name: string; listPrice: number; salePrice: number | null;
   ratingSum: number; reviewCount: number; publishedAt: Date | null;
   brand: { name: string };
   images: { url: string; alt: string }[];
@@ -51,9 +51,9 @@ type ListRow = {
 
 function toListItem(p: ListRow, now: number): ProductListItem {
   const listPrice = won(p.listPrice);
-  const price = p.discountPercent > 0
-    ? won(listPrice - percentOf(listPrice, p.discountPercent))
-    : listPrice;
+  const price = p.salePrice === null ? listPrice : won(p.salePrice);
+  // 표시 할인율은 저장하지 않고 두 값에서 계산한다
+  const rate = discountRateOf(listPrice, price);
 
   const image = p.images[0];
   return {
@@ -62,8 +62,8 @@ function toListItem(p: ListRow, now: number): ProductListItem {
     brand: p.brand.name,
     name: p.name,
     price,
-    listPrice: p.discountPercent > 0 ? listPrice : undefined,
-    discountPercent: p.discountPercent > 0 ? p.discountPercent : undefined,
+    listPrice: rate > 0 ? listPrice : undefined,
+    discountPercent: rate > 0 ? rate : undefined,
     // 리뷰가 없으면 평점을 만들어 내지 않는다. 0.0으로 표시하면 나쁜 상품처럼 보인다.
     rating: p.reviewCount > 0 ? p.ratingSum / p.reviewCount : undefined,
     reviewCount: p.reviewCount,

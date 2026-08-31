@@ -12,11 +12,11 @@ const post = (body: unknown) =>
 
 const coat = {
   variantId: 'v-coat-m', productName: '오버사이즈 울 블렌드 코트',
-  listPrice: 413_000, discountPercent: 30, quantity: 1,
+  listPrice: 413_000, salePrice: 289_000, quantity: 1,
 };
 const knit = {
   variantId: 'v-knit-l', productName: '램스울 크루넥 니트',
-  listPrice: 129_000, discountPercent: 0, quantity: 1,
+  listPrice: 129_000, salePrice: 129_000, quantity: 1,
 };
 
 describe('POST /api/cart/quote — 금액은 서버가 정한다', () => {
@@ -25,11 +25,11 @@ describe('POST /api/cart/quote — 금액은 서버가 정한다', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.listTotal).toBe(542_000);
-    expect(body.productDiscount).toBe(123_900);
-    expect(body.merchandiseTotal).toBe(418_100);
+    expect(body.productDiscount).toBe(124_000);
+    expect(body.merchandiseTotal).toBe(418_000);
     expect(body.isFreeShipping).toBe(true);
-    expect(body.payable).toBe(418_100);
-    expect(body.rewardPoints).toBe(4_181);
+    expect(body.payable).toBe(418_000);
+    expect(body.rewardPoints).toBe(4_180);
   });
 
   it('쿠폰과 포인트를 함께 적용한다', async () => {
@@ -41,7 +41,8 @@ describe('POST /api/cart/quote — 금액은 서버가 정한다', () => {
     const body = await res.json();
     expect(body.couponDiscount).toBe(10_000);
     expect(body.pointsUsed).toBe(3_000);
-    expect(body.payable).toBe(405_100);
+    // 시안의 체크아웃 화면과 같은 값이다
+    expect(body.payable).toBe(405_000);
   });
 
   it('도서산간은 무료배송이어도 추가비를 붙인다', async () => {
@@ -53,7 +54,7 @@ describe('POST /api/cart/quote — 금액은 서버가 정한다', () => {
 
   it('무료배송까지 남은 금액을 알려준다', async () => {
     const res = await post({
-      lines: [{ ...knit, listPrice: 30_000, discountPercent: 0 }],
+      lines: [{ ...knit, listPrice: 30_000, salePrice: 30_000 }],
     });
     const body = await res.json();
     expect(body.isFreeShipping).toBe(false);
@@ -89,8 +90,8 @@ describe('POST /api/cart/quote — 잘못된 입력을 경계에서 막는다', 
     expect(Object.keys(body.fields).some((k) => k.includes('quantity'))).toBe(true);
   });
 
-  it('100%를 넘는 할인율은 400', async () => {
-    const res = await post({ lines: [{ ...coat, discountPercent: 120 }] });
+  it('판매가가 정가보다 크면 400', async () => {
+    const res = await post({ lines: [{ ...coat, salePrice: 500_000 }] });
     expect(res.status).toBe(400);
   });
 

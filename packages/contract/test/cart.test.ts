@@ -18,7 +18,7 @@ describe('wonSchema', () => {
 
 describe('cartQuoteRequestSchema', () => {
   const line = {
-    variantId: 'v-1', productName: '코트', listPrice: 413_000, discountPercent: 30, quantity: 1,
+    variantId: 'v-1', productName: '코트', listPrice: 413_000, salePrice: 289_000, quantity: 1,
   };
 
   it('isRemoteArea 는 생략하면 false 로 채운다', () => {
@@ -41,6 +41,21 @@ describe('cartQuoteRequestSchema', () => {
     const r = cartQuoteRequestSchema.safeParse({ lines: [line, { ...line, quantity: 0 }] });
     expect(r.success).toBe(false);
     expect(r.error?.issues[0]?.path).toEqual(['lines', 1, 'quantity']);
+  });
+
+  it('판매가가 정가보다 크면 거부한다', () => {
+    const r = cartQuoteRequestSchema.safeParse({
+      lines: [{ ...line, salePrice: 500_000 }],
+    });
+    expect(r.success).toBe(false);
+    expect(r.error?.issues[0]?.path).toEqual(['lines', 0, 'salePrice']);
+  });
+
+  it('할인이 없으면 판매가와 정가가 같다', () => {
+    const r = cartQuoteRequestSchema.safeParse({
+      lines: [{ ...line, listPrice: 129_000, salePrice: 129_000 }],
+    });
+    expect(r.success).toBe(true);
   });
 });
 
