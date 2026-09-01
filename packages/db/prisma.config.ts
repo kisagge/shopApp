@@ -15,9 +15,20 @@ export default defineConfig({
      *
      * **풀러를 거치지 않은 주소를 쓴다.** 서버리스용 커넥션 풀러(PgBouncer 등)는
      * 트랜잭션 모드에서 DDL 과 어드바이저리 락을 제대로 다루지 못해 마이그레이션이
-     * 중간에 멈춘다. Neon·Supabase 는 풀링/직결 두 주소를 함께 준다.
+     * 중간에 멈춘다.
+     *
+     * DATABASE_URL_UNPOOLED 는 Neon 의 Vercel 통합이 자동으로 넣어 주는 이름이다.
+     * 이 이름을 함께 받으면 **비밀번호가 든 URL 을 손으로 옮겨 적을 일이 없다.**
+     * 마지막 폴백은 로컬용 — 도커 Postgres 에는 풀러가 없다.
      */
-    url: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL ?? '',
+    // ?? 가 아니라 || 를 쓴다. 빈 문자열도 "없음" 으로 봐야 한다 —
+    // .env 에 DIRECT_DATABASE_URL="" 처럼 자리만 잡아 둔 경우가 흔하고,
+    // ?? 는 그 빈 값을 그대로 통과시켜 연결 주소가 비어 버린다.
+    url:
+      process.env.DIRECT_DATABASE_URL ||
+      process.env.DATABASE_URL_UNPOOLED ||
+      process.env.DATABASE_URL ||
+      '',
     /**
      * 섀도 DB — 마이그레이션 이력이 실제로 무엇을 만들어 내는지 검사할 때
      * Prisma 가 임시로 쓰고 지우는 빈 데이터베이스다.

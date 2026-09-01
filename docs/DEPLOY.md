@@ -23,6 +23,10 @@ Neon · Supabase · Vercel Postgres 중 아무거나. 리전은 `icn1`(서울)�
 Neon 은 `-pooler` 가 붙은 호스트가 풀링 주소이고, Supabase 는 6543 포트가 풀러,
 5432 가 직결이다.
 
+**Neon 을 Vercel 마켓플레이스로 붙였다면 `DIRECT_DATABASE_URL` 을 따로 넣지 않아도 된다.**
+Neon 이 직결 주소를 `DATABASE_URL_UNPOOLED` 로 자동 주입하고, `prisma.config.ts` 가
+그 이름도 함께 읽는다. 비밀번호가 든 URL 을 손으로 옮겨 적지 않는 편이 안전하다.
+
 ## 2. 오브젝트 스토리지
 
 S3 · Cloudflare R2 · Vercel Blob 중 아무거나. **`products/` 접두사를 익명 읽기로
@@ -44,7 +48,7 @@ openssl rand -base64 32   # CRON_SECRET
 | 변수 | 값 | 비워 두면 |
 |---|---|---|
 | `DATABASE_URL` | 풀링 주소 | 앱이 뜨지 않는다 |
-| `DIRECT_DATABASE_URL` | 직결 주소 | 마이그레이션이 풀러를 타서 멈출 수 있다 |
+| `DIRECT_DATABASE_URL` | 직결 주소 (Neon 통합이면 불필요) | 마이그레이션이 풀러를 타서 멈출 수 있다 |
 | `BETTER_AUTH_SECRET` | 랜덤 32바이트 | 세션 서명이 안 된다 |
 | `BETTER_AUTH_URL` | `https://<운영 도메인>` | 프리뷰는 `VERCEL_URL` 로 자동 해결. **운영에는 넣는다** |
 | `NEXT_PUBLIC_APP_URL` | `https://<운영 도메인>` | Capacitor 셸이 붙을 주소 |
