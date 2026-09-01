@@ -13,7 +13,8 @@ import { hashIp } from './analytics/server';
  * 바뀌어도 "그때 무슨 권한으로 했는지"가 남아야 한다.
  */
 
-export type AuditTargetType = 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon';
+export type AuditTargetType =
+  | 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon' | 'banner';
 
 export interface AuditInput {
   readonly actor: Actor;

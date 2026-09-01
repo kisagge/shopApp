@@ -9,4 +9,5 @@ export {
   type LinkLike,
   type LinkLikeProps,
 } from './components/product-card';
+export { Carousel, type CarouselProps, type CarouselSlide } from './components/carousel';
 export { VisuallyHidden } from './components/visually-hidden';

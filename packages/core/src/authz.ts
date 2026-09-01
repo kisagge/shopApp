@@ -44,6 +44,9 @@ export const PERMISSION = [
   'user:assignRole',    // 권한 부여
   'coupon:read',
   'coupon:write',
+  // 홈 배너는 플랫폼 진열이다. 가맹점이 만지면 남의 매대를 바꾸는 셈이 된다.
+  'banner:read',
+  'banner:write',
   'settlement:read',
   'settlement:confirm', // 정산 금액 확정
   'settlement:pay',     // 실제 지급 집행
@@ -74,6 +77,7 @@ const ADMIN: readonly Permission[] = [
   'merchant:read', 'merchant:write',
   'user:read', 'user:write',
   'coupon:read', 'coupon:write',
+  'banner:read', 'banner:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:moderate',
 ];

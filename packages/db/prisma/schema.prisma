@@ -198,6 +198,43 @@ model Settlement {
   @@map("settlements")
 }
 
+/// 홈 히어로 배너. 운영자가 어드민에서 직접 넣고 뺀다.
+///
+/// 문구를 코드에 박아 두면 한 줄 바꾸는 데 배포가 필요하다. 기획전은
+/// 시작·종료 시각이 정해져 있는 일이라 게시 기간도 함께 둔다.
+model Banner {
+  id String @id @default(cuid())
+
+  /// "EDITORIAL · 01" 같은 윗줄. 없어도 된다.
+  eyebrow  String?
+  headline String
+  subcopy  String?
+
+  /// 버튼 문구와 링크. 둘 다 있어야 버튼을 그린다.
+  ctaLabel String?
+  href     String?
+
+  imageUrl   String?
+  imageAlt   String?
+  storageKey String?
+
+  /// 이미지가 없을 때 쓰는 배경 톤. theme.css 의 --color-ph-* 이름.
+  tone String @default("sand")
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  /// 게시 기간. null 이면 제한 없음.
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("banners")
+}
+
 // ─────────────────────────────────────────── 상품
 
 model Brand {

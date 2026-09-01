@@ -20,6 +20,22 @@ const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.status.cancelled': '주문 취소',
   'order.status.refunded': '환불',
   'order.cancel': '주문 취소',
+  'product.image.add': '이미지 추가',
+  'product.image.delete': '이미지 삭제',
+  'product.image.reorder': '이미지 순서 변경',
+  'product.image.alt': '대체 텍스트 수정',
+  'merchant.approved': '입점 승인',
+  'merchant.suspended': '가맹점 정지',
+  'merchant.terminated': '가맹점 해지',
+  'user.assignRole': '권한 부여',
+  'settlement.close': '정산 확정',
+  'settlement.pay': '정산 지급',
+  'points.reconcile': '포인트 대사',
+  'banner.create': '배너 등록',
+  'banner.update': '배너 수정',
+  'banner.delete': '배너 삭제',
+  'banner.reorder': '배너 순서 변경',
+  'banner.image': '배너 이미지 교체',
 };
 
 const TARGET_LABEL: Readonly<Record<string, string>> = {
@@ -28,6 +44,7 @@ const TARGET_LABEL: Readonly<Record<string, string>> = {
   user: '회원',
   merchant: '가맹점',
   settlement: '정산',
+  banner: '배너',
 };
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', {

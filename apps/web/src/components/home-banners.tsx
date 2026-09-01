@@ -1,0 +1,93 @@
+'use client';
+
+import { Carousel } from '@shop/ui';
+import { AppLink } from './app-link';
+
+export interface HomeBanner {
+  readonly id: string;
+  readonly eyebrow: string | null;
+  readonly headline: string;
+  readonly subcopy: string | null;
+  readonly ctaLabel: string | null;
+  readonly href: string | null;
+  readonly imageUrl: string | null;
+  readonly imageAlt: string | null;
+  readonly tone: string;
+}
+
+const TONE_CLASS: Record<string, string> = {
+  sand: 'bg-ph-sand', stone: 'bg-ph-stone', clay: 'bg-ph-clay',
+  olive: 'bg-ph-olive', mist: 'bg-ph-mist',
+};
+
+/**
+ * 홈 히어로.
+ *
+ * 배너가 하나면 캐러셀 조작 장치를 그리지 않는다 — 넘길 것이 없는데 화살표와
+ * 점을 두면 누를 수 있는 것처럼 보인다.
+ */
+export function HomeBanners({ banners }: { banners: readonly HomeBanner[] }) {
+  if (banners.length === 0) return null;
+
+  return (
+    <Carousel
+      label="기획전 배너"
+      slides={banners.map((banner) => ({
+        id: banner.id,
+        content: <BannerSlide banner={banner} />,
+      }))}
+    />
+  );
+}
+
+function BannerSlide({ banner }: { banner: HomeBanner }) {
+  const tone = TONE_CLASS[banner.tone] ?? 'bg-ph-sand';
+
+  return (
+    <div
+      className={`relative flex min-h-[380px] items-center px-4 py-14 md:min-h-[520px] md:px-10 ${
+        banner.imageUrl ? 'bg-[var(--surface-2)]' : tone
+      }`}
+    >
+      {banner.imageUrl && (
+        <>
+          <img
+            src={banner.imageUrl}
+            // 배경 이미지의 의미는 옆의 제목이 이미 전달한다. 같은 내용을
+            // 두 번 읽히지 않도록 장식으로 둔다.
+            alt=""
+            aria-hidden="true"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+          {/* 사진 위 글자의 대비를 보장한다. 사진이 밝든 어둡든 읽혀야 한다. */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-r from-n-0/85 via-n-0/60 to-transparent"
+          />
+        </>
+      )}
+
+      <div className="relative z-10 flex max-w-[460px] flex-col gap-4">
+        {banner.eyebrow && (
+          <p className="text-[11px] font-medium tracking-[0.18em] text-n-600">{banner.eyebrow}</p>
+        )}
+        {/* 줄바꿈을 그대로 살린다. 히어로 문구는 어디서 끊기느냐가 조판의
+            일부라 운영자가 정할 수 있어야 한다. */}
+        <p className="font-serif text-[32px] leading-tight font-medium tracking-tight whitespace-pre-line text-n-900 md:text-[56px]">
+          {banner.headline}
+        </p>
+        {banner.subcopy && (
+          <p className="text-sm leading-relaxed text-n-700 md:text-[15px]">{banner.subcopy}</p>
+        )}
+        {banner.ctaLabel && banner.href && (
+          <AppLink
+            href={banner.href}
+            className="mt-2 inline-flex h-12 w-fit items-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline hover:bg-n-950"
+          >
+            {banner.ctaLabel}
+          </AppLink>
+        )}
+      </div>
+    </div>
+  );
+}

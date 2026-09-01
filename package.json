@@ -18,6 +18,7 @@
     "db:studio": "pnpm --filter @shop/db exec prisma studio",
     "storage:setup": "pnpm --filter @shop/web run setup:bucket",
     "storage:seed": "pnpm --filter @shop/web run seed:images",
+    "banners:seed": "pnpm --filter @shop/web run seed:banners",
     "db:seed": "pnpm --filter @shop/db run seed && pnpm --filter @shop/auth run seed",
     "mobile:sync": "pnpm --filter @shop/mobile run sync"
   },

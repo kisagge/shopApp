@@ -1,0 +1,207 @@
+'use client';
+
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { cn } from '../lib/cn';
+
+export interface CarouselSlide {
+  readonly id: string;
+  readonly content: ReactNode;
+}
+
+export interface CarouselProps {
+  readonly slides: readonly CarouselSlide[];
+  /** 이 캐러셀이 무엇인지. 스크린리더가 영역을 지나칠 때 읽는다 */
+  readonly label: string;
+  /** 자동 넘김 간격(ms). 0이면 자동으로 넘기지 않는다 */
+  readonly intervalMs?: number;
+  readonly className?: string;
+}
+
+/**
+ * 접근 가능한 캐러셀.
+ *
+ * 캐러셀은 접근성 사고가 가장 잦은 컴포넌트다. 지킨 것들:
+ *
+ * 1. **멈출 수 있다.** 5초 넘게 자동으로 움직이는 콘텐츠에는 멈추는 수단이
+ *    있어야 한다(WCAG 2.2.2). 재생/일시정지 버튼을 눈에 보이게 둔다.
+ * 2. **움직임을 줄이라고 한 사용자에게는 자동으로 넘기지 않는다.**
+ *    prefers-reduced-motion 은 취향이 아니라 전정기관 장애 대응이다.
+ * 3. **숨은 슬라이드에 탭이 들어가지 않는다.** 화면 밖 슬라이드의 링크에
+ *    포커스가 가면 키보드 사용자는 보이지 않는 곳으로 끌려간다.
+ * 4. **포커스나 마우스가 올라가면 멈춘다.** 읽는 중에 넘어가지 않도록.
+ * 5. **슬라이드 변경을 사용자가 눌렀을 때만 알린다.** 자동 전환까지 읽으면
+ *    스크린리더가 끝없이 떠든다.
+ */
+export function Carousel({ slides, label, intervalMs = 6000, className }: CarouselProps) {
+  const [index, setIndex] = useState(0);
+  const [playing, setPlaying] = useState(true);
+  const [announcement, setAnnouncement] = useState('');
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const hoveredRef = useRef(false);
+  const focusedRef = useRef(false);
+  const baseId = useId();
+
+  const count = slides.length;
+  const single = count <= 1;
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const apply = () => setReduceMotion(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
+
+  /** 사용자가 눌러서 이동한 경우에만 알린다 */
+  const goTo = useCallback(
+    (next: number, announce: boolean) => {
+      const target = ((next % count) + count) % count;
+      setIndex(target);
+      if (announce) setAnnouncement(`${count}개 중 ${target + 1}번째 배너`);
+    },
+    [count],
+  );
+
+  const autoAdvance = !single && playing && !reduceMotion && intervalMs > 0;
+
+  useEffect(() => {
+    if (!autoAdvance) return;
+    const timer = window.setInterval(() => {
+      // 읽는 중이면 넘기지 않는다. playing 을 건드리지 않으므로
+      // 마우스를 치우면 저절로 다시 흐른다.
+      if (hoveredRef.current || focusedRef.current) return;
+      setIndex((i) => (i + 1) % count);
+    }, intervalMs);
+    return () => window.clearInterval(timer);
+  }, [autoAdvance, count, intervalMs]);
+
+  function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      goTo(index - 1, true);
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      goTo(index + 1, true);
+    }
+  }
+
+  if (count === 0) return null;
+
+  return (
+    <section
+      aria-label={label}
+      // 역할 설명을 붙여야 스크린리더가 "지역" 이 아니라 "캐러셀" 로 읽는다
+      aria-roledescription="캐러셀"
+      className={cn('relative', className)}
+      onMouseEnter={() => { hoveredRef.current = true; }}
+      onMouseLeave={() => { hoveredRef.current = false; }}
+      onFocusCapture={() => { focusedRef.current = true; }}
+      onBlurCapture={() => { focusedRef.current = false; }}
+    >
+      <div
+        id={`${baseId}-slides`}
+        // 키보드 좌우 이동. tabIndex 를 주지 않으면 화살표를 받을 수 없다.
+        role="group"
+        tabIndex={single ? -1 : 0}
+        onKeyDown={single ? undefined : onKeyDown}
+        aria-label={single ? undefined : '좌우 화살표 키로 배너를 넘길 수 있습니다'}
+        className="relative overflow-hidden rounded-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+      >
+        {slides.map((slide, i) => {
+          const current = i === index;
+          return (
+            <div
+              key={slide.id}
+              role="group"
+              aria-roledescription="슬라이드"
+              aria-label={`${count}개 중 ${i + 1}번째`}
+              // 보이지 않는 슬라이드는 접근성 트리에서도 빼고 포커스도 막는다.
+              // hidden 만 쓰면 전환 애니메이션을 넣을 수 없고, aria-hidden 만
+              // 쓰면 링크에 탭이 들어간다.
+              {...(current ? {} : { inert: true })}
+              aria-hidden={current ? undefined : true}
+              className={cn(
+                current ? 'block' : 'hidden',
+              )}
+            >
+              {slide.content}
+            </div>
+          );
+        })}
+      </div>
+
+      {!single && (
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-2 md:px-4">
+            <CarouselArrow
+              direction="prev"
+              label={`이전 배너 (${count}개 중 ${index + 1}번째)`}
+              onClick={() => goTo(index - 1, true)}
+            />
+            <CarouselArrow
+              direction="next"
+              label={`다음 배너 (${count}개 중 ${index + 1}번째)`}
+              onClick={() => goTo(index + 1, true)}
+            />
+          </div>
+
+          <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3 md:bottom-6">
+            <ul className="flex items-center gap-2">
+              {slides.map((slide, i) => (
+                <li key={slide.id}>
+                  <button
+                    type="button"
+                    onClick={() => goTo(i, true)}
+                    // 현재 위치를 색으로만 알리지 않는다
+                    aria-current={i === index ? 'true' : undefined}
+                    aria-label={`${i + 1}번째 배너로 이동`}
+                    className={cn(
+                      'block h-2.5 w-2.5 rounded-full border border-n-900/30 transition-colors',
+                      'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]',
+                      i === index ? 'bg-n-900' : 'bg-n-900/15 hover:bg-n-900/35',
+                    )}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {/* 자동으로 움직이는 콘텐츠에는 멈추는 수단이 있어야 한다 */}
+            {!reduceMotion && intervalMs > 0 && (
+              <button
+                type="button"
+                onClick={() => setPlaying((p) => !p)}
+                aria-label={playing ? '배너 자동 넘김 멈춤' : '배너 자동 넘김 시작'}
+                className="ml-1 flex h-7 w-7 items-center justify-center rounded-full border border-n-900/30 bg-n-0/70 text-[10px] text-n-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+              >
+                <span aria-hidden="true">{playing ? '❚❚' : '▶'}</span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* 사용자가 눌러 이동했을 때만 채워진다 */}
+      <p aria-live="polite" className="sr-only">{announcement}</p>
+    </section>
+  );
+}
+
+function CarouselArrow({
+  direction, label, onClick,
+}: {
+  direction: 'prev' | 'next';
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-n-900/15 bg-n-0/80 text-n-900 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+    >
+      <span aria-hidden="true">{direction === 'prev' ? '‹' : '›'}</span>
+    </button>
+  );
+}

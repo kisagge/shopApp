@@ -9,6 +9,7 @@
     "start": "next start",
     "setup:bucket": "node --env-file=../../.env scripts/setup-bucket.mjs",
     "seed:images": "tsx --env-file=../../.env scripts/seed-images.ts",
+    "seed:banners": "tsx --env-file=../../.env scripts/seed-banners.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
