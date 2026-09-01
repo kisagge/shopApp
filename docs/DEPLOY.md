@@ -67,9 +67,16 @@ GitHub 저장소를 Vercel 에 연결하면 `vercel.json` 을 그대로 읽는�
 
 ```
 installCommand  pnpm install --frozen-lockfile
-buildCommand    prisma migrate deploy && turbo run build --filter=@shop/web
+buildCommand    check-db-url && prisma migrate deploy && turbo run build --filter=@shop/web
 outputDirectory apps/web/.next
 ```
+
+**Root Directory 는 저장소 루트로 둔다.** `apps/web` 으로 두면 `outputDirectory`
+가 `apps/web/apps/web/.next` 로 풀리고, 빌드 명령이 워크스페이스 루트를 못 찾는다.
+
+빌드 첫 단계가 DB 주소를 확인한다. 비어 있으면 어느 변수를 어디에 넣어야 하는지
+적어 주고 멈춘다 — Prisma 는 "Connection url is empty" 만 말해서 로그만으로는
+원인을 좁힐 수 없다.
 
 **마이그레이션이 빌드 안에서 돈다.** 실패하면 배포도 안 되므로, 스키마와 코드가
 어긋난 채로 뜨는 일이 없다. 첫 배포에서 `0_init` 이 전체 스키마를 만든다.
