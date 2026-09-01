@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
-const db = vi.hoisted(() => ({ adminAuditLog: { findMany: vi.fn() } }));
+const db = vi.hoisted(() => ({ adminAuditLog: { findMany: vi.fn<(...a: any[]) => any>() } }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const { getAuditLogs } = await import('~/lib/queries/audit-log');

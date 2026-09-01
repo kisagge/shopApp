@@ -127,10 +127,12 @@ export function ProductOptions({ product }: { product: ProductDetail }) {
         </div>
       )}
 
+      {/* flex 행 안에서는 block(w-full) 을 쓰지 않는다. 두 버튼이 모두
+          100% 너비를 요구하면 비율(flex-[1.3])이 눌려 글자가 잘린다. */}
       <div className="flex gap-2">
         <Button
           variant="secondary"
-          block
+          className="flex-1"
           aria-disabled={!canAdd}
           onClick={() => {
             if (!canAdd || !selected) return;
@@ -157,7 +159,7 @@ export function ProductOptions({ product }: { product: ProductDetail }) {
         >
           장바구니
         </Button>
-        <Button block aria-disabled={!canAdd} className="flex-[1.3]">
+        <Button aria-disabled={!canAdd} className="flex-[1.3]">
           {canAdd ? '바로 구매' : '옵션을 선택하세요'}
         </Button>
       </div>

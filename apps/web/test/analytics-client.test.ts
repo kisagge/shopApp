@@ -130,7 +130,7 @@ describe('페이지 이탈', () => {
 describe('게이트', () => {
   it('purchase 는 큐에 담지도 않는다 — 서버만 기록한다', () => {
     const t = makeTransport();
-    const onDropped = vi.fn();
+    const onDropped = vi.fn<(...a: any[]) => any>();
     const tracker = new AnalyticsTracker({ transport: t.transport, batchSize: 1, onDropped });
     tracker.track('purchase');
     expect(t.posted).toHaveLength(0);
@@ -139,7 +139,7 @@ describe('게이트', () => {
 
   it('동의가 없으면 분석 이벤트를 보내지 않는다', () => {
     const t = makeTransport();
-    const onDropped = vi.fn();
+    const onDropped = vi.fn<(...a: any[]) => any>();
     const tracker = new AnalyticsTracker({
       transport: t.transport, batchSize: 1, hasConsent: () => false, onDropped,
     });

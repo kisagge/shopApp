@@ -3,8 +3,8 @@ import type { Actor } from '@shop/core';
 import { assignRoleSchema, updateMerchantStatusSchema } from '@shop/contract';
 
 const db = vi.hoisted(() => ({
-  merchant: { findUnique: vi.fn(), update: vi.fn() },
-  user: { findUnique: vi.fn(), update: vi.fn() },
+  merchant: { findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  user: { findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 

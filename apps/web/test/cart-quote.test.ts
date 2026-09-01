@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const findManyVariants = vi.hoisted(() => vi.fn());
-const findFirstUserCoupon = vi.hoisted(() => vi.fn());
+const findManyVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const findFirstUserCoupon = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/db', () => ({
   prisma: {
     productVariant: { findMany: findManyVariants },

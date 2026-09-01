@@ -29,7 +29,7 @@ export async function SiteHeader() {
           </ul>
         </nav>
 
-        <span className="flex items-center gap-4">
+        <span className="flex shrink-0 items-center gap-4">
           <SessionNav />
           <CartBadge />
         </span>

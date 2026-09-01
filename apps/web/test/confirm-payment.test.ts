@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { won, PaymentError, type PaymentGateway } from '@shop/core';
 
-const recordServerEvent = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
 const tx = vi.hoisted(() => ({
-  order: { updateMany: vi.fn(), update: vi.fn() },
-  orderItem: { updateMany: vi.fn() },
-  orderStatusLog: { create: vi.fn() },
-  payment: { update: vi.fn() },
+  order: { updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
+  orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
+  payment: { update: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({
-  order: { findFirst: vi.fn() },
-  $transaction: vi.fn(),
+  order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -29,12 +29,12 @@ const order = (over: Record<string, unknown> = {}) => ({
 
 const gateway = (over: Partial<PaymentGateway> = {}): PaymentGateway => ({
   provider: 'mock',
-  confirm: vi.fn(async ({ amount }) => ({
+  confirm: vi.fn<(...a: any[]) => any>(async ({ amount }) => ({
     paymentKey: 'pk_1', approvalNo: 'A1', method: 'CARD' as const, status: 'DONE' as const,
     amount: won(amount), approvedAt: new Date('2026-08-31T06:00:00Z'),
     virtualAccount: null, raw: {},
   })),
-  cancel: vi.fn(),
+  cancel: vi.fn<(...a: any[]) => any>(),
   ...over,
 });
 
@@ -124,7 +124,7 @@ describe('승인 성공', () => {
 
 describe('가상계좌 — 입금 전이라 아직 결제가 아니다', () => {
   const vaGateway = gateway({
-    confirm: vi.fn(async ({ amount }) => ({
+    confirm: vi.fn<(...a: any[]) => any>(async ({ amount }) => ({
       paymentKey: 'pk_va', approvalNo: null, method: 'VIRTUAL_ACCOUNT' as const,
       status: 'WAITING_FOR_DEPOSIT' as const, amount: won(amount), approvedAt: null,
       virtualAccount: { bank: '기업은행', accountNumber: '00012345678', dueDate: new Date('2026-09-03T00:00:00Z') },
@@ -159,7 +159,7 @@ describe('실패', () => {
 
   it('PG 가 거절하면 그대로 전달한다', async () => {
     const gw = gateway({
-      confirm: vi.fn(() => Promise.reject(new PaymentError('REJECT_CARD_COMPANY', '카드사 거절'))),
+      confirm: vi.fn<(...a: any[]) => any>(() => Promise.reject(new PaymentError('REJECT_CARD_COMPANY', '카드사 거절'))),
     });
     await expect(
       confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gw),

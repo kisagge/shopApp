@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
-  order: { findMany: vi.fn(), count: vi.fn() },
-  product: { findMany: vi.fn(), count: vi.fn() },
+  order: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
+  product: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: {} }));
 

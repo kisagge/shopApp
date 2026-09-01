@@ -1,21 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CartQuoteResponse } from '@shop/contract';
 
-const quoteCart = vi.hoisted(() => vi.fn());
+const quoteCart = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/queries/cart', () => ({ quoteCart }));
 
 const tx = vi.hoisted(() => ({
-  productVariant: { updateMany: vi.fn() },
-  user: { updateMany: vi.fn() },
-  userCoupon: { updateMany: vi.fn() },
-  order: { create: vi.fn() },
-  pointTransaction: { create: vi.fn() },
+  productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
+  user: { updateMany: vi.fn<(...a: any[]) => any>() },
+  userCoupon: { updateMany: vi.fn<(...a: any[]) => any>() },
+  order: { create: vi.fn<(...a: any[]) => any>() },
+  pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({
-  address: { findFirst: vi.fn() },
-  productVariant: { findMany: vi.fn() },
-  userCoupon: { findFirst: vi.fn() },
-  $transaction: vi.fn(),
+  address: { findFirst: vi.fn<(...a: any[]) => any>() },
+  productVariant: { findMany: vi.fn<(...a: any[]) => any>() },
+  userCoupon: { findFirst: vi.fn<(...a: any[]) => any>() },
+  $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 

@@ -15,14 +15,16 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 // 이 앱에서 해석하지 못해 실패한다.
 import { prisma } from '@shop/db';
 import { imageObjectKey, defaultAlt } from '@shop/core';
-// @ts-expect-error — .mjs 인코더에는 타입 선언이 없다. 시드에서만 쓴다.
 import { placeholder, TONES } from './make-png.mjs';
 
 const TONE_NAMES = Object.keys(TONES) as string[];
 
+const endpoint = process.env['S3_ENDPOINT'];
 const s3 = new S3Client({
   region: process.env['S3_REGION'] ?? 'us-east-1',
-  endpoint: process.env['S3_ENDPOINT'],
+  // exactOptionalPropertyTypes 아래에서는 undefined 를 명시적으로 넘길 수 없다.
+  // 값이 없으면 키 자체를 빼야 SDK 가 기본 엔드포인트를 쓴다.
+  ...(endpoint ? { endpoint } : {}),
   forcePathStyle: true,
   credentials: {
     accessKeyId: process.env['S3_ACCESS_KEY_ID'] ?? '',

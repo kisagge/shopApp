@@ -1,5 +1,5 @@
 {
   "extends": "@shop/config/tsconfig/base.json",
   "compilerOptions": { "noEmit": true },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "test/**/*"]
 }

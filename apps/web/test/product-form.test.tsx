@@ -3,9 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const push = vi.hoisted(() => vi.fn());
-const refresh = vi.hoisted(() => vi.fn());
-const back = vi.hoisted(() => vi.fn());
+const push = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const refresh = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const back = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push, refresh, back }) }));
 
 const { ProductForm } = await import('~/app/admin/products/product-form');
@@ -33,7 +33,7 @@ function setup(mode: 'create' | 'edit' = 'edit') {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubGlobal('fetch', vi.fn());
+  vi.stubGlobal('fetch', vi.fn<(...a: any[]) => any>());
 });
 
 describe('접근성', () => {

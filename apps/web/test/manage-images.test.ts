@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
-  product: { findFirst: vi.fn() },
+  product: { findFirst: vi.fn<(...a: any[]) => any>() },
   productImage: {
-    create: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), delete: vi.fn(),
-    update: vi.fn(), updateMany: vi.fn(), findUniqueOrThrow: vi.fn(),
+    create: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), delete: vi.fn<(...a: any[]) => any>(),
+    update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>(), findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
   },
-  $transaction: vi.fn(),
+  $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -26,8 +26,8 @@ const HTML = new Uint8Array([0x3c, 0x21, 0x44, 0x4f, 0x43, ...Array(24).fill(0)]
 
 const storage = {
   name: 'fake',
-  put: vi.fn(async ({ key }: { key: string }) => ({ url: `https://cdn.test/${key}` })),
-  remove: vi.fn(async () => {}),
+  put: vi.fn<(...a: any[]) => any>(async ({ key }: { key: string }) => ({ url: `https://cdn.test/${key}` })),
+  remove: vi.fn<(...a: any[]) => any>(async () => {}),
 };
 
 const product = (imageCount = 0) => ({

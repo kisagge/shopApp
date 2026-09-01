@@ -37,7 +37,8 @@ describe('관리자와 슈퍼관리자의 경계', () => {
     ['user:assignRole', '권한 부여'],
     ['merchant:approve', '가맹점 입점 승인'],
     ['settlement:pay', '정산 지급 집행'],
-  ] as const)('관리자는 %s(%s)를 할 수 없다', (permission) => {
+    // 두 번째 인자(설명)를 받지 않으면 it.each 의 튜플 시그니처와 어긋난다
+  ] as const)('관리자는 %s(%s)를 할 수 없다', (permission, _label) => {
     expect(hasPermission(admin, permission)).toBe(false);
     expect(hasPermission(superAdmin, permission)).toBe(true);
   });

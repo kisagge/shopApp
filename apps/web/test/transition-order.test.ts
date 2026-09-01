@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 const tx = vi.hoisted(() => ({
-  orderItem: { updateMany: vi.fn(), findMany: vi.fn() },
-  order: { update: vi.fn() },
-  orderStatusLog: { create: vi.fn() },
+  orderItem: { updateMany: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  order: { update: vi.fn<(...a: any[]) => any>() },
+  orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
 }));
-const db = vi.hoisted(() => ({ order: { findFirst: vi.fn() }, $transaction: vi.fn() }));
+const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const { transitionOrder, TransitionError } = await import('~/lib/admin/transition-order');

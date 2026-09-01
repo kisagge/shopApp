@@ -3,11 +3,11 @@ import type { Actor } from '@shop/core';
 import { createProductSchema, updateProductSchema } from '@shop/contract';
 
 const db = vi.hoisted(() => ({
-  brand: { findUnique: vi.fn(), findMany: vi.fn() },
-  category: { findUnique: vi.fn(), findMany: vi.fn() },
-  product: { findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-  productVariant: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
-  $transaction: vi.fn(),
+  brand: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  category: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  product: { findUnique: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  productVariant: { findMany: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
+  $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 

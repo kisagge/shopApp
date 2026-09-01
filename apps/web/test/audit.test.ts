@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
-const create = vi.hoisted(() => vi.fn(() => Promise.resolve({})));
+const create = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve({})));
 vi.mock('@shop/db', () => ({ prisma: { adminAuditLog: { create } } }));
 
 const { recordAudit, redactForAudit } = await import('~/lib/audit');

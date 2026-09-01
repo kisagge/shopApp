@@ -1,20 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { won, type Actor, type PaymentGateway } from '@shop/core';
 
-const recordServerEvent = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
 const tx = vi.hoisted(() => ({
-  order: { updateMany: vi.fn(), update: vi.fn() },
-  orderItem: { updateMany: vi.fn() },
-  productVariant: { updateMany: vi.fn() },
-  user: { update: vi.fn() },
-  pointTransaction: { create: vi.fn() },
-  userCoupon: { update: vi.fn() },
-  payment: { update: vi.fn() },
-  orderStatusLog: { create: vi.fn() },
+  order: { updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
+  productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
+  user: { update: vi.fn<(...a: any[]) => any>() },
+  pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
+  userCoupon: { update: vi.fn<(...a: any[]) => any>() },
+  payment: { update: vi.fn<(...a: any[]) => any>() },
+  orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
 }));
-const db = vi.hoisted(() => ({ order: { findFirst: vi.fn() }, $transaction: vi.fn() }));
+const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const { cancelOrder, CancelError } = await import('~/lib/orders/cancel-order');
@@ -35,8 +35,8 @@ const order = (over: Record<string, unknown> = {}) => ({
 
 const gateway = (): PaymentGateway => ({
   provider: 'mock',
-  confirm: vi.fn(),
-  cancel: vi.fn(async () => ({
+  confirm: vi.fn<(...a: any[]) => any>(),
+  cancel: vi.fn<(...a: any[]) => any>(async () => ({
     paymentKey: 'pk_1', approvalNo: null, method: 'CARD' as const, status: 'CANCELED' as const,
     amount: won(0), approvedAt: null, virtualAccount: null, raw: {},
   })),

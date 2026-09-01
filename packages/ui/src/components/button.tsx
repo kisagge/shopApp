@@ -3,7 +3,9 @@ import type { ButtonHTMLAttributes, Ref } from 'react';
 import { cn } from '../lib/cn';
 
 const button = cva(
-  'inline-flex items-center justify-center gap-2 rounded-sm font-medium transition-colors ' +
+  // 라벨이 줄바꿈되면 버튼 높이가 무너지거나 글자가 잘린다. 이 디자인의
+  // 버튼 라벨은 모두 짧으므로 기본으로 막는다.
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm font-medium transition-colors ' +
     'disabled:cursor-not-allowed aria-disabled:cursor-not-allowed',
   {
     variants: {

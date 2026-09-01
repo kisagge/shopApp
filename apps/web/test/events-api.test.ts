@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // DB 싱크는 건드리지 않는다. 이 테스트가 검증하는 것은 라우트의 판단이지 적재가 아니다.
-const recordEvents = vi.hoisted(() => vi.fn(() => Promise.resolve()));
+const recordEvents = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/analytics/server', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/analytics/server')>();
   return { ...actual, recordEvents };
 });
 
 // 세션도 갈아 끼운다. 라우트가 세션을 어떻게 쓰는지가 이 테스트의 관심사다.
-const getSessionUser = vi.hoisted(() => vi.fn(() => Promise.resolve(null as unknown)));
+const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve(null as unknown)));
 vi.mock('@shop/auth/session', () => ({ getSessionUser }));
 
 // 동의는 세션이 아니라 DB 에서 읽는다
-const findUniqueUser = vi.hoisted(() => vi.fn(() => Promise.resolve({ analyticsConsent: null })));
+const findUniqueUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve({ analyticsConsent: null })));
 vi.mock('@shop/db', () => ({ prisma: { user: { findUnique: findUniqueUser } } }));
 
 const { POST } = await import('~/app/api/events/route');

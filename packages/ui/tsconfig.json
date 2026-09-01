@@ -3,7 +3,9 @@
   "compilerOptions": {
     "noEmit": true,
     "jsx": "react-jsx",
-    "lib": ["ES2023", "DOM", "DOM.Iterable"]
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // 토큰 대비 테스트가 theme.css 를 직접 읽는다 — node 내장 모듈 타입이 필요하다
+    "types": ["node"]
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*", "test/**/*"]
 }

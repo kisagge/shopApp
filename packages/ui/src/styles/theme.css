@@ -75,6 +75,26 @@
  * 다크 테마는 자동 반전이 아니라 각 역할에 다른 단계를 배정한 것이다.
  */
 @layer base {
+  /**
+   * Tailwind v4 Preflight 는 버튼의 cursor 를 브라우저 기본값으로 되돌렸다.
+   * 그 결과 링크는 손가락인데 버튼만 화살표라, 눌리는 요소로 보이지 않는다.
+   * 되살려 둔다.
+   *
+   * 비활성 상태는 각 컴포넌트의 disabled:cursor-not-allowed 가 이긴다 —
+   * 유틸리티 레이어가 base 보다 뒤에 오기 때문이다. :not(:disabled) 를
+   * 함께 건 것은 aria-disabled 만 쓰는 요소까지 손가락이 되지 않게 하기 위해서다.
+   */
+  button:not(:disabled):not([aria-disabled='true']),
+  summary,
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  /* 파일 선택 버튼은 별도 의사 요소라 위 규칙이 닿지 않는다 */
+  input[type='file']::file-selector-button {
+    cursor: pointer;
+  }
+
   :root {
     --bg: var(--color-n-0);
     --surface: var(--color-n-50);

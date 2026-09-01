@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CartQuoteResponse } from '@shop/contract';
 
-const useCartQuote = vi.hoisted(() => vi.fn());
+const useCartQuote = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/use-cart-quote', () => ({ useCartQuote }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (

@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
-  merchant: { findMany: vi.fn() },
-  orderItem: { groupBy: vi.fn() },
-  settlement: { findMany: vi.fn(), upsert: vi.fn(), findUnique: vi.fn(), updateMany: vi.fn() },
+  merchant: { findMany: vi.fn<(...a: any[]) => any>() },
+  orderItem: { groupBy: vi.fn<(...a: any[]) => any>() },
+  settlement: { findMany: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 

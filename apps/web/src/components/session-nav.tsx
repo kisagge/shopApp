@@ -21,7 +21,7 @@ export function SessionNav() {
 
   if (!data) {
     return (
-      <Link href="/login" className="text-xs font-medium text-[var(--fg-secondary)]">
+      <Link href="/login" className="shrink-0 whitespace-nowrap text-xs font-medium text-[var(--fg-secondary)]">
         로그인
       </Link>
     );
@@ -30,11 +30,14 @@ export function SessionNav() {
   const role = (data.user as { role?: string }).role;
 
   return (
-    <span className="flex items-center gap-3">
-      <Link href="/mypage" className="text-xs text-[var(--fg-secondary)] no-underline">
+    // 모바일에서 좁아지면 "마이페 / 이지" 처럼 단어 중간에서 끊긴다.
+    // 줄바꿈을 막고, 자리가 모자라면 이름부터 감춘다 — 동작(마이페이지·로그아웃)이
+    // 이름보다 중요하다.
+    <span className="flex items-center gap-3 whitespace-nowrap">
+      <Link href="/mypage" className="shrink-0 text-xs text-[var(--fg-secondary)] no-underline">
         마이페이지
       </Link>
-      <span className="text-xs text-[var(--fg-secondary)]">
+      <span className="hidden text-xs text-[var(--fg-secondary)] sm:inline">
         {data.user.name}
         {role && role !== 'CUSTOMER' && (
           <span className="ml-1.5 rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
@@ -47,7 +50,7 @@ export function SessionNav() {
         onClick={() => {
           void authClient.signOut().then(() => router.refresh());
         }}
-        className="text-xs text-[var(--fg-muted)] underline underline-offset-2"
+        className="shrink-0 text-xs text-[var(--fg-muted)] underline underline-offset-2"
       >
         로그아웃
       </button>
