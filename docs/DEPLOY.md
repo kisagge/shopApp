@@ -77,8 +77,12 @@ installCommand  pnpm install --frozen-lockfile
 buildCommand    check-db-url && prisma migrate deploy && turbo run build --filter=@shop/web
 ```
 
-`outputDirectory` 는 두지 않는다. framework 프리셋이 Root Directory 아래의
-`.next` 를 찾는다. 명시하면 `apps/web` 기준으로 한 번 더 풀려 어긋난다.
+`outputDirectory` 는 `.next` 다 — Root Directory 기준으로 풀린다.
+`apps/web/.next` 로 적으면 `apps/web/apps/web/.next` 를 찾다가 실패한다.
+
+**명시해 두는 이유가 있다.** 가져오기 화면에서 잡힌 값이 대시보드에 남아 있으면
+그것이 적용되는데, `vercel.json` 이 대시보드 설정보다 우선하므로 여기서 못박아
+둬야 어느 프로젝트에서 배포하든 같은 결과가 나온다.
 
 빌드 명령의 세 단계는 모두 `pnpm --filter` 를 거친다. pnpm 이 워크스페이스를
 스스로 찾으므로 **실행 위치에 매이지 않는다.** 저장소 루트 기준 상대 경로를
