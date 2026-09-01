@@ -33,11 +33,44 @@ Capacitor는 Next.js의 서버 기능(RSC, Route Handler)을 기기 안에서 �
 ```bash
 pnpm install
 cp .env.example .env      # 값 채우기
-pnpm db:up                # postgres + minio
+pnpm db:up                # postgres + minio (docker)
+pnpm db:deploy            # 마이그레이션 적용
+pnpm storage:setup        # 이미지 버킷 생성 + 공개 정책
+pnpm db:seed              # 상품·사용자
+pnpm storage:seed         # 상품 플레이스홀더 이미지
+pnpm banners:seed         # 홈 배너
 pnpm dev
 ```
 
 Node 24 LTS와 pnpm 11이 필요하다. `.nvmrc`와 `packageManager` 필드에 고정돼 있다.
+
+시드 계정은 모두 비밀번호 `plain1234!` 다.
+
+| 계정 | 역할 |
+|---|---|
+| `demo@plain.test` | 고객 |
+| `contact@moor.test` | 가맹점 (무어) |
+| `admin@plain.test` | 관리자 |
+| `super@plain.test` | 슈퍼관리자 |
+
+### 스키마를 바꿀 때
+
+```bash
+pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트 재생성
+```
+
+`pnpm db:push` 는 이력을 남기지 않으므로 **버릴 실험에만** 쓴다.
+그리고 스키마를 바꾼 뒤에는 **dev 서버를 재시작해야 한다** — 실행 중인 서버는
+예전 Prisma 클라이언트를 물고 있어서 `Unknown argument` 같은 오류가 난다.
+(두 번 당했다.)
+
+## 배포
+
+Vercel. 프론트와 백이 한 프로젝트라 별도 백엔드 서버가 필요 없고,
+API 라우트와 서버 렌더링이 전부 서버리스 함수로 돈다.
+
+Postgres 와 오브젝트 스토리지는 따로 마련해야 한다. 절차와 환경변수,
+"무엇을 비워 두면 무엇이 조용히 꺼지는지"는 [docs/DEPLOY.md](docs/DEPLOY.md) 에 있다.
 
 ## 테스트
 
