@@ -188,7 +188,8 @@ export default async function AdminAuditPage({
                       <span className="block text-[13px]">{row.actorName}</span>
                       <span className="block text-[11px] text-[var(--fg-muted)]">
                         {/* 역할은 그 시점 스냅샷이다. 지금 역할이 바뀌었어도 그대로 남는다. */}
-                        {USER_ROLE_LABEL[row.actorRole as UserRole] ?? row.actorRole} · {row.actorEmail}
+                        {USER_ROLE_LABEL[row.actorRole as UserRole] ?? row.actorRole}
+                        {row.actorEmail ? ` · ${row.actorEmail}` : ' · 자동 실행'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[13px]">{ACTION_LABEL[row.action] ?? row.action}</td>

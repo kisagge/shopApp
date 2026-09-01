@@ -16,6 +16,11 @@ import { hashIp } from './analytics/server';
 export type AuditTargetType =
   | 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon' | 'banner';
 
+/** 배치처럼 사람이 아닌 행위자 */
+export function isSystemActor(actor: Actor): boolean {
+  return actor.id.startsWith('system:');
+}
+
 export interface AuditInput {
   readonly actor: Actor;
   /** '<대상>.<동작>' 형태. 'order.refund', 'user.assignRole' */
@@ -45,10 +50,14 @@ function redact(value: unknown): unknown {
 
 export async function recordAudit(input: AuditInput): Promise<void> {
   const ip = input.request?.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null;
+  const system = isSystemActor(input.actor);
   try {
     await prisma.adminAuditLog.create({
       data: {
-        actorId: input.actor.id,
+        // 'system:' 으로 시작하는 행위자는 사용자 테이블에 없다.
+        // 외래키를 만족시키려고 가짜 사용자 행을 만드는 대신, 이름만 남긴다.
+        actorId: system ? null : input.actor.id,
+        actorLabel: system ? input.actor.id : null,
         actorRole: input.actor.role,
         merchantId: input.actor.merchantId,
         action: input.action,

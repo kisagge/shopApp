@@ -834,9 +834,16 @@ model EventLog {
 /// 권한을 나눠 놓고 누가 무엇을 했는지 남기지 않으면 절반만 한 것이다.
 /// 환불·권한부여처럼 되돌릴 수 없고 돈이 걸린 동작이 대상이다.
 model AdminAuditLog {
-  id      String @id @default(cuid())
-  actorId String
-  actor   User   @relation("AuditActor", fields: [actorId], references: [id])
+  id String @id @default(cuid())
+
+  /// 사람이 한 동작이면 채워진다. **배치는 사용자가 아니므로 비어 있다.**
+  /// 필수로 두면 자동 실행이 감사 로그를 아예 못 남긴다 —
+  /// 정산 확정처럼 돈이 걸린 배치가 흔적 없이 도는 것이 가장 나쁘다.
+  actorId String?
+  actor   User?   @relation("AuditActor", fields: [actorId], references: [id])
+
+  /// actorId 가 없을 때 무엇이 했는지. 'system:cron' 같은 이름.
+  actorLabel String?
 
   /// **그 시점의** 역할과 소속. 나중에 역할이 바뀌어도 "그때 무슨 권한으로
   /// 했는지"가 남아야 하므로 조인이 아니라 스냅샷으로 박는다.

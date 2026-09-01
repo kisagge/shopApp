@@ -10,8 +10,23 @@ config({ path: resolve(import.meta.dirname, '../../.env'), quiet: true });
 export default defineConfig({
   schema: 'prisma/schema.prisma',
   datasource: {
-    // 마이그레이션·introspection 용. 런타임 클라이언트는 어댑터로 따로 연결한다.
-    url: process.env.DATABASE_URL ?? '',
+    /**
+     * 마이그레이션·introspection 용. 런타임 클라이언트는 어댑터로 따로 연결한다.
+     *
+     * **풀러를 거치지 않은 주소를 쓴다.** 서버리스용 커넥션 풀러(PgBouncer 등)는
+     * 트랜잭션 모드에서 DDL 과 어드바이저리 락을 제대로 다루지 못해 마이그레이션이
+     * 중간에 멈춘다. Neon·Supabase 는 풀링/직결 두 주소를 함께 준다.
+     */
+    url: process.env.DIRECT_DATABASE_URL ?? process.env.DATABASE_URL ?? '',
+    /**
+     * 섀도 DB — 마이그레이션 이력이 실제로 무엇을 만들어 내는지 검사할 때
+     * Prisma 가 임시로 쓰고 지우는 빈 데이터베이스다.
+     *
+     * 개발 DB 를 그대로 쓰면 검사 도중 데이터가 날아간다. 반드시 별도
+     * 데이터베이스를 가리켜야 하고, **배포 환경에는 필요 없다**
+     * (migrate deploy 는 섀도 DB 를 쓰지 않는다).
+     */
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL ?? '',
   },
   migrations: {
     seed: 'tsx src/seed.ts',

@@ -16,7 +16,9 @@ import { assertPermission, type Actor, type UserRole } from '@shop/core';
 export interface AuditLogRow {
   readonly id: string;
   readonly actorName: string;
-  readonly actorEmail: string;
+  /** 배치가 한 동작이면 이메일이 없다 */
+  readonly actorEmail: string | null;
+  readonly isSystem: boolean;
   readonly actorRole: UserRole;
   readonly action: string;
   readonly targetType: string;
@@ -64,7 +66,7 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     select: {
       id: true, actorRole: true, action: true, targetType: true, targetId: true,
-      before: true, after: true, createdAt: true,
+      before: true, after: true, createdAt: true, actorLabel: true,
       actor: { select: { name: true, email: true } },
     },
   });
@@ -86,8 +88,10 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
   return {
     rows: page.map((r) => ({
       id: r.id,
-      actorName: r.actor.name,
-      actorEmail: r.actor.email,
+      // 배치는 사용자가 없으므로 남겨 둔 이름을 쓴다
+      actorName: r.actor?.name ?? r.actorLabel ?? '(알 수 없음)',
+      actorEmail: r.actor?.email ?? null,
+      isSystem: r.actor === null,
       actorRole: r.actorRole,
       action: r.action,
       targetType: r.targetType,

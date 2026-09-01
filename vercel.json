@@ -2,7 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm turbo run build --filter=@shop/web",
+  "buildCommand": "pnpm --filter @shop/db exec prisma migrate deploy && pnpm turbo run build --filter=@shop/web",
   "outputDirectory": "apps/web/.next",
-  "regions": ["icn1"]
+  "regions": [
+    "icn1"
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/settlements",
+      "schedule": "0 20 1 * *"
+    },
+    {
+      "path": "/api/cron/reconcile-points",
+      "schedule": "0 18 * * *"
+    }
+  ]
 }
