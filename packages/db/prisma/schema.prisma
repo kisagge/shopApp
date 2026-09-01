@@ -302,6 +302,27 @@ model Product {
   /// 표시용 할인율은 packages/core 의 discountRateOf 가 만든다.
   salePrice Int?
 
+  /// 실제로 파는 가격 = salePrice ?? listPrice.
+  ///
+  /// 파생값을 굳이 저장하는 이유는 **정렬과 범위 필터 때문**이다. Prisma 는
+  /// COALESCE 같은 식으로 정렬할 수 없고, 가져와서 JS 로 정렬하면 페이지네이션이
+  /// 깨진다. 인덱스도 걸 수 없다.
+  ///
+  /// 쓰기는 manage-product.ts 의 priceFields() 한 곳으로 모았다.
+  /// 가격을 바꾸는 경로가 그것뿐이어야 이 값이 어긋나지 않는다.
+  sellingPrice Int @default(0)
+
+  /// 검색 대상 문자열 = 상품명 + 브랜드명 (소문자).
+  ///
+  /// 브랜드명을 여기 복사해 두는 이유는 **인덱스를 쓰기 위해서**다.
+  /// `p.name ILIKE ... OR b.name ILIKE ...` 처럼 OR 가 두 테이블에 걸치면
+  /// Postgres 는 어느 쪽 인덱스도 못 쓰고 전체를 훑는다. 5만 행 기준으로
+  /// 재 보니 1002 → 473 buffers 차이였다.
+  ///
+  /// 쓰기는 manage-product.ts 의 searchTextFor() 한 곳으로 모았다.
+  /// 브랜드명을 바꾸는 화면이 생기면 그 브랜드의 상품을 함께 갱신해야 한다.
+  searchText String @default("")
+
   /// 목록 정렬·필터에 쓰는 집계값. 리뷰/주문 발생 시 갱신한다.
   ratingSum   Int @default(0)
   reviewCount Int @default(0)
@@ -321,6 +342,11 @@ model Product {
   @@index([status, publishedAt])
   @@index([categoryId, status])
   @@index([brandId, status])
+  @@index([sellingPrice])
+  @@index([soldCount(sort: Desc)])
+  @@index([publishedAt(sort: Desc)])
+  /// 부분 일치(ILIKE '%...%') 는 b-tree 로 못 찾는다. 트라이그램 색인이라야 한다.
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
 }
 

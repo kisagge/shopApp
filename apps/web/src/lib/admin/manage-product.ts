@@ -7,6 +7,31 @@ import {
   type ProductErrorCode,
 } from '@shop/contract';
 
+/**
+ * 가격 세 값을 한 번에 만든다.
+ *
+ * sellingPrice 는 salePrice ?? listPrice 인 파생값인데, 정렬과 범위 필터
+ * 때문에 컬럼으로 저장한다. **가격을 바꾸는 모든 경로가 이 함수를 거쳐야**
+ * 값이 어긋나지 않는다. 따로 계산해 쓰지 말 것.
+ */
+export function priceFields(input: { listPrice: number; salePrice: number | null }) {
+  return {
+    listPrice: input.listPrice,
+    salePrice: input.salePrice,
+    sellingPrice: input.salePrice ?? input.listPrice,
+  };
+}
+
+/**
+ * 검색 대상 문자열.
+ *
+ * 브랜드명을 상품 행에 복사해 둔다 — 검색 OR 가 두 테이블에 걸치면
+ * 인덱스를 못 쓴다. 소문자로 저장해 비교 때 대소문자를 신경 쓰지 않는다.
+ */
+export function searchTextFor(input: { name: string; brandName: string }): string {
+  return `${input.name} ${input.brandName}`.toLowerCase();
+}
+
 export class ProductError extends Error {
   constructor(readonly code: ProductErrorCode, readonly status = 409) {
     super(PRODUCT_ERROR_MESSAGE[code]);
@@ -20,19 +45,21 @@ export class ProductError extends Error {
  * **권한만 보면 안 된다.** 가맹점은 product:write 를 갖고 있지만 남의 브랜드는
  * 건드릴 수 없다. core 의 canManageProduct 가 두 층을 함께 본다.
  */
-async function assertBrandAllowed(actor: Actor, brandId: string): Promise<void> {
+async function assertBrandAllowed(actor: Actor, brandId: string): Promise<{ name: string }> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
-    select: { merchantId: true },
+    // 이름도 함께 가져온다 — searchText 를 만들 때 필요하다
+    select: { merchantId: true, name: true },
   });
   if (!brand) throw new ProductError('BRAND_NOT_ALLOWED', 403);
   if (!canManageProduct(actor, { merchantId: brand.merchantId })) {
     throw new ProductError('BRAND_NOT_ALLOWED', 403);
   }
+  return { name: brand.name };
 }
 
 export async function createProduct(actor: Actor, input: CreateProductInput) {
-  await assertBrandAllowed(actor, input.brandId);
+  const brand = await assertBrandAllowed(actor, input.brandId);
 
   const category = await prisma.category.findUnique({
     where: { id: input.categoryId }, select: { id: true },
@@ -51,8 +78,8 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
       description: input.description,
       brandId: input.brandId,
       categoryId: input.categoryId,
-      listPrice: input.listPrice,
-      salePrice: input.salePrice,
+      ...priceFields(input),
+      searchText: searchTextFor({ name: input.name, brandName: brand.name }),
       status: input.status,
       // 공개 상태로 만들 때만 게시 시각을 찍는다. 이 값이 없으면 스토어프론트
       // 조회에서 걸러진다.
@@ -96,8 +123,22 @@ export async function updateProduct(
   }
   // 브랜드를 옮기는 경우 **옮겨 갈 브랜드도** 확인해야 한다.
   // 그러지 않으면 자기 브랜드 상품을 남의 브랜드로 밀어 넣을 수 있다.
+  let brandName: string | null = null;
   if (input.brandId && input.brandId !== before.brandId) {
-    await assertBrandAllowed(actor, input.brandId);
+    brandName = (await assertBrandAllowed(actor, input.brandId)).name;
+  }
+
+  // 이름이나 브랜드가 바뀌면 검색 문자열을 다시 만든다.
+  // 바뀌지 않은 쪽은 지금 값을 그대로 읽어 와야 한다.
+  const nameChanged = input.name !== undefined && input.name !== before.name;
+  const brandChanged = brandName !== null;
+  if (nameChanged || brandChanged) {
+    brandName ??= (
+      await prisma.brand.findUniqueOrThrow({
+        where: { id: before.brandId },
+        select: { name: true },
+      })
+    ).name;
   }
 
   if (input.slug && input.slug !== before.slug) {
@@ -117,9 +158,18 @@ export async function updateProduct(
       ...(input.description !== undefined ? { description: input.description } : {}),
       ...(input.brandId !== undefined ? { brandId: input.brandId } : {}),
       ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
-      ...(input.listPrice !== undefined ? { listPrice: input.listPrice } : {}),
-      ...(input.salePrice !== undefined ? { salePrice: input.salePrice } : {}),
+      // 둘 중 하나만 바뀌어도 판매가가 달라지므로 셋을 함께 다시 쓴다.
+      // 보내지 않은 쪽은 기존 값을 그대로 쓴다.
+      ...(input.listPrice !== undefined || input.salePrice !== undefined
+        ? priceFields({
+            listPrice: input.listPrice ?? before.listPrice,
+            salePrice: input.salePrice !== undefined ? input.salePrice : before.salePrice,
+          })
+        : {}),
       ...(input.status !== undefined ? { status: input.status } : {}),
+      ...(nameChanged || brandChanged
+        ? { searchText: searchTextFor({ name: input.name ?? before.name, brandName: brandName! }) }
+        : {}),
       // 처음 공개할 때만 게시 시각을 찍는다. 다시 공개할 때 덮어쓰면
       // "신상품" 판정이 되살아난다.
       ...(goingPublic && before.publishedAt === null ? { publishedAt: new Date() } : {}),

@@ -3,7 +3,11 @@ import type { Actor } from '@shop/core';
 import { createProductSchema, updateProductSchema } from '@shop/contract';
 
 const db = vi.hoisted(() => ({
-  brand: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  brand: {
+    findUnique: vi.fn<(...a: any[]) => any>(),
+    findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
+    findMany: vi.fn<(...a: any[]) => any>(),
+  },
   category: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   product: { findUnique: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
@@ -40,7 +44,8 @@ const existing = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.brand.findUnique.mockResolvedValue({ merchantId: 'm-a' });
+  db.brand.findUnique.mockResolvedValue({ merchantId: 'm-a', name: 'MOOR' });
+  db.brand.findUniqueOrThrow.mockResolvedValue({ name: 'MOOR' });
   db.category.findUnique.mockResolvedValue({ id: 'c-1' });
   db.product.findUnique.mockResolvedValue(null);
   db.product.findFirst.mockResolvedValue(existing);
@@ -140,8 +145,10 @@ describe('상품 수정', () => {
 
   it('보내지 않은 필드는 건드리지 않는다', async () => {
     await updateProduct(merchantA, 'p-1', patch({ name: '바꾼 이름' }));
-    // 계약을 통과한 입력이라도 UPDATE 문에 name 하나만 실려야 한다
-    expect(Object.keys(db.product.update.mock.calls[0]?.[0].data)).toEqual(['name']);
+    // 계약을 통과한 입력이라도 관련 없는 필드는 실리지 않아야 한다.
+    // searchText 는 이름에서 파생되므로 함께 바뀌는 것이 맞다.
+    expect(Object.keys(db.product.update.mock.calls[0]?.[0].data).sort())
+      .toEqual(['name', 'searchText']);
   });
 
   it('변경 전 값을 감사 로그용으로 함께 돌려준다', async () => {
@@ -236,5 +243,55 @@ describe('폼 선택지', () => {
       { id: 'c-1', label: '아우터 > 코트' },
       { id: 'c-2', label: '가방' },
     ]);
+  });
+});
+
+describe('파생 컬럼 — 정렬과 검색을 위해 저장하는 값', () => {
+  beforeEach(() => {
+    db.brand.findUnique.mockResolvedValue({ merchantId: 'm-a', name: 'MOOR' });
+  });
+
+  it('등록 시 판매가를 함께 저장한다', async () => {
+    // Prisma 는 COALESCE 로 정렬할 수 없어 파생값을 컬럼으로 둔다
+    await createProduct(merchantA, input);
+    expect(db.product.create.mock.calls[0]?.[0].data.sellingPrice).toBe(289_000);
+  });
+
+  it('할인이 없으면 정가가 판매가다', async () => {
+    await createProduct(merchantA, { ...input, salePrice: null });
+    expect(db.product.create.mock.calls[0]?.[0].data.sellingPrice).toBe(413_000);
+  });
+
+  it('등록 시 검색 문자열을 소문자로 만든다', async () => {
+    await createProduct(merchantA, { ...input, name: '오트 코트' });
+    expect(db.product.create.mock.calls[0]?.[0].data.searchText).toBe('오트 코트 moor');
+  });
+
+  it('정가만 바꿔도 판매가를 다시 계산한다', async () => {
+    await updateProduct(merchantA, 'p-1', patch({ listPrice: 500_000 }));
+    const data = db.product.update.mock.calls[0]?.[0].data;
+    // 기존 salePrice(289,000) 가 유지되므로 판매가도 그대로여야 한다
+    expect(data.sellingPrice).toBe(289_000);
+    expect(data.listPrice).toBe(500_000);
+  });
+
+  it('할인을 없애면 판매가가 정가로 돌아간다', async () => {
+    await updateProduct(merchantA, 'p-1', patch({ salePrice: null }));
+    expect(db.product.update.mock.calls[0]?.[0].data.sellingPrice).toBe(413_000);
+  });
+
+  it('이름을 바꾸면 검색 문자열도 바꾼다', async () => {
+    await updateProduct(merchantA, 'p-1', patch({ name: '새 이름' }));
+    expect(db.product.update.mock.calls[0]?.[0].data.searchText).toBe('새 이름 moor');
+  });
+
+  it('이름도 브랜드도 그대로면 검색 문자열을 건드리지 않는다', async () => {
+    await updateProduct(merchantA, 'p-1', patch({ status: 'HIDDEN' }));
+    expect(db.product.update.mock.calls[0]?.[0].data.searchText).toBeUndefined();
+  });
+
+  it('가격을 안 바꾸면 판매가도 건드리지 않는다', async () => {
+    await updateProduct(merchantA, 'p-1', patch({ name: '새 이름' }));
+    expect(db.product.update.mock.calls[0]?.[0].data.sellingPrice).toBeUndefined();
   });
 });

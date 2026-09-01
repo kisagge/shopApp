@@ -2,8 +2,12 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { ProductCard } from '@shop/ui';
-import { getCategoryWithChildren, getProductsByCategory } from '~/lib/queries/products';
+import { catalogQuerySchema } from '@shop/contract';
+import { emptyResultHint } from '@shop/core';
+import { getCategoryWithChildren, searchProducts } from '~/lib/queries/products';
 import { TrackedProductList } from '~/components/tracked-product-list';
+import { CatalogControls } from '~/components/catalog-controls';
+import { CatalogPager } from '~/components/catalog-pager';
 import { AppLink } from '~/components/app-link';
 
 export const dynamic = 'force-dynamic';
@@ -12,21 +16,33 @@ const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
 
 interface Params {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ params }: Params): Promise<Metadata> {
+export async function generateMetadata({ params }: Pick<Params, 'params'>): Promise<Metadata> {
   const { slug } = await params;
   const category = await getCategoryWithChildren(slug);
   return { title: category?.name ?? '카테고리' };
 }
 
-export default async function CategoryPage({ params }: Params) {
+export default async function CategoryPage({ params, searchParams }: Params) {
   const { slug } = await params;
-  const [category, products] = await Promise.all([
+  const raw = await searchParams;
+  const query = catalogQuerySchema.parse(raw);
+
+  const [category, page] = await Promise.all([
     getCategoryWithChildren(slug),
-    getProductsByCategory(slug, 48),
+    searchProducts({
+      categorySlug: slug,
+      sort: query.sort,
+      minPrice: query.minPrice,
+      maxPrice: query.maxPrice,
+      cursor: query.cursor,
+    }),
   ]);
   if (!category) notFound();
+
+  const products = page.items;
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
@@ -51,7 +67,10 @@ export default async function CategoryPage({ params }: Params) {
       <div className="flex items-baseline gap-3 border-b border-[var(--border)] pb-6">
         <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{category.name}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          <span className="tnum font-semibold text-[var(--fg-secondary)]">{products.length}</span>개의 상품
+          {/* 이 쪽에 담긴 수가 아니라 조건에 맞는 전체 수 */}
+          <span className="tnum font-semibold text-[var(--fg-secondary)]">
+            {(page.total ?? products.length).toLocaleString('ko-KR')}
+          </span>개의 상품
         </p>
       </div>
 
@@ -78,11 +97,28 @@ export default async function CategoryPage({ params }: Params) {
         </nav>
       )}
 
+      <div className="pt-6">
+        <CatalogControls
+          action={`/category/${category.slug}`}
+          sort={query.sort}
+          minPrice={query.minPrice}
+          maxPrice={query.maxPrice}
+          total={page.total}
+        />
+      </div>
+
       <section aria-label="상품 목록" className="pt-8">
         {products.length === 0 ? (
-          <p className="py-24 text-center text-sm text-[var(--fg-muted)]">
-            아직 등록된 상품이 없습니다.
-          </p>
+          <div className="flex flex-col items-center gap-2 py-24">
+            <p className="text-[15px] font-medium">조건에 맞는 상품이 없습니다</p>
+            <p className="text-[13px] text-[var(--fg-muted)]">
+              {emptyResultHint({
+                hasQuery: false,
+                hasPriceRange: query.minPrice !== undefined || query.maxPrice !== undefined,
+                hasCategory: true,
+              })}
+            </p>
+          </div>
         ) : (
           <TrackedProductList listId={`category_${category.slug}`} itemCount={products.length}>
             <ul className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4">
@@ -108,6 +144,12 @@ export default async function CategoryPage({ params }: Params) {
             </ul>
           </TrackedProductList>
         )}
+
+        <CatalogPager
+          basePath={`/category/${category.slug}`}
+          params={raw}
+          nextCursor={page.nextCursor}
+        />
       </section>
     </div>
   );

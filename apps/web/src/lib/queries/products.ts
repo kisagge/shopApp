@@ -1,6 +1,9 @@
 import 'server-only';
-import { prisma } from '@shop/db';
-import { discountRateOf, won, type Won } from '@shop/core';
+import { prisma, Prisma } from '@shop/db';
+import {
+  discountRateOf, won, normalizeSearchTerm, normalizePriceRange,
+  type Won, type ProductSort,
+} from '@shop/core';
 
 /**
  * 화면이 쓰는 모양. Prisma 모델을 그대로 컴포넌트에 넘기지 않는다 —
@@ -97,33 +100,6 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]>
   return rows.map((r) => toListItem(r as ListRow, now));
 }
 
-/** 카테고리 목록 — 하위 카테고리까지 포함해서 조회 */
-export async function getProductsByCategory(
-  categorySlug: string,
-  limit = 24,
-): Promise<ProductListItem[]> {
-  const category = await prisma.category.findUnique({
-    where: { slug: categorySlug },
-    select: { id: true, children: { select: { id: true } } },
-  });
-  if (!category) return [];
-
-  const categoryIds = [category.id, ...category.children.map((c) => c.id)];
-  const rows = await prisma.product.findMany({
-    where: {
-      deletedAt: null, publishedAt: { not: null },
-      status: { in: ['ACTIVE', 'SOLD_OUT'] },
-      categoryId: { in: categoryIds },
-      // 정지·해지된 가맹점의 상품은 목록에서 내려간다
-      brand: sellableBrand(),
-    },
-    orderBy: [{ soldCount: 'desc' }],
-    take: limit,
-    select: listSelect,
-  });
-  const now = Date.now();
-  return rows.map((r) => toListItem(r as ListRow, now));
-}
 
 /** 헤더 내비게이션용 최상위 카테고리 */
 export async function getTopCategories(): Promise<{ slug: string; name: string }[]> {
@@ -254,4 +230,135 @@ export async function getCategoryWithChildren(slug: string) {
       children: { select: { name: true, slug: true }, orderBy: { sortOrder: 'asc' } },
     },
   });
+}
+
+
+// ── 검색 · 필터 · 정렬 ────────────────────────────────────────
+
+export interface CatalogFilter {
+  readonly q?: string | undefined;
+  readonly categorySlug?: string | undefined;
+  readonly sort?: ProductSort | undefined;
+  readonly minPrice?: number | undefined;
+  readonly maxPrice?: number | undefined;
+  readonly cursor?: string | undefined;
+  readonly take?: number;
+}
+
+export interface CatalogPage {
+  readonly items: readonly ProductListItem[];
+  readonly nextCursor: string | null;
+  /** 첫 쪽에서만 센다. 다음 쪽부터는 null — 화면이 들고 있던 값을 쓴다 */
+  readonly total: number | null;
+  /** 실제로 적용된 검색어. 너무 짧아 무시했으면 null */
+  readonly term: string | null;
+}
+
+const PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 48;
+
+/**
+ * 정렬 축.
+ *
+ * **어느 정렬이든 id 를 마지막 축으로 붙인다.** 같은 값이 여럿이면 순서가
+ * 요청마다 달라지고, 그러면 커서 페이지네이션이 행을 건너뛰거나 되풀이한다.
+ */
+function orderFor(sort: ProductSort) {
+  switch (sort) {
+    case 'newest':
+      return [{ publishedAt: 'desc' as const }, { id: 'desc' as const }];
+    case 'price_asc':
+      return [{ sellingPrice: 'asc' as const }, { id: 'desc' as const }];
+    case 'price_desc':
+      return [{ sellingPrice: 'desc' as const }, { id: 'desc' as const }];
+    default:
+      return [{ soldCount: 'desc' as const }, { id: 'desc' as const }];
+  }
+}
+
+/**
+ * 목록 조회 — 검색어·카테고리·가격 범위·정렬을 한 곳에서 처리한다.
+ *
+ * 검색은 상품명과 브랜드명만 본다. 설명까지 넣으면 "울" 같은 흔한 낱말이
+ * 본문에 스치기만 해도 걸려 결과가 탁해진다.
+ *
+ * 한글은 형태소 분석 없이 부분 일치로 찾는다. products.searchText 에 트라이그램
+ * 색인을 걸어 두어 인덱스를 탄다. 더 나아가려면 검색 엔진이 필요하지만,
+ * 그건 규모가 요구할 때 할 일이다.
+ *
+ * **전체 건수는 첫 쪽에서만 센다.** 카운트는 조건에 맞는 행을 전부 훑어야 해서
+ * 매 쪽마다 돌리면 "더 보기" 한 번에 그 비용이 그대로 붙는다. 총 건수는
+ * 첫 쪽에서 한 번 구해 화면이 들고 다니면 된다.
+ */
+export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage> {
+  const take = Math.min(filter.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
+  const sort = filter.sort ?? 'recommended';
+  const term = filter.q ? normalizeSearchTerm(filter.q) : null;
+  const range = normalizePriceRange({ min: filter.minPrice, max: filter.maxPrice });
+
+  const categoryIds = filter.categorySlug ? await categoryIdsFor(filter.categorySlug) : null;
+  // 카테고리를 지정했는데 찾지 못하면 전체를 보여 주지 않는다.
+  // 잘못된 슬러그로 엉뚱한 목록을 내놓는 편이 빈 목록보다 나쁘다.
+  if (filter.categorySlug && (categoryIds === null || categoryIds.length === 0)) {
+    return { items: [], nextCursor: null, total: 0, term };
+  }
+
+  // 조건부 스프레드로 조립하면 선택 속성이 생겨 Prisma 입력 타입과 어긋나고
+  // (exactOptionalPropertyTypes), 그 여파로 select 추론까지 무너진다.
+  // 명시 타입에 하나씩 붙인다.
+  const where: Prisma.ProductWhereInput = {
+    deletedAt: null,
+    publishedAt: { not: null },
+    status: { in: ['ACTIVE', 'SOLD_OUT'] },
+    brand: sellableBrand(),
+  };
+
+  if (categoryIds) where.categoryId = { in: categoryIds };
+
+  if (range.min !== null || range.max !== null) {
+    const bounds: Prisma.IntFilter = {};
+    if (range.min !== null) bounds.gte = range.min;
+    if (range.max !== null) bounds.lte = range.max;
+    where.sellingPrice = bounds;
+  }
+
+  if (term) {
+    // 상품명과 브랜드명을 합쳐 둔 한 컬럼을 본다. 두 테이블에 OR 를 걸면
+    // Postgres 가 어느 인덱스도 못 쓰고 전체를 훑는다.
+    // 소문자로 저장해 두므로 여기서도 소문자로 맞춘다.
+    where.searchText = { contains: term.toLowerCase() };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: orderFor(sort),
+      take: take + 1,
+      ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
+      select: listSelect,
+    }),
+    // 첫 쪽에서만 센다. 커서가 있으면 이미 화면이 총 건수를 알고 있다.
+    filter.cursor ? Promise.resolve(null) : prisma.product.count({ where }),
+  ]);
+
+  const hasMore = rows.length > take;
+  const page = hasMore ? rows.slice(0, take) : rows;
+  const now = Date.now();
+
+  return {
+    items: page.map((r) => toListItem(r as ListRow, now)),
+    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
+    term,
+  };
+}
+
+/** 카테고리와 그 하위까지. 부모를 고르면 자식 상품도 나와야 한다. */
+async function categoryIdsFor(slug: string): Promise<string[] | null> {
+  const category = await prisma.category.findUnique({
+    where: { slug },
+    select: { id: true, children: { select: { id: true } } },
+  });
+  if (!category) return null;
+  return [category.id, ...category.children.map((c) => c.id)];
 }

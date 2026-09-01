@@ -30,6 +30,18 @@ export async function SiteHeader() {
         </nav>
 
         <span className="flex shrink-0 items-center gap-4">
+          {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
+          <form method="get" action="/search" role="search" className="hidden sm:block">
+            <label htmlFor="site-search" className="sr-only">상품 검색</label>
+            <input
+              id="site-search"
+              type="search"
+              name="q"
+              placeholder="상품 · 브랜드"
+              maxLength={60}
+              className="h-9 w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500 md:w-48"
+            />
+          </form>
           <SessionNav />
           <CartBadge />
         </span>

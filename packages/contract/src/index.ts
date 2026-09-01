@@ -6,3 +6,4 @@ export * from './payment';
 export * from './product';
 export * from './admin';
 export * from './banner';
+export * from './catalog';
