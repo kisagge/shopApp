@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { cuidSchema, quantitySchema, wonSchema } from './common';
+import { cuidSchema, orderNoSchema, quantitySchema, wonSchema } from './common';
 
 /**
  * 이벤트 수집 계약.
@@ -50,8 +50,8 @@ export const eventInputSchema = z.discriminatedUnion('name', [
   ev('sign_up', { method: z.string().max(32).optional() }),
   // purchase / refund 는 서버만 기록한다. 수집 API 가 이름으로 거부하므로
   // 여기 정의는 서버 측 기록 함수의 타입을 위한 것이다.
-  ev('purchase', { orderId: cuidSchema, value: wonSchema, itemCount: z.int().min(1) }),
-  ev('refund', { orderId: cuidSchema, value: wonSchema }),
+  ev('purchase', { orderId: orderNoSchema, value: wonSchema, itemCount: z.int().min(1) }),
+  ev('refund', { orderId: orderNoSchema, value: wonSchema }),
 ]);
 
 export type EventInput = z.infer<typeof eventInputSchema>;

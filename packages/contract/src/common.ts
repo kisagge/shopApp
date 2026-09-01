@@ -16,7 +16,29 @@ export const discountPercentSchema = z
   .min(0, '할인율은 0 이상이어야 합니다')
   .max(100, '할인율은 100 이하여야 합니다');
 
-export const cuidSchema = z.string().min(1, '식별자가 비어 있습니다');
+/**
+ * Prisma 가 만드는 식별자.
+ *
+ * 이름만 cuid 이고 실제로는 "비어 있지 않은 문자열" 이었다. 그래서 형식부터
+ * 틀린 값이 검증을 통과해 뒤쪽에서 조용히 버려졌다 — 잘못된 입력은 조용히
+ * 무시하지 말고 그 자리에서 거절해야 무엇이 잘못됐는지 알 수 있다.
+ *
+ * 길이 폭을 넉넉히 둔 것은 cuid 버전에 따라 25~32자로 갈리기 때문이다.
+ */
+export const cuidSchema = z
+  .string()
+  .regex(/^[a-z0-9]{20,32}$/, '식별자 형식이 아닙니다');
+
+/**
+ * 사람이 읽는 주문번호. YYYYMMDD-NNNNNNN.
+ *
+ * 내부 id 와 다르다. 고객·운영자·이벤트 로그가 주고받는 것은 이쪽이라
+ * cuid 로 받으면 안 된다 — 실제로 이벤트 계약이 cuid 라고 적어 두고
+ * 주문번호를 받고 있었다.
+ */
+export const orderNoSchema = z
+  .string()
+  .regex(/^\d{8}-\d{7}$/, '주문번호 형식이 아닙니다');
 
 /** 실패 응답. 필드 단위 에러를 폼에 그대로 연결할 수 있게 담는다. */
 export const apiErrorSchema = z.object({

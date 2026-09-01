@@ -48,7 +48,7 @@ describe('POST /api/events — 정상 수집', () => {
     const res = await post({
       events: [
         { ...envelope, name: 'page_view' },
-        { ...envelope, name: 'view_item', productId: 'p-1' },
+        { ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' },
       ],
     });
     expect(res.status).toBe(202);
@@ -80,14 +80,14 @@ describe('POST /api/events — 정상 수집', () => {
     // null 을 거부로 뭉뚱그리면 로그인하는 순간 추적이 줄어든다
     getSessionUser.mockResolvedValue(session());
     findUniqueUser.mockResolvedValue({ analyticsConsent: null });
-    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' }] });
     expect(await res.json()).toEqual({ accepted: 1, rejected: 0 });
   });
 
   it('동의(GRANTED)한 사용자의 이벤트를 받는다', async () => {
     getSessionUser.mockResolvedValue(session());
     findUniqueUser.mockResolvedValue({ analyticsConsent: 'GRANTED' });
-    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    const res = await post({ events: [{ ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' }] });
     expect(await res.json()).toEqual({ accepted: 1, rejected: 0 });
   });
 
@@ -98,7 +98,7 @@ describe('POST /api/events — 정상 수집', () => {
   });
 
   it('비로그인이면 동의를 조회하지 않는다', async () => {
-    await post({ events: [{ ...envelope, name: 'view_item', productId: 'p-1' }] });
+    await post({ events: [{ ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' }] });
     expect(findUniqueUser).not.toHaveBeenCalled();
   });
 
@@ -107,7 +107,7 @@ describe('POST /api/events — 정상 수집', () => {
     findUniqueUser.mockResolvedValue({ analyticsConsent: 'DENIED' });
     const res = await post({
       events: [
-        { ...envelope, name: 'view_item', productId: 'p-1' },
+        { ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' },
         { ...envelope, name: 'login' },
       ],
     });
@@ -144,17 +144,17 @@ describe('POST /api/events — 정상 수집', () => {
 
   it('집계 축을 컬럼으로 뽑아 준다', async () => {
     await post({
-      events: [{ ...envelope, name: 'add_to_cart', productId: 'p-1', variantId: 'v-1', quantity: 3 }],
+      events: [{ ...envelope, name: 'add_to_cart', productId: 'cmtgrsyc8000hx9oh6tozfnvx', variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 3 }],
     });
     const [events] = recordEvents.mock.calls[0]!;
-    expect(events[0]).toMatchObject({ productId: 'p-1', variantId: 'v-1', quantity: 3 });
+    expect(events[0]).toMatchObject({ productId: 'cmtgrsyc8000hx9oh6tozfnvx', variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 3 });
   });
 });
 
 describe('POST /api/events — 위조와 남용을 막는다', () => {
   it('purchase 를 브라우저가 보내면 거부한다 — 매출을 지어낼 수 없어야 한다', async () => {
     const res = await post({
-      events: [{ ...envelope, name: 'purchase', orderId: 'o-1', value: 99_999_999, itemCount: 1 }],
+      events: [{ ...envelope, name: 'purchase', orderId: '20260901-1234567', value: 99_999_999, itemCount: 1 }],
     });
     expect(res.status).toBe(400);
     expect((await res.json()).code).toBe('SERVER_ONLY_EVENT');
@@ -163,7 +163,7 @@ describe('POST /api/events — 위조와 남용을 막는다', () => {
 
   it('refund 도 마찬가지로 거부한다', async () => {
     const res = await post({
-      events: [{ ...envelope, name: 'refund', orderId: 'o-1', value: 405_000 }],
+      events: [{ ...envelope, name: 'refund', orderId: '20260901-1234567', value: 405_000 }],
     });
     expect(res.status).toBe(400);
   });
@@ -172,7 +172,7 @@ describe('POST /api/events — 위조와 남용을 막는다', () => {
     const res = await post({
       events: [
         { ...envelope, name: 'page_view' },
-        { ...envelope, name: 'purchase', orderId: 'o-1', value: 1, itemCount: 1 },
+        { ...envelope, name: 'purchase', orderId: '20260901-1234567', value: 1, itemCount: 1 },
       ],
     });
     expect(res.status).toBe(400);

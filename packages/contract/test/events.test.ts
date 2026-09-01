@@ -25,19 +25,19 @@ describe('이벤트 이름 정합성', () => {
 
 describe('eventInputSchema', () => {
   it('알 수 없는 이벤트 이름을 거부한다', () => {
-    const r = eventInputSchema.safeParse({ ...envelope, name: 'veiw_item', productId: 'p-1' });
+    const r = eventInputSchema.safeParse({ ...envelope, name: 'veiw_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' });
     expect(r.success).toBe(false);
   });
 
   it('view_item 은 productId 가 없으면 거부한다', () => {
     expect(eventInputSchema.safeParse({ ...envelope, name: 'view_item' }).success).toBe(false);
     expect(
-      eventInputSchema.safeParse({ ...envelope, name: 'view_item', productId: 'p-1' }).success,
+      eventInputSchema.safeParse({ ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx' }).success,
     ).toBe(true);
   });
 
   it('add_to_cart 는 수량이 1 이상이어야 한다', () => {
-    const bad = { ...envelope, name: 'add_to_cart', productId: 'p', variantId: 'v', quantity: 0 };
+    const bad = { ...envelope, name: 'add_to_cart', productId: 'cmtgrsyc8000hx9oh6tozfnvx', variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 0 };
     expect(eventInputSchema.safeParse(bad).success).toBe(false);
     expect(eventInputSchema.safeParse({ ...bad, quantity: 2 }).success).toBe(true);
   });
@@ -76,7 +76,7 @@ describe('eventInputSchema', () => {
   });
 
   it('purchase 는 금액이 정수여야 한다', () => {
-    const base = { ...envelope, name: 'purchase', orderId: 'o-1', itemCount: 2 };
+    const base = { ...envelope, name: 'purchase', orderId: '20260901-1234567', itemCount: 2 };
     expect(eventInputSchema.safeParse({ ...base, value: 405_000 }).success).toBe(true);
     expect(eventInputSchema.safeParse({ ...base, value: 405_000.5 }).success).toBe(false);
     expect(eventInputSchema.safeParse({ ...base, value: -1 }).success).toBe(false);

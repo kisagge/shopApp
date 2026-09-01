@@ -21,30 +21,30 @@ describe('wonSchema', () => {
 
 describe('cartLineInputSchema — 요청에 금액이 없다', () => {
   it('변형 id 와 수량만 받는다', () => {
-    const r = cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 2 });
+    const r = cartLineInputSchema.safeParse({ variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 2 });
     expect(r.success).toBe(true);
     expect(r.success && Object.keys(r.data).toSorted()).toEqual(['quantity', 'variantId']);
   });
 
   it('가격을 실어 보내도 결과에 담기지 않는다 — 서버가 DB 에서 조회한다', () => {
     const r = cartLineInputSchema.safeParse({
-      variantId: 'v-1', quantity: 1, listPrice: 1, salePrice: 1, unitPrice: 1,
+      variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 1, listPrice: 1, salePrice: 1, unitPrice: 1,
     });
     expect(r.success).toBe(true);
-    expect(r.success && r.data).toEqual({ variantId: 'v-1', quantity: 1 });
+    expect(r.success && r.data).toEqual({ variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 1 });
   });
 
   it('수량 0 은 거부한다', () => {
-    expect(cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 0 }).success).toBe(false);
+    expect(cartLineInputSchema.safeParse({ variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 0 }).success).toBe(false);
   });
 
   it('한 번에 담을 수 있는 수량 상한이 있다', () => {
-    expect(cartLineInputSchema.safeParse({ variantId: 'v-1', quantity: 100 }).success).toBe(false);
+    expect(cartLineInputSchema.safeParse({ variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 100 }).success).toBe(false);
   });
 });
 
 describe('cartQuoteRequestSchema', () => {
-  const line = { variantId: 'v-1', quantity: 1 };
+  const line = { variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 1 };
 
   it('isRemoteArea 는 생략하면 false 로 채운다', () => {
     expect(cartQuoteRequestSchema.parse({ lines: [line] }).isRemoteArea).toBe(false);

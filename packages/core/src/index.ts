@@ -13,3 +13,4 @@ export * from './image';
 export * from './banner';
 export * from './catalog';
 export * from './review';
+export * from './cart-sync';

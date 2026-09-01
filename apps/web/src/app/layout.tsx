@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
+import { CartSync } from '~/components/cart-sync';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
@@ -56,6 +57,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <SiteFooter />
           </div>
           <AnalyticsProvider />
+          {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
+          <CartSync />
         </Providers>
       </body>
     </html>

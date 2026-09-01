@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { MAX_QUANTITY } from '@shop/core';
 
 export interface CartItem {
   readonly variantId: string;
@@ -15,7 +16,8 @@ export interface CartItem {
   selected: boolean;
 }
 
-export const MAX_QUANTITY = 99;
+// 상한은 core 에 있다. 서버 병합도 같은 값을 써야 두 곳이 어긋나지 않는다.
+export { MAX_QUANTITY };
 
 interface CartState {
   items: CartItem[];
