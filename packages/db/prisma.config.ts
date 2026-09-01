@@ -36,8 +36,14 @@ export default defineConfig({
      * 개발 DB 를 그대로 쓰면 검사 도중 데이터가 날아간다. 반드시 별도
      * 데이터베이스를 가리켜야 하고, **배포 환경에는 필요 없다**
      * (migrate deploy 는 섀도 DB 를 쓰지 않는다).
+     *
+     * 값이 없으면 **키 자체를 뺀다.** 빈 문자열을 넘기면 Prisma 가 P1013 으로
+     * 거절하는데, 정작 그 값을 쓰지도 않는 migrate deploy 까지 같이 죽는다.
+     * 실제로 배포가 이것 때문에 실패했다.
      */
-    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL ?? '',
+    ...(process.env.SHADOW_DATABASE_URL
+      ? { shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL }
+      : {}),
   },
   migrations: {
     seed: 'tsx src/seed.ts',
