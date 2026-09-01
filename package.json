@@ -15,7 +15,7 @@
     "db:up": "docker compose -f tooling/docker-compose.yml up -d",
     "db:down": "docker compose -f tooling/docker-compose.yml down",
     "db:migrate": "pnpm --filter @shop/db exec prisma migrate dev && pnpm --filter @shop/db run generate",
-    "db:deploy": "node --env-file-if-exists=.env packages/db/scripts/check-db-url.mjs && pnpm --filter @shop/db exec prisma migrate deploy",
+    "db:deploy": "pnpm --filter @shop/db exec node --env-file-if-exists=../../.env scripts/check-db-url.mjs && pnpm --filter @shop/db exec prisma migrate deploy",
     "db:status": "pnpm --filter @shop/db exec prisma migrate status",
     "db:push": "pnpm --filter @shop/db exec prisma db push && pnpm --filter @shop/db run generate",
     "db:studio": "pnpm --filter @shop/db exec prisma studio",

@@ -8,8 +8,13 @@
  * prisma.config.ts 에서 던지지 않는 이유: `prisma generate` 는 DB 없이도
  * 돌아야 한다(CI 에는 DB 가 없다). 설정 파일에서 막으면 그것까지 깨진다.
  *
- * 로컬에서는 `--env-file-if-exists=.env` 로 실행한다. Vercel 에는 .env 가
- * 없지만 그 플래그는 파일이 없으면 조용히 넘어가므로 같은 명령이 양쪽에서 돈다.
+ * `pnpm --filter @shop/db exec` 로 부른다. pnpm 이 워크스페이스를 스스로 찾아
+ * 이 패키지 디렉터리에서 실행하므로, **어느 경로에서 빌드가 시작되든 같은 곳을
+ * 가리킨다.** 저장소 루트 기준 상대 경로로 쓰면 Vercel 의 Root Directory 설정에
+ * 따라 파일을 못 찾는다(실제로 그렇게 깨졌다).
+ *
+ * .env 는 `--env-file-if-exists` 로 읽는다. Vercel 에는 없지만 그 플래그는
+ * 파일이 없으면 조용히 넘어가므로 같은 명령이 양쪽에서 돈다.
  */
 const CANDIDATES = ['DIRECT_DATABASE_URL', 'DATABASE_URL_UNPOOLED', 'DATABASE_URL'];
 

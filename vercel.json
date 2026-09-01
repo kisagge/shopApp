@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "node --env-file-if-exists=.env packages/db/scripts/check-db-url.mjs && pnpm --filter @shop/db exec prisma migrate deploy && pnpm turbo run build --filter=@shop/web",
+  "buildCommand": "pnpm --filter @shop/db exec node --env-file-if-exists=../../.env scripts/check-db-url.mjs && pnpm --filter @shop/db exec prisma migrate deploy && pnpm turbo run build --filter=@shop/web",
   "outputDirectory": "apps/web/.next",
   "regions": [
     "icn1"
