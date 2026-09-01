@@ -5,6 +5,7 @@ import { config } from 'dotenv';
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
 import { prisma } from './client';
+import { seedReviews } from './seed-reviews';
 
 /**
  * 개발용 시드. 여러 번 돌려도 같은 상태가 되도록 전부 upsert 로 쓴다.
@@ -227,11 +228,10 @@ async function main(): Promise<void> {
         name: p.name, description: p.description, listPrice: p.listPrice,
         salePrice: p.salePrice, brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
-        // 평점 집계는 reviews 테이블이 진실이다. 뒷받침하는 행 없이 숫자만 넣으면
-    // 첫 리뷰가 그 숫자를 덮어써 "리뷰 2,318개" 가 갑자기 1개가 된다.
-    // 실제로 그렇게 됐고, 그래서 0 에서 시작한다.
-    ratingSum: 0,
-        reviewCount: 0, soldCount: p.soldCount,
+        // 평점 집계는 여기서 건드리지 않는다. reviews 테이블이 진실이고
+        // seedReviews 가 원본을 세어 채운다. 여기서 0 으로 되돌리면
+        // 시드를 두 번 돌렸을 때 이미 쌓인 리뷰의 집계가 사라진다.
+        soldCount: p.soldCount,
         publishedAt: new Date('2026-07-01T00:00:00Z'),
       },
       create: {
@@ -239,11 +239,10 @@ async function main(): Promise<void> {
         listPrice: p.listPrice, salePrice: p.salePrice,
         brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
-        // 평점 집계는 reviews 테이블이 진실이다. 뒷받침하는 행 없이 숫자만 넣으면
-    // 첫 리뷰가 그 숫자를 덮어써 "리뷰 2,318개" 가 갑자기 1개가 된다.
-    // 실제로 그렇게 됐고, 그래서 0 에서 시작한다.
-    ratingSum: 0,
-        reviewCount: 0, soldCount: p.soldCount,
+        // 평점은 0 에서 시작한다. 뒷받침하는 Review 행 없이 숫자만 넣으면
+        // 첫 리뷰가 그 숫자를 덮어써 "리뷰 2,318개" 가 갑자기 1개가 된다.
+        ratingSum: 0, reviewCount: 0,
+        soldCount: p.soldCount,
         publishedAt: new Date('2026-07-01T00:00:00Z'),
       },
     });
@@ -330,6 +329,8 @@ async function main(): Promise<void> {
 
   // 계정은 @shop/auth 의 시드가 만든다. 비밀번호 해시를 여기서 흉내 내지 않고
   // 실제 가입 API 를 호출하기 위해서다. pnpm db:seed 가 두 단계를 이어서 돌린다.
+
+  await seedReviews();
 
   console.log('시드 완료');
 }
