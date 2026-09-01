@@ -10,11 +10,42 @@ import { prisma } from '@shop/db';
  * Capacitor 웹뷰는 앱 재시작 후 쿠키가 날아가는 경우가 있어서, 네이티브 셸은
  * 토큰을 Keychain 에 넣어 두고 Bearer 로 붙일 수 있어야 한다.
  */
+/**
+ * 이 배포가 스스로를 부르는 주소.
+ *
+ * Better Auth 는 Origin 을 검사한다. 운영 도메인을 상수로 박아 두면
+ * **프리뷰 배포마다 주소가 달라 로그인이 통째로 막힌다.** Vercel 은 각
+ * 배포의 호스트를 VERCEL_URL 로 주므로, 명시값이 없으면 그것을 쓴다.
+ */
+function resolveBaseUrl(): string | undefined {
+  const explicit = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit) return explicit;
+
+  const vercel = process.env.VERCEL_URL;
+  return vercel ? `https://${vercel}` : undefined;
+}
+
+/**
+ * 쿠키를 실어 보낼 수 있는 출처.
+ *
+ * Capacitor 웹뷰는 origin 이 capacitor:// 라 기본 검사에 걸린다.
+ * 여기 없으면 앱에서 로그인 자체가 안 된다.
+ */
+function resolveTrustedOrigins(): string[] {
+  const origins = ['capacitor://localhost', 'http://localhost'];
+  const base = resolveBaseUrl();
+  if (base) origins.push(base);
+  // 프리뷰 배포도 스스로를 신뢰해야 한다
+  if (process.env.VERCEL_URL) origins.push(`https://${process.env.VERCEL_URL}`);
+  return [...new Set(origins)];
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
 
   secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL,
+  baseURL: resolveBaseUrl(),
+  trustedOrigins: resolveTrustedOrigins(),
 
   emailAndPassword: {
     enabled: true,
