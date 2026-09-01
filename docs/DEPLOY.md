@@ -29,11 +29,62 @@ Neon 이 직결 주소를 `DATABASE_URL_UNPOOLED` 로 자동 주입하고, `pris
 
 ## 2. 오브젝트 스토리지
 
-S3 · Cloudflare R2 · Vercel Blob 중 아무거나. **`products/` 접두사를 익명 읽기로
-열어 둔다** — 이미지는 브라우저가 직접 가져간다. 우리 함수로 프록시하면 요청마다
-함수가 깨어나고 실행 시간을 이미지 전송에 쓴다.
+**S3 호환이어야 한다.** 어댑터가 `@aws-sdk/client-s3` 로 붙는다 —
+Vercel Blob 은 S3 API 가 아니라 쓸 수 없다.
 
-로컬 MinIO 정책은 `apps/web/scripts/setup-bucket.mjs` 에 있다. 같은 정책을 옮기면 된다.
+**`products/` 접두사를 익명 읽기로 열어 둔다.** 이미지는 브라우저가 직접
+가져간다. 우리 함수로 프록시하면 요청마다 함수가 깨어나고 서버리스 실행 시간을
+이미지 전송에 쓴다.
+
+### Cloudflare R2 (권장)
+
+이미지 전송 요금이 없어 이런 용도에 맞는다.
+
+1. R2 → Create bucket
+2. R2 → Manage API Tokens → Create → **Object Read & Write**
+   → Access Key ID 와 Secret Access Key 를 준다
+3. 버킷 → Settings → **Public Development URL** 활성화
+   (또는 커스텀 도메인 연결)
+
+| 변수 | 값 |
+|---|---|
+| `S3_ENDPOINT` | `https://<계정ID>.r2.cloudflarestorage.com` |
+| `S3_REGION` | `auto` |
+| `S3_BUCKET` | 버킷 이름 |
+| `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` | 2번의 토큰 |
+| `S3_PUBLIC_BASE_URL` | 3번의 공개 주소 (`https://pub-xxxx.r2.dev`) |
+| `S3_FORCE_PATH_STYLE` | `true` |
+
+R2 는 S3 의 버킷 정책 API 를 지원하지 않으므로 `pnpm storage:setup` 의 정책
+단계는 건너뛴다(경고만 남기고 멈추지 않는다). 공개 설정은 3번이 대신한다.
+
+### AWS S3
+
+| 변수 | 값 |
+|---|---|
+| `S3_ENDPOINT` | 비워 둔다 (AWS 기본 엔드포인트) |
+| `S3_REGION` | `ap-northeast-2` |
+| `S3_PUBLIC_BASE_URL` | `https://<버킷>.s3.ap-northeast-2.amazonaws.com` |
+| `S3_FORCE_PATH_STYLE` | `false` |
+
+IAM 사용자에게 `s3:PutObject`, `s3:DeleteObject` 를 준다. 공개 읽기는
+`pnpm storage:setup` 이 넣는 버킷 정책이 처리한다(퍼블릭 액세스 차단은 꺼야 한다).
+
+### 배포 후 이미지 채우기
+
+시드된 이미지 URL 은 로컬 MinIO 를 가리키므로 배포본에서는 깨진다.
+운영 스토리지를 가리켜 다시 넣는다.
+
+```bash
+# 기존 행을 지운 뒤 (시드는 이미지가 있으면 건너뛴다)
+psql "<운영 DB 주소>" -c 'delete from product_images;'
+
+DATABASE_URL="<운영 DB 주소>" \
+S3_ENDPOINT="..." S3_BUCKET="..." S3_REGION="..." \
+S3_ACCESS_KEY_ID="..." S3_SECRET_ACCESS_KEY="..." \
+S3_PUBLIC_BASE_URL="..." \
+  pnpm storage:seed
+```
 
 ## 3. 환경변수
 

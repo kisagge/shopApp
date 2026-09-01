@@ -34,17 +34,38 @@ try {
   console.log(`버킷 ${bucket} 생성`);
 }
 
-await client.send(new PutBucketPolicyCommand({
-  Bucket: bucket,
-  Policy: JSON.stringify({
-    Version: '2012-10-17',
-    Statement: [{
-      Sid: 'PublicReadProducts',
-      Effect: 'Allow',
-      Principal: { AWS: ['*'] },
-      Action: ['s3:GetObject'],
-      Resource: [`arn:aws:s3:::${bucket}/products/*`],
-    }],
-  }),
-}));
-console.log('products/ 익명 읽기 허용');
+/**
+ * products/ 를 익명 읽기로 연다.
+ *
+ * **Cloudflare R2 는 S3 의 버킷 정책 API 를 지원하지 않는다.** 공개 설정은
+ * 대시보드(Settings → Public Development URL 또는 커스텀 도메인)에서 한다.
+ * 여기서 실패해도 나머지는 정상이므로 멈추지 않고 안내만 남긴다.
+ */
+try {
+  await client.send(new PutBucketPolicyCommand({
+    Bucket: bucket,
+    Policy: JSON.stringify({
+      Version: '2012-10-17',
+      Statement: [{
+        Sid: 'PublicReadProducts',
+        Effect: 'Allow',
+        Principal: { AWS: ['*'] },
+        Action: ['s3:GetObject'],
+        Resource: [`arn:aws:s3:::${bucket}/products/*`],
+      }],
+    }),
+  }));
+  console.log('products/ 익명 읽기 허용');
+} catch (error) {
+  console.warn(`
+⚠ 버킷 정책을 설정하지 못했습니다: ${error.name ?? error}
+
+  Cloudflare R2 라면 정상입니다 — 정책 API 를 지원하지 않습니다.
+  대시보드에서 공개 접근을 켜세요:
+    R2 → 버킷 → Settings → Public Development URL 활성화
+    (또는 커스텀 도메인 연결)
+
+  그 주소를 S3_PUBLIC_BASE_URL 에 넣으면 됩니다.
+  이미지는 브라우저가 그 주소로 직접 가져갑니다.
+`);
+}
