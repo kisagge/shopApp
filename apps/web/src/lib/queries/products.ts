@@ -271,6 +271,9 @@ function orderFor(sort: ProductSort) {
       return [{ sellingPrice: 'asc' as const }, { id: 'desc' as const }];
     case 'price_desc':
       return [{ sellingPrice: 'desc' as const }, { id: 'desc' as const }];
+    case 'rating':
+      // 리뷰가 없는 상품은 0 이라 자연히 뒤로 밀린다
+      return [{ ratingScore: 'desc' as const }, { id: 'desc' as const }];
     default:
       return [{ soldCount: 'desc' as const }, { id: 'desc' as const }];
   }

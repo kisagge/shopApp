@@ -326,6 +326,15 @@ model Product {
   /// 목록 정렬·필터에 쓰는 집계값. 리뷰/주문 발생 시 갱신한다.
   ratingSum   Int @default(0)
   reviewCount Int @default(0)
+
+  /// 평점순 정렬용. 평균 × 100 을 정수로 눌러 둔다 (4.35 → 435).
+  ///
+  /// 평균은 ratingSum / reviewCount 파생값이라 Prisma 가 정렬할 수 없다.
+  /// 실수로 두면 같은 평점끼리의 순서가 미세한 오차로 흔들려 커서가 깨진다.
+  /// 리뷰가 없으면 0 이라 평점순에서 자연히 뒤로 밀린다.
+  ///
+  /// 세 값 모두 write-review.ts 에서 원본을 다시 세어 함께 갱신한다.
+  ratingScore Int @default(0)
   soldCount   Int @default(0)
 
   images      ProductImage[]
@@ -343,6 +352,7 @@ model Product {
   @@index([categoryId, status])
   @@index([brandId, status])
   @@index([sellingPrice])
+  @@index([ratingScore(sort: Desc)])
   @@index([soldCount(sort: Desc)])
   @@index([publishedAt(sort: Desc)])
   /// 부분 일치(ILIKE '%...%') 는 b-tree 로 못 찾는다. 트라이그램 색인이라야 한다.

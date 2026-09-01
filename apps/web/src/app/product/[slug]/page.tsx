@@ -3,8 +3,12 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
 import { formatWithUnit } from '@shop/core';
+import { headers } from 'next/headers';
+import { getSessionUser } from '@shop/auth/session';
 import { getProductBySlug } from '~/lib/queries/products';
+import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
 import { ProductOptions } from '~/components/product-options';
+import { ReviewSection } from '~/components/review-section';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +31,13 @@ export default async function ProductPage({ params }: Params) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
+
+  // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
+  const viewer = await getSessionUser(await headers());
+  const [summary, reviews] = await Promise.all([
+    getReviewSummary(product.id),
+    getProductReviews(product.id, { viewerId: viewer?.id }),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
@@ -104,6 +115,10 @@ export default async function ProductPage({ params }: Params) {
           {product.description}
         </p>
       </section>
+
+      <div className="pt-16">
+        <ReviewSection summary={summary} reviews={reviews.items} />
+      </div>
     </div>
   );
 }

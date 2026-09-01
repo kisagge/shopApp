@@ -4,16 +4,12 @@ import { won, type Won } from './money';
  * 목록 정렬과 필터 규칙. 순수 로직만.
  */
 
-/**
- * 평점순은 아직 없다. 평점은 ratingSum / reviewCount 파생값이라 DB 가 정렬할
- * 수 없고, 정렬하려면 평균을 컬럼으로 저장해야 한다. 리뷰 기능이 붙어 그
- * 값을 갱신할 주체가 생길 때 함께 넣는 것이 맞다.
- */
 export const PRODUCT_SORT = [
   'recommended',
   'newest',
   'price_asc',
   'price_desc',
+  'rating',
 ] as const;
 export type ProductSort = (typeof PRODUCT_SORT)[number];
 
@@ -22,6 +18,7 @@ export const PRODUCT_SORT_LABEL: Readonly<Record<ProductSort, string>> = {
   newest: '신상품순',
   price_asc: '낮은 가격순',
   price_desc: '높은 가격순',
+  rating: '평점순',
 };
 
 export const DEFAULT_SORT: ProductSort = 'recommended';

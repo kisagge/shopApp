@@ -68,8 +68,9 @@ describe('정렬 값', () => {
     expect(isProductSort('random')).toBe(false);
   });
 
-  it('평점순은 아직 없다 — 평균을 저장하지 않으면 DB 가 정렬할 수 없다', () => {
-    expect(isProductSort('rating')).toBe(false);
+  it('평점순은 저장된 평균(ratingScore)으로 정렬한다', () => {
+    // 평균은 파생값이라 DB 가 정렬할 수 없다. 리뷰가 그 값을 갱신한다.
+    expect(isProductSort('rating')).toBe(true);
   });
 });
 

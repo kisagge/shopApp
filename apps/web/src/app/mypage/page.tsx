@@ -175,16 +175,22 @@ export default async function MyPage() {
               </Link>
             </li>
           ))}
-          {summary.reviewableCount > 0 && (
-            <li className="border-b border-[var(--border)]">
-              <span className="flex min-h-13 items-center justify-between px-1 text-sm">
-                <span>리뷰 작성</span>
-                <span className="tnum text-xs font-semibold text-accent">
-                  작성 가능 {summary.reviewableCount}
-                </span>
+          <li className="border-b border-[var(--border)]">
+            <Link
+              href="/mypage/reviews"
+              className="flex min-h-13 items-center justify-between px-1 text-sm text-[var(--fg)] no-underline"
+            >
+              <span>리뷰 쓰기</span>
+              <span className="flex items-center gap-2">
+                {summary.reviewableCount > 0 && (
+                  <span className="tnum text-xs font-semibold text-accent">
+                    작성 가능 {summary.reviewableCount}
+                  </span>
+                )}
+                <span aria-hidden="true" className="text-[var(--fg-muted)]">›</span>
               </span>
-            </li>
-          )}
+            </Link>
+          </li>
         </ul>
       </nav>
     </div>

@@ -73,6 +73,16 @@ interface SeedProduct {
   sizes: string[];
   /** 사이즈별 재고. 없는 사이즈는 0(품절)으로 둔다. */
   stock: Record<string, number>;
+  /**
+   * 평점은 시드하지 않는다.
+   *
+   * 집계 컬럼(ratingSum·reviewCount·ratingScore)의 진실은 reviews 테이블이고,
+   * 리뷰를 쓸 때마다 원본을 다시 세어 갱신한다. 뒷받침하는 행 없이 숫자만
+   * 넣어 두면 첫 리뷰가 그 숫자를 덮어써 갑자기 떨어진다.
+   *
+   * 두 값은 상품 정의에 남겨 두었지만 DB 에 넣지 않는다 — 나중에 실제 리뷰를
+   * 시드할 때 목표치로 쓸 수 있다.
+   */
   rating: number;
   reviewCount: number;
   soldCount: number;
@@ -217,8 +227,11 @@ async function main(): Promise<void> {
         name: p.name, description: p.description, listPrice: p.listPrice,
         salePrice: p.salePrice, brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
-        ratingSum: Math.round(p.rating * p.reviewCount),
-        reviewCount: p.reviewCount, soldCount: p.soldCount,
+        // 평점 집계는 reviews 테이블이 진실이다. 뒷받침하는 행 없이 숫자만 넣으면
+    // 첫 리뷰가 그 숫자를 덮어써 "리뷰 2,318개" 가 갑자기 1개가 된다.
+    // 실제로 그렇게 됐고, 그래서 0 에서 시작한다.
+    ratingSum: 0,
+        reviewCount: 0, soldCount: p.soldCount,
         publishedAt: new Date('2026-07-01T00:00:00Z'),
       },
       create: {
@@ -226,8 +239,11 @@ async function main(): Promise<void> {
         listPrice: p.listPrice, salePrice: p.salePrice,
         brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
-        ratingSum: Math.round(p.rating * p.reviewCount),
-        reviewCount: p.reviewCount, soldCount: p.soldCount,
+        // 평점 집계는 reviews 테이블이 진실이다. 뒷받침하는 행 없이 숫자만 넣으면
+    // 첫 리뷰가 그 숫자를 덮어써 "리뷰 2,318개" 가 갑자기 1개가 된다.
+    // 실제로 그렇게 됐고, 그래서 0 에서 시작한다.
+    ratingSum: 0,
+        reviewCount: 0, soldCount: p.soldCount,
         publishedAt: new Date('2026-07-01T00:00:00Z'),
       },
     });
