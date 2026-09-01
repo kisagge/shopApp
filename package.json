@@ -14,8 +14,10 @@
     "test": "turbo run test",
     "db:up": "docker compose -f tooling/docker-compose.yml up -d",
     "db:down": "docker compose -f tooling/docker-compose.yml down",
-    "db:push": "pnpm --filter @shop/db exec prisma db push",
+    "db:push": "pnpm --filter @shop/db exec prisma db push && pnpm --filter @shop/db run generate",
     "db:studio": "pnpm --filter @shop/db exec prisma studio",
+    "storage:setup": "pnpm --filter @shop/web run setup:bucket",
+    "storage:seed": "pnpm --filter @shop/web run seed:images",
     "db:seed": "pnpm --filter @shop/db run seed && pnpm --filter @shop/auth run seed",
     "mobile:sync": "pnpm --filter @shop/mobile run sync"
   },

@@ -9,3 +9,4 @@ export * from './order-draft';
 export * from './payment';
 export * from './grade';
 export * from './settlement';
+export * from './image';

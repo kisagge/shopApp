@@ -6,9 +6,12 @@ import { PRODUCT_STATUS_LABEL, type ProductStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProductDetail } from '~/lib/queries/admin';
 import { getProductFormOptions } from '~/lib/admin/manage-product';
+import { listProductImages } from '~/lib/admin/manage-images';
+import { isStorageConfigured } from '~/lib/storage';
 import { ProductForm } from '../product-form';
 import { StockForm } from '../stock-form';
 import { VariantForm } from '../variant-form';
+import { ImageManager } from '../image-manager';
 
 export const metadata: Metadata = { title: '상품 수정' };
 export const dynamic = 'force-dynamic';
@@ -27,7 +30,10 @@ export default async function AdminProductDetailPage({
   if (!product) notFound();
 
   const canWrite = hasPermission(actor, 'product:write');
-  const options = canWrite ? await getProductFormOptions(actor) : null;
+  const [options, images] = await Promise.all([
+    canWrite ? getProductFormOptions(actor) : Promise.resolve(null),
+    listProductImages(product.id),
+  ]);
 
   return (
     <>
@@ -48,7 +54,10 @@ export default async function AdminProductDetailPage({
       </header>
 
       <main className="grid gap-6 p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
-        <section aria-labelledby="product-edit" className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-7">
+        <section
+          aria-labelledby="product-edit"
+          className="h-fit rounded-md border border-[var(--border)] bg-[var(--bg)] p-7 xl:col-start-1 xl:row-span-2 xl:row-start-1"
+        >
           <h2 id="product-edit" className="sr-only">상품 정보 수정</h2>
           {canWrite && options ? (
             <ProductForm
@@ -80,8 +89,46 @@ export default async function AdminProductDetailPage({
         </section>
 
         <section
+          aria-labelledby="product-images"
+          className="flex h-fit flex-col gap-5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-7 xl:col-start-2 xl:row-start-1"
+        >
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 id="product-images" className="text-[15px] font-semibold tracking-tight">이미지</h2>
+            <p className="text-[11px] text-[var(--fg-muted)]">
+              첫 장이 목록 대표 이미지
+            </p>
+          </div>
+
+          {canWrite ? (
+            <ImageManager
+              productId={product.id}
+              initial={images}
+              storageConfigured={isStorageConfigured()}
+            />
+          ) : images.length === 0 ? (
+            <p className="text-[13px] text-[var(--fg-muted)]">등록된 이미지가 없습니다.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-2">
+              {images.map((i) => (
+                <li key={i.id}>
+                  <img
+                    src={i.url}
+                    alt={i.alt}
+                    width={72}
+                    height={90}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-[90px] w-[72px] rounded-xs bg-[var(--surface-2)] object-cover"
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section
           aria-labelledby="product-stock"
-          className="flex h-fit flex-col gap-7 rounded-md border border-[var(--border)] bg-[var(--bg)] p-7"
+          className="flex h-fit flex-col gap-7 rounded-md border border-[var(--border)] bg-[var(--bg)] p-7 xl:col-start-2 xl:row-start-2"
         >
           <h2 id="product-stock" className="text-[15px] font-semibold tracking-tight">재고</h2>
 

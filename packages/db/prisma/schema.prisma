@@ -296,6 +296,13 @@ model ProductImage {
   alt       String
   sortOrder Int     @default(0)
 
+  /// 오브젝트 스토리지의 키. 우리가 올린 이미지에만 있다.
+  /// url 에서 잘라 쓰지 않는 이유는 공개 도메인(CDN)이 바뀌면
+  /// 예전 행의 키를 더 이상 복원할 수 없기 때문이다.
+  storageKey String?
+
+  createdAt DateTime @default(now())
+
   @@index([productId, sortOrder])
   @@map("product_images")
 }
