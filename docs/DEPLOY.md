@@ -65,14 +65,24 @@ openssl rand -base64 32   # CRON_SECRET
 
 GitHub 저장소를 Vercel 에 연결하면 `vercel.json` 을 그대로 읽는다.
 
+**Root Directory 는 `apps/web` 이다.** Vercel 은 그 디렉터리의 `package.json` 에서
+`next` 를 찾아 프레임워크를 감지한다. 저장소 루트로 두면
+"No Next.js version detected" 로 죽는다.
+
+그래서 **`vercel.json` 도 `apps/web/` 에 있다.** Vercel 은 Root Directory 기준으로
+이 파일을 읽는다.
+
 ```
 installCommand  pnpm install --frozen-lockfile
 buildCommand    check-db-url && prisma migrate deploy && turbo run build --filter=@shop/web
-outputDirectory apps/web/.next
 ```
 
-**Root Directory 는 저장소 루트로 둔다.** `apps/web` 으로 두면 `outputDirectory`
-가 `apps/web/apps/web/.next` 로 풀리고, 빌드 명령이 워크스페이스 루트를 못 찾는다.
+`outputDirectory` 는 두지 않는다. framework 프리셋이 Root Directory 아래의
+`.next` 를 찾는다. 명시하면 `apps/web` 기준으로 한 번 더 풀려 어긋난다.
+
+빌드 명령의 세 단계는 모두 `pnpm --filter` 를 거친다. pnpm 이 워크스페이스를
+스스로 찾으므로 **실행 위치에 매이지 않는다.** 저장소 루트 기준 상대 경로를
+쓰면 Root Directory 설정에 따라 파일을 못 찾는다.
 
 빌드 첫 단계가 DB 주소를 확인한다. 비어 있으면 어느 변수를 어디에 넣어야 하는지
 적어 주고 멈춘다 — Prisma 는 "Connection url is empty" 만 말해서 로그만으로는
