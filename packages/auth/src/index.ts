@@ -10,33 +10,52 @@ import { prisma } from '@shop/db';
  * Capacitor 웹뷰는 앱 재시작 후 쿠키가 날아가는 경우가 있어서, 네이티브 셸은
  * 토큰을 Keychain 에 넣어 두고 Bearer 로 붙일 수 있어야 한다.
  */
+const https = (host: string | undefined): string | undefined =>
+  host ? `https://${host}` : undefined;
+
 /**
  * 이 배포가 스스로를 부르는 주소.
  *
  * Better Auth 는 Origin 을 검사한다. 운영 도메인을 상수로 박아 두면
- * **프리뷰 배포마다 주소가 달라 로그인이 통째로 막힌다.** Vercel 은 각
- * 배포의 호스트를 VERCEL_URL 로 주므로, 명시값이 없으면 그것을 쓴다.
+ * **프리뷰 배포마다 주소가 달라 로그인이 통째로 막힌다.**
+ *
+ * Vercel 이 주는 주소는 두 가지다.
+ * - VERCEL_URL: **배포마다 바뀌는** 주소 (shop-abc123.vercel.app)
+ * - VERCEL_PROJECT_PRODUCTION_URL: 프로젝트의 **안정된** 운영 도메인
+ *
+ * 운영에서 VERCEL_URL 을 쓰면 사용자가 실제로 접속하는 안정 도메인과
+ * 어긋나 Invalid origin 이 난다. 실제로 그렇게 막혔다.
  */
 function resolveBaseUrl(): string | undefined {
   const explicit = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (explicit) return explicit;
 
-  const vercel = process.env.VERCEL_URL;
-  return vercel ? `https://${vercel}` : undefined;
+  if (process.env.VERCEL_ENV === 'production') {
+    return https(process.env.VERCEL_PROJECT_PRODUCTION_URL) ?? https(process.env.VERCEL_URL);
+  }
+  return https(process.env.VERCEL_URL);
 }
 
 /**
  * 쿠키를 실어 보낼 수 있는 출처.
  *
+ * 배포가 여러 주소로 동시에 열린다 — 안정 도메인, 브랜치 별칭, 배포별 주소.
+ * 어느 쪽으로 들어와도 로그인이 돼야 하므로 전부 신뢰한다. 같은 배포를
+ * 가리키는 주소들이라 넓히는 것이 아니다.
+ *
  * Capacitor 웹뷰는 origin 이 capacitor:// 라 기본 검사에 걸린다.
  * 여기 없으면 앱에서 로그인 자체가 안 된다.
  */
 function resolveTrustedOrigins(): string[] {
-  const origins = ['capacitor://localhost', 'http://localhost'];
-  const base = resolveBaseUrl();
-  if (base) origins.push(base);
-  // 프리뷰 배포도 스스로를 신뢰해야 한다
-  if (process.env.VERCEL_URL) origins.push(`https://${process.env.VERCEL_URL}`);
+  const origins = [
+    'capacitor://localhost',
+    'http://localhost',
+    resolveBaseUrl(),
+    https(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+    https(process.env.VERCEL_BRANCH_URL),
+    https(process.env.VERCEL_URL),
+  ].filter((value): value is string => Boolean(value));
+
   return [...new Set(origins)];
 }
 

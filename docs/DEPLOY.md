@@ -108,9 +108,15 @@ openssl rand -base64 32   # CRON_SECRET
 | `S3_*` | 스토리지 값 6개 | 이미지 업로드가 503 으로 거절한다 |
 | `TOSS_SECRET_KEY` / `NEXT_PUBLIC_TOSS_CLIENT_KEY` | 토스 키 | Mock 게이트웨이로 돈다 (배포는 성공한다) |
 
-`BETTER_AUTH_URL` 은 **Production 환경에만** 넣는다. Preview 에 운영 도메인을 넣으면
-프리뷰 배포의 Origin 과 어긋나 로그인이 통째로 막힌다 — 비워 두면 각 배포가
-자기 `VERCEL_URL` 을 쓴다.
+`BETTER_AUTH_URL` 은 **비워 둬도 된다.** 운영에서는 Vercel 이 주는
+`VERCEL_PROJECT_PRODUCTION_URL`(안정 도메인)을, 프리뷰에서는 `VERCEL_URL`
+(그 배포 주소)을 쓴다.
+
+넣을 거라면 **Production 환경에만** 넣는다. Preview 에 운영 도메인을 넣으면
+프리뷰의 Origin 과 어긋나 로그인이 막힌다.
+
+> 운영에서 `VERCEL_URL` 을 쓰면 안 된다. 배포마다 바뀌는 주소라 사용자가
+> 실제로 접속하는 안정 도메인과 달라 `Invalid origin` 이 난다. 실제로 겪었다.
 
 ## 4. 배포
 
