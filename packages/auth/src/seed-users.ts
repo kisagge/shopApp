@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { config } from 'dotenv';
+import { SEED_PASSWORD } from './seed-fixtures';
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
 import { prisma } from '@shop/db';
@@ -15,7 +16,8 @@ import { auth } from './index';
  * additionalFields 에 input: false 를 걸어 뒀기 때문이다.
  */
 
-const PASSWORD = 'plain1234!';
+// 시드와 E2E 가 같은 값을 보도록 한곳에 둔다
+const PASSWORD = SEED_PASSWORD;
 
 interface SeedUser {
   email: string;

@@ -29,9 +29,9 @@ export default async function AdminBannersPage() {
         </div>
       </header>
 
-      <main className="p-8">
+      <div className="p-8">
         <BannerEditor initial={items} />
-      </main>
+      </div>
     </>
   );
 }

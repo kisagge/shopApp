@@ -110,3 +110,26 @@ describe('신뢰 출처', () => {
     expect(origins.length).toBe(new Set(origins).size);
   });
 });
+
+describe('로그인 요청 제한', () => {
+  it('기본은 켜져 있다 — 무차별 대입을 막는 최소한이다', async () => {
+    delete process.env['AUTH_RATE_LIMIT'];
+    const { rateLimitEnabled } = await import('../src/index');
+    expect(rateLimitEnabled()).toBe(true);
+  });
+
+  it('아무 값이나로는 꺼지지 않는다', async () => {
+    const { rateLimitEnabled } = await import('../src/index');
+    for (const value of ['false', '0', 'no', 'disabled', '']) {
+      process.env['AUTH_RATE_LIMIT'] = value;
+      expect(rateLimitEnabled()).toBe(true);
+    }
+  });
+
+  it("정확히 'off' 일 때만 꺼진다 — E2E 전용이다", async () => {
+    const { rateLimitEnabled } = await import('../src/index');
+    process.env['AUTH_RATE_LIMIT'] = 'off';
+    expect(rateLimitEnabled()).toBe(false);
+    delete process.env['AUTH_RATE_LIMIT'];
+  });
+});

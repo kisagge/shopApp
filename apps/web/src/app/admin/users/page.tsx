@@ -66,7 +66,7 @@ export default async function AdminUsersPage({
         </form>
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
           {page.rows.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
@@ -130,7 +130,7 @@ export default async function AdminUsersPage({
         </div>
 
         <Pager href={nextHref} label="다음 회원 더 보기" hasRows={page.rows.length > 0} />
-      </main>
+      </div>
     </>
   );
 }

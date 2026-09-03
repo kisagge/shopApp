@@ -29,7 +29,7 @@ export default async function NewProductPage() {
         </nav>
       </header>
 
-      <main className="p-8">
+      <div className="p-8">
         <div className="max-w-2xl rounded-md border border-[var(--border)] bg-[var(--bg)] p-7">
           {options.brands.length === 0 ? (
             <p className="text-[13px] text-[var(--fg-muted)]">
@@ -51,7 +51,7 @@ export default async function NewProductPage() {
         <p className="mt-3 max-w-2xl text-[11px] text-[var(--fg-muted)]">
           등록 직후에는 옵션이 없습니다. 저장한 뒤 상세 화면에서 재고를 넣어 주세요.
         </p>
-      </main>
+      </div>
     </>
   );
 }

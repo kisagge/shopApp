@@ -60,7 +60,7 @@ export default async function AdminOrderDetail({
         </div>
       </header>
 
-      <main className="grid gap-5 p-8 xl:grid-cols-[minmax(0,1fr)_372px]">
+      <div className="grid gap-5 p-8 xl:grid-cols-[minmax(0,1fr)_372px]">
         <div className="flex flex-col gap-5">
           <section
             aria-labelledby="items-title"
@@ -279,7 +279,7 @@ export default async function AdminOrderDetail({
             <OrderStatusActions orderNo={order.orderNo} options={options} />
           </section>
         </div>
-      </main>
+      </div>
     </>
   );
 }

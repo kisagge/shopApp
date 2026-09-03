@@ -44,7 +44,7 @@ export default async function AdminOrdersPage({
         </div>
       </header>
 
-      <main className="p-8">
+      <div className="p-8">
         <nav aria-label="주문 상태 필터" className="mb-5 border-b border-[var(--border)]">
           <ul className="flex gap-1 overflow-x-auto">
             <li>
@@ -127,7 +127,7 @@ export default async function AdminOrdersPage({
         <div className="mt-5">
           <Pager href={nextHref} label="이전 주문 더 보기" hasRows={orders.length > 0} />
         </div>
-      </main>
+      </div>
     </>
   );
 }

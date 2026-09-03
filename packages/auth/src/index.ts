@@ -59,12 +59,26 @@ function resolveTrustedOrigins(): string[] {
   return [...new Set(origins)];
 }
 
+/**
+ * 로그인 요청 제한을 켤 것인가.
+ *
+ * **기본은 켜짐이다.** 무차별 대입을 막는 최소한의 장치라, NODE_ENV 나
+ * 배포 환경으로 자동으로 꺼지게 두지 않는다.
+ *
+ * E2E 는 짧은 시간에 여러 계정으로 로그인해서 제한에 걸린다. 그때만
+ * 명시적으로 끈다 — 실수로 꺼지는 일이 없도록 값을 정확히 'off' 로 적어야
+ * 하고, 운영에서는 이 변수를 아예 두지 않는다.
+ */
+export const rateLimitEnabled = (): boolean => process.env.AUTH_RATE_LIMIT !== 'off';
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
 
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: resolveBaseUrl(),
   trustedOrigins: resolveTrustedOrigins(),
+
+  rateLimit: { enabled: rateLimitEnabled() },
 
   emailAndPassword: {
     enabled: true,

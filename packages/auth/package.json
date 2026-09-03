@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./session": "./src/session-user.ts",
-    "./client": "./src/client.ts"
+    "./client": "./src/client.ts",
+    "./seed-fixtures": "./src/seed-fixtures.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

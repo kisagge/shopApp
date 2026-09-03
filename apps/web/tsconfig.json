@@ -10,7 +10,9 @@
     ".next/types/**/*.ts",
     "test/**/*.ts",
     "test/**/*.tsx",
-    "scripts/**/*.ts"
+    "scripts/**/*.ts",
+    "e2e/**/*.ts",
+    "playwright.config.ts"
   ],
   "exclude": ["node_modules"]
 }

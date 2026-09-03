@@ -23,7 +23,8 @@
     "storage:seed": "pnpm --filter @shop/web run seed:images",
     "banners:seed": "pnpm --filter @shop/web run seed:banners",
     "db:seed": "pnpm --filter @shop/db run seed && pnpm --filter @shop/auth run seed",
-    "mobile:sync": "pnpm --filter @shop/mobile run sync"
+    "mobile:sync": "pnpm --filter @shop/mobile run sync",
+    "e2e": "turbo run e2e"
   },
   "devDependencies": {
     "turbo": "2.10.12",

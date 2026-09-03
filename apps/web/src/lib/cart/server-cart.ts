@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma } from '@shop/db';
+import { prisma, Prisma } from '@shop/db';
 import { mergeCartLines, type CartLineState } from '@shop/core';
 
 /**
@@ -91,22 +91,47 @@ export async function replaceServerCart(
   const valid = new Set(known.map((v) => v.id));
   const usable = lines.filter((l) => valid.has(l.variantId));
 
-  await prisma.$transaction([
-    prisma.cartItem.deleteMany({ where: { userId } }),
-    ...(usable.length > 0
-      ? [
-          prisma.cartItem.createMany({
-            data: usable.map((l) => ({
-              userId,
-              variantId: l.variantId,
-              quantity: l.quantity,
-              selected: l.selected,
-            })),
-          }),
-        ]
-      : []),
-  ]);
+  /**
+   * 지우고 다시 넣지 않고 **줄 단위로 맞춘다.**
+   *
+   * 통째로 지웠다가 넣으면 그 사이에 다른 저장이 끼어들 때 유니크 제약에
+   * 걸린다. 같은 사람이 탭을 두 개 열어 두면 실제로 일어나고, E2E 를
+   * 워커 여러 개로 돌리면서 서버 로그에 드러났다 — 클라이언트가 저장
+   * 실패를 조용히 삼키고 있어서 그전에는 아무도 몰랐다.
+   *
+   * upsert 는 이미 있는 줄을 갱신하므로 그 창이 없다. 그래도 두 요청이
+   * 같은 줄을 동시에 **처음** 만들면 부딪힐 수 있어 한 번 다시 시도한다.
+   * 이 함수의 뜻이 "마지막에 보낸 것이 결과" 라, 진 쪽이 다시 써도
+   * 의미가 달라지지 않는다.
+   */
+  const write = () =>
+    prisma.$transaction([
+      // 새 목록에 없는 줄만 지운다
+      prisma.cartItem.deleteMany({
+        where: {
+          userId,
+          ...(usable.length > 0 ? { variantId: { notIn: usable.map((l) => l.variantId) } } : {}),
+        },
+      }),
+      ...usable.map((l) =>
+        prisma.cartItem.upsert({
+          where: { userId_variantId: { userId, variantId: l.variantId } },
+          update: { quantity: l.quantity, selected: l.selected },
+          create: { userId, variantId: l.variantId, quantity: l.quantity, selected: l.selected },
+        }),
+      ),
+    ]);
+
+  try {
+    await write();
+  } catch (error) {
+    const conflict =
+      error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+    if (!conflict) throw error;
+    await write();
+  }
 }
+
 
 /**
  * 로그인 직후 병합.

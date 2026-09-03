@@ -25,7 +25,7 @@ export default async function AdminPointsPage() {
         {canFix && <ReconcileButton mismatchCount={result.mismatches.length} />}
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         <section
           aria-labelledby="summary"
           className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
@@ -110,7 +110,7 @@ export default async function AdminPointsPage() {
             </table>
           )}
         </section>
-      </main>
+      </div>
     </>
   );
 }

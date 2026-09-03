@@ -29,7 +29,7 @@ export default async function TrafficPage() {
         <p className="text-[13px] text-[var(--fg-muted)]">최근 12개월</p>
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         <section
           aria-labelledby="traffic-title"
           className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
@@ -88,7 +88,7 @@ export default async function TrafficPage() {
             </table>
           )}
         </section>
-      </main>
+      </div>
     </>
   );
 }

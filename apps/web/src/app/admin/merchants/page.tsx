@@ -35,7 +35,7 @@ export default async function AdminMerchantsPage() {
         </div>
       </header>
 
-      <main className="p-8">
+      <div className="p-8">
         {!canApprove && (
           <p className="mb-4 text-[12px] text-[var(--fg-muted)]">
             입점 승인은 슈퍼관리자만 할 수 있습니다.
@@ -101,7 +101,7 @@ export default async function AdminMerchantsPage() {
             </tbody>
           </table>
         </div>
-      </main>
+      </div>
     </>
   );
 }

@@ -33,7 +33,7 @@ export default async function CheckoutFailPage({
   const message = REASON[code] ?? '결제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-col items-center gap-6 px-5 py-24 text-center">
+    <div className="mx-auto flex w-full max-w-lg flex-col items-center gap-6 px-5 py-24 text-center">
       <h1 className="text-[22px] font-semibold tracking-tight">결제를 완료하지 못했습니다</h1>
       <p className="text-[15px] leading-relaxed text-[var(--fg-secondary)]">{message}</p>
       <p className="text-[13px] text-[var(--fg-muted)]">
@@ -53,6 +53,6 @@ export default async function CheckoutFailPage({
           장바구니로
         </Link>
       </div>
-    </main>
+    </div>
   );
 }

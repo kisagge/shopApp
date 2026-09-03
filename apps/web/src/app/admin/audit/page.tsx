@@ -101,7 +101,7 @@ export default async function AdminAuditPage({
         </div>
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         {/* 필터는 GET 폼이다. 주소에 조건이 남아야 공유하고 뒤로 갈 수 있다. */}
         <form
           method="get"
@@ -232,7 +232,7 @@ export default async function AdminAuditPage({
         </div>
 
         <Pager href={nextHref} label="이전 기록 더 보기" hasRows={page.rows.length > 0} />
-      </main>
+      </div>
     </>
   );
 }

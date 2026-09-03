@@ -24,9 +24,9 @@ export default async function AdminCouponsPage() {
           발급 <span className="tnum">{coupons.length}</span>종
         </p>
       </header>
-      <main className="p-8">
+      <div className="p-8">
         <CouponBoard initial={coupons} brands={brands} categories={categories} />
-      </main>
+      </div>
     </>
   );
 }

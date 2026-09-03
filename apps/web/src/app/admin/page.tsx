@@ -41,7 +41,7 @@ export default async function AdminDashboard({
         </div>
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         <section aria-labelledby="kpi-title">
           <h2 id="kpi-title" className="sr-only">{d.rangeLabel} 주요 지표</h2>
           <ul className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -212,7 +212,7 @@ export default async function AdminDashboard({
             )}
           </section>
         </div>
-      </main>
+      </div>
     </>
   );
 }

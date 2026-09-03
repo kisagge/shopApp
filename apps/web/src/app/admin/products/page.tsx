@@ -52,7 +52,7 @@ export default async function AdminProductsPage({
         )}
       </header>
 
-      <main className="p-8">
+      <div className="p-8">
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
           {products.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
@@ -125,7 +125,7 @@ export default async function AdminProductsPage({
         <div className="mt-5">
           <Pager href={nextHref} label="이전 상품 더 보기" hasRows={products.length > 0} />
         </div>
-      </main>
+      </div>
     </>
   );
 }

@@ -77,7 +77,7 @@ export default async function SettlementsPage({
         </form>
       </header>
 
-      <main className="flex flex-col gap-5 p-8">
+      <div className="flex flex-col gap-5 p-8">
         {periodError && (
           <p role="alert" className="text-[12px] text-accent">
             {periodError} {yearMonth} 기준으로 보여 줍니다.
@@ -228,7 +228,7 @@ export default async function SettlementsPage({
             </table>
           )}
         </section>
-      </main>
+      </div>
     </>
   );
 }
