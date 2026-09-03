@@ -133,20 +133,20 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
 
       {!single && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 flex -translate-y-1/2 justify-between px-2 md:px-4">
+          {/*
+            조작 장치를 한 줄에 모은다.
+            화살표를 세로 중앙 양옆에 두면 **왼쪽 정렬 본문과 반드시 겹친다** —
+            글이 시작하는 자리가 곧 화살표가 있는 자리다. 슬라이드 문구는
+            어드민에서 바꾸므로 길이를 예측할 수도 없다. 자리를 비켜 주는
+            대신 아예 겹치지 않는 곳으로 옮겼다.
+          */}
+          <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3 md:bottom-6">
             <CarouselArrow
               direction="prev"
               label={`이전 배너 (${count}개 중 ${index + 1}번째)`}
               onClick={() => goTo(index - 1, true)}
             />
-            <CarouselArrow
-              direction="next"
-              label={`다음 배너 (${count}개 중 ${index + 1}번째)`}
-              onClick={() => goTo(index + 1, true)}
-            />
-          </div>
 
-          <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-3 md:bottom-6">
             <ul className="flex items-center gap-2">
               {slides.map((slide, i) => (
                 <li key={slide.id}>
@@ -177,6 +177,12 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
                 <span aria-hidden="true">{playing ? '❚❚' : '▶'}</span>
               </button>
             )}
+
+            <CarouselArrow
+              direction="next"
+              label={`다음 배너 (${count}개 중 ${index + 1}번째)`}
+              onClick={() => goTo(index + 1, true)}
+            />
           </div>
         </>
       )}
@@ -199,7 +205,7 @@ function CarouselArrow({
       type="button"
       onClick={onClick}
       aria-label={label}
-      className="pointer-events-auto flex h-11 w-11 items-center justify-center rounded-full border border-n-900/15 bg-n-0/80 text-n-900 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-n-900/20 bg-n-0/80 text-n-900 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
     >
       <span aria-hidden="true">{direction === 'prev' ? '‹' : '›'}</span>
     </button>
