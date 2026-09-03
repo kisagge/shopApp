@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   calculateCart, discountRateOf, won, ZERO,
-  type CartLine, type Coupon, type Won,
+  type CartLine, type Coupon,
 } from '@shop/core';
 import {
   type CartQuoteRequest, type CartQuoteResponse, type CartQuoteLine, type LineIssue,
@@ -27,8 +27,10 @@ export async function quoteCart(
       id: true, label: true, stock: true, isActive: true, priceOverride: true,
       product: {
         select: {
-          slug: true, name: true, listPrice: true, salePrice: true,
+          id: true, slug: true, name: true, listPrice: true, salePrice: true,
           status: true, deletedAt: true,
+          // 대상이 정해진 쿠폰의 판정에 쓴다
+          brandId: true, categoryId: true,
           // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면
           // 정지 처분이 판매를 멈추지 못한다.
           brand: { select: { name: true, merchant: { select: { status: true } } } },
@@ -89,10 +91,30 @@ export async function quoteCart(
       listPrice: won(l.listPrice),
       salePrice: won(l.unitPrice),
       quantity: l.quantity,
+      /**
+       * 쿠폰 대상 판정에 쓰는 id 들.
+       *
+       * 화면에 내려가는 줄(lines)에는 얹지 않는다 — 응답 모양을 바꾸지
+       * 않으려는 것도 있고, 브라우저가 알 필요도 없는 값이다.
+       * 계산에 넘기는 줄에만 붙인다.
+       */
+      ...(byId.get(l.variantId)
+        ? {
+            productId: byId.get(l.variantId)!.product.id,
+            brandId: byId.get(l.variantId)!.product.brandId,
+            categoryId: byId.get(l.variantId)!.product.categoryId,
+          }
+        : {}),
     }));
 
-  const merchandiseSoFar = won(payableLines.reduce((sum, l) => sum + l.salePrice * l.quantity, 0));
-  const resolved = await resolveCoupon(input.couponCode, viewer?.id ?? null, merchandiseSoFar);
+  /**
+   * 최소 주문 금액을 여기서 미리 재지 않는다.
+   *
+   * 대상이 정해진 쿠폰은 **그 줄들의 합계**로 재야 하는데 여기는 장바구니
+   * 전체밖에 모른다. 전체로 재면 대상 아닌 상품으로 기준을 채울 수 있다.
+   * 판정은 calculateCart 안에서 올바른 기준으로 한 번만 한다.
+   */
+  const resolved = await resolveCoupon(input.couponCode, viewer?.id ?? null);
 
   const pointsAvailable = won(viewer?.pointBalance ?? 0);
 
@@ -152,7 +174,6 @@ function emptyLine(
 async function resolveCoupon(
   code: string | undefined,
   userId: string | null,
-  merchandiseTotal: Won,
 ): Promise<{ coupon: Coupon; name: string } | null> {
   if (!code || !userId) return null;
 
@@ -164,20 +185,33 @@ async function resolveCoupon(
       expiresAt: { gt: now },
       coupon: { code, isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
     },
-    select: { coupon: true },
+    select: { coupon: { include: { targets: { select: { targetType: true, targetId: true } } } } },
   });
   if (!issued) return null;
 
   const c = issued.coupon;
-  if (merchandiseTotal < c.minimumOrder) return null;
 
+  // 대상 행이 하나도 없으면 장바구니 전체가 대상이다.
+  // ?? [] 를 둔 이유: 나중에 select 에서 targets 를 빠뜨리면 조용히
+  // undefined 가 되어 터진다 — 이 저장소에서 이미 겪은 유형이다.
+  const targets = c.targets ?? [];
+  const scope =
+    targets.length === 0
+      ? undefined
+      : {
+          productIds: targets.filter((t) => t.targetType === 'PRODUCT').map((t) => t.targetId),
+          brandIds: targets.filter((t) => t.targetType === 'BRAND').map((t) => t.targetId),
+          categoryIds: targets.filter((t) => t.targetType === 'CATEGORY').map((t) => t.targetId),
+        };
+
+  const base = { code: c.code, minimumOrder: won(c.minimumOrder), ...(scope ? { scope } : {}) };
   const coupon: Coupon =
     c.kind === 'AMOUNT'
-      ? { kind: 'amount', code: c.code, value: won(c.value), minimumOrder: won(c.minimumOrder) }
+      ? { kind: 'amount', value: won(c.value), ...base }
       : {
-          kind: 'percent', code: c.code, percent: c.percent,
+          kind: 'percent', percent: c.percent,
           maxDiscount: c.maxDiscount === null ? null : won(c.maxDiscount),
-          minimumOrder: won(c.minimumOrder),
+          ...base,
         };
   return { coupon, name: c.name };
 }

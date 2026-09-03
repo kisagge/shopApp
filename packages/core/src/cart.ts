@@ -17,11 +17,33 @@ export interface CartLine {
    */
   readonly salePrice: Won;
   readonly quantity: number;
+  /** 쿠폰 적용 대상 판정에 쓴다. 전체 대상 쿠폰만 쓸 때는 없어도 된다. */
+  readonly productId?: string | undefined;
+  readonly brandId?: string | undefined;
+  readonly categoryId?: string | undefined;
+}
+
+/**
+ * 쿠폰이 어디에 붙는가.
+ *
+ * `null` 이면 장바구니 전체. 아니면 그 목록에 해당하는 줄에만 붙는다.
+ */
+export interface CouponScope {
+  readonly productIds?: readonly string[] | undefined;
+  readonly brandIds?: readonly string[] | undefined;
+  readonly categoryIds?: readonly string[] | undefined;
+}
+
+interface CouponBase {
+  readonly code: string;
+  readonly minimumOrder: Won;
+  /** 없으면 전체 대상 */
+  readonly scope?: CouponScope | undefined;
 }
 
 export type Coupon =
-  | { readonly kind: 'amount'; readonly code: string; readonly value: Won; readonly minimumOrder: Won }
-  | { readonly kind: 'percent'; readonly code: string; readonly percent: number; readonly maxDiscount: Won | null; readonly minimumOrder: Won };
+  | ({ readonly kind: 'amount'; readonly value: Won } & CouponBase)
+  | ({ readonly kind: 'percent'; readonly percent: number; readonly maxDiscount: Won | null } & CouponBase);
 
 export interface CartInput {
   readonly lines: readonly CartLine[];
@@ -102,7 +124,16 @@ export function calculateCart(input: CartInput): CartTotals {
   const productDiscount = add(...lines.map((l) => l.discount));
   const merchandiseTotal = won(listTotal - productDiscount);
 
-  const couponDiscount = resolveCoupon(input.coupon, merchandiseTotal);
+  /**
+   * 쿠폰이 붙는 금액.
+   *
+   * 대상이 정해진 쿠폰은 **그 상품 줄의 합계**에만 붙는다. 장바구니 전체를
+   * 기준으로 삼으면 두 가지가 한꺼번에 잘못된다.
+   * 1) 5,000원짜리 티셔츠 전용 10,000원 쿠폰이 다른 상품 값까지 깎는다.
+   * 2) 최소 주문 금액을 대상 아닌 상품으로 채울 수 있다.
+   */
+  const couponBase = eligibleTotal(input.coupon, input.lines, lines);
+  const couponDiscount = resolveCoupon(input.coupon, couponBase);
   const afterCoupon = subtractToZero(merchandiseTotal, couponDiscount);
 
   const pointsUsed = resolvePoints(input.pointsToUse, input.pointsAvailable, afterCoupon);
@@ -124,6 +155,34 @@ export function calculateCart(input: CartInput): CartTotals {
     lines, listTotal, productDiscount, merchandiseTotal,
     couponDiscount, pointsUsed, shipping, payable, rewardPoints,
   };
+}
+
+/** 쿠폰 대상 줄들의 판매가 합계. 대상이 없으면 전체 합계. */
+function eligibleTotal(
+  coupon: Coupon | undefined,
+  inputLines: readonly CartLine[],
+  totals: readonly CartLineTotal[],
+): Won {
+  const all = add(...totals.map((l) => l.subtotal));
+  const scope = coupon?.scope;
+  if (!scope) return all;
+
+  const has = (list: readonly string[] | undefined, value: string | undefined) =>
+    list !== undefined && list.length > 0 && value !== undefined && list.includes(value);
+
+  // 셋 중 하나라도 걸리면 대상이다. 브랜드 전체를 열어 두고 그중 한 상품을
+  // 따로 지정하는 식으로 겹쳐 쓸 수 있어야 한다.
+  const eligible = totals.filter((_, i) => {
+    const line = inputLines[i];
+    if (!line) return false;
+    return (
+      has(scope.productIds, line.productId) ||
+      has(scope.brandIds, line.brandId) ||
+      has(scope.categoryIds, line.categoryId)
+    );
+  });
+
+  return add(...eligible.map((l) => l.subtotal));
 }
 
 function resolveCoupon(coupon: Coupon | undefined, base: Won): Won {

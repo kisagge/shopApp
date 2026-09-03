@@ -39,6 +39,7 @@ const input = (over: Record<string, unknown> = {}) => ({
   issueLimit: 100,
   startsAt: '2026-09-01T00:00:00+09:00',
   endsAt: '2026-09-30T23:59:59+09:00',
+  targets: [] as { targetType: 'PRODUCT' | 'BRAND' | 'CATEGORY'; targetId: string }[],
   ...over,
 });
 
@@ -87,6 +88,22 @@ describe('발행 내용', () => {
     expect(db.coupon.create.mock.calls[0]?.[0].data).toMatchObject({
       kind: 'PERCENT', percent: 20, value: 0, maxDiscount: 10_000,
     });
+  });
+
+  it('대상을 지정하면 함께 저장한다', async () => {
+    await createCoupon(admin, input({
+      targets: [{ targetType: 'PRODUCT', targetId: 'p-tee' }],
+    }));
+
+    expect(db.coupon.create.mock.calls[0]?.[0].data.targets).toMatchObject({
+      createMany: { data: [{ targetType: 'PRODUCT', targetId: 'p-tee' }] },
+    });
+  });
+
+  it('대상이 없으면 행을 만들지 않는다 — 장바구니 전체라는 뜻이다', async () => {
+    await createCoupon(admin, input());
+
+    expect(db.coupon.create.mock.calls[0]?.[0].data.targets).toBeUndefined();
   });
 
   it('정액이면 percent·maxDiscount 를 저장하지 않는다', async () => {

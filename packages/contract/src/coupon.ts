@@ -8,6 +8,18 @@ import { COUPON_KIND, COUPON_CODE_PATTERN } from '@shop/core';
  * 여기서는 형식만 본다 — 정액인데 상한을 넣었다 같은 판단은 정책이지
  * 계약이 아니다.
  */
+/**
+ * 쿠폰이 붙는 대상.
+ *
+ * 비워 두면 장바구니 전체. 지정하면 그 줄에만 붙고 **최소 주문 금액도
+ * 그 줄들의 합계로 잰다** — 전체로 재면 대상 아닌 상품으로 채울 수 있다.
+ */
+export const couponTargetSchema = z.object({
+  targetType: z.enum(['PRODUCT', 'BRAND', 'CATEGORY']),
+  targetId: z.string().min(1).max(40),
+});
+export type CouponTargetInput = z.infer<typeof couponTargetSchema>;
+
 export const createCouponSchema = z.object({
   code: z
     .string()
@@ -23,6 +35,7 @@ export const createCouponSchema = z.object({
   issueLimit: z.number().int().min(0).max(1_000_000).nullable().default(null),
   startsAt: z.string().datetime({ offset: true }),
   endsAt: z.string().datetime({ offset: true }),
+  targets: z.array(couponTargetSchema).max(200).default([]),
 });
 export type CreateCouponInput = z.infer<typeof createCouponSchema>;
 

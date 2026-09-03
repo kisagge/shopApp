@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { prisma } from '@shop/db';
 import { requireAdmin } from '~/lib/admin/guard';
 import { listCoupons } from '~/lib/admin/manage-coupon';
 import { CouponBoard } from './coupon-board';
@@ -8,7 +9,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminCouponsPage() {
   const actor = await requireAdmin('coupon:read');
-  const coupons = await listCoupons(actor);
+  const [coupons, brands, categories] = await Promise.all([
+    listCoupons(actor),
+    // 대상 지정에 쓸 목록. 브랜드·카테고리는 수가 적어 통째로 내려도 된다.
+    prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+  ]);
 
   return (
     <>
@@ -19,7 +25,7 @@ export default async function AdminCouponsPage() {
         </p>
       </header>
       <main className="p-8">
-        <CouponBoard initial={coupons} />
+        <CouponBoard initial={coupons} brands={brands} categories={categories} />
       </main>
     </>
   );

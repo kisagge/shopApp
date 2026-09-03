@@ -43,6 +43,8 @@ export interface CouponRow {
   readonly isActive: boolean;
   readonly status: CouponStatus;
   readonly editable: boolean;
+  /** 대상이 정해져 있으면 그 수. 0이면 장바구니 전체. */
+  readonly targetCount: number;
 }
 
 export async function listCoupons(actor: Actor, now = new Date()): Promise<CouponRow[]> {
@@ -55,13 +57,14 @@ export async function listCoupons(actor: Actor, now = new Date()): Promise<Coupo
       maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
       startsAt: true, endsAt: true, isActive: true,
       // 발급된 것 중 실제로 쓴 수. 발급 수만으로는 효과를 알 수 없다.
-      _count: { select: { issued: { where: { usedAt: { not: null } } } } },
+      _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
     },
   });
 
   return rows.map((r) => ({
     ...r,
     usedCount: r._count.issued,
+    targetCount: r._count.targets,
     status: couponStatus(r, now),
     editable: canEditDiscount(r.issuedCount),
   }));
@@ -93,7 +96,15 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
 
   try {
     const created = await prisma.coupon.create({
-      data: { ...definition, code, name: input.name.trim() },
+      data: {
+        ...definition,
+        code,
+        name: input.name.trim(),
+        // 대상이 없으면 행을 안 만든다 = 장바구니 전체
+        ...(input.targets.length > 0
+          ? { targets: { createMany: { data: [...input.targets] } } }
+          : {}),
+      },
       select: {
         id: true, code: true, name: true, kind: true, value: true, percent: true,
         maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
@@ -103,6 +114,7 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
     return {
       ...created,
       usedCount: 0,
+      targetCount: input.targets.length,
       status: couponStatus(created, new Date()),
       editable: true,
     };
@@ -159,13 +171,14 @@ export async function updateCoupon(
       id: true, code: true, name: true, kind: true, value: true, percent: true,
       maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
       startsAt: true, endsAt: true, isActive: true,
-      _count: { select: { issued: { where: { usedAt: { not: null } } } } },
+      _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
     },
   });
 
   return {
     ...updated,
     usedCount: updated._count.issued,
+    targetCount: updated._count.targets,
     status: couponStatus(updated, new Date()),
     editable: canEditDiscount(updated.issuedCount),
   };

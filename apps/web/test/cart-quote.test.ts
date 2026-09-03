@@ -123,6 +123,8 @@ describe('쿠폰은 코드만으로 적용되지 않는다', () => {
   const dbCoupon = {
     code: 'WELCOME10000', name: '신규회원 10,000원 할인', kind: 'AMOUNT',
     value: 10_000, percent: 0, maxDiscount: null, minimumOrder: 30_000,
+    // 대상이 비어 있으면 장바구니 전체가 대상이다
+    targets: [] as { targetType: string; targetId: string }[],
   };
 
   it('비로그인은 쿠폰을 쓸 수 없다', async () => {

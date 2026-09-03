@@ -691,12 +691,32 @@ model Coupon {
   endsAt   DateTime
   isActive Boolean  @default(true)
 
-  issued UserCoupon[]
+  issued  UserCoupon[]
+  targets CouponTarget[]
 
   createdAt DateTime @default(now())
 
   @@index([isActive, startsAt, endsAt])
   @@map("coupons")
+}
+
+/// 쿠폰이 붙는 대상.
+///
+/// 행이 하나도 없으면 장바구니 전체가 대상이다. 있으면 그 목록에 해당하는
+/// 줄에만 붙고, **최소 주문 금액도 그 줄들의 합계로 잰다** — 전체를 기준으로
+/// 삼으면 대상 아닌 상품으로 기준을 채울 수 있다.
+model CouponTarget {
+  id       String @id @default(cuid())
+  couponId String
+  coupon   Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+
+  /// PRODUCT | BRAND | CATEGORY
+  targetType String
+  targetId   String
+
+  @@unique([couponId, targetType, targetId])
+  @@index([couponId])
+  @@map("coupon_targets")
 }
 
 model UserCoupon {

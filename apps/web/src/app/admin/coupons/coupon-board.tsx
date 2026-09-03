@@ -25,7 +25,12 @@ interface CouponRow {
   isActive: boolean;
   status: CouponStatus;
   editable: boolean;
+  targetCount: number;
 }
+
+interface NamedOption { id: string; name: string }
+
+type Target = { targetType: 'PRODUCT' | 'BRAND' | 'CATEGORY'; targetId: string };
 
 /** 'YYYY-MM-DDTHH:mm' (datetime-local) 을 KST 로 해석해 ISO 로 */
 const toIso = (value: string) => new Date(`${value}:00+09:00`).toISOString();
@@ -40,7 +45,15 @@ const dateText = (v: string | Date) =>
  * 쓸 수 있다고 믿고 있다. 그래서 수정 자리를 따로 두지 않고, 목록에서는
  * 중지·재개와 기간 연장만 할 수 있게 했다.
  */
-export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
+export function CouponBoard({
+  initial,
+  brands,
+  categories,
+}: {
+  initial: readonly CouponRow[];
+  brands: readonly NamedOption[];
+  categories: readonly NamedOption[];
+}) {
   const router = useRouter();
   const [coupons, setCoupons] = useState<readonly CouponRow[]>(initial);
   const [creating, setCreating] = useState(initial.length === 0);
@@ -50,6 +63,49 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState('');
+
+  /**
+   * 쿠폰이 붙을 대상.
+   *
+   * 비워 두면 장바구니 전체다. 지정하면 그 줄에만 붙고 **최소 주문 금액도
+   * 그 줄들의 합계로 잰다** — 5,000원짜리 티셔츠 전용 쿠폰을 다른 상품으로
+   * 기준을 채워 쓰는 일이 없어야 한다.
+   */
+  const [targets, setTargets] = useState<Target[]>([]);
+  const [productQuery, setProductQuery] = useState('');
+  const [productHits, setProductHits] = useState<NamedOption[]>([]);
+  const [searching, setSearching] = useState(false);
+
+  const has = (t: Target) =>
+    targets.some((x) => x.targetType === t.targetType && x.targetId === t.targetId);
+  const toggleTarget = (t: Target) =>
+    setTargets((list) =>
+      has(t)
+        ? list.filter((x) => !(x.targetType === t.targetType && x.targetId === t.targetId))
+        : [...list, t],
+    );
+
+  const nameOf = (t: Target) => {
+    if (t.targetType === 'BRAND') return brands.find((b) => b.id === t.targetId)?.name ?? t.targetId;
+    if (t.targetType === 'CATEGORY') {
+      return categories.find((c) => c.id === t.targetId)?.name ?? t.targetId;
+    }
+    return productHits.find((p) => p.id === t.targetId)?.name ?? t.targetId;
+  };
+
+  async function searchProducts() {
+    const q = productQuery.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
+      if (!response.ok) return;
+      const data = (await response.json()) as { products: NamedOption[] };
+      setProductHits(data.products);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   async function onCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -75,6 +131,7 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
       issueLimit: text('issueLimit') ? num('issueLimit') : null,
       startsAt: toIso(text('startsAt')),
       endsAt: toIso(text('endsAt')),
+      targets,
     };
 
     try {
@@ -96,6 +153,9 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
       setCoupons((list) => [result.coupon!, ...list]);
       setCreating(false);
       setCode('');
+      setTargets([]);
+      setProductHits([]);
+      setProductQuery('');
       setStatus(`${result.coupon.name} 쿠폰을 만들었습니다.`);
       router.refresh();
     } catch {
@@ -155,6 +215,7 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
                 <th scope="col" className="px-4 py-3 font-medium">쿠폰</th>
                 <th scope="col" className="px-4 py-3 font-medium">할인</th>
                 <th scope="col" className="px-4 py-3 font-medium">최소 주문</th>
+                <th scope="col" className="px-4 py-3 font-medium">대상</th>
                 <th scope="col" className="px-4 py-3 text-right font-medium">발급 / 사용</th>
                 <th scope="col" className="px-4 py-3 font-medium">기간</th>
                 <th scope="col" className="px-4 py-3 font-medium">상태</th>
@@ -180,6 +241,13 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
                   </td>
                   <td className="tnum px-4 py-3">
                     {c.minimumOrder === 0 ? '없음' : `${format(won(c.minimumOrder))}원`}
+                  </td>
+                  <td className="px-4 py-3 text-[12px]">
+                    {c.targetCount === 0 ? (
+                      '전체'
+                    ) : (
+                      <span className="tnum">지정 {c.targetCount}개</span>
+                    )}
                   </td>
                   <td className="tnum px-4 py-3 text-right">
                     {c.issuedCount}
@@ -304,6 +372,121 @@ export function CouponBoard({ initial }: { initial: readonly CouponRow[] }) {
               error={fieldErrors['issueLimit']}
             />
           </div>
+
+          <fieldset className="flex flex-col gap-3 rounded-sm border border-[var(--border)] p-4">
+            <legend className="px-1 text-xs font-medium text-[var(--fg-secondary)]">
+              사용 대상
+            </legend>
+            <p className="text-[12px] leading-relaxed text-[var(--fg-muted)]">
+              아무것도 고르지 않으면 <b>모든 상품</b>에 쓸 수 있습니다. 고르면 그 상품 줄에만
+              할인이 붙고, <b>최소 주문 금액도 그 줄들의 합계로 잽니다</b> — 대상이 아닌 상품으로
+              기준을 채울 수 없습니다.
+            </p>
+
+            {targets.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5">
+                {targets.map((t) => (
+                  <li key={`${t.targetType}-${t.targetId}`}>
+                    <button
+                      type="button"
+                      onClick={() => toggleTarget(t)}
+                      aria-label={`${nameOf(t)} 대상에서 빼기`}
+                      className="flex items-center gap-1.5 rounded-full border border-n-900/20 bg-[var(--surface)] px-3 py-1 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+                    >
+                      {nameOf(t)}
+                      <span aria-hidden="true" className="text-[var(--fg-muted)]">×</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium text-[var(--fg-muted)]">브랜드</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {brands.map((b) => (
+                    <label
+                      key={b.id}
+                      className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={has({ targetType: 'BRAND', targetId: b.id })}
+                        onChange={() => toggleTarget({ targetType: 'BRAND', targetId: b.id })}
+                        className="accent-[var(--brand)]"
+                      />
+                      {b.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-medium text-[var(--fg-muted)]">카테고리</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {categories.map((c) => (
+                    <label
+                      key={c.id}
+                      className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={has({ targetType: 'CATEGORY', targetId: c.id })}
+                        onChange={() => toggleTarget({ targetType: 'CATEGORY', targetId: c.id })}
+                        className="accent-[var(--brand)]"
+                      />
+                      {c.name}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <span className="text-[11px] font-medium text-[var(--fg-muted)]">개별 상품</span>
+              <div className="flex items-center gap-2">
+                {/*
+                  상품은 많아서 목록으로 못 편다. 찾아서 고른다.
+                  이 폼 안에 또 form 을 둘 수 없으므로(중첩 form 은 HTML 이
+                  허용하지 않는다) Enter 는 직접 처리한다.
+                */}
+                <label htmlFor="product-q" className="sr-only">상품 검색</label>
+                <input
+                  id="product-q"
+                  value={productQuery}
+                  onChange={(e) => setProductQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void searchProducts();
+                    }
+                  }}
+                  placeholder="상품명으로 검색"
+                  className="h-10 w-[240px] rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
+                />
+                <Button type="button" variant="secondary" size="md" onClick={() => void searchProducts()}>
+                  {searching ? '찾는 중…' : '검색'}
+                </Button>
+              </div>
+              {productHits.length > 0 && (
+                <ul className="flex flex-wrap gap-1.5">
+                  {productHits.map((p) => (
+                    <li key={p.id}>
+                      <label className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900">
+                        <input
+                          type="checkbox"
+                          checked={has({ targetType: 'PRODUCT', targetId: p.id })}
+                          onChange={() => toggleTarget({ targetType: 'PRODUCT', targetId: p.id })}
+                          className="accent-[var(--brand)]"
+                        />
+                        {p.name}
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </fieldset>
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="시작" name="startsAt" type="datetime-local" required error={fieldErrors['startsAt']} />

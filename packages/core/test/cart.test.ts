@@ -136,3 +136,89 @@ describe('수량', () => {
     ).toThrow(MoneyError);
   });
 });
+
+describe('대상이 정해진 쿠폰', () => {
+  const tee = { variantId: 'v-tee', productName: '티셔츠', listPrice: won(20_000), salePrice: won(20_000), quantity: 1, productId: 'p-tee', brandId: 'b-a' };
+  const coat = { variantId: 'v-coat', productName: '코트', listPrice: won(200_000), salePrice: won(200_000), quantity: 1, productId: 'p-coat', brandId: 'b-b' };
+
+  it('대상 상품 줄에만 붙는다 — 전체를 깎으면 안 된다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: {
+        kind: 'percent', code: 'TEE50', percent: 50,
+        maxDiscount: null, minimumOrder: won(0),
+        scope: { productIds: ['p-tee'] },
+      },
+    });
+    // 티셔츠 20,000 의 50% 만. 코트까지 세면 110,000 이 된다.
+    expect(r.couponDiscount).toBe(10_000);
+  });
+
+  it('최소 주문 금액도 대상 줄 합계로 잰다 — 다른 상품으로 채울 수 없다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: {
+        kind: 'amount', code: 'TEE5000', value: won(5000),
+        minimumOrder: won(50_000),
+        scope: { productIds: ['p-tee'] },
+      },
+    });
+    // 장바구니는 220,000 이지만 대상은 20,000 뿐이라 기준을 못 넘는다
+    expect(r.couponDiscount).toBe(0);
+  });
+
+  it('대상이 장바구니에 없으면 할인이 없다', () => {
+    const r = calculateCart({
+      lines: [coat],
+      coupon: {
+        kind: 'amount', code: 'TEE5000', value: won(5000),
+        minimumOrder: won(0), scope: { productIds: ['p-tee'] },
+      },
+    });
+    expect(r.couponDiscount).toBe(0);
+  });
+
+  it('브랜드로도 지정할 수 있다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: {
+        kind: 'amount', code: 'BRANDB', value: won(30_000),
+        minimumOrder: won(0), scope: { brandIds: ['b-b'] },
+      },
+    });
+    expect(r.couponDiscount).toBe(30_000);
+  });
+
+  it('상품과 브랜드를 겹쳐 쓰면 둘 중 하나만 걸려도 대상이다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: {
+        kind: 'percent', code: 'MIX', percent: 10,
+        maxDiscount: null, minimumOrder: won(0),
+        scope: { productIds: ['p-tee'], brandIds: ['b-b'] },
+      },
+    });
+    // 둘 다 대상이므로 220,000 의 10%
+    expect(r.couponDiscount).toBe(22_000);
+  });
+
+  it('대상을 정하지 않으면 예전처럼 장바구니 전체다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: { kind: 'amount', code: 'ALL', value: won(5000), minimumOrder: won(0) },
+    });
+    expect(r.couponDiscount).toBe(5000);
+  });
+
+  it('할인이 대상 줄 합계를 넘지 않는다', () => {
+    const r = calculateCart({
+      lines: [tee, coat],
+      coupon: {
+        kind: 'amount', code: 'BIG', value: won(999_999),
+        minimumOrder: won(0), scope: { productIds: ['p-tee'] },
+      },
+    });
+    expect(r.couponDiscount).toBe(20_000);
+    expect(r.payable).toBeGreaterThanOrEqual(200_000);
+  });
+});
