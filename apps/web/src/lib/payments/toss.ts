@@ -53,17 +53,22 @@ export function createTossGateway(secretKey: string): PaymentGateway {
   // 토스는 시크릿 키를 Basic auth 의 username 으로 쓰고 password 는 빈 값이다
   const auth = `Basic ${Buffer.from(`${secretKey}:`).toString('base64')}`;
 
-  async function call(path: string, body: unknown, idempotencyKey?: string): Promise<TossPayment> {
+  async function call(
+    path: string,
+    body: unknown,
+    idempotencyKey?: string,
+    method: 'POST' | 'GET' = 'POST',
+  ): Promise<TossPayment> {
     let res: Response;
     try {
       res = await fetch(`${BASE}${path}`, {
-        method: 'POST',
+        method,
         headers: {
           Authorization: auth,
           'Content-Type': 'application/json',
           ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
         },
-        body: JSON.stringify(body),
+        ...(method === 'GET' ? {} : { body: JSON.stringify(body) }),
       });
     } catch (cause) {
       // 요청이 나갔는지 알 수 없다. 재시도 가능으로 표시하되 호출부는
@@ -109,6 +114,15 @@ export function createTossGateway(secretKey: string): PaymentGateway {
     async confirm({ paymentKey, orderNo, amount }) {
       // orderId 에 우리 주문번호를 넣는다. 토스가 중복 승인을 막아 준다.
       return toResult(await call('/payments/confirm', { paymentKey, orderId: orderNo, amount }));
+    },
+    /**
+     * 결제 조회. 웹훅을 받았을 때 진짜로 그런지 확인하는 데 쓴다.
+     * 본문이 아니라 이 응답이 진실이다.
+     */
+    async inquire(paymentKey) {
+      return toResult(
+        await call(`/payments/${encodeURIComponent(paymentKey)}`, null, undefined, 'GET'),
+      );
     },
     async cancel({ paymentKey, amount, reason, idempotencyKey }) {
       return toResult(

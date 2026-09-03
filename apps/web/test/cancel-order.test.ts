@@ -35,6 +35,7 @@ const order = (over: Record<string, unknown> = {}) => ({
 
 const gateway = (): PaymentGateway => ({
   provider: 'mock',
+  inquire: vi.fn<(...a: any[]) => any>(),
   confirm: vi.fn<(...a: any[]) => any>(),
   cancel: vi.fn<(...a: any[]) => any>(async () => ({
     paymentKey: 'pk_1', approvalNo: null, method: 'CARD' as const, status: 'CANCELED' as const,

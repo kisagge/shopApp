@@ -10,6 +10,18 @@ import { won, PaymentError, type PaymentGateway, type PaymentResult } from '@sho
  *   mock_va_*      → 가상계좌(입금 대기)
  */
 export function createMockGateway(): PaymentGateway {
+  /**
+   * 이 가짜 PG 가 승인한 결제들.
+   *
+   * inquire 가 있어야 가상계좌 입금 웹훅을 로컬에서 재현할 수 있는데,
+   * 아무 값이나 돌려주면 금액 검증에 걸려 **성공 경로를 아예 못 밟는다.**
+   * 자기가 승인한 금액을 기억했다가 그대로 답한다.
+   *
+   * 프로세스 안에만 있으므로 서버를 재시작하면 사라진다. 로컬·CI 전용이라
+   * 그것으로 충분하다 — 실제 PG 는 자기 DB 를 본다.
+   */
+  const approved = new Map<string, PaymentResult>();
+
   return {
     provider: 'mock',
 
@@ -26,7 +38,7 @@ export function createMockGateway(): PaymentGateway {
       }
 
       const isVirtual = paymentKey.startsWith('mock_va');
-      return Promise.resolve({
+      const result: PaymentResult = {
         paymentKey,
         approvalNo: isVirtual ? null : `MOCK${orderNo.slice(-8)}`,
         method: isVirtual ? 'VIRTUAL_ACCOUNT' : 'CARD',
@@ -41,6 +53,32 @@ export function createMockGateway(): PaymentGateway {
             }
           : null,
         raw: { mock: true, orderNo },
+      };
+      approved.set(paymentKey, result);
+      return Promise.resolve(result);
+    },
+
+    /**
+     * 조회. 가상계좌 입금 웹훅을 로컬에서 재현하려고 둔다.
+     *
+     * 승인한 적 있는 키면 **그때 금액 그대로** 입금 완료로 답한다. 그래야
+     * 입금 반영의 성공 경로를 밟아 볼 수 있다. 승인한 적 없는 키는
+     * 실패로 답한다 — 모르는 결제를 아는 척하면 안 된다.
+     */
+    inquire(paymentKey): Promise<PaymentResult> {
+      const seen = approved.get(paymentKey);
+      if (!seen) {
+        return Promise.resolve({
+          paymentKey, approvalNo: null, method: 'CARD', status: 'FAILED',
+          amount: won(0), approvedAt: null, virtualAccount: null,
+          raw: { mock: true, unknown: true },
+        });
+      }
+      return Promise.resolve({
+        ...seen,
+        status: 'DONE',
+        approvedAt: seen.approvedAt ?? new Date(),
+        raw: { mock: true, inquired: true },
       });
     },
 

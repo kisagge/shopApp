@@ -84,6 +84,15 @@ export interface PaymentGateway {
   readonly provider: string;
   confirm(request: PaymentConfirmRequest): Promise<PaymentResult>;
   cancel(request: PaymentCancelRequest): Promise<PaymentResult>;
+  /**
+   * 결제 하나를 PG 에 다시 물어본다.
+   *
+   * 웹훅 때문에 필요하다. **웹훅 본문을 믿고 상태를 바꾸면 안 된다** —
+   * 우리 엔드포인트 주소만 알면 누구나 "입금됐다" 고 보낼 수 있고, 그러면
+   * 돈을 받지 않고 주문이 결제 완료가 된다. 웹훅은 "뭔가 바뀌었으니 가서
+   * 확인해라" 는 신호로만 쓰고, 진실은 여기서 가져온다.
+   */
+  inquire(paymentKey: string): Promise<PaymentResult>;
 }
 
 export class PaymentError extends Error {

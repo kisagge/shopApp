@@ -11,7 +11,8 @@ import {
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
-import { getSessionId } from '~/lib/analytics/session';
+import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
+import { openPaymentWindow, isUsableClientKey } from '~/lib/payments/client';
 import { useMemo } from 'react';
 
 const METHOD_LABEL: Record<PaymentMethodInput, string> = {
@@ -32,6 +33,23 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
   const selected = useMemo(() => items.filter((i) => i.selected), [items]);
 
   const [method, setMethod] = useState<PaymentMethodInput>('CARD');
+
+  /**
+   * 고를 수 있는 결제 수단.
+   *
+   * 간편결제는 토스 결제창에서 제공사(카카오페이·네이버페이…)를 함께
+   * 지정해야 하는데 아직 그 연동을 하지 않았다. 그대로 두면 실제 키를 넣은
+   * 환경에서 **간편결제만 조용히 Mock 으로 빠진다** — 결제창도 안 뜨는데
+   * 주문은 결제 완료가 되는, 가장 나쁜 종류의 불일치다.
+   * 그래서 실제 결제창을 쓸 때는 아예 보여 주지 않는다.
+   */
+  const methods = useMemo(
+    () =>
+      isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'])
+        ? PAYMENT_METHOD.filter((m) => m !== 'EASY_PAY')
+        : PAYMENT_METHOD,
+    [],
+  );
   const [agreed, setAgreed] = useState(false);
   const [memo, setMemo] = useState('');
   const [pointsToUse, setPointsToUse] = useState(0);
@@ -85,12 +103,41 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
     track('add_payment_info', { method });
 
     /**
-     * 결제 승인.
+     * 결제창.
      *
-     * 실제로는 여기서 PG 결제창을 띄우고, 창이 돌려준 paymentKey 로 승인을
-     * 요청한다. 아직 결제창을 붙이지 않아 Mock 게이트웨이가 알아보는 키를
-     * 만들어 보낸다 — 서버 쪽 승인 흐름(금액 검증·멱등·상태 전이)은 실제와 같다.
+     * 클라이언트 키가 있으면 실제 토스 결제창을 띄운다. 창이 성공하면
+     * 토스가 /checkout/success 로 **리다이렉트**하고 승인은 거기서 서버가
+     * 한다 — 이 함수 뒤의 코드는 실행되지 않는다.
+     *
+     * 키가 없으면 Mock 으로 간다. 로컬에서 키 없이도 주문 흐름 전체를
+     * 볼 수 있어야 한다. 서버 쪽 승인 흐름(금액 검증·멱등·상태 전이)은 같다.
      */
+    const clientKey = process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'];
+    if (isUsableClientKey(clientKey) && method !== 'EASY_PAY') {
+      // 주문에 들어간 항목은 결제창을 열기 전에 장바구니에서 뺀다.
+      // 창이 뜨면 이 페이지는 떠나므로 뒤에서 지울 기회가 없다.
+      for (const i of selected) useCartStore.getState().remove(i.variantId);
+      try {
+        await openPaymentWindow({
+          clientKey,
+          customerKey: getAnonymousId(),
+          orderNo: order.orderNo,
+          orderName:
+            selected.length === 1
+              ? (selected[0]?.productName ?? '주문')
+              : `${selected[0]?.productName ?? '주문'} 외 ${selected.length - 1}건`,
+          amount: order.payable,
+          method,
+          origin: window.location.origin,
+        });
+      } catch {
+        // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있으므로
+        // 주문 화면에서 다시 시도할 수 있다.
+        router.push(`/order/${order.orderNo}?payment=failed`);
+      }
+      return;
+    }
+
     setPending(true);
     const mockKey = `${method === 'VIRTUAL_ACCOUNT' ? 'mock_va' : 'mock'}_${order.orderNo}`;
     const confirmRes = await fetch(`/api/orders/${order.orderNo}/confirm`, {
@@ -213,7 +260,7 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
       <section aria-labelledby="method-title">
         <h2 id="method-title" className="mb-3.5 text-sm font-semibold">결제 수단</h2>
         <ul role="radiogroup" aria-labelledby="method-title" className="grid grid-cols-2 gap-2">
-          {PAYMENT_METHOD.map((m) => (
+          {methods.map((m) => (
             <li key={m}>
               <button
                 type="button"

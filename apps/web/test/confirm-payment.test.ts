@@ -29,6 +29,7 @@ const order = (over: Record<string, unknown> = {}) => ({
 
 const gateway = (over: Partial<PaymentGateway> = {}): PaymentGateway => ({
   provider: 'mock',
+  inquire: vi.fn<(...a: any[]) => any>(),
   confirm: vi.fn<(...a: any[]) => any>(async ({ amount }) => ({
     paymentKey: 'pk_1', approvalNo: 'A1', method: 'CARD' as const, status: 'DONE' as const,
     amount: won(amount), approvedAt: new Date('2026-08-31T06:00:00Z'),
