@@ -79,7 +79,7 @@ export default async function AdminDashboard({
                 </span>
               </p>
             </div>
-            <RevenueChart data={d.dailyRevenue} />
+            <RevenueChart data={d.dailyRevenue} label={d.rangeLabel} />
           </section>
 
           <section
@@ -109,7 +109,7 @@ export default async function AdminDashboard({
             <div className="mb-4 flex flex-col gap-1">
               <h2 id="funnel-title" className="text-base font-semibold">구매 퍼널</h2>
               <p className="text-xs text-[var(--fg-muted)]">
-                최근 7일 세션 기준 · 앞 단계를 거친 세션만 다음 단계로 셉니다
+                {d.rangeLabel} 세션 기준 · 앞 단계를 거친 세션만 다음 단계로 셉니다
               </p>
             </div>
             <ol className="grid grid-cols-4 gap-3">
@@ -139,11 +139,11 @@ export default async function AdminDashboard({
             <h2 id="top-title" className="mb-4 text-base font-semibold">판매 상위 상품</h2>
             {d.topProducts.length === 0 ? (
               <p className="py-10 text-center text-[13px] text-[var(--fg-muted)]">
-                최근 7일 판매 기록이 없습니다.
+                {d.rangeLabel} 판매 기록이 없습니다.
               </p>
             ) : (
               <table>
-                <caption className="sr-only">최근 7일 판매 상위 상품</caption>
+                <caption className="sr-only">{d.rangeLabel} 판매 상위 상품</caption>
                 <thead>
                   <tr className="border-b border-[var(--border)]">
                     <th scope="col" className="w-7 pb-2.5 text-[11px] text-[var(--fg-secondary)]">#</th>

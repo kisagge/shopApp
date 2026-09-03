@@ -11,7 +11,14 @@ import type { DailyRevenue } from '~/lib/queries/admin';
  * SVG 옆에 스크린리더용 표를 숨겨 둔다. 그래프는 시각적 요약일 뿐이고
  * 값을 읽어야 하는 사람에게는 표가 필요하다.
  */
-export function RevenueChart({ data }: { data: readonly DailyRevenue[] }) {
+export function RevenueChart({
+  data,
+  label,
+}: {
+  data: readonly DailyRevenue[];
+  /** '최근 30일' 처럼 이 차트가 무슨 기간인지. 표 제목과 대체 텍스트에 쓴다. */
+  label: string;
+}) {
   if (data.length === 0) {
     return (
       <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
@@ -41,7 +48,7 @@ export function RevenueChart({ data }: { data: readonly DailyRevenue[] }) {
   return (
     <>
       <svg viewBox={`0 0 ${W} 250`} width="100%" role="img" aria-labelledby="rc-t rc-d" className="block">
-        <title id="rc-t">최근 7일 일별 매출</title>
+        <title id="rc-t">{label} 일별 매출</title>
         <desc id="rc-d">{data.map((d) => `${d.date} ${format(won(d.revenue))}원`).join(', ')}</desc>
 
         {gridValues.map((v) => (
@@ -103,7 +110,7 @@ export function RevenueChart({ data }: { data: readonly DailyRevenue[] }) {
       </svg>
 
       <table className="sr-only">
-        <caption>최근 7일 일별 매출</caption>
+        <caption>{label} 일별 매출</caption>
         <thead>
           <tr><th scope="col">날짜</th><th scope="col">매출</th></tr>
         </thead>
