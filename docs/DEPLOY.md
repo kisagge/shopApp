@@ -166,9 +166,10 @@ DATABASE_URL="<운영 풀링 주소>" pnpm db:seed
 |---|---|---|
 | `/api/cron/settlements` | 매달 1일 KST 05:00 | 앞 달 정산 확정 |
 | `/api/cron/reconcile-points` | 매일 KST 03:00 | 포인트 잔액을 원장에 맞춤 |
+| `/api/cron/rollup-events` | 매일 KST 04:00 | 어제치 이벤트를 일별 집계로 접고, 90일 지난 원본을 지움 |
 
 Vercel 은 `CRON_SECRET` 이 설정돼 있으면 `Authorization: Bearer` 로 보낸다.
-두 라우트 모두 그 값을 확인하고, **시크릿이 없으면 열어 두지 않고 503 으로 막는다.**
+세 라우트 모두 그 값을 확인하고, **시크릿이 없으면 열어 두지 않고 503 으로 막는다.**
 
 플랜에 따라 크론 개수와 주기에 제한이 있으니 확인할 것.
 

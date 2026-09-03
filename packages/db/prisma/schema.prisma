@@ -76,18 +76,18 @@ model User {
   /// 매번 합계를 구하면 마이페이지가 느려져서 캐시하되, 정합성은 배치로 검증한다.
   pointBalance Int @default(0)
 
-  addresses      Address[]
-  orders         Order[]
-  cartItems      CartItem[]
-  reviews        Review[]
-  wishlist       WishlistItem[]
-  coupons        UserCoupon[]
-  pointHistory   PointTransaction[]
-  restockAlerts  RestockNotification[]
-  events         EventLog[]
-  auditLogs      AdminAuditLog[]        @relation("AuditActor")
-  sessions       Session[]
-  accounts       Account[]
+  addresses     Address[]
+  orders        Order[]
+  cartItems     CartItem[]
+  reviews       Review[]
+  wishlist      WishlistItem[]
+  coupons       UserCoupon[]
+  pointHistory  PointTransaction[]
+  restockAlerts RestockNotification[]
+  events        EventLog[]
+  auditLogs     AdminAuditLog[]       @relation("AuditActor")
+  sessions      Session[]
+  accounts      Account[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -136,15 +136,15 @@ model Merchant {
   status MerchantStatus @default(PENDING)
 
   // ── 사업자 정보
-  businessName     String
-  businessNumber   String  @unique
-  representative   String
-  contactEmail     String
-  contactPhone     String
+  businessName   String
+  businessNumber String @unique
+  representative String
+  contactEmail   String
+  contactPhone   String
 
   // ── 정산
   /// 판매액에서 떼는 수수료율(%). 가맹점마다 다를 수 있다.
-  commissionPercent Int    @default(15)
+  commissionPercent Int     @default(15)
   settlementBank    String?
   settlementAccount String?
   settlementHolder  String?
@@ -178,13 +178,13 @@ model Settlement {
   periodEnd   DateTime
 
   /// 해당 기간 확정 매출(구매확정 기준)
-  grossAmount Int
+  grossAmount      Int
   /// 떼어 간 수수료
   commissionAmount Int
   /// 환불·반품으로 차감된 금액
-  refundAmount Int @default(0)
+  refundAmount     Int @default(0)
   /// 실제 지급액 = gross - commission - refund
-  netAmount Int
+  netAmount        Int
 
   status SettlementStatus @default(PENDING)
 
@@ -257,15 +257,15 @@ model Brand {
 }
 
 model Category {
-  id       String     @id @default(cuid())
-  name     String
-  slug     String     @unique
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
   /// 자기참조 트리. 아우터 > 코트 같은 2~3단 구조를 담는다.
-  parentId String?
-  parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
-  children Category[] @relation("CategoryTree")
-  sortOrder Int       @default(0)
-  products Product[]
+  parentId  String?
+  parent    Category?  @relation("CategoryTree", fields: [parentId], references: [id])
+  children  Category[] @relation("CategoryTree")
+  sortOrder Int        @default(0)
+  products  Product[]
 
   createdAt DateTime @default(now())
 
@@ -337,11 +337,11 @@ model Product {
   ratingScore Int @default(0)
   soldCount   Int @default(0)
 
-  images      ProductImage[]
+  images       ProductImage[]
   optionGroups ProductOptionGroup[]
-  variants    ProductVariant[]
-  reviews     Review[]
-  wishedBy    WishlistItem[]
+  variants     ProductVariant[]
+  reviews      Review[]
+  wishedBy     WishlistItem[]
 
   publishedAt DateTime?
   createdAt   DateTime  @default(now())
@@ -422,7 +422,7 @@ model ProductVariant {
 
   /// 옵션별 가격 차이가 있을 때만 채운다. null이면 product.listPrice를 쓴다.
   priceOverride Int?
-  stock         Int  @default(0)
+  stock         Int     @default(0)
   isActive      Boolean @default(true)
 
   cartItems     CartItem[]
@@ -482,15 +482,15 @@ model Order {
   status  OrderStatus @default(PENDING)
 
   // ── 금액 스냅샷. 계산은 packages/core 가 하고 결과만 박는다.
-  listTotal        Int
-  productDiscount  Int
-  couponDiscount   Int @default(0)
-  pointsUsed       Int @default(0)
-  shippingFee      Int @default(0)
+  listTotal       Int
+  productDiscount Int
+  couponDiscount  Int @default(0)
+  pointsUsed      Int @default(0)
+  shippingFee     Int @default(0)
   /// 실제 결제 금액. 위 값들의 계산 결과이지만 별도로 저장한다 —
   /// 정책이 바뀌어도 과거 주문의 결제액은 그대로여야 한다.
-  payable          Int
-  rewardPoints     Int @default(0)
+  payable         Int
+  rewardPoints    Int @default(0)
 
   // ── 배송지 스냅샷. Address를 참조만 하면 고객이 주소를 고칠 때
   //    과거 주문의 배송지까지 바뀐다.
@@ -546,18 +546,18 @@ model OrderItem {
   // ── 주문 시점 스냅샷
   /// 어느 가맹점의 상품이었는지. 정산과 가맹점 주문 조회의 기준이 된다.
   /// 한 주문에 여러 가맹점 상품이 섞일 수 있어 Order가 아니라 줄 단위로 둔다.
-  merchantId   String?
-  productName  String
-  brandName    String
-  optionLabel  String
-  imageUrl     String?
+  merchantId  String?
+  productName String
+  brandName   String
+  optionLabel String
+  imageUrl    String?
   /// 주문 시점의 정가
-  listPrice    Int
+  listPrice   Int
   /// 주문 시점의 실제 판매 단가. 표시 할인율은 이 둘에서 계산되므로 따로 두지 않는다.
-  unitPrice    Int
-  quantity     Int
+  unitPrice   Int
+  quantity    Int
   /// unitPrice * quantity
-  subtotal     Int
+  subtotal    Int
 
   /// 부분 취소·부분 반품을 지원하려면 줄 단위 상태가 필요하다.
   status OrderStatus @default(PENDING)
@@ -619,13 +619,13 @@ model Payment {
   amount Int
 
   /// PG가 발급한 키. 취소·조회에 쓴다.
-  pgProvider      String  @default("toss")
-  pgPaymentKey    String? @unique
-  pgApprovalNo    String?
+  pgProvider     String    @default("toss")
+  pgPaymentKey   String?   @unique
+  pgApprovalNo   String?
   /// 가상계좌 정보
-  virtualAccount  String?
-  virtualBank     String?
-  virtualDueDate  DateTime?
+  virtualAccount String?
+  virtualBank    String?
+  virtualDueDate DateTime?
 
   /// 환불 누계. 부분 취소가 여러 번 일어날 수 있다.
   refundedAmount Int @default(0)
@@ -675,12 +675,12 @@ model Coupon {
   kind CouponKind
 
   /// AMOUNT면 할인액, PERCENT면 사용하지 않는다.
-  value Int @default(0)
+  value        Int  @default(0)
   /// PERCENT일 때 할인율. AMOUNT면 0.
-  percent Int @default(0)
+  percent      Int  @default(0)
   /// PERCENT 쿠폰의 할인 상한. null이면 상한 없음.
-  maxDiscount Int?
-  minimumOrder Int @default(0)
+  maxDiscount  Int?
+  minimumOrder Int  @default(0)
 
   /// 발급 총량. null이면 무제한.
   issueLimit  Int?
@@ -754,9 +754,9 @@ model PointTransaction {
 // ─────────────────────────────────────────── 리뷰 · 찜 · 재입고
 
 model Review {
-  id        String @id @default(cuid())
+  id        String  @id @default(cuid())
   userId    String
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
@@ -863,6 +863,67 @@ model EventLog {
   @@index([productId, name])
   @@index([receivedAt])
   @@map("event_logs")
+}
+
+/// 하루치로 접은 이벤트 수.
+///
+/// 원본은 보존 기간이 지나면 지우지만 이 행은 남는다. 지표를 보려고 원본을
+/// 영원히 들고 있을 수는 없고, 그렇다고 지난 달 매출을 못 보게 할 수도 없다.
+model EventDaily {
+  id String @id @default(cuid())
+
+  /// KST 기준 하루. UTC 로 자르면 매일 오전 9시간이 앞날 칸에 들어간다.
+  day  DateTime @db.Date
+  name String
+
+  /// 이벤트 수. **날짜끼리 더해도 된다.**
+  events   Int
+  /// 그날의 고유 세션 수. **더하면 안 된다** — 이틀에 걸쳐 온 세션이 양쪽에 세어져 있다.
+  sessions Int
+  /// 그날의 고유 로그인 사용자 수. 세션과 같은 이유로 더하면 안 된다.
+  users    Int
+  /// 금액 합계(원). purchase·refund 에만 채워진다. 더해도 된다.
+  value    Int @default(0)
+  /// 수량 합계. 더해도 된다.
+  quantity Int @default(0)
+
+  @@unique([day, name])
+  @@index([day])
+  @@map("event_daily")
+}
+
+/// 하루치 퍼널.
+///
+/// 이름별 세션 수(EventDaily.sessions)만으로는 strict 퍼널을 되살릴 수 없다.
+/// "앞 단계를 모두 거친 세션" 은 세션 단위로 교집합을 내야 나오는 값이라
+/// 접을 때 함께 계산해 둔다.
+model FunnelDaily {
+  id String @id @default(cuid())
+
+  day      DateTime @db.Date
+  step     String
+  /// 이 단계까지 앞 단계를 **모두** 거친 세션 수
+  sessions Int
+
+  @@unique([day, step])
+  @@index([day])
+  @@map("funnel_daily")
+}
+
+/// 어느 날까지 접었는지에 대한 기록.
+///
+/// 원본 삭제가 이 표를 본다. 접힌 날만 지우므로, 롤업이 고장 나면 삭제도
+/// 함께 멈춘다. 테이블이 커지는 것은 눈에 보이고 데이터가 사라지는 것은
+/// 보이지 않으니, 보이는 쪽으로 실패하게 둔다.
+model EventRollup {
+  /// KST 기준 하루
+  day DateTime @id @db.Date
+
+  /// 접을 당시의 원본 행 수. 나중에 "이 날은 왜 이렇게 적지" 를 볼 때 쓴다.
+  rawEvents   Int
+  completedAt DateTime @default(now())
+
+  @@map("event_rollups")
 }
 
 /// 운영진·가맹점의 쓰기 동작 기록.
