@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   generateOrderNumber, INITIAL_ORDER_STATUS, won,
   type OrderItemDraft, type ShippingSnapshot, type Won,
+  isRemoteAreaPostalCode,
 } from '@shop/core';
 import type {
   CreateOrderRequest, CreateOrderResponse, OrderErrorCode,
@@ -217,7 +218,9 @@ async function resolveShipping(
     postalCode: a.postalCode,
     address1: a.address1,
     address2: a.address2 ?? null,
-    isRemoteArea: a.isRemoteArea,
+    // 요청이 아니라 우편번호에서 정한다. 받아 쓰면 제주 주소에 false 를
+    // 보내 도서산간 추가 배송비를 피할 수 있다.
+    isRemoteArea: isRemoteAreaPostalCode(a.postalCode),
     deliveryMemo: input.deliveryMemo ?? null,
   };
 }

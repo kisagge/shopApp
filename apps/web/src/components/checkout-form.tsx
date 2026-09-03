@@ -8,6 +8,7 @@ import {
   PAYMENT_METHOD, LINE_ISSUE_MESSAGE,
   type CreateOrderResponse, type OrderError, type PaymentMethodInput,
 } from '@shop/contract';
+import { AddressPicker } from '~/components/address-picker';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
@@ -27,8 +28,18 @@ interface SavedAddress {
   postalCode: string; address1: string; address2: string | null; isRemoteArea: boolean;
 }
 
-export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress | null }) {
+export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
   const router = useRouter();
+
+  /**
+   * 배송지를 상태로 들고 있는다.
+   *
+   * 새로 등록한 뒤 서버 컴포넌트를 다시 받아 올 수도 있지만, 그러면 입력하던
+   * 요청사항·포인트·선택한 결제 수단이 초기화된다. 방금 저장한 주소를 그대로
+   * 화면에 반영하는 편이 낫다.
+   */
+  const [defaultAddress, setDefaultAddress] = useState<SavedAddress | null>(initialAddress);
+  const [editingAddress, setEditingAddress] = useState(initialAddress === null);
   const items = useCartStore((s) => s.items);
   const selected = useMemo(() => items.filter((i) => i.selected), [items]);
 
@@ -168,27 +179,72 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-8" noValidate>
+    <div className="flex flex-col gap-8">
+      {/*
+        배송지는 주문 폼 **밖에** 둔다.
+        <form> 안에 <form> 을 넣는 것은 HTML 이 허용하지 않는 구조라
+        브라우저마다 동작이 다르다. 배송지는 자체 API 로 따로 저장하므로
+        주문 폼의 일부일 이유도 없다 — 나란한 두 개의 폼이 맞다.
+      */}
       <section aria-labelledby="addr-title">
         <h2 id="addr-title" className="mb-3.5 text-sm font-semibold">배송지</h2>
-        {defaultAddress ? (
-          <div className="flex flex-col gap-1.5 rounded-sm border border-[var(--border)] p-4">
-            <p className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{defaultAddress.recipient}</span>
-              {defaultAddress.label && <Badge tone="neutral">{defaultAddress.label}</Badge>}
-            </p>
-            <p className="tnum text-[13px] text-[var(--fg-secondary)]">{defaultAddress.phone}</p>
-            <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-              {defaultAddress.address1} {defaultAddress.address2}{' '}
-              <span className="tnum text-[var(--fg-muted)]">({defaultAddress.postalCode})</span>
-            </p>
+        {defaultAddress && !editingAddress ? (
+          <div className="flex items-start justify-between gap-4 rounded-sm border border-[var(--border)] p-4">
+            <div className="flex flex-col gap-1.5">
+              <p className="flex items-center gap-2">
+                <span className="text-sm font-semibold">{defaultAddress.recipient}</span>
+                {defaultAddress.label && <Badge tone="neutral">{defaultAddress.label}</Badge>}
+              </p>
+              <p className="tnum text-[13px] text-[var(--fg-secondary)]">{defaultAddress.phone}</p>
+              <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
+                {defaultAddress.address1} {defaultAddress.address2}{' '}
+                <span className="tnum text-[var(--fg-muted)]">({defaultAddress.postalCode})</span>
+              </p>
+              {defaultAddress.isRemoteArea && (
+                <p className="text-[12px] text-[var(--fg-muted)]">
+                  도서산간 지역이라 추가 배송비가 붙습니다.
+                </p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => setEditingAddress(true)}
+            >
+              변경
+            </Button>
           </div>
         ) : (
-          <p role="alert" className="rounded-sm bg-accent-soft px-4 py-3 text-[13px] text-accent-hover">
-            등록된 배송지가 없습니다. 배송지를 먼저 등록해 주세요.
-          </p>
+          <div className="rounded-sm border border-[var(--border)] p-4">
+            {/*
+              주소가 없으면 여기서 바로 입력한다. 예전에는 "배송지를 먼저
+              등록해 주세요" 라고만 적혀 있었는데, 등록할 곳이 어디에도
+              없어서 주문이 막다른 길이었다.
+            */}
+            {!defaultAddress && (
+              <p className="mb-4 text-[13px] text-[var(--fg-secondary)]">
+                받으실 곳을 입력해 주세요. 다음 주문부터는 다시 입력하지 않아도 됩니다.
+              </p>
+            )}
+            <AddressPicker
+              currentId={defaultAddress?.id ?? null}
+              onPicked={(picked) => {
+                setDefaultAddress(picked);
+                setEditingAddress(false);
+              }}
+              onCancel={() => setEditingAddress(false)}
+            />
+          </div>
         )}
-        <div className="mt-4">
+      </section>
+
+      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-8" noValidate>
+        {/*
+          제목을 따로 두지 않는다. Field 의 라벨이 이미 "배송 요청사항" 이라
+          제목을 붙이면 스크린리더가 같은 말을 두 번 읽는다.
+        */}
+        <section>
           <Field
             label="배송 요청사항"
             value={memo}
@@ -196,8 +252,7 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
             placeholder="부재 시 문 앞에 놓아주세요"
             maxLength={100}
           />
-        </div>
-      </section>
+        </section>
 
       <section aria-labelledby="items-title">
         <h2 id="items-title" className="mb-3.5 text-sm font-semibold">
@@ -353,7 +408,8 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
             ? `${format(won(q.payable))}원 결제하기`
             : '주문하기'}
       </Button>
-    </form>
+      </form>
+    </div>
   );
 }
 

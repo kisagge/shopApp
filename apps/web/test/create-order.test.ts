@@ -268,9 +268,24 @@ describe('배송지', () => {
     ).rejects.toMatchObject({ code: 'ADDRESS_NOT_FOUND' });
   });
 
-  it('도서산간이면 그 값으로 견적을 다시 낸다', async () => {
-    await createOrder(request({ address: { ...address, isRemoteArea: true } }), user);
+  it('도서산간은 우편번호가 정한다', async () => {
+    await createOrder(request({ address: { ...address, postalCode: '63309' } }), user);
     expect(quoteCart.mock.calls[0]![0]).toMatchObject({ isRemoteArea: true });
+  });
+
+  it('요청이 도서산간을 정하지 못한다 — 정하게 두면 추가 배송비를 피할 수 있다', async () => {
+    // 제주 주소인데 isRemoteArea: false 를 끼워 보낸다. 예전에는 이 값을
+    // 그대로 써서 3,000원을 아낄 수 있었다.
+    await createOrder(
+      request({ address: { ...address, postalCode: '63309', isRemoteArea: false } }),
+      user,
+    );
+    expect(quoteCart.mock.calls[0]![0]).toMatchObject({ isRemoteArea: true });
+  });
+
+  it('육지 주소는 추가 배송비가 붙지 않는다', async () => {
+    await createOrder(request({ address: { ...address, postalCode: '04766' } }), user);
+    expect(quoteCart.mock.calls[0]![0]).toMatchObject({ isRemoteArea: false });
   });
 });
 
