@@ -31,6 +31,16 @@ export async function getOrderForUser(orderNo: string, userId: string) {
       payment: { select: { method: true, status: true } },
       // 배송 조회. 송장이 없으면 null 이고 화면은 그 절을 통째로 감춘다.
       shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
+      deliveredAt: true,
+      // 가장 최근 신청이 현재 신청이다. 지난 것은 이력으로 남아 있다.
+      returnRequests: {
+        orderBy: { requestedAt: 'desc' },
+        take: 1,
+        select: {
+          type: true, reason: true, detail: true, status: true,
+          shippingBorneBy: true, rejectReason: true, requestedAt: true,
+        },
+      },
       items: {
         select: {
           productName: true, brandName: true, optionLabel: true,

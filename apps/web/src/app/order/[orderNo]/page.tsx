@@ -3,9 +3,14 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
-import { format, won, ORDER_STATUS_LABEL, isCancellableByCustomer } from '@shop/core';
+import {
+  format, won, ORDER_STATUS_LABEL, isCancellableByCustomer, canRequestReturn,
+  RETURN_TYPE_LABEL, RETURN_REASON_LABEL, RETURN_STATUS_LABEL,
+  type ReturnType, type ReturnReason, type ReturnStatus,
+} from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
+import { ReturnRequestForm } from '~/components/return-request-form';
 import { getOrderForUser } from '~/lib/queries/orders';
 
 export const metadata: Metadata = { title: '주문 완료' };
@@ -47,6 +52,20 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
     CONFIRMED: '구매가 확정되었습니다.',
   };
   const nextStep = NEXT_STEP[order.status] ?? null;
+
+  const activeReturn = order.returnRequests[0] ?? null;
+  /**
+   * 신청 버튼은 신청할 수 있을 때만.
+   *
+   * 반려된 뒤에는 다시 낼 수 있어야 한다 — 사유를 잘못 골랐을 수도 있고,
+   * 반려 사유를 보고 보완할 수도 있다. canRequestReturn 이 상태로 판단하므로
+   * 반려로 배송중에 돌아왔으면 자연히 다시 보인다.
+   */
+  const showReturnForm = canRequestReturn({
+    status: order.status,
+    deliveredAt: order.deliveredAt,
+    now: new Date(),
+  });
 
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
@@ -131,10 +150,55 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         </p>
       </section>
 
+      {/*
+        접수된 신청이 있으면 지금 어떤 상태인지 보여 준다.
+        신청만 받고 아무것도 안 보여 주면 고객은 접수가 된 건지 알 수 없다.
+      */}
+      {activeReturn && (
+        <section
+          aria-labelledby="return-title"
+          className="mt-8 rounded-sm border border-[var(--border)] p-4"
+        >
+          <h2 id="return-title" className="mb-3 text-sm font-semibold">
+            {RETURN_TYPE_LABEL[activeReturn.type as ReturnType]} 신청
+          </h2>
+          <dl className="flex flex-col gap-2 text-[13px]">
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">상태</dt>
+              <dd className="font-medium">
+                {RETURN_STATUS_LABEL[activeReturn.status as ReturnStatus]}
+              </dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">사유</dt>
+              <dd>{RETURN_REASON_LABEL[activeReturn.reason as ReturnReason]}</dd>
+            </div>
+            <div className="flex gap-3">
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">반송비</dt>
+              <dd>
+                {activeReturn.shippingBorneBy === 'CUSTOMER' ? '고객 부담' : '판매자 부담'}
+              </dd>
+            </div>
+            {activeReturn.detail && (
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">설명</dt>
+                <dd className="leading-relaxed text-[var(--fg-secondary)]">{activeReturn.detail}</dd>
+              </div>
+            )}
+          </dl>
+          {activeReturn.status === 'REJECTED' && activeReturn.rejectReason && (
+            <p className="mt-3 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
+              반려 사유: {activeReturn.rejectReason}
+            </p>
+          )}
+        </section>
+      )}
+
       <div className="mt-10 flex flex-col gap-3">
         {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}
+        {showReturnForm && <ReturnRequestForm orderNo={order.orderNo} />}
         <div className="flex gap-2">
           <Link
             href="/mypage/orders"

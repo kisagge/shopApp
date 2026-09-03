@@ -432,6 +432,15 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       user: { select: { name: true, email: true, grade: true } },
       payment: { select: { method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true } },
       shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
+      deliveredAt: true,
+      returnRequests: {
+        orderBy: { requestedAt: 'desc' },
+        take: 1,
+        select: {
+          type: true, reason: true, detail: true, status: true,
+          shippingBorneBy: true, rejectReason: true, requestedAt: true,
+        },
+      },
       items: {
         ...(scope ? { where: { merchantId: scope } } : {}),
         select: {

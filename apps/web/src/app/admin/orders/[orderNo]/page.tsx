@@ -5,9 +5,11 @@ import { Badge } from '@shop/ui';
 import {
   format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL, MEMBER_GRADE_LABEL,
-  type OrderStatus,
+  RETURN_TYPE_LABEL, RETURN_REASON_LABEL, RETURN_STATUS_LABEL,
+  type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
+import { ReturnActions } from './return-actions';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
@@ -35,6 +37,10 @@ export default async function AdminOrderDetail({
   const canFulfill =
     hasPermission(actor, 'order:fulfill') &&
     !['CANCELLED', 'REFUNDED', 'RETURNED', 'PENDING'].includes(order.status);
+
+  const activeReturn = order.returnRequests[0] ?? null;
+  // 반품 처리는 환불로 이어지는 판단이라 order:refund 를 요구한다
+  const canResolveReturn = hasPermission(actor, 'order:refund');
 
   // 어떤 전이가 가능한지는 상태머신이 정하고, 그중 권한이 있는 것만 보여 준다.
   const options = nextStatuses(order.status).filter((to) => {
@@ -142,6 +148,45 @@ export default async function AdminOrderDetail({
               )}
             </section>
           </div>
+
+          {activeReturn && (
+            <section
+              aria-labelledby="return-title"
+              className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            >
+              <div className="mb-4 flex items-baseline justify-between gap-4">
+                <h2 id="return-title" className="text-base font-semibold">
+                  {RETURN_TYPE_LABEL[activeReturn.type as ReturnType]} 신청
+                </h2>
+                <span className="text-xs text-[var(--fg-muted)]">
+                  {RETURN_STATUS_LABEL[activeReturn.status as ReturnStatus]}
+                </span>
+              </div>
+              <dl className="flex flex-col">
+                <Row label="사유" value={RETURN_REASON_LABEL[activeReturn.reason as ReturnReason]} />
+                <Row
+                  label="반송비"
+                  value={activeReturn.shippingBorneBy === 'CUSTOMER' ? '고객 부담' : '판매자 부담'}
+                />
+                <Row
+                  label="신청일"
+                  value={activeReturn.requestedAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+                />
+                {activeReturn.detail && <Row label="상세" value={activeReturn.detail} />}
+                {activeReturn.rejectReason && (
+                  <Row label="반려 사유" value={activeReturn.rejectReason} />
+                )}
+              </dl>
+
+              {/*
+                아직 처리 안 된 신청에만 버튼을 둔다. 이미 승인·반려한 것에
+                다시 버튼이 보이면 두 번 누르게 된다.
+              */}
+              {activeReturn.status === 'REQUESTED' && canResolveReturn && (
+                <ReturnActions orderNo={order.orderNo} />
+              )}
+            </section>
+          )}
 
           <section
             aria-labelledby="log-title"

@@ -512,11 +512,12 @@ model Order {
   usedCouponId String?
   usedCoupon   UserCoupon? @relation(fields: [usedCouponId], references: [id])
 
-  items      OrderItem[]
-  payment    Payment?
-  shipment   Shipment?
-  statusLogs OrderStatusLog[]
-  pointTxns  PointTransaction[]
+  items          OrderItem[]
+  payment        Payment?
+  shipment       Shipment?
+  statusLogs     OrderStatusLog[]
+  returnRequests ReturnRequest[]
+  pointTxns      PointTransaction[]
 
   placedAt    DateTime  @default(now())
   paidAt      DateTime?
@@ -795,6 +796,42 @@ model WishlistItem {
   @@unique([userId, productId])
   @@index([userId, createdAt])
   @@map("wishlist_items")
+}
+
+/// 반품·교환 신청.
+///
+/// 주문당 여러 번 남을 수 있다(반려 후 재신청). **가장 최근 것이 현재 신청**이고
+/// 지난 것은 이력으로 남긴다 — 왜 반려됐는지 지워 버리면 같은 일이 반복된다.
+model ReturnRequest {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// RETURN(반품) | EXCHANGE(교환)
+  type   String
+  /// CHANGED_MIND | DEFECT | WRONG_ITEM | DAMAGED
+  reason String
+  /// 고객이 직접 적은 설명
+  detail String?
+
+  /// 반송비를 누가 내는가. CUSTOMER | SELLER
+  /// **요청으로 받지 않고 서버가 사유에서 정한다** — 받아 쓰면 누구나
+  /// SELLER 를 보내 반송비를 넘길 수 있다.
+  shippingBorneBy String
+
+  /// REQUESTED | APPROVED | REJECTED | COMPLETED
+  status       String  @default("REQUESTED")
+  /// 반려 사유. 고객에게 그대로 보여 준다.
+  rejectReason String?
+
+  requestedAt DateTime  @default(now())
+  resolvedAt  DateTime?
+  /// 처리한 운영자. 배치나 시스템이면 null
+  resolvedBy  String?
+
+  @@index([orderId, requestedAt])
+  @@index([status, requestedAt])
+  @@map("return_requests")
 }
 
 model RestockNotification {

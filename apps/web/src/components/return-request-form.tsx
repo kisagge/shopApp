@@ -1,0 +1,183 @@
+'use client';
+
+import { useId, useState, type FormEvent } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@shop/ui';
+import {
+  RETURN_TYPE, RETURN_TYPE_LABEL, RETURN_REASON, RETURN_REASON_LABEL,
+  shippingBorneBy, returnWindowDays,
+  type ReturnReason, type ReturnType,
+} from '@shop/core';
+
+/**
+ * 반품·교환 신청.
+ *
+ * **반송비를 누가 내는지 고르기 전에 알려 준다.** 신청하고 나서 알게 되면
+ * 속았다고 느낀다. 사유를 바꾸는 순간 문구도 함께 바뀐다.
+ *
+ * 부담 주체를 화면에서 계산해 보여 주지만 **그 값을 서버로 보내지는 않는다.**
+ * 서버가 사유에서 다시 정한다 — 보내면 누구나 판매자 부담으로 바꿀 수 있다.
+ */
+export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
+  const router = useRouter();
+  const formId = useId();
+  const [open, setOpen] = useState(false);
+  const [type, setType] = useState<ReturnType>('RETURN');
+  const [reason, setReason] = useState<ReturnReason>('CHANGED_MIND');
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const borneBy = shippingBorneBy(reason);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+
+    const data = new FormData(event.currentTarget);
+    const detail = data.get('detail');
+
+    try {
+      const response = await fetch(`/api/orders/${orderNo}/return`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          type,
+          reason,
+          ...(typeof detail === 'string' && detail.trim() ? { detail: detail.trim() } : {}),
+        }),
+      });
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        setError(result.message ?? '신청하지 못했습니다.');
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError('네트워크 오류로 신청하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="secondary"
+        size="md"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        aria-controls={formId}
+      >
+        반품 · 교환 신청
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      id={formId}
+      onSubmit={(e) => void onSubmit(e)}
+      className="flex flex-col gap-5 rounded-sm border border-[var(--border)] p-4"
+    >
+      <h3 className="text-sm font-semibold">반품 · 교환 신청</h3>
+
+      {error && (
+        <p role="alert" className="rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[13px] text-accent">
+          {error}
+        </p>
+      )}
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">
+          무엇을 원하시나요
+        </legend>
+        <div className="flex gap-2">
+          {RETURN_TYPE.map((t) => (
+            <label
+              key={t}
+              className="flex flex-1 cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
+            >
+              <input
+                type="radio"
+                name="type"
+                value={t}
+                checked={type === t}
+                onChange={() => setType(t)}
+                className="accent-[var(--brand)]"
+              />
+              {RETURN_TYPE_LABEL[t]}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">사유</legend>
+        {RETURN_REASON.map((r) => (
+          <label
+            key={r}
+            className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
+          >
+            <input
+              type="radio"
+              name="reason"
+              value={r}
+              checked={reason === r}
+              onChange={() => setReason(r)}
+              className="accent-[var(--brand)]"
+            />
+            {RETURN_REASON_LABEL[r]}
+          </label>
+        ))}
+      </fieldset>
+
+      {/*
+        반송비 부담과 기한을 사유 바로 아래에 붙인다. aria-live 로 사유를
+        바꿀 때마다 읽힌다 — 눈으로만 바뀌면 스크린리더 사용자는 어떤 조건으로
+        신청하는지 모른 채 제출하게 된다.
+      */}
+      <p
+        aria-live="polite"
+        className="rounded-sm bg-[var(--surface)] px-3.5 py-2.5 text-[12px] leading-relaxed text-[var(--fg-secondary)]"
+      >
+        {borneBy === 'CUSTOMER' ? (
+          <>
+            <b className="font-semibold">반송비는 고객님이 부담</b>합니다. 배송완료 후{' '}
+            {returnWindowDays(reason)}일 이내에 신청할 수 있습니다.
+          </>
+        ) : (
+          <>
+            <b className="font-semibold">반송비는 저희가 부담</b>합니다. 배송완료 후{' '}
+            {returnWindowDays(reason)}일 이내에 신청할 수 있습니다.
+          </>
+        )}
+      </p>
+
+      <div className="flex flex-col gap-2">
+        <label htmlFor={`${formId}-detail`} className="text-xs font-medium text-[var(--fg-secondary)]">
+          상세 설명 <span className="text-[var(--fg-muted)]">(선택)</span>
+        </label>
+        <textarea
+          id={`${formId}-detail`}
+          name="detail"
+          rows={3}
+          maxLength={500}
+          placeholder="어떤 점이 문제였는지 적어 주시면 처리가 빨라집니다."
+          className="rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
+        />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? '신청하는 중…' : '신청하기'}
+        </Button>
+        <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
+          취소
+        </Button>
+      </div>
+    </form>
+  );
+}
