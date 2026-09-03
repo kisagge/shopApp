@@ -43,12 +43,10 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
    * 주문은 결제 완료가 되는, 가장 나쁜 종류의 불일치다.
    * 그래서 실제 결제창을 쓸 때는 아예 보여 주지 않는다.
    */
+  const realGateway = isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY']);
   const methods = useMemo(
-    () =>
-      isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'])
-        ? PAYMENT_METHOD.filter((m) => m !== 'EASY_PAY')
-        : PAYMENT_METHOD,
-    [],
+    () => (realGateway ? PAYMENT_METHOD.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD),
+    [realGateway],
   );
   const [agreed, setAgreed] = useState(false);
   const [memo, setMemo] = useState('');
@@ -279,9 +277,23 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
             </li>
           ))}
         </ul>
+        {/*
+          무엇으로 도는지 사실대로 말한다. 결제창이 뜨지 않는데 주문이 완료되는
+          것은 놀랄 일이므로 미리 알려야 하고, 반대로 실제 결제창이 뜰 때
+          "연동이 안 됐다" 고 적혀 있으면 그것대로 사람을 헷갈리게 만든다.
+        */}
         <p className="mt-3 rounded-sm bg-[var(--surface)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-secondary)]">
-          결제 연동은 아직 붙지 않았습니다. 주문은 <strong className="font-semibold">입금대기</strong> 상태로
-          생성되고 실제 결제는 발생하지 않습니다.
+          {realGateway ? (
+            <>
+              결제하기를 누르면 <strong className="font-semibold">토스 결제창</strong>이 열립니다.
+              테스트 키로 연결돼 있어 실제 청구는 발생하지 않습니다.
+            </>
+          ) : (
+            <>
+              결제 키가 설정되지 않아 <strong className="font-semibold">결제창 없이</strong> 주문이
+              완료됩니다. 실제 결제는 발생하지 않습니다.
+            </>
+          )}
         </p>
       </section>
 

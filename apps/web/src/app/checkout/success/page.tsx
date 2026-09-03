@@ -46,10 +46,19 @@ export default async function CheckoutSuccessPage({
   } catch (error) {
     if (error instanceof ConfirmError) {
       /**
-       * 승인이 실패해도 주문 화면으로 보낸다.
+       * 주문 자체가 없으면 실패 화면으로 보낸다.
        *
-       * 실패 화면에 세워 두면 사용자는 주문이 어떻게 됐는지 알 수 없다.
-       * 주문은 이미 만들어져 있고 그 화면에서 다시 시도할 수 있다.
+       * 없는 주문의 주문 화면으로 보내면 맨 404 가 뜬다. 결제가 어떻게 됐는지
+       * 한 글자도 못 보는 셈이다. 낡은 콜백 주소를 다시 열었거나 남의 주문
+       * 번호로 들어온 경우라 실제로 일어난다.
+       */
+      if (error.code === 'ORDER_NOT_FOUND') {
+        redirect('/checkout/fail?code=ORDER_NOT_FOUND');
+      }
+      /**
+       * 그 밖의 실패는 주문 화면으로 보낸다. 주문은 이미 만들어져 있고
+       * 거기서 다시 시도할 수 있다 — 실패 화면에 세워 두면 자기 주문이
+       * 어떻게 됐는지 알 수 없다.
        */
       redirect(`/order/${orderNo}?payment=failed&reason=${encodeURIComponent(error.code)}`);
     }

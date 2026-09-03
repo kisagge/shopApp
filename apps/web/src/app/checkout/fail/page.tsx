@@ -19,6 +19,7 @@ const REASON: Readonly<Record<string, string>> = {
   EXCEED_MAX_DAILY_PAYMENT_COUNT: '하루 결제 한도를 넘었습니다.',
   NOT_ENOUGH_BALANCE: '잔액이 부족합니다.',
   INVALID_CALLBACK: '결제 정보가 올바르지 않아 확인하지 못했습니다.',
+  ORDER_NOT_FOUND: '주문을 찾을 수 없습니다. 결제가 진행됐다면 주문 내역에서 확인해 주세요.',
 };
 
 export default async function CheckoutFailPage({
