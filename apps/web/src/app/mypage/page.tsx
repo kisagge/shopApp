@@ -168,6 +168,7 @@ export default async function MyPage() {
               { href: '/mypage/orders', label: '주문 내역' },
               { href: '/mypage/wishlist', label: '찜한 상품' },
               { href: '/mypage/points', label: '포인트 내역' },
+              { href: '/mypage/addresses', label: '배송지 관리' },
             ] as const
           ).map((m) => (
             <li key={m.href} className="border-b border-[var(--border)]">
