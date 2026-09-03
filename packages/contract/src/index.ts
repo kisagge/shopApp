@@ -1,3 +1,4 @@
+export * from './shipment';
 export * from './address';
 export * from './common';
 export * from './cart';

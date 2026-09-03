@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
 import { format, won, ORDER_STATUS_LABEL, isCancellableByCustomer } from '@shop/core';
+import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { getOrderForUser } from '~/lib/queries/orders';
 
@@ -25,6 +26,28 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
     </div>
   );
 
+  /**
+   * 이 화면은 주문 직후에도, 나중에 주문 내역에서 들어와도 열린다.
+   * 그래서 문구가 상태를 따라가야 한다 — 배송중인 주문에 "결제가 확인되면
+   * 배송 준비를 시작합니다" 라고 적혀 있으면 무슨 말인지 알 수 없다.
+   */
+  const headline =
+    order.status === 'PENDING'
+      ? '주문이 접수되었습니다'
+      : order.status === 'CANCELLED' || order.status === 'REFUNDED'
+        ? '주문이 종료되었습니다'
+        : '주문 내역';
+
+  const NEXT_STEP: Partial<Record<typeof order.status, string>> = {
+    PENDING: '결제가 확인되면 배송 준비를 시작합니다.',
+    PAID: '곧 배송 준비를 시작합니다.',
+    PREPARING: '상품을 준비하고 있습니다. 출고되면 송장번호를 알려 드립니다.',
+    SHIPPED: '배송이 시작되었습니다. 아래에서 배송 상황을 조회할 수 있습니다.',
+    DELIVERED: '배송이 완료되었습니다. 이상이 없으면 구매를 확정해 주세요.',
+    CONFIRMED: '구매가 확정되었습니다.',
+  };
+  const nextStep = NEXT_STEP[order.status] ?? null;
+
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
       <div className="flex flex-col items-center gap-4 py-12 text-center">
@@ -34,17 +57,31 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         >
           ✓
         </span>
-        <h1 className="font-serif text-2xl font-medium tracking-tight">주문이 접수되었습니다</h1>
+        <h1 className="font-serif text-2xl font-medium tracking-tight">{headline}</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
           현재 상태는 <strong className="font-semibold">{ORDER_STATUS_LABEL[order.status]}</strong>입니다.
-          <br />
-          결제가 확인되면 배송 준비를 시작합니다.
+          {nextStep && (
+            <>
+              <br />
+              {nextStep}
+            </>
+          )}
         </p>
         <p className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--surface)] px-3.5">
           <span className="text-xs text-[var(--fg-muted)]">주문번호</span>
           <span className="tnum text-xs font-semibold">{order.orderNo}</span>
         </p>
       </div>
+
+      {order.shipment && (
+        <div className="border-t border-[var(--border)] pt-6">
+          <TrackingPanel
+            carrier={order.shipment.carrier}
+            trackingNumber={order.shipment.trackingNumber}
+            shippedAt={order.shipment.shippedAt}
+          />
+        </div>
+      )}
 
       <section aria-labelledby="items-title" className="border-t border-[var(--border)] pt-6">
         <h2 id="items-title" className="mb-3.5 text-sm font-semibold">

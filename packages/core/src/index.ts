@@ -4,6 +4,7 @@ export * from './cart';
 export * from './order-state';
 export * from './authz';
 export * from './address';
+export * from './carrier';
 export * from './events';
 export * from './event-rollup';
 export * from './order-number';

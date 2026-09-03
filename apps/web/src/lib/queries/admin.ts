@@ -431,6 +431,7 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       address1: true, address2: true, deliveryMemo: true,
       user: { select: { name: true, email: true, grade: true } },
       payment: { select: { method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true } },
+      shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
       items: {
         ...(scope ? { where: { merchantId: scope } } : {}),
         select: {

@@ -7,6 +7,7 @@ import {
   PAYMENT_STATUS_LABEL, MEMBER_GRADE_LABEL,
   type OrderStatus,
 } from '@shop/core';
+import { ShipmentForm } from './shipment-form';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
@@ -23,6 +24,17 @@ export default async function AdminOrderDetail({
   const { orderNo } = await params;
   const order = await getAdminOrder(actor, orderNo);
   if (!order) notFound();
+
+  /**
+   * 송장 입력은 출고 권한이 있을 때만 보여 준다.
+   *
+   * 이미 배송중·배송완료인 주문에도 보여 준다 — 송장을 잘못 넣는 일은
+   * 흔하고, 고칠 방법이 없으면 고객이 남의 택배를 조회하게 된다.
+   * 취소·환불된 주문에는 의미가 없으므로 감춘다.
+   */
+  const canFulfill =
+    hasPermission(actor, 'order:fulfill') &&
+    !['CANCELLED', 'REFUNDED', 'RETURNED', 'PENDING'].includes(order.status);
 
   // 어떤 전이가 가능한지는 상태머신이 정하고, 그중 권한이 있는 것만 보여 준다.
   const options = nextStatuses(order.status).filter((to) => {
@@ -117,6 +129,17 @@ export default async function AdminOrderDetail({
                 />
                 {order.deliveryMemo && <Row label="요청사항" value={order.deliveryMemo} />}
               </dl>
+
+              {/*
+                송장 등록을 배송 정보 바로 아래에 둔다. 주소를 확인하고
+                송장을 적는 것이 실제 순서다.
+              */}
+              {canFulfill && (
+                <div className="mt-5 border-t border-[var(--border)] pt-5">
+                  <h3 className="mb-3 text-[13px] font-semibold text-[var(--fg)]">송장</h3>
+                  <ShipmentForm orderNo={order.orderNo} current={order.shipment} />
+                </div>
+              )}
             </section>
           </div>
 

@@ -29,6 +29,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
       recipient: true, recipientPhone: true, postalCode: true,
       address1: true, address2: true, deliveryMemo: true,
       payment: { select: { method: true, status: true } },
+      // 배송 조회. 송장이 없으면 null 이고 화면은 그 절을 통째로 감춘다.
+      shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
       items: {
         select: {
           productName: true, brandName: true, optionLabel: true,
