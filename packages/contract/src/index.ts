@@ -1,3 +1,4 @@
+export * from './coupon';
 export * from './return-request';
 export * from './shipment';
 export * from './address';

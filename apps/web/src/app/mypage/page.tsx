@@ -85,10 +85,14 @@ export default async function MyPage() {
             </Link>
           </li>
           <li className="border-l border-[var(--border)]">
-            <span className="flex h-[68px] flex-col items-center justify-center gap-1">
+            {/* 숫자만 보여 주고 갈 곳이 없으면 막다른 길이 된다 — 찜과 같은 이유 */}
+            <Link
+              href="/mypage/coupons"
+              className="flex h-[68px] flex-col items-center justify-center gap-1 text-[var(--fg)] no-underline"
+            >
               <span className="tnum text-[17px] font-semibold">{summary.couponCount}</span>
               <span className="text-[11px] text-[var(--fg-muted)]">쿠폰</span>
-            </span>
+            </Link>
           </li>
           <li className="border-l border-[var(--border)]">
             {/* 숫자만 보여 주고 갈 곳이 없으면 막다른 길이 된다 */}
@@ -169,6 +173,7 @@ export default async function MyPage() {
               { href: '/mypage/wishlist', label: '찜한 상품' },
               { href: '/mypage/points', label: '포인트 내역' },
               { href: '/mypage/addresses', label: '배송지 관리' },
+              { href: '/mypage/coupons', label: '쿠폰함' },
             ] as const
           ).map((m) => (
             <li key={m.href} className="border-b border-[var(--border)]">

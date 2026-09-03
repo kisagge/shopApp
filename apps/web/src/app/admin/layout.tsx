@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 interface NavItem {
   readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners'
-    | '/admin/traffic';
+    | '/admin/traffic' | '/admin/coupons';
   readonly label: string;
   readonly permission: Permission;
 }
@@ -21,6 +21,7 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/orders', label: '주문', permission: 'order:read' },
   { href: '/admin/products', label: '상품', permission: 'product:read' },
   { href: '/admin/banners', label: '배너', permission: 'banner:read' },
+  { href: '/admin/coupons', label: '쿠폰', permission: 'coupon:read' },
   { href: '/admin/settlements', label: '정산', permission: 'settlement:read' },
   { href: '/admin/merchants', label: '가맹점', permission: 'merchant:read' },
   { href: '/admin/users', label: '회원', permission: 'user:read' },

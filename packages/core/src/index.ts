@@ -5,6 +5,7 @@ export * from './order-state';
 export * from './authz';
 export * from './address';
 export * from './carrier';
+export * from './coupon-policy';
 export * from './return-request';
 export * from './events';
 export * from './event-rollup';
