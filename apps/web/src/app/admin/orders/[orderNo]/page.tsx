@@ -5,7 +5,7 @@ import { Badge } from '@shop/ui';
 import {
   format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL,
   PAYMENT_STATUS_LABEL, MEMBER_GRADE_LABEL,
-  type OrderStatus, type PaymentStatusCode,
+  type OrderStatus,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin';
@@ -186,7 +186,7 @@ export default async function AdminOrderDetail({
                     <Row label="결제 수단" value={order.payment.method} small />
                     <Row
                       label="결제 상태"
-                      value={PAYMENT_STATUS_LABEL[order.payment.status as PaymentStatusCode] ?? order.payment.status}
+                      value={PAYMENT_STATUS_LABEL[order.payment.status] ?? order.payment.status}
                       small
                     />
                     {order.payment.pgApprovalNo && (

@@ -17,7 +17,7 @@ env:
 
 jobs:
   verify:
-    name: 타입체크 · 테스트 · 빌드
+    name: 린트 · 타입체크 · 테스트 · 빌드
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -43,6 +43,10 @@ jobs:
           path: .turbo
           key: turbo-${{ runner.os }}-${{ github.sha }}
           restore-keys: turbo-${{ runner.os }}-
+
+      # 린트를 먼저 돌린다. 가장 빠르고, 여기서 걸리는 것은 대개 가장 고치기 쉽다.
+      - name: 린트
+        run: pnpm turbo run lint
 
       - name: 타입체크
         run: pnpm turbo run typecheck

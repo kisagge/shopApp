@@ -31,7 +31,7 @@ export function ReconcileButton({ mismatchCount }: { mismatchCount: number }) {
 
   return (
     <div className="flex flex-col items-end gap-2">
-      <Button type="button" size="md" variant="secondary" disabled={pending || mismatchCount === 0} onClick={run}>
+      <Button type="button" size="md" variant="secondary" disabled={pending || mismatchCount === 0} onClick={() => void run()}>
         {pending ? '대사 중…' : '원장에 맞추기'}
       </Button>
       {message && (

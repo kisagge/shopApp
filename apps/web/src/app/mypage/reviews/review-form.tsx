@@ -76,7 +76,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
   }
 
   return (
-    <form onSubmit={submit} noValidate className="flex flex-col gap-5">
+    <form onSubmit={(e) => void submit(e)} noValidate className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-2 border-0 p-0">
         <legend id={groupId} className="text-xs font-medium text-[var(--fg-secondary)]">
           별점

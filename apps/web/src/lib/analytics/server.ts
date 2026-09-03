@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { fanOut, type CommerceEvent, type EventSink, type TrackedEvent } from '@shop/core';
+import { fanOut, type EventSink, type TrackedEvent } from '@shop/core';
 import type { EventInput } from '@shop/contract';
 import { dbSink } from './sinks/db';
 import { consoleSink } from './sinks/console';
@@ -63,7 +63,7 @@ export function toTrackedEvent(input: EventInput, ctx: CollectionContext): Track
   };
 
   return {
-    name: name as CommerceEvent,
+    name: name,
     occurredAt: new Date(occurredAt),
     sessionId,
     anonymousId,

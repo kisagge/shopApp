@@ -97,7 +97,7 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]>
     select: listSelect,
   });
   const now = Date.now();
-  return rows.map((r) => toListItem(r as ListRow, now));
+  return rows.map((r) => toListItem(r, now));
 }
 
 
@@ -349,7 +349,7 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
   const now = Date.now();
 
   return {
-    items: page.map((r) => toListItem(r as ListRow, now)),
+    items: page.map((r) => toListItem(r, now)),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     total,
     term,

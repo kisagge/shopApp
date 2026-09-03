@@ -224,7 +224,7 @@ export function ImageManager({
         </ol>
       )}
 
-      <form onSubmit={upload} className="flex flex-col gap-3 border-t border-[var(--surface-2)] pt-5">
+      <form onSubmit={(e) => void upload(e)} className="flex flex-col gap-3 border-t border-[var(--surface-2)] pt-5">
         <label htmlFor={fileId} className="text-xs font-medium text-[var(--fg-secondary)]">
           이미지 추가
         </label>

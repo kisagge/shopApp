@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   isReviewableStatus, ratingScore,
-  REVIEW_ERROR_MESSAGE, type ReviewErrorCode, type OrderStatus,
+  REVIEW_ERROR_MESSAGE, type ReviewErrorCode,
 } from '@shop/core';
 import type { CreateReviewInput, UpdateReviewInput } from '@shop/contract';
 
@@ -80,7 +80,7 @@ export async function createReview(
   if (!item) throw new ReviewError('NOT_PURCHASED', 404);
   // 남의 주문 항목 id 를 알아내도 쓸 수 없다
   if (item.order.userId !== userId) throw new ReviewError('NOT_PURCHASED', 403);
-  if (!isReviewableStatus(item.order.status as OrderStatus)) {
+  if (!isReviewableStatus(item.order.status)) {
     throw new ReviewError('NOT_DELIVERED', 409);
   }
   // 운영진이 내린 리뷰는 행이 남아 이 검사에 걸린다 — 다시 올릴 수 없다.

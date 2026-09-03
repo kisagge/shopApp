@@ -9,7 +9,7 @@
       "outputs": [".next/**", "!.next/cache/**", "dist/**"]
     },
     "dev": { "cache": false, "persistent": true },
-    "lint": { "dependsOn": ["^build"] },
+    "lint": { "dependsOn": ["^build"], "outputs": [] },
     "typecheck": { "dependsOn": ["^build"], "outputs": [] },
     "test": { "dependsOn": ["^build"], "outputs": [] },
     "db:generate": { "cache": false }

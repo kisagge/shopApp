@@ -82,7 +82,7 @@ export async function previewSettlements(
 
   const salesBy = new Map(sales.map((s) => [s.merchantId, s]));
   const refundBy = new Map(refunds.map((r) => [r.merchantId, r._sum.subtotal ?? 0]));
-  const statusBy = new Map(existing.map((e) => [e.merchantId, e.status as SettlementStatus]));
+  const statusBy = new Map(existing.map((e) => [e.merchantId, e.status]));
 
   return merchants.map((m) => {
     const sale = salesBy.get(m.id);

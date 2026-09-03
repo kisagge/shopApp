@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
-import { format, won, ORDER_STATUS_LABEL, isCancellableByCustomer, type OrderStatus } from '@shop/core';
+import { format, won, ORDER_STATUS_LABEL, isCancellableByCustomer } from '@shop/core';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { getOrderForUser } from '~/lib/queries/orders';
 
@@ -36,7 +36,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         </span>
         <h1 className="font-serif text-2xl font-medium tracking-tight">주문이 접수되었습니다</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-          현재 상태는 <strong className="font-semibold">{ORDER_STATUS_LABEL[order.status as OrderStatus]}</strong>입니다.
+          현재 상태는 <strong className="font-semibold">{ORDER_STATUS_LABEL[order.status]}</strong>입니다.
           <br />
           결제가 확인되면 배송 준비를 시작합니다.
         </p>
@@ -95,7 +95,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
       </section>
 
       <div className="mt-10 flex flex-col gap-3">
-        {isCancellableByCustomer(order.status as OrderStatus) && (
+        {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}
         <div className="flex gap-2">

@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { previewSettlements, closeSettlements, paySettlement, SettlementCloseError } =
+const { previewSettlements, closeSettlements, paySettlement } =
   await import('~/lib/admin/close-settlement');
 
 const superAdmin: Actor = { id: 'u-s', role: 'SUPER_ADMIN', merchantId: null };

@@ -9,6 +9,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -31,6 +32,7 @@
     "@types/react-dom": "19.2.2",
     "@vitejs/plugin-react": "6.1.1",
     "axe-core": "4.13.0",
+    "eslint": "10.9.1",
     "jsdom": "30.0.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",

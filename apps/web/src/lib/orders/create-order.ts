@@ -275,5 +275,8 @@ function isOrderNoConflict(error: unknown): boolean {
   const e = error as { code?: string; meta?: { target?: unknown } };
   if (e?.code !== 'P2002') return false;
   const target = e.meta?.target;
-  return Array.isArray(target) ? target.includes('orderNo') : String(target ?? '').includes('orderNo');
+  // 문자열이 아닌 값에 String() 을 씌우면 "[object Object]" 가 되어
+  // 'orderNo' 를 절대 못 찾는다. 그러면 재시도가 조용히 실패한다.
+  if (Array.isArray(target)) return target.includes('orderNo');
+  return typeof target === 'string' && target.includes('orderNo');
 }

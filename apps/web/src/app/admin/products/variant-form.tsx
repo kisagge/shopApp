@@ -41,7 +41,7 @@ export function VariantForm({ productId }: { productId: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate aria-labelledby={headingId} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void onSubmit(e)} noValidate aria-labelledby={headingId} className="flex flex-col gap-4">
       <h3 id={headingId} className="text-xs font-semibold tracking-wide text-[var(--fg-secondary)]">
         옵션 추가
       </h3>

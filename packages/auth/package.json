@@ -10,6 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "vitest run",
     "seed": "tsx src/seed-users.ts"
   },
@@ -20,9 +21,10 @@
   },
   "devDependencies": {
     "@shop/config": "workspace:*",
-    "typescript": "6.0.3",
-    "vitest": "4.1.11",
     "dotenv": "17.2.3",
-    "tsx": "4.23.13"
+    "eslint": "10.9.1",
+    "tsx": "4.23.13",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
   }
 }

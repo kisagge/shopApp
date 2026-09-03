@@ -52,17 +52,27 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState('');
 
-  async function send(key: string, url: string, init: RequestInit): Promise<any> {
+  /**
+   * 요청 하나를 보내고 결과를 돌려준다. 실패하면 화면에 사유를 띄우고 null.
+   *
+   * 응답 모양이 호출마다 달라 (배너 하나 / 배너 목록 / 삭제 확인) 제네릭으로
+   * 받는다. any 로 두면 setBanners 에 아무 값이나 넣어도 조용히 통과한다.
+   */
+  async function send<T>(key: string, url: string, init: RequestInit): Promise<T | null> {
     setBusy(key);
     setError(null);
     try {
       const response = await fetch(url, init);
-      const data = await response.json();
+      const data: unknown = await response.json();
       if (!response.ok) {
-        setError(typeof data?.message === 'string' ? data.message : '처리하지 못했습니다.');
+        const message =
+          typeof data === 'object' && data !== null && 'message' in data
+            ? (data as { message?: unknown }).message
+            : undefined;
+        setError(typeof message === 'string' ? message : '처리하지 못했습니다.');
         return null;
       }
-      return data;
+      return data as T;
     } catch {
       setError('네트워크 오류로 처리하지 못했습니다.');
       return null;
@@ -72,7 +82,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
   }
 
   async function create() {
-    const data = await send('create', '/api/admin/banners', {
+    const data = await send<BannerItem>('create', '/api/admin/banners', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ headline: '새 배너', isActive: false, tone: 'sand' }),
@@ -84,7 +94,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
   }
 
   async function patch(id: string, body: Record<string, unknown>) {
-    const data = await send(`patch-${id}`, `/api/admin/banners/${id}`, {
+    const data = await send<BannerItem>(`patch-${id}`, `/api/admin/banners/${id}`, {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(body),
@@ -105,7 +115,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
     next[index] = b;
     next[target] = a;
 
-    const data = await send('order', '/api/admin/banners', {
+    const data = await send<{ banners: BannerItem[] }>('order', '/api/admin/banners', {
       method: 'PATCH',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ orderedIds: next.map((x) => x.id) }),
@@ -117,7 +127,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
   }
 
   async function remove(banner: BannerItem) {
-    const data = await send(`del-${banner.id}`, `/api/admin/banners/${banner.id}`, {
+    const data = await send<{ ok: boolean }>(`del-${banner.id}`, `/api/admin/banners/${banner.id}`, {
       method: 'DELETE',
     });
     if (!data) return;
@@ -132,7 +142,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
         <p className="text-[12px] text-[var(--fg-muted)]">
           위에 있는 배너가 홈에서 먼저 나옵니다. 노출 중인 배너가 하나면 캐러셀 조작 장치는 그리지 않습니다.
         </p>
-        <Button type="button" size="md" onClick={create} disabled={busy !== null || banners.length >= 6}>
+        <Button type="button" size="md" onClick={() => void create()} disabled={busy !== null || banners.length >= 6}>
           {banners.length >= 6 ? '6개까지' : '배너 추가'}
         </Button>
       </div>

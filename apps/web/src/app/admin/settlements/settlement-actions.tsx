@@ -48,7 +48,7 @@ export function CloseButton({ yearMonth }: { yearMonth: string }) {
           <p className="text-[12px] text-[var(--fg-secondary)]">
             {yearMonth} 정산을 확정합니다. 확정 후에는 금액이 다시 계산되지 않습니다.
           </p>
-          <Button type="button" size="sm" onClick={close}>확정</Button>
+          <Button type="button" size="sm" onClick={() => void close()}>확정</Button>
           <Button type="button" size="sm" variant="ghost" onClick={() => setState('idle')}>
             취소
           </Button>
@@ -115,7 +115,7 @@ export function PayButton({
 
   return (
     <>
-      <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={pay}>
+      <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => void pay()}>
         <span className="sr-only">{merchantName} </span>
         {pending ? '처리 중…' : '지급'}
       </Button>

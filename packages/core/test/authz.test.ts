@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
-  hasPermission, assertPermission, ForbiddenError,
-  ownsMerchant, canManageProduct, canViewOrder, canFulfillOrderItem,
+  hasPermission, assertPermission, ForbiddenError, canManageProduct, canViewOrder, canFulfillOrderItem,
   canRefundOrder, canViewSettlement, canAssignRole, canEditUser, merchantScope,
   type Actor,
 } from '../src/authz';

@@ -8,7 +8,6 @@ const css = readFileSync(resolve(process.cwd(), 'src/styles/theme.css'), 'utf8')
 const T = parseOklchTokens(css);
 
 const AA_TEXT = 4.5;      // 본문 크기 텍스트
-const AA_LARGE = 3.0;     // 18.66px+ 굵은 글씨, 24px+ 일반
 const AA_GRAPHIC = 3.0;   // UI 컴포넌트·그래픽 객체 (WCAG 1.4.11)
 
 /**

@@ -57,7 +57,7 @@ export function StockForm({ productId, variants }: { productId: string; variants
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-4">
+    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
       <table>
         <caption className="sr-only">옵션별 재고</caption>
         <thead>

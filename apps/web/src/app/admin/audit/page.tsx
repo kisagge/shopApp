@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { USER_ROLE_LABEL, type UserRole } from '@shop/core';
+import { USER_ROLE_LABEL } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAuditLogs } from '~/lib/queries/audit-log';
 import { Pager } from '../pager';
@@ -188,7 +188,7 @@ export default async function AdminAuditPage({
                       <span className="block text-[13px]">{row.actorName}</span>
                       <span className="block text-[11px] text-[var(--fg-muted)]">
                         {/* 역할은 그 시점 스냅샷이다. 지금 역할이 바뀌었어도 그대로 남는다. */}
-                        {USER_ROLE_LABEL[row.actorRole as UserRole] ?? row.actorRole}
+                        {USER_ROLE_LABEL[row.actorRole] ?? row.actorRole}
                         {row.actorEmail ? ` · ${row.actorEmail}` : ' · 자동 실행'}
                       </span>
                     </td>

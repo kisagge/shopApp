@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma } from '@shop/db';
+import { prisma, Prisma } from '@shop/db';
 import type { EventSink, TrackedEvent } from '@shop/core';
 
 /**
@@ -30,7 +30,14 @@ export const dbSink: EventSink = {
         quantity: e.quantity,
         deviceType: e.deviceType,
         ipHash: e.ipHash,
-        props: e.props as object,
+        /**
+         * props 는 이벤트마다 모양이 다른 자유 형식이라 Readonly 로 들고 있는데,
+         * Prisma 의 Json 입력 타입은 그것을 받지 못한다. 단언이 필요하다.
+         *
+         * eslint 의 no-unnecessary-type-assertion 이 이 단언을 불필요하다고
+         * 판단해 지운 적이 있다 — 지우면 타입이 깨진다.
+         */
+        props: e.props as Prisma.InputJsonValue,
       })),
     });
   },

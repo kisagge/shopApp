@@ -134,18 +134,18 @@ describe('수정', () => {
   });
 
   it('보내지 않은 필드는 UPDATE 문에 싣지 않는다', async () => {
-    await updateBanner(admin, 'b-1', { headline: '새 제목', subcopy: undefined } as never);
+    await updateBanner(admin, 'b-1', { headline: '새 제목', subcopy: undefined });
     expect(Object.keys(db.banner.update.mock.calls[0]?.[0].data)).toEqual(['headline']);
   });
 
   it('명시적 null 은 그대로 실어 보낸다 — 지우려는 뜻이다', async () => {
-    await updateBanner(admin, 'b-1', { subcopy: null } as never);
+    await updateBanner(admin, 'b-1', { subcopy: null });
     expect(db.banner.update.mock.calls[0]?.[0].data).toEqual({ subcopy: null });
   });
 
   it('없는 배너는 404', async () => {
     db.banner.findUnique.mockResolvedValue(null);
-    await expect(updateBanner(admin, 'b-x', { headline: 'x' } as never)).rejects.toMatchObject({
+    await expect(updateBanner(admin, 'b-x', { headline: 'x' })).rejects.toMatchObject({
       code: 'BANNER_NOT_FOUND', status: 404,
     });
   });

@@ -123,7 +123,7 @@ export function CheckoutForm({ defaultAddress }: { defaultAddress: SavedAddress 
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-8" noValidate>
+    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-8" noValidate>
       <section aria-labelledby="addr-title">
         <h2 id="addr-title" className="mb-3.5 text-sm font-semibold">배송지</h2>
         {defaultAddress ? (

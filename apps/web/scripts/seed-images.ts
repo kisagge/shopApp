@@ -17,7 +17,7 @@ import { prisma } from '@shop/db';
 import { imageObjectKey, defaultAlt } from '@shop/core';
 import { placeholder, TONES } from './make-png.mjs';
 
-const TONE_NAMES = Object.keys(TONES) as string[];
+const TONE_NAMES = Object.keys(TONES);
 
 const endpoint = process.env['S3_ENDPOINT'];
 const s3 = new S3Client({

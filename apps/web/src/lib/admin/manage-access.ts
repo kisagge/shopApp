@@ -91,10 +91,10 @@ export async function assignRole(
   });
   if (!target) throw new AccessError('USER_NOT_FOUND', 404);
 
-  if (!canAssignRole(actor, target, input.role as UserRole)) {
+  if (!canAssignRole(actor, target, input.role)) {
     throw new AccessError('CANNOT_CHANGE_OWN_ROLE', 403);
   }
-  if (!canEditUser(actor, { id: target.id, role: target.role as UserRole })) {
+  if (!canEditUser(actor, { id: target.id, role: target.role })) {
     throw new AccessError('CANNOT_EDIT_SUPER_ADMIN', 403);
   }
 

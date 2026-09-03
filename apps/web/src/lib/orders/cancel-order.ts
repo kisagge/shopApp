@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   isCancellableByCustomer, transition, canRefundOrder, ORDER_STATUS_LABEL,
-  type Actor, type OrderStatus, type PaymentGateway,
+  type Actor, type PaymentGateway,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
@@ -52,7 +52,7 @@ export async function cancelOrder(
   // 이미 끝난 주문과 아직 진행 중인데 취소할 수 없는 주문은 다른 이야기다.
   // 둘을 한 메시지로 뭉뚱그리면 "출고된 주문은 취소할 수 없습니다" 가
   // 이미 환불된 주문에도 뜬다.
-  const status = order.status as OrderStatus;
+  const status = order.status;
   if (status === 'CANCELLED' || status === 'REFUNDED') {
     throw new CancelError(
       'ALREADY_CANCELLED',

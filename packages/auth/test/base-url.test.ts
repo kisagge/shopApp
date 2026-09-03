@@ -84,7 +84,7 @@ describe('신뢰 출처', () => {
       VERCEL_BRANCH_URL: 'shop-git-main.vercel.app',
       VERCEL_PROJECT_PRODUCTION_URL: 'shop-app-web-tau.vercel.app',
     });
-    const origins = auth.options.trustedOrigins as string[];
+    const origins = auth.options.trustedOrigins;
     expect(origins).toContain('https://shop-abc123.vercel.app');
     expect(origins).toContain('https://shop-git-main.vercel.app');
     expect(origins).toContain('https://shop-app-web-tau.vercel.app');
@@ -106,7 +106,7 @@ describe('신뢰 출처', () => {
       VERCEL_ENV: 'preview',
       VERCEL_URL: 'preview-abc.vercel.app',
     });
-    const origins = auth.options.trustedOrigins as string[];
+    const origins = auth.options.trustedOrigins;
     expect(origins.length).toBe(new Set(origins).size);
   });
 });

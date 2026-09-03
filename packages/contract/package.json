@@ -8,6 +8,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "test": "vitest run"
   },
   "dependencies": {
@@ -15,8 +16,9 @@
   },
   "devDependencies": {
     "@shop/config": "workspace:*",
+    "@shop/core": "workspace:*",
+    "eslint": "10.9.1",
     "typescript": "6.0.3",
-    "vitest": "4.1.11",
-    "@shop/core": "workspace:*"
+    "vitest": "4.1.11"
   }
 }
