@@ -3,7 +3,9 @@ import type { Actor } from '@shop/core';
 
 const tx = vi.hoisted(() => ({
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
-  order: { update: vi.fn<(...a: any[]) => any>() },
+  order: { updateMany: vi.fn<(...a: any[]) => any>() },
+  pointTransaction: { findFirst: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
+  user: { update: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
@@ -30,6 +32,9 @@ beforeEach(() => {
   db.order.findFirst.mockResolvedValue(mixedOrder());
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.orderItem.updateMany.mockResolvedValue({ count: 1 });
+  // 조건부 UPDATE 가 성공한 경우가 기본. 0건은 그 사이 누가 먼저 처리했다는 뜻이다.
+  tx.order.updateMany.mockResolvedValue({ count: 1 });
+  tx.pointTransaction.findFirst.mockResolvedValue(null);
   tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'PREPARING' }]);
 });
 
@@ -94,7 +99,7 @@ describe('주문 전체는 모든 줄이 도달해야 움직인다', () => {
 
     expect(r.waitingForOthers).toBe(true);
     expect(r.orderStatus).toBe('PAID');
-    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('그래도 누가 무엇을 했는지는 이력에 남긴다', async () => {
@@ -110,8 +115,8 @@ describe('주문 전체는 모든 줄이 도달해야 움직인다', () => {
     const r = await transitionOrder('20260831-1234567', 'SHIPPED', admin);
 
     expect(r.waitingForOthers).toBe(false);
-    expect(tx.order.update.mock.calls[0]![0].data).toMatchObject({ status: 'SHIPPED' });
-    expect(tx.order.update.mock.calls[0]![0].data.shippedAt).toBeInstanceOf(Date);
+    expect(tx.order.updateMany.mock.calls[0]![0].data).toMatchObject({ status: 'SHIPPED' });
+    expect(tx.order.updateMany.mock.calls[0]![0].data.shippedAt).toBeInstanceOf(Date);
   });
 });
 
@@ -156,7 +161,7 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
     const r = await transitionOrder('20260831-1234567', 'PREPARING', merchantB);
 
     expect(r.orderStatus).toBe('PREPARING');
-    expect(tx.order.update.mock.calls[0]![0].data.status).toBe('PREPARING');
+    expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('PREPARING');
   });
 
   it('이행 경로 밖의 상태가 섞이면 주문을 옮기지 않는다', async () => {
@@ -165,7 +170,7 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
 
     const r = await transitionOrder('20260831-1234567', 'PREPARING', merchantA);
     expect(r.waitingForOthers).toBe(true);
-    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
   });
 
   it('주문이 뒤처져 있으면 한 홉을 건너뛰어서라도 따라간다', async () => {
@@ -176,7 +181,7 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
 
     const r = await transitionOrder('20260831-1234567', 'PREPARING', admin);
     expect(r.orderStatus).toBe('SHIPPED');
-    expect(tx.order.update.mock.calls[0]![0].data.status).toBe('SHIPPED');
+    expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('SHIPPED');
   });
 
   it('줄과 주문이 이미 같으면 주문을 건드리지 않는다', async () => {
@@ -184,7 +189,54 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
     tx.orderItem.findMany.mockResolvedValue([{ status: 'PAID' }, { status: 'PAID' }]);
 
     const r = await transitionOrder('20260831-1234567', 'PREPARING', admin);
-    expect(tx.order.update).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
     expect(r.orderStatus).toBe('PAID');
+  });
+});
+
+describe('구매확정 적립', () => {
+  const confirmable = () => ({
+    id: 'o-1', orderNo: '20260831-1234567', status: 'DELIVERED',
+    userId: 'u-1', rewardPoints: 2890,
+    items: [{ id: 'i-1', status: 'DELIVERED', merchantId: 'm-a' }],
+  });
+
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(confirmable());
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'CONFIRMED' }]);
+  });
+
+  it('확정하면 적립을 지급한다', async () => {
+    const r = await transitionOrder('20260831-1234567', 'CONFIRMED', admin);
+
+    expect(r.rewardGranted).toBe(2890);
+    expect(tx.pointTransaction.create.mock.calls[0]?.[0].data).toMatchObject({
+      reason: 'EARN_PURCHASE', amount: 2890,
+    });
+  });
+
+  it('그 사이 다른 요청이 먼저 확정시켰으면 적립하지 않는다', async () => {
+    // 조건부 UPDATE 가 0건 = 내가 확정시킨 것이 아니다.
+    // 그냥 update 였다면 성공한 것처럼 보이고 적립이 두 번 나간다.
+    tx.order.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      transitionOrder('20260831-1234567', 'CONFIRMED', admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_PROCESSED' });
+    expect(tx.pointTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it('확정이 아닌 전이에서는 적립하지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...confirmable(),
+      status: 'PREPARING',
+      items: [{ id: 'i-1', status: 'PREPARING', merchantId: 'm-a' }],
+    });
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'SHIPPED' }]);
+
+    const r = await transitionOrder('20260831-1234567', 'SHIPPED', admin);
+
+    expect(r.rewardGranted).toBe(0);
+    expect(tx.pointTransaction.create).not.toHaveBeenCalled();
   });
 });

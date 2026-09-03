@@ -5,6 +5,7 @@ import {
   slowestFulfillmentStatus,
   type Actor, type OrderStatus,
 } from '@shop/core';
+import { grantPurchaseReward } from '~/lib/orders/grant-reward';
 
 export class TransitionError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -19,6 +20,8 @@ export interface TransitionResult {
   readonly itemsMoved: number;
   /** 다른 가맹점 줄이 남아 주문 전체는 아직 안 움직였는지 */
   readonly waitingForOthers: boolean;
+  /** 구매확정으로 지급된 적립 포인트. 0이면 지급 없음 */
+  readonly rewardGranted: number;
 }
 
 /** 어떤 전이에 어떤 권한이 필요한가 */
@@ -58,6 +61,8 @@ export async function transitionOrder(
     where: { orderNo, ...(scope ? { items: { some: { merchantId: scope } } } : {}) },
     select: {
       id: true, orderNo: true, status: true,
+      // 구매확정 적립에 필요하다
+      userId: true, rewardPoints: true,
       items: { select: { id: true, status: true, merchantId: true } },
     },
   });
@@ -78,6 +83,8 @@ export async function transitionOrder(
       );
     }
   }
+
+  let rewarded: { granted: boolean; amount: number } = { granted: false, amount: 0 };
 
   const result = await prisma.$transaction(async (tx) => {
     const { count } = await tx.orderItem.updateMany({
@@ -116,16 +123,33 @@ export async function transitionOrder(
       if (slowest === 'CONFIRMED') timestamps['confirmedAt'] = new Date();
       if (slowest === 'CANCELLED') timestamps['canceledAt'] = new Date();
 
-      await tx.order.update({
-        where: { id: order.id },
+      /**
+       * 조건부 UPDATE 로 옮긴다.
+       *
+       * 그냥 update 하면 같은 순간 다른 요청이 먼저 확정시켰어도 성공한
+       * 것처럼 보이고, 그 아래 적립이 **두 번** 나간다. 포인트는 돈이고
+       * 한 번 더 준 것은 회수할 수 없다.
+       */
+      const { count: moved } = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
         data: { status: slowest, ...timestamps },
       });
+      if (moved === 0) throw new TransitionError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+
       await tx.orderStatusLog.create({
         data: {
           orderId: order.id, from: order.status, to: slowest,
           actor: actor.id, note: note ?? '어드민에서 변경',
         },
       });
+
+      // 구매확정 적립. 여기까지 왔다는 것은 이 요청이 확정을 만들었다는 뜻이다.
+      if (slowest === 'CONFIRMED') {
+        rewarded = await grantPurchaseReward(tx, {
+          id: order.id, orderNo: order.orderNo,
+          userId: order.userId, rewardPoints: order.rewardPoints,
+        });
+      }
     } else {
       // 주문은 아직 안 움직였어도 누가 무엇을 했는지는 남긴다
       await tx.orderStatusLog.create({
@@ -145,5 +169,6 @@ export async function transitionOrder(
     orderStatus: result.moveOrder && result.slowest ? result.slowest : order.status,
     itemsMoved: result.count,
     waitingForOthers: !result.moveOrder,
+    rewardGranted: rewarded.granted ? rewarded.amount : 0,
   };
 }
