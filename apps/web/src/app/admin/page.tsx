@@ -1,17 +1,28 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { format, ORDER_STATUS_LABEL, USER_ROLE_LABEL } from '@shop/core';
+import { format, won, isDashboardRange, ORDER_STATUS_LABEL, USER_ROLE_LABEL } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getDashboard } from '~/lib/queries/admin';
 import { RevenueChart } from '~/components/admin/revenue-chart';
+import { RangeTabs } from '~/components/admin/range-tabs';
 
 export const metadata: Metadata = { title: '대시보드' };
 export const dynamic = 'force-dynamic';
 
-export default async function AdminDashboard() {
+export default async function AdminDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requireAdmin();
-  const d = await getDashboard(actor);
+
+  // 주소에 아무 값이나 들어올 수 있다. 아는 값이 아니면 기본값으로 되돌린다 —
+  // 오류를 내면 링크를 잘못 눌렀을 뿐인 사람에게 빈 화면을 보여 주게 된다.
+  const raw = (await searchParams)['range'];
+  const range = typeof raw === 'string' && isDashboardRange(raw) ? raw : '7d';
+
+  const d = await getDashboard(actor, range);
 
   return (
     <>
@@ -24,16 +35,19 @@ export default async function AdminDashboard() {
             </p>
           )}
         </div>
-        <p className="text-[13px] text-[var(--fg-muted)]">{USER_ROLE_LABEL[actor.role]}</p>
+        <div className="flex items-center gap-4">
+          <RangeTabs current={range} />
+          <p className="text-[13px] text-[var(--fg-muted)]">{USER_ROLE_LABEL[actor.role]}</p>
+        </div>
       </header>
 
       <main className="flex flex-col gap-5 p-8">
         <section aria-labelledby="kpi-title">
-          <h2 id="kpi-title" className="sr-only">오늘 주요 지표</h2>
+          <h2 id="kpi-title" className="sr-only">{d.rangeLabel} 주요 지표</h2>
           <ul className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <Kpi label="오늘 매출" value={`${format(d.today.revenue)}원`} />
-            <Kpi label="오늘 주문" value={`${d.today.orderCount}건`} />
-            <Kpi label="객단가" value={`${format(d.today.averageOrderValue)}원`} />
+            <Kpi label={`${d.rangeLabel} 매출`} value={`${format(d.period.revenue)}원`} />
+            <Kpi label={`${d.rangeLabel} 주문`} value={`${d.period.orderCount}건`} />
+            <Kpi label="객단가" value={`${format(d.period.averageOrderValue)}원`} />
             {d.funnel ? (
               <Kpi
                 label="구매 전환율"
@@ -55,17 +69,13 @@ export default async function AdminDashboard() {
               <div className="flex flex-col gap-1">
                 <h2 id="chart-title" className="text-base font-semibold">매출 추이</h2>
                 <p className="text-xs text-[var(--fg-muted)]">
-                  최근 7일 · 결제 완료 이후 상태 · 취소·환불 제외
+                  {d.rangeLabel} · 결제 완료 이후 상태 · 취소·환불 제외
                 </p>
               </div>
               <p className="flex items-baseline gap-2">
                 <span className="text-xs text-[var(--fg-muted)]">기간 합계</span>
                 <span className="tnum text-lg font-semibold">
-                  {format(
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    (d.dailyRevenue.reduce((s, r) => s + r.revenue, 0) as any),
-                  )}
-                  원
+                  {format(won(d.dailyRevenue.reduce((s, r) => s + r.revenue, 0)))}원
                 </span>
               </p>
             </div>

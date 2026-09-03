@@ -188,3 +188,61 @@ export interface DailyFunnelStep {
   readonly step: string;
   readonly sessions: number;
 }
+
+// ── 대시보드 조회 기간 ────────────────────────────────────────
+
+/**
+ * 대시보드가 고를 수 있는 기간.
+ *
+ * 90일이 상한인 이유는 **원본 보존 기간과 같기 때문이다.** 그보다 긴 구간을
+ * 원본에서 세면 지워진 날이 조용히 0으로 잡혀서, 트래픽이 줄어든 것처럼
+ * 보인다. 긴 구간은 접힌 값을 보는 별도 화면이 맡는다.
+ */
+export const DASHBOARD_RANGE = ['1d', '7d', '30d', '90d'] as const;
+export type DashboardRange = (typeof DASHBOARD_RANGE)[number];
+
+export const DASHBOARD_RANGE_LABEL: Readonly<Record<DashboardRange, string>> = {
+  '1d': '오늘',
+  '7d': '7일',
+  '30d': '30일',
+  '90d': '90일',
+};
+
+export const DASHBOARD_RANGE_DAYS: Readonly<Record<DashboardRange, number>> = {
+  '1d': 1,
+  '7d': 7,
+  '30d': 30,
+  '90d': 90,
+};
+
+export function isDashboardRange(value: string): value is DashboardRange {
+  return (DASHBOARD_RANGE as readonly string[]).includes(value);
+}
+
+/**
+ * 기간의 시작 시각 (KST 자정).
+ *
+ * `days` 는 오늘을 포함해서 센다. 7일이면 오늘 + 앞 6일이다.
+ * 오늘을 빼면 "최근 7일" 표에 오늘 매출이 안 잡혀서 오전 내내 0으로 보인다.
+ */
+export function rangeStart(range: DashboardRange, now: Date): Date {
+  const days = DASHBOARD_RANGE_DAYS[range];
+  const todayStart = dayWindow(dayKeyOf(now)).start;
+  return new Date(todayStart.getTime() - (days - 1) * DAY_MS);
+}
+
+/**
+ * 접힌 값으로 볼 월 목록. 최근 것이 앞에 온다.
+ *
+ * 'YYYY-MM' 형식이며 이번 달도 포함한다 — 진행 중인 달을 빼면 이번 달
+ * 트래픽을 어디서도 볼 수 없다.
+ */
+export function recentMonths(now: Date, count: number): string[] {
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  const months: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const d = new Date(Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth() - i, 1));
+    months.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+}

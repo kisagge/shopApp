@@ -8,6 +8,11 @@ import {
   deletableThrough,
   RollupError,
   MAX_DAYS_PER_RUN,
+  RAW_RETENTION_DAYS,
+  DASHBOARD_RANGE_DAYS,
+  isDashboardRange,
+  rangeStart,
+  recentMonths,
 } from '../src/event-rollup';
 
 /** KST 자정 = 전날 UTC 15:00 */
@@ -138,5 +143,50 @@ describe('원본 삭제 경계 — 접힌 날만 지운다', () => {
     expect(deletableThrough({ lastRolledUp: '2026-08-10', now: later, retentionDays: 90 })).toBe(
       '2026-08-10',
     );
+  });
+});
+
+describe('대시보드 기간', () => {
+  const now = new Date('2026-09-03T10:00:00+09:00');
+
+  it('오늘을 포함해서 센다 — 빼면 오전 내내 0으로 보인다', () => {
+    expect(rangeStart('1d', now).toISOString()).toBe('2026-09-02T15:00:00.000Z'); // 9/3 00:00 KST
+    expect(rangeStart('7d', now).toISOString()).toBe('2026-08-27T15:00:00.000Z'); // 8/28 00:00 KST
+  });
+
+  it('시작은 KST 자정이다', () => {
+    // 9/3 10:00 에 봐도 시작은 그날 자정이지 24시간 전이 아니다
+    const start = rangeStart('1d', now);
+    expect(start.getTime()).toBeLessThan(now.getTime());
+    expect(dayKeyOf(start)).toBe('2026-09-03');
+  });
+
+  it('상한은 원본 보존 기간과 같다 — 더 길면 지워진 날이 0으로 잡힌다', () => {
+    expect(DASHBOARD_RANGE_DAYS['90d']).toBe(RAW_RETENTION_DAYS);
+  });
+
+  it('아는 기간만 받는다', () => {
+    expect(isDashboardRange('7d')).toBe(true);
+    expect(isDashboardRange('1y')).toBe(false);
+    expect(isDashboardRange('')).toBe(false);
+  });
+});
+
+describe('월 목록', () => {
+  it('이번 달을 포함해 최근 것부터 준다', () => {
+    expect(recentMonths(new Date('2026-09-03T10:00:00+09:00'), 3)).toEqual([
+      '2026-09', '2026-08', '2026-07',
+    ]);
+  });
+
+  it('연을 넘어간다', () => {
+    expect(recentMonths(new Date('2026-01-15T10:00:00+09:00'), 3)).toEqual([
+      '2026-01', '2025-12', '2025-11',
+    ]);
+  });
+
+  it('KST 기준이다 — UTC 로 보면 달이 바뀌는 시각', () => {
+    // 9/1 08:00 KST = 8/31 23:00 UTC. UTC 로 보면 8월이지만 한국은 9월이다.
+    expect(recentMonths(new Date('2026-09-01T08:00:00+09:00'), 1)).toEqual(['2026-09']);
   });
 });

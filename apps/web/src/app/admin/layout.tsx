@@ -8,13 +8,16 @@ export const dynamic = 'force-dynamic';
 
 interface NavItem {
   readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
-    | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners';
+    | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners'
+    | '/admin/traffic';
   readonly label: string;
   readonly permission: Permission;
 }
 
 const NAV: readonly NavItem[] = [
   { href: '/admin', label: '대시보드', permission: 'admin:access' },
+  // 전체 트래픽이라 가맹점에게는 보이지 않는다
+  { href: '/admin/traffic', label: '트래픽', permission: 'analytics:all' },
   { href: '/admin/orders', label: '주문', permission: 'order:read' },
   { href: '/admin/products', label: '상품', permission: 'product:read' },
   { href: '/admin/banners', label: '배너', permission: 'banner:read' },

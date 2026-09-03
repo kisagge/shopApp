@@ -52,6 +52,9 @@ export const PERMISSION = [
   'settlement:pay',     // 실제 지급 집행
   'review:write',
   'review:moderate',
+  // 전체 트래픽 지표. 가맹점은 자기 매출만 보고 플랫폼 전체 방문·전환은 못 본다 —
+  // 다른 가맹점의 성과를 역산할 수 있는 값이다.
+  'analytics:all',
 ] as const;
 export type Permission = (typeof PERMISSION)[number];
 
@@ -80,6 +83,7 @@ const ADMIN: readonly Permission[] = [
   'banner:read', 'banner:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:moderate',
+  'analytics:all',
 ];
 
 const SUPER_ADMIN: readonly Permission[] = PERMISSION;

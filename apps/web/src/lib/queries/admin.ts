@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
   merchantScope, computeFunnel, won, FUNNEL_STEP, assertPermission,
-  type Actor, type Won, type OrderStatus, type FunnelStepResult,
+  rangeStart, DASHBOARD_RANGE_LABEL, RAW_RETENTION_DAYS, recentMonths, dayKeyOf,
+  type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
 } from '@shop/core';
 
 /**
@@ -34,14 +35,6 @@ function scopeOf(actor: Actor): string | null {
   if (scope === undefined) throw new ScopeError();
   return scope;
 }
-
-const startOfToday = (): Date => {
-  // KST 기준 오늘. UTC 로 자르면 한국 시간 오전 9시 전 주문이 어제로 잡힌다.
-  const now = new Date();
-  const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  kst.setUTCHours(0, 0, 0, 0);
-  return new Date(kst.getTime() - 9 * 60 * 60 * 1000);
-};
 
 export interface DashboardKpi {
   readonly revenue: Won;
@@ -78,7 +71,10 @@ export interface DailyRevenue {
 
 export interface Dashboard {
   readonly scope: string | null;
-  readonly today: DashboardKpi;
+  readonly range: DashboardRange;
+  /** '최근 7일' 처럼 화면에 그대로 쓰는 문구 */
+  readonly rangeLabel: string;
+  readonly period: DashboardKpi;
   readonly todo: DashboardTodo;
   readonly topProducts: readonly TopProduct[];
   readonly recentOrders: readonly RecentOrder[];
@@ -87,10 +83,20 @@ export interface Dashboard {
   readonly funnel: readonly FunnelStepResult[] | null;
 }
 
-export async function getDashboard(actor: Actor): Promise<Dashboard> {
+export async function getDashboard(
+  actor: Actor,
+  range: DashboardRange = '1d',
+  now: Date = new Date(),
+): Promise<Dashboard> {
   const scope = scopeOf(actor);
-  const since = startOfToday();
-  const sevenDaysAgo = new Date(since.getTime() - 6 * 24 * 60 * 60 * 1000);
+
+  /**
+   * 기간의 시작. 오늘을 포함해서 센다.
+   *
+   * 90일까지만 고를 수 있다 — 원본 이벤트 보존 기간과 같다. 더 긴 구간을
+   * 원본에서 세면 지워진 날이 조용히 0으로 잡혀 트래픽이 줄어든 것처럼 보인다.
+   */
+  const since = rangeStart(range, now);
 
   const orderWhere = (from: Date) => ({
     status: { in: [...REVENUE_STATUSES] },
@@ -112,10 +118,10 @@ export async function getDashboard(actor: Actor): Promise<Dashboard> {
         })
       : Promise.resolve(null),
     loadTodo(scope),
-    loadTopProducts(scope, sevenDaysAgo),
+    loadTopProducts(scope, since),
     loadRecentOrders(scope),
-    loadDailyRevenue(scope, sevenDaysAgo),
-    scope === null ? loadFunnel(sevenDaysAgo) : Promise.resolve(null),
+    loadDailyRevenue(scope, since),
+    scope === null ? loadFunnel(since) : Promise.resolve(null),
   ]);
 
   const revenue = won(
@@ -125,7 +131,10 @@ export async function getDashboard(actor: Actor): Promise<Dashboard> {
 
   return {
     scope,
-    today: {
+    range,
+    rangeLabel:
+      range === '1d' ? '오늘' : `최근 ${DASHBOARD_RANGE_LABEL[range]}`,
+    period: {
       revenue,
       orderCount,
       averageOrderValue: won(orderCount === 0 ? 0 : Math.floor(revenue / orderCount)),
@@ -247,6 +256,83 @@ async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
   }
 
   return computeFunnel([...bySession].map(([sessionId, names]) => ({ sessionId, names })));
+}
+
+// ── 장기 트래픽 추이 (접힌 값) ────────────────────────────────
+
+export interface MonthlyTraffic {
+  /** 'YYYY-MM' */
+  readonly month: string;
+  /** 상품 조회 이벤트 수 */
+  readonly viewItems: number;
+  /** 장바구니 담기 이벤트 수 */
+  readonly addToCarts: number;
+  /** 결제 완료 이벤트 수 */
+  readonly purchases: number;
+  /** 조회 대비 결제 비율(%). 소수 첫째 자리 */
+  readonly conversionRate: number;
+}
+
+export interface TrafficHistory {
+  readonly months: readonly MonthlyTraffic[];
+  /** 원본이 남아 있는 가장 이른 날. 이보다 앞은 접힌 값만 있다. */
+  readonly rawSince: string;
+}
+
+/**
+ * 월별 트래픽. **접힌 값(EventDaily)에서 읽는다.**
+ *
+ * 원본은 90일이 지나면 지워지므로 그보다 긴 구간은 여기서만 볼 수 있다.
+ * 이 표가 접힌 값을 읽는 유일한 자리이고, 롤업이 존재하는 이유다.
+ *
+ * **세션 수를 쓰지 않는다.** 접힌 세션 수는 하루 단위 고유값이라 날짜끼리
+ * 더하면 이틀에 걸쳐 온 세션이 두 번 세어진다. 여기서는 날짜끼리 더해도
+ * 되는 **이벤트 수**만 쓰고, 전환율도 이벤트 기준이라고 이름에 적는다.
+ * 세션 기준 전환율이 필요하면 90일 안쪽에서 퍼널을 봐야 한다.
+ */
+export async function getTrafficHistory(
+  actor: Actor,
+  monthCount = 12,
+  now: Date = new Date(),
+): Promise<TrafficHistory> {
+  // 전체 트래픽 지표다. 가맹점에게는 주지 않는다.
+  assertPermission(actor, 'analytics:all');
+
+  const months = recentMonths(now, monthCount);
+  const oldest = months.at(-1)!;
+  const rows = await prisma.eventDaily.findMany({
+    where: {
+      day: { gte: new Date(`${oldest}-01T00:00:00.000Z`) },
+      name: { in: ['view_item', 'add_to_cart', 'purchase'] },
+    },
+    select: { day: true, name: true, events: true },
+  });
+
+  const byMonth = new Map<string, { view_item: number; add_to_cart: number; purchase: number }>();
+  for (const month of months) byMonth.set(month, { view_item: 0, add_to_cart: 0, purchase: 0 });
+
+  for (const row of rows) {
+    // DATE 컬럼은 UTC 자정으로 저장돼 있고 그 값이 곧 KST 날짜다
+    const month = row.day.toISOString().slice(0, 7);
+    const bucket = byMonth.get(month);
+    if (!bucket) continue;
+    bucket[row.name as keyof typeof bucket] += row.events;
+  }
+
+  return {
+    months: months.map((month) => {
+      const b = byMonth.get(month)!;
+      return {
+        month,
+        viewItems: b.view_item,
+        addToCarts: b.add_to_cart,
+        purchases: b.purchase,
+        conversionRate:
+          b.view_item === 0 ? 0 : Math.round((b.purchase / b.view_item) * 1000) / 10,
+      };
+    }),
+    rawSince: dayKeyOf(new Date(now.getTime() - RAW_RETENTION_DAYS * 24 * 60 * 60 * 1000)),
+  };
 }
 
 void Prisma;
