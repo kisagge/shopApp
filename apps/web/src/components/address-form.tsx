@@ -195,6 +195,12 @@ export function AddressForm({
         />
       </div>
 
+      {/*
+        버튼을 입력칸 옆에 맞춘다.
+        Field 는 라벨·입력·힌트를 세로로 쌓으므로 items-end 로 묶으면
+        **힌트까지 포함한 아래**가 기준이 되어 버튼이 입력칸보다 내려간다.
+        힌트를 빼고 형식은 placeholder 로 보여 주면 두 요소의 아래가 맞는다.
+      */}
       <div className="flex items-end gap-2">
         <Field
           label="우편번호"
@@ -203,7 +209,7 @@ export function AddressForm({
           inputMode="numeric"
           maxLength={5}
           autoComplete="postal-code"
-          hint="5자리 숫자"
+          placeholder="12345"
           className="w-[140px]"
           value={postalCode}
           onChange={(e) => setPostalCode(e.target.value.replace(/\D/g, '').slice(0, 5))}
