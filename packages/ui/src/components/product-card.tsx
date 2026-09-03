@@ -43,6 +43,14 @@ export interface ProductCardProps {
    * Next 앱에서는 next/link 를 넘겨 클라이언트 내비게이션과 프리페치를 쓴다.
    */
   readonly linkComponent?: LinkLike;
+  /**
+   * 찜 버튼 자리.
+   *
+   * 버튼을 여기서 직접 만들지 않고 받아 끼운다 — 이 패키지는 표현만 맡고
+   * 세션·요청 같은 앱의 관심사를 모른다. linkComponent 와 같은 결이다.
+   * 링크 **바깥**에 그려지므로 카드 이동과 키보드 순서가 꼬이지 않는다.
+   */
+  readonly wishlistButton?: ReactNode;
   readonly className?: string;
 }
 
@@ -59,11 +67,14 @@ const TONE = {
 export function ProductCard({
   href, brand, name, price, listPrice, discountPercent,
   rating, reviewCount, soldOut = false, isNew = false,
-  image, placeholderTone = 'sand', linkComponent, className,
+  image, placeholderTone = 'sand', linkComponent, wishlistButton, className,
 }: ProductCardProps) {
   const Link = linkComponent ?? DefaultLink;
   return (
     <article className={cn('relative flex flex-col gap-2.5', className)}>
+      {wishlistButton && (
+        <div className="absolute top-2 right-2 z-10">{wishlistButton}</div>
+      )}
       <Link href={href} className="flex flex-col gap-2.5 no-underline">
         <div
           className={cn(

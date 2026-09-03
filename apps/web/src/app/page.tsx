@@ -1,12 +1,8 @@
-import { ProductCard } from '@shop/ui';
 import { getFeaturedProducts } from '~/lib/queries/products';
 import { getLiveBanners } from '~/lib/admin/manage-banner';
 import { HomeBanners } from '~/components/home-banners';
+import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
-import { AppLink } from '~/components/app-link';
-
-/** 이미지를 아직 안 올린 상품의 자리 색. 올리면 이 자리에 사진이 들어간다. */
-const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
 
 /**
  * 지금은 매 요청마다 DB를 읽는다.
@@ -50,27 +46,9 @@ export default async function HomePage() {
           </h2>
         </div>
         <TrackedProductList listId="home_editors_pick" itemCount={products.length}>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4 xl:grid-cols-5">
-            {products.map((p, i) => (
-              <li key={p.slug} data-product-id={p.id}>
-                <ProductCard
-                  href={`/product/${p.slug}`}
-                  linkComponent={AppLink}
-                  brand={p.brand}
-                  name={p.name}
-                  price={p.price}
-                  listPrice={p.listPrice}
-                  discountPercent={p.discountPercent}
-                  rating={p.rating}
-                  reviewCount={p.reviewCount}
-                  soldOut={p.soldOut}
-                  isNew={p.isNew}
-                  image={p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined}
-                  placeholderTone={TONES[i % TONES.length] ?? 'sand'}
-                />
-              </li>
-            ))}
-          </ul>
+          <ProductGrid products={products}
+            columns="lg:grid-cols-4 xl:grid-cols-5"
+          />
         </TrackedProductList>
       </section>
     </div>

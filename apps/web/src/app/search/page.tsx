@@ -1,17 +1,14 @@
 import type { Metadata } from 'next';
-import { ProductCard } from '@shop/ui';
 import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultHint, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
 import { searchProducts } from '~/lib/queries/products';
+import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { TrackedSearch } from '~/components/tracked-search';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
-import { AppLink } from '~/components/app-link';
 
 export const dynamic = 'force-dynamic';
-
-const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -87,27 +84,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             page && (
               <>
                 <TrackedProductList listId="search_results" itemCount={page.items.length}>
-                  <ul className="mt-8 grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4 xl:grid-cols-5">
-                    {page.items.map((p, i) => (
-                      <li key={p.slug} data-product-id={p.id}>
-                        <ProductCard
-                          href={`/product/${p.slug}`}
-                          linkComponent={AppLink}
-                          brand={p.brand}
-                          name={p.name}
-                          price={p.price}
-                          listPrice={p.listPrice}
-                          discountPercent={p.discountPercent}
-                          rating={p.rating}
-                          reviewCount={p.reviewCount}
-                          soldOut={p.soldOut}
-                          isNew={p.isNew}
-                          image={p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined}
-                          placeholderTone={TONES[i % TONES.length] ?? 'sand'}
-                        />
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="mt-8">
+                    <ProductGrid products={page.items} columns="lg:grid-cols-4 xl:grid-cols-5" />
+                  </div>
                 </TrackedProductList>
 
                 <CatalogPager basePath="/search" params={raw} nextCursor={page.nextCursor} />

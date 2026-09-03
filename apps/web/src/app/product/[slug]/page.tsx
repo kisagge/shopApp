@@ -9,6 +9,8 @@ import { getProductBySlug } from '~/lib/queries/products';
 import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
 import { ProductOptions } from '~/components/product-options';
 import { ReviewSection } from '~/components/review-section';
+import { WishlistButton } from '~/components/wishlist-button';
+import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,9 +36,10 @@ export default async function ProductPage({ params }: Params) {
 
   // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
   const viewer = await getSessionUser(await headers());
-  const [summary, reviews] = await Promise.all([
+  const [summary, reviews, wishlisted] = await Promise.all([
     getReviewSummary(product.id),
     getProductReviews(product.id, { viewerId: viewer?.id }),
+    viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
   ]);
 
   return (
@@ -73,7 +76,16 @@ export default async function ProductPage({ params }: Params) {
             <Link href={`/category/${product.categorySlug}`} className="text-[11px] font-medium tracking-[0.1em] text-[var(--fg-secondary)]">
               {product.brand}
             </Link>
-            <h1 className="text-xl leading-snug font-semibold tracking-tight md:text-[26px]">{product.name}</h1>
+            <div className="flex items-start justify-between gap-4">
+              <h1 className="text-xl leading-snug font-semibold tracking-tight md:text-[26px]">{product.name}</h1>
+              <WishlistButton
+                productId={product.id}
+                productName={product.name}
+                initialWishlisted={wishlisted.has(product.id)}
+                loggedIn={viewer !== null}
+                size="md"
+              />
+            </div>
             {product.rating !== undefined && (
               <p className="flex items-center gap-1.5 text-[13px] text-[var(--fg-secondary)]">
                 <span aria-hidden="true" className="text-warning-graphic">★</span>

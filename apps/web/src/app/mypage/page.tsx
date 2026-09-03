@@ -91,10 +91,14 @@ export default async function MyPage() {
             </span>
           </li>
           <li className="border-l border-[var(--border)]">
-            <span className="flex h-[68px] flex-col items-center justify-center gap-1">
+            {/* 숫자만 보여 주고 갈 곳이 없으면 막다른 길이 된다 */}
+            <Link
+              href="/mypage/wishlist"
+              className="flex h-[68px] flex-col items-center justify-center gap-1 text-[var(--fg)] no-underline"
+            >
               <span className="tnum text-[17px] font-semibold">{summary.wishlistCount}</span>
-              <span className="text-[11px] text-[var(--fg-muted)]">좋아요</span>
-            </span>
+              <span className="text-[11px] text-[var(--fg-muted)]">찜</span>
+            </Link>
           </li>
         </ul>
       </section>
@@ -162,6 +166,7 @@ export default async function MyPage() {
           {(
             [
               { href: '/mypage/orders', label: '주문 내역' },
+              { href: '/mypage/wishlist', label: '찜한 상품' },
               { href: '/mypage/points', label: '포인트 내역' },
             ] as const
           ).map((m) => (

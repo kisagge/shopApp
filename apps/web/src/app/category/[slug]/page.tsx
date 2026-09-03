@@ -1,18 +1,15 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { ProductCard } from '@shop/ui';
 import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultHint } from '@shop/core';
 import { getCategoryWithChildren, searchProducts } from '~/lib/queries/products';
+import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
-import { AppLink } from '~/components/app-link';
 
 export const dynamic = 'force-dynamic';
-
-const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
 
 interface Params {
   params: Promise<{ slug: string }>;
@@ -121,27 +118,8 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           </div>
         ) : (
           <TrackedProductList listId={`category_${category.slug}`} itemCount={products.length}>
-            <ul className="grid grid-cols-2 gap-x-3 gap-y-8 md:grid-cols-3 md:gap-x-6 md:gap-y-9 lg:grid-cols-4">
-              {products.map((p, i) => (
-                <li key={p.slug} data-product-id={p.id}>
-                  <ProductCard
-                    href={`/product/${p.slug}`}
-                    linkComponent={AppLink}
-                    brand={p.brand}
-                    name={p.name}
-                    price={p.price}
-                    listPrice={p.listPrice}
-                    discountPercent={p.discountPercent}
-                    rating={p.rating}
-                    reviewCount={p.reviewCount}
-                    soldOut={p.soldOut}
-                    isNew={p.isNew}
-                    image={p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined}
-                    placeholderTone={TONES[i % TONES.length] ?? 'sand'}
-                  />
-                </li>
-              ))}
-            </ul>
+            <ProductGrid products={products}
+            />
           </TrackedProductList>
         )}
 
