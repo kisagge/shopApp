@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { requestReturn, resolveReturn, ReturnError } = await import('~/lib/orders/return-request');
+const { requestReturn, resolveReturn } = await import('~/lib/orders/return-request');
 
 const user = { id: 'u-1' };
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
