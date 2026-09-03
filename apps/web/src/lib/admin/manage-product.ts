@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { canManageProduct, merchantScope, type Actor } from '@shop/core';
+import { canManageProduct, merchantScope, becameAvailable, type Actor } from '@shop/core';
+import { notifyRestocked } from '~/lib/restock/notify';
 import {
   PRODUCT_ERROR_MESSAGE,
   type CreateProductInput, type UpdateProductInput, type UpdateStockInput,
@@ -212,6 +213,30 @@ export async function updateStock(actor: Actor, productId: string, input: Update
       }),
     ),
   );
+
+  /**
+   * 재입고 알림.
+   *
+   * **없다가 생긴 것만** 고른다. "재고가 0보다 크다" 로 판단하면 10에서
+   * 8로 줄이는 평범한 수정에도 알림이 나간다.
+   *
+   * 트랜잭션 밖에서 부르고 실패해도 삼킨다. 재고는 팔기 위한 값이고
+   * 알림은 곁다리다 — 알림이 안 나갔다고 재고 수정이 되돌아가면 안 된다.
+   */
+  const restocked = input.variants
+    .filter((v) => {
+      const was = owned.find((o) => o.id === v.variantId);
+      return was !== undefined && becameAvailable(was.stock, v.stock);
+    })
+    .map((v) => v.variantId);
+
+  if (restocked.length > 0) {
+    try {
+      await notifyRestocked(restocked);
+    } catch (error) {
+      console.error('[restock] 알림 실패', { variantIds: restocked }, error);
+    }
+  }
 
   return {
     before: owned.map((o) => ({ sku: o.sku, stock: o.stock })),

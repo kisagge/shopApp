@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Price } from '@shop/ui';
+import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
 import { useCartStore } from '~/stores/cart';
 import type { ProductDetail } from '~/lib/queries/products';
@@ -13,7 +14,16 @@ import type { ProductDetail } from '~/lib/queries/products';
  * 그 조합에 해당하는 변형을 찾는다. **재고는 변형 단위**라, 색을 고른
  * 순간 어떤 사이즈가 품절인지 달라진다 — 그걸 반영해 버튼을 비활성화한다.
  */
-export function ProductOptions({ product }: { product: ProductDetail }) {
+export function ProductOptions({
+  product,
+  loggedIn,
+  restockOn,
+}: {
+  product: ProductDetail;
+  loggedIn: boolean;
+  /** 이미 재입고 알림을 걸어 둔 옵션 id 들 */
+  restockOn: readonly string[];
+}) {
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -127,6 +137,19 @@ export function ProductOptions({ product }: { product: ProductDetail }) {
         </div>
       )}
 
+      {/*
+        품절된 옵션을 고르면 담기 대신 재입고 알림을 준다.
+        살 수 없는 화면에서 할 수 있는 일이 아무것도 없으면 그냥 떠난다.
+      */}
+      {selected && selected.stock <= 0 ? (
+        <RestockButton
+          variantId={selected.id}
+          optionLabel={selected.label}
+          subscribed={restockOn.includes(selected.id)}
+          loggedIn={loggedIn}
+        />
+      ) : (
+      <>
       {/* flex 행 안에서는 block(w-full) 을 쓰지 않는다. 두 버튼이 모두
           100% 너비를 요구하면 비율(flex-[1.3])이 눌려 글자가 잘린다. */}
       <div className="flex gap-2">
@@ -168,6 +191,8 @@ export function ProductOptions({ product }: { product: ProductDetail }) {
       <p role="status" aria-live="polite" className="text-center text-xs text-success">
         {added ? '장바구니에 담았습니다' : ''}
       </p>
+      </>
+      )}
     </div>
   );
 }

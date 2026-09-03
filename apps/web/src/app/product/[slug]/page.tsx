@@ -5,6 +5,7 @@ import { Badge, Price } from '@shop/ui';
 import { formatWithUnit } from '@shop/core';
 import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
+import { getSubscribedVariantIds } from '~/lib/restock/query';
 import { getProductBySlug } from '~/lib/queries/products';
 import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
 import { ProductOptions } from '~/components/product-options';
@@ -36,10 +37,14 @@ export default async function ProductPage({ params }: Params) {
 
   // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
   const viewer = await getSessionUser(await headers());
-  const [summary, reviews, wishlisted] = await Promise.all([
+  const [summary, reviews, wishlisted, restockOn] = await Promise.all([
     getReviewSummary(product.id),
     getProductReviews(product.id, { viewerId: viewer?.id }),
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
+    // 품절 옵션에 이미 알림을 걸어 뒀는지. 옵션마다 물으면 옵션 수만큼 쿼리가 나간다.
+    viewer
+      ? getSubscribedVariantIds(viewer.id, product.variants.map((v) => v.id))
+      : Promise.resolve(new Set<string>()),
   ]);
 
   return (
@@ -117,7 +122,11 @@ export default async function ProductPage({ params }: Params) {
             </div>
           </dl>
 
-          <ProductOptions product={product} />
+          <ProductOptions
+            product={product}
+            loggedIn={viewer !== null}
+            restockOn={[...restockOn]}
+          />
         </div>
       </div>
 
