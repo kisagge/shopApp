@@ -145,41 +145,31 @@ export function ownsMerchant(actor: Actor, merchantId: string | null): boolean {
  * 상품을 고칠 수 있는가.
  * merchantId 가 null 인 상품은 자사 직매입이라 운영진만 다룬다.
  */
+/**
+ * **범위 제한은 조회에서 건다.**
+ *
+ * 예전에는 여기에 canViewOrder·canFulfillOrderItem·canViewSettlement 가 있었는데
+ * 앱에서 한 번도 부르지 않았다. 앱은 행을 읽어 놓고 판정하지 않고, 애초에
+ * where 절로 남의 것을 빼고 읽는다 — 그쪽이 더 안전하다. 읽고 나서 막는
+ * 방식은 어딘가에서 그 한 줄을 빠뜨리면 그대로 새고, 실수해도 눈에 띄지
+ * 않는다.
+ *
+ * 여기 있으면서 아무도 쓰지 않는 판정 함수는 **읽는 사람을 속인다** —
+ * 주문 접근이 이 함수를 거치는 줄 알게 된다. 그래서 지웠다.
+ * 실제 범위 제한은 lib/queries/admin.ts 와 lib/orders/* 의 where 절에 있고,
+ * 권한 자체는 각 조회가 assertPermission 으로 확인한다.
+ */
 export function canManageProduct(actor: Actor, product: { merchantId: string | null }): boolean {
   return hasPermission(actor, 'product:write') && ownsMerchant(actor, product.merchantId);
 }
 
-/**
- * 주문을 볼 수 있는가.
- * 고객은 자기 주문만, 가맹점은 자기 상품이 한 줄이라도 들어간 주문만 본다.
- * (한 주문에 여러 가맹점 상품이 섞일 수 있어 줄 단위로 판단한다)
- */
-export function canViewOrder(
-  actor: Actor,
-  order: { userId: string; itemMerchantIds: readonly (string | null)[] },
-): boolean {
-  if (isStaff(actor)) return hasPermission(actor, 'order:read');
-  if (actor.role === 'CUSTOMER') return actor.id === order.userId;
-  if (actor.role === 'MERCHANT') {
-    if (!hasPermission(actor, 'order:read')) return false;
-    return order.itemMerchantIds.includes(actor.merchantId);
-  }
-  return false;
-}
 
-/** 주문 줄을 출고 처리할 수 있는가 */
-export function canFulfillOrderItem(actor: Actor, item: { merchantId: string | null }): boolean {
-  return hasPermission(actor, 'order:fulfill') && ownsMerchant(actor, item.merchantId);
-}
 
 /** 환불은 돈이 나가는 동작이라 가맹점에게 주지 않는다 */
 export function canRefundOrder(actor: Actor): boolean {
   return hasPermission(actor, 'order:refund');
 }
 
-export function canViewSettlement(actor: Actor, settlement: { merchantId: string }): boolean {
-  return hasPermission(actor, 'settlement:read') && ownsMerchant(actor, settlement.merchantId);
-}
 
 /**
  * 권한을 부여할 수 있는가.

@@ -3,7 +3,7 @@ import { prisma, Prisma } from '@shop/db';
 import {
   merchantScope, funnelFromCounts, won, FUNNEL_STEP, assertPermission,
   rangeStart, DASHBOARD_RANGE_LABEL, RAW_RETENTION_DAYS, recentMonths, dayKeyOf,
-  type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
+  type Actor, type Permission, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
   readOrderSearch, readDateRange,
   type ProductStatus,
 } from '@shop/core';
@@ -23,6 +23,21 @@ import {
 const REVENUE_STATUSES: readonly OrderStatus[] = [
   'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CONFIRMED',
 ];
+
+/**
+ * 어드민 조회의 권한 확인.
+ *
+ * **콘솔 진입 권한을 함께 본다.** 고객도 order:read·product:read 를 갖기
+ * 때문에 개별 권한만 확인하면 그대로 통과한다 — requireAdmin 이 정확히 그
+ * 실수로 결함이었고, 여기서 같은 실수를 반복할 뻔했다.
+ *
+ * 범위 제한(where 절)과는 다른 일이다. where 절은 "남의 것을 빼고 읽는다"
+ * 이지 "이 사람이 봐도 되는가" 가 아니다.
+ */
+function assertAdminQuery(actor: Actor, permission: Permission): void {
+  assertPermission(actor, 'admin:access');
+  assertPermission(actor, permission);
+}
 
 export class ScopeError extends Error {
   constructor() {
@@ -90,6 +105,7 @@ export async function getDashboard(
   range: DashboardRange = '1d',
   now: Date = new Date(),
 ): Promise<Dashboard> {
+  assertAdminQuery(actor, 'admin:access');
   const scope = scopeOf(actor);
 
   /**
@@ -409,6 +425,7 @@ export async function getAdminOrders(
     to?: string | undefined;
   } = {},
 ): Promise<Paged<AdminOrderRow>> {
+  assertAdminQuery(actor, 'order:read');
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
@@ -486,6 +503,7 @@ export async function getAdminOrders(
 }
 
 export async function getAdminOrder(actor: Actor, orderNo: string) {
+  assertAdminQuery(actor, 'order:read');
   const scope = scopeOf(actor);
 
   const order = await prisma.order.findFirst({
@@ -562,6 +580,7 @@ export async function getAdminProducts(
   actor: Actor,
   query: { cursor?: string | undefined; take?: number; status?: ProductStatus | undefined } = {},
 ): Promise<Paged<AdminProductRow> & { readonly awaitingReview: number }> {
+  assertAdminQuery(actor, 'product:read');
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
@@ -634,6 +653,7 @@ export interface SettlementRow {
 }
 
 export async function getSettlements(actor: Actor): Promise<SettlementRow[]> {
+  assertAdminQuery(actor, 'settlement:read');
   const scope = scopeOf(actor);
 
   const rows = await prisma.settlement.findMany({
@@ -691,6 +711,7 @@ export async function getAdminProductDetail(
   actor: Actor,
   productId: string,
 ): Promise<AdminProductDetail | null> {
+  assertAdminQuery(actor, 'product:read');
   const scope = scopeOf(actor);
 
   const p = await prisma.product.findFirst({
@@ -749,6 +770,7 @@ export interface MerchantRow {
 }
 
 export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
+  assertAdminQuery(actor, 'merchant:read');
   const scope = scopeOf(actor);
 
   const rows = await prisma.merchant.findMany({

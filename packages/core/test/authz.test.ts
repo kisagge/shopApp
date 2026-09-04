@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
-  hasPermission, assertPermission, ForbiddenError, canManageProduct, canViewOrder, canFulfillOrderItem,
-  canRefundOrder, canViewSettlement, canAssignRole, canEditUser, merchantScope,
+  hasPermission, assertPermission, ForbiddenError, canManageProduct,
+  canRefundOrder, canAssignRole, canEditUser, merchantScope,
   type Actor,
 } from '../src/authz';
 
@@ -86,12 +86,6 @@ describe('가맹점 범위', () => {
     expect(canManageProduct(otherMerchant, { merchantId: 'm-1' })).toBe(false);
   });
 
-  it('자기 정산만 볼 수 있다', () => {
-    expect(canViewSettlement(merchant, { merchantId: 'm-1' })).toBe(true);
-    expect(canViewSettlement(merchant, { merchantId: 'm-2' })).toBe(false);
-    expect(canViewSettlement(admin, { merchantId: 'm-2' })).toBe(true);
-  });
-
   it('목록 쿼리 범위 — 운영진은 제한 없음, 가맹점은 자기 것으로', () => {
     expect(merchantScope(admin)).toBeNull();
     expect(merchantScope(superAdmin)).toBeNull();
@@ -100,28 +94,7 @@ describe('가맹점 범위', () => {
   });
 });
 
-describe('주문 조회 범위', () => {
-  const order = { userId: 'u-1', itemMerchantIds: ['m-1', 'm-2'] };
-
-  it('고객은 자기 주문만 본다', () => {
-    expect(canViewOrder(customer, order)).toBe(true);
-    expect(canViewOrder({ ...customer, id: 'u-99' }, order)).toBe(false);
-  });
-
-  it('가맹점은 자기 상품이 한 줄이라도 들어간 주문을 본다', () => {
-    expect(canViewOrder(merchant, order)).toBe(true);
-    expect(canViewOrder({ id: 'u-9', role: 'MERCHANT', merchantId: 'm-9' }, order)).toBe(false);
-  });
-
-  it('운영진은 모든 주문을 본다', () => {
-    expect(canViewOrder(admin, order)).toBe(true);
-    expect(canViewOrder(superAdmin, order)).toBe(true);
-  });
-
-  it('가맹점은 자기 줄만 출고 처리한다', () => {
-    expect(canFulfillOrderItem(merchant, { merchantId: 'm-1' })).toBe(true);
-    expect(canFulfillOrderItem(merchant, { merchantId: 'm-2' })).toBe(false);
-  });
+describe('환불 권한', () => {
 
   it('환불은 가맹점이 못 한다 — 돈이 나가는 동작이다', () => {
     expect(canRefundOrder(merchant)).toBe(false);
