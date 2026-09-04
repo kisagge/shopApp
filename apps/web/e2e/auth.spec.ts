@@ -92,3 +92,42 @@ test('로그인과 회원가입은 서로 오갈 수 있다', async ({ page }) =
   await main.getByRole('link', { name: '로그인' }).click();
   await expect(page).toHaveURL(/\/login$/);
 });
+
+/**
+ * 비밀번호 재설정.
+ *
+ * 메일을 실제로 받아 볼 수는 없으므로 **토큰이 만들어지는 곳까지**를 본다.
+ * 화면이 서로 이어지는지, 죽은 링크가 다음 행동을 주는지가 여기서 깨지기
+ * 쉬운 부분이다.
+ */
+test('비밀번호 찾기는 가입 여부를 알려 주지 않는다', async ({ page }) => {
+  await page.goto('/forgot-password');
+  await page.getByLabel(/^이메일/).fill('nobody-here@plain.test');
+  await page.getByRole('button', { name: '재설정 링크 받기' }).click();
+
+  // 가입된 주소든 아니든 같은 화면이 나와야 한다
+  await expect(page.getByRole('status')).toContainText('메일을 보냈습니다');
+});
+
+test('토큰 없이 재설정 화면에 오면 다시 받을 길을 준다', async ({ page }) => {
+  await page.goto('/reset-password');
+
+  await expect(page.locator('#main').getByRole('alert')).toContainText('만료');
+  await page.getByRole('link', { name: '링크 다시 받기' }).click();
+  await expect(page).toHaveURL(/\/forgot-password$/);
+});
+
+test('죽은 토큰은 재설정 화면까지 가지 못한다', async ({ page }) => {
+  // 인증 서버가 먼저 토큰을 확인하고 error 를 붙여 돌려보낸다
+  await page.goto('/api/auth/reset-password/made-up-token?callbackURL=/reset-password');
+
+  await expect(page).toHaveURL(/\/reset-password\?error=/);
+  await expect(page.locator('#main').getByRole('alert')).toContainText('올바르지 않거나 만료');
+});
+
+test('로그인 화면에서 비밀번호 찾기로 갈 수 있다', async ({ page }) => {
+  await page.goto('/login');
+  await page.locator('#main').getByRole('link', { name: '비밀번호를 잊으셨나요?' }).click();
+
+  await expect(page).toHaveURL(/\/forgot-password$/);
+});

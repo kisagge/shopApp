@@ -41,3 +41,31 @@ export const signUpSchema = z
   });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
+
+/**
+ * 비밀번호 재설정 폼 계약.
+ *
+ * 여기서는 이메일을 모른다 — 사용자는 메일의 링크로 들어오고 토큰만 들고
+ * 온다. 그래서 "이메일과 비슷한가" 검사를 걸 수 없다. 길이와 확인란만 본다.
+ */
+export const resetPasswordSchema = z
+  .object({
+    password: z
+      .string()
+      .min(PASSWORD_MIN_LENGTH, `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다`)
+      .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 넘을 수 없습니다`),
+    passwordConfirm: z.string(),
+  })
+  .refine((v) => v.password === v.passwordConfirm, {
+    path: ['passwordConfirm'],
+    message: '비밀번호가 일치하지 않습니다',
+  });
+
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+/** 재설정 메일을 요청하는 폼. */
+export const forgotPasswordSchema = z.object({
+  email: z.email('이메일 주소를 정확히 입력해 주세요'),
+});
+
+export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

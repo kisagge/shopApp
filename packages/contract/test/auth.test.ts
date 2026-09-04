@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { signUpSchema } from '../src/auth';
+import { signUpSchema, resetPasswordSchema, forgotPasswordSchema } from '../src/auth';
 
 const valid = {
   email: 'buyer@plain.test',
@@ -46,5 +46,32 @@ describe('가입 계약', () => {
 
   it('이메일 형식을 본다', () => {
     expect(messageAt({ ...valid, email: 'not-an-email' }, 'email')).toBeDefined();
+  });
+});
+
+describe('재설정 계약', () => {
+  const ok = { password: 'quiet-harbor-42', passwordConfirm: 'quiet-harbor-42' };
+
+  it('길이와 확인만 본다 — 여기서는 이메일을 모른다', () => {
+    // 사용자는 메일 링크로 들어오고 토큰만 들고 온다
+    expect(resetPasswordSchema.safeParse(ok).success).toBe(true);
+  });
+
+  it('짧으면 거절한다', () => {
+    const r = resetPasswordSchema.safeParse({ password: 'short7', passwordConfirm: 'short7' });
+    expect(r.success).toBe(false);
+  });
+
+  it('확인이 다르면 확인 칸을 가리킨다', () => {
+    const r = resetPasswordSchema.safeParse({ ...ok, passwordConfirm: 'other-value-1' });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0]?.path[0]).toBe('passwordConfirm');
+  });
+});
+
+describe('찾기 계약', () => {
+  it('이메일 형식만 본다', () => {
+    expect(forgotPasswordSchema.safeParse({ email: 'a@plain.test' }).success).toBe(true);
+    expect(forgotPasswordSchema.safeParse({ email: 'nope' }).success).toBe(false);
   });
 });
