@@ -175,6 +175,7 @@ export default async function MyPage() {
               { href: '/mypage/addresses', label: '배송지 관리' },
               { href: '/mypage/coupons', label: '쿠폰함' },
               { href: '/mypage/restock', label: '재입고 알림' },
+              { href: '/mypage/inquiries', label: '문의 내역' },
             ] as const
           ).map((m) => (
             <li key={m.href} className="border-b border-[var(--border)]">

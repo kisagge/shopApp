@@ -54,8 +54,14 @@ export function isAnswered(inquiry: { answeredAt: Date | null }): boolean {
   return inquiry.answeredAt !== null;
 }
 
-/** 비공개 문의를 남이 볼 때 대신 보여 줄 문구 */
-export const PRIVATE_INQUIRY_PLACEHOLDER = '비공개 문의입니다.';
+/*
+ * 비공개 문의를 남이 볼 때 보여 줄 문구는 여기 없다.
+ *
+ * 예전에는 이 자리에 한국어 한 줄이 있었고 조회가 그 문자열을 본문 대신
+ * 실어 보냈다. 화면이 세 나라 말로 나가면서 그 줄만 한국어로 남는다 —
+ * 조회는 **볼 수 있는지 여부**만 알려 주고, 못 볼 때 뭐라고 적을지는
+ * 화면이 정한다.
+ */
 
 export const INQUIRY_ERROR = {
   PRODUCT_NOT_FOUND: '상품을 찾을 수 없습니다.',

@@ -3,7 +3,7 @@ import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   product: { findFirst: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>() },
-  productInquiry: {
+  inquiry: {
     create: vi.fn<(...a: any[]) => any>(),
     findFirst: vi.fn<(...a: any[]) => any>(),
     findMany: vi.fn<(...a: any[]) => any>(),
@@ -34,10 +34,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.product.findFirst.mockResolvedValue({ id: 'p-1' });
   db.product.findUnique.mockResolvedValue({ brand: { merchantId: 'm-a' } });
-  db.productInquiry.create.mockResolvedValue({ id: 'q-1' });
-  db.productInquiry.findFirst.mockResolvedValue(inquiryRow());
-  db.productInquiry.update.mockResolvedValue({ id: 'q-1', answer: '있습니다' });
-  db.productInquiry.findMany.mockResolvedValue([]);
+  db.inquiry.create.mockResolvedValue({ id: 'q-1' });
+  db.inquiry.findFirst.mockResolvedValue(inquiryRow());
+  db.inquiry.update.mockResolvedValue({ id: 'q-1', answer: '있습니다' });
+  db.inquiry.findMany.mockResolvedValue([]);
 });
 
 describe('문의 작성', () => {
@@ -48,7 +48,7 @@ describe('문의 작성', () => {
 
     // 주문·주문항목을 조회하지 않는다
     expect(db.product.findFirst).toHaveBeenCalled();
-    expect(db.productInquiry.create).toHaveBeenCalled();
+    expect(db.inquiry.create).toHaveBeenCalled();
   });
 
   it('없는 상품에는 남기지 못한다', async () => {
@@ -61,7 +61,7 @@ describe('문의 작성', () => {
 
   it('비공개 여부를 그대로 저장한다', async () => {
     await createInquiry('u-c', { ...input, isPrivate: true });
-    expect(db.productInquiry.create.mock.calls[0]![0].data.isPrivate).toBe(true);
+    expect(db.inquiry.create.mock.calls[0]![0].data.isPrivate).toBe(true);
   });
 });
 
@@ -71,7 +71,7 @@ describe('답변', () => {
   it('자기 상품이면 답한다', async () => {
     const result = await answerInquiry(merchantA, 'q-1', input);
 
-    expect(db.productInquiry.update.mock.calls[0]![0].data).toMatchObject({
+    expect(db.inquiry.update.mock.calls[0]![0].data).toMatchObject({
       answer: '있습니다', answeredById: 'u-a',
     });
     // 알림에 필요한 것을 함께 돌려준다
@@ -82,7 +82,7 @@ describe('답변', () => {
     await expect(answerInquiry(merchantB, 'q-1', input)).rejects.toMatchObject({
       code: 'NOT_ALLOWED', status: 403,
     });
-    expect(db.productInquiry.update).not.toHaveBeenCalled();
+    expect(db.inquiry.update).not.toHaveBeenCalled();
   });
 
   it('고객은 답하지 못한다', async () => {
@@ -95,7 +95,7 @@ describe('답변', () => {
     /*
      * 답이 조용히 바뀌면 물어본 사람은 자기가 본 것이 무엇이었는지 알 수 없다.
      */
-    db.productInquiry.findFirst.mockResolvedValue(inquiryRow({ answeredAt: new Date() }));
+    db.inquiry.findFirst.mockResolvedValue(inquiryRow({ answeredAt: new Date() }));
 
     await expect(answerInquiry(admin, 'q-1', input)).rejects.toMatchObject({
       code: 'ALREADY_ANSWERED', status: 409,
@@ -105,21 +105,21 @@ describe('답변', () => {
 
 describe('삭제', () => {
   beforeEach(() => {
-    db.productInquiry.findFirst.mockResolvedValue({ id: 'q-1', authorId: 'u-c' });
+    db.inquiry.findFirst.mockResolvedValue({ id: 'q-1', authorId: 'u-c' });
   });
 
   it('본인이 지우면 행을 없앤다', async () => {
     await deleteInquiry(customer, 'q-1');
 
-    expect(db.productInquiry.delete).toHaveBeenCalledWith({ where: { id: 'q-1' } });
-    expect(db.productInquiry.update).not.toHaveBeenCalled();
+    expect(db.inquiry.delete).toHaveBeenCalledWith({ where: { id: 'q-1' } });
+    expect(db.inquiry.update).not.toHaveBeenCalled();
   });
 
   it('운영진이 내리면 표시만 한다 — 분쟁 때 원본이 있어야 한다', async () => {
     await deleteInquiry(admin, 'q-1');
 
-    expect(db.productInquiry.update.mock.calls[0]![0].data.deletedAt).toBeInstanceOf(Date);
-    expect(db.productInquiry.delete).not.toHaveBeenCalled();
+    expect(db.inquiry.update.mock.calls[0]![0].data.deletedAt).toBeInstanceOf(Date);
+    expect(db.inquiry.delete).not.toHaveBeenCalled();
   });
 
   it('남은 지우지 못한다', async () => {
@@ -141,7 +141,7 @@ describe('비공개 문의는 서버에서 지운 채 내려간다', () => {
     /*
      * 화면에서 감추기만 하면 HTML 에는 실려 나가고 개발자 도구를 열면 보인다.
      */
-    db.productInquiry.findMany.mockResolvedValue([row()]);
+    db.inquiry.findMany.mockResolvedValue([row()]);
 
     const page = await getProductInquiries('p-1', other);
 
@@ -151,7 +151,7 @@ describe('비공개 문의는 서버에서 지운 채 내려간다', () => {
   });
 
   it('쓴 사람에게는 그대로 준다', async () => {
-    db.productInquiry.findMany.mockResolvedValue([row()]);
+    db.inquiry.findMany.mockResolvedValue([row()]);
 
     const page = await getProductInquiries('p-1', customer);
 
@@ -160,7 +160,7 @@ describe('비공개 문의는 서버에서 지운 채 내려간다', () => {
   });
 
   it('답할 사람에게도 준다', async () => {
-    db.productInquiry.findMany.mockResolvedValue([row()]);
+    db.inquiry.findMany.mockResolvedValue([row()]);
 
     const page = await getProductInquiries('p-1', merchantA);
 
@@ -169,7 +169,7 @@ describe('비공개 문의는 서버에서 지운 채 내려간다', () => {
   });
 
   it('공개 문의는 로그인하지 않아도 그대로 보인다', async () => {
-    db.productInquiry.findMany.mockResolvedValue([row({ isPrivate: false })]);
+    db.inquiry.findMany.mockResolvedValue([row({ isPrivate: false })]);
 
     const page = await getProductInquiries('p-1', null);
 
@@ -178,10 +178,55 @@ describe('비공개 문의는 서버에서 지운 채 내려간다', () => {
   });
 
   it('작성자 이름은 가린다', async () => {
-    db.productInquiry.findMany.mockResolvedValue([row({ isPrivate: false })]);
+    db.inquiry.findMany.mockResolvedValue([row({ isPrivate: false })]);
 
     const page = await getProductInquiries('p-1', null);
 
     expect(page.items[0]!.authorName).toBe('홍○동');
+  });
+});
+
+describe('고객센터로 들어온 문의 — 상품이 없다', () => {
+  const general = { topic: 'DELIVERY' as const, content: '언제 도착하나요', isPrivate: true };
+
+  it('상품을 찾지 않는다 — 물어볼 상품이 없다', async () => {
+    await createInquiry('u-c', general);
+
+    expect(db.product.findFirst).not.toHaveBeenCalled();
+    expect(db.inquiry.create.mock.calls[0]![0].data).toMatchObject({
+      productId: null,
+      topic: 'DELIVERY',
+    });
+  });
+
+  it('상품 문의에는 갈래를 넣지 않는다 — 상품이 이미 그것을 말한다', async () => {
+    await createInquiry('u-c', { productId: 'p-1', content: '재고 있나요', isPrivate: false });
+
+    expect(db.inquiry.create.mock.calls[0]![0].data.topic).toBeNull();
+  });
+
+  describe('누가 답하는가', () => {
+    beforeEach(() => {
+      // 상품이 없으므로 소속도 없다
+      db.inquiry.findFirst.mockResolvedValue(inquiryRow({ product: null }));
+    });
+
+    it('가맹점은 답할 수 없다 — 배송·환불은 플랫폼이 정한다', async () => {
+      await expect(answerInquiry(merchantA, 'q-1', { answer: '곧 갑니다' })).rejects.toThrow();
+      expect(db.inquiry.update).not.toHaveBeenCalled();
+    });
+
+    it('운영진은 답한다', async () => {
+      await answerInquiry(admin, 'q-1', { answer: '오늘 출고됩니다' });
+      expect(db.inquiry.update).toHaveBeenCalled();
+    });
+
+    it('알림에 상품 이름을 지어내지 않는다', async () => {
+      // 이름 자리를 비워 두면 "undefined 문의" 라는 메일이 나간다
+      const answered = await answerInquiry(admin, 'q-1', { answer: '오늘 출고됩니다' });
+
+      expect(answered.productName).toBeNull();
+      expect(answered.productSlug).toBeNull();
+    });
   });
 });

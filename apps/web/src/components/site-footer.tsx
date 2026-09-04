@@ -34,7 +34,13 @@ export async function SiteFooter() {
           입점 신청 입구. 헤더에 두기에는 고객이 쓸 일이 아니고, 아예 없으면
           브랜드가 찾아올 방법이 없다 — 쇼핑몰 푸터의 흔한 자리다.
         */}
-        <p className="mt-6">
+        <p className="mt-6 flex flex-wrap gap-x-6">
+          <Link
+            href="/support"
+            className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+          >
+            {t('support.heading')}
+          </Link>
           <Link
             href="/merchant/apply"
             className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"

@@ -9,6 +9,9 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 const { InquiryForm } = await import('~/components/inquiry-form');
 const { InquirySection } = await import('~/components/inquiry-section');
 
+/** 화면이 넘겨 주는 문구. 조회는 내용을 싣지 않고 여기서만 정해진다. */
+const MASKED = '비공개 문의입니다.';
+
 const fetchMock = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 
 beforeEach(() => {
@@ -62,7 +65,7 @@ describe('문의 작성', () => {
 
 describe('문의 목록', () => {
   it('로그인하지 않으면 양식 대신 안내를 보여 준다', () => {
-    render(<InquirySection productId="p-1" inquiries={[]} loggedIn={false} />);
+    render(<InquirySection productId="p-1" inquiries={[]} loggedIn={false} privateText={MASKED} />);
 
     expect(screen.getByText(/로그인 후 남기실 수 있습니다/)).toBeDefined();
     expect(screen.queryByRole('button', { name: '문의 남기기' })).toBeNull();
@@ -74,6 +77,7 @@ describe('문의 목록', () => {
         productId="p-1"
         inquiries={[inquiry(), inquiry({ id: 'q-2', answeredAt: new Date(), answer: '있습니다' })]}
         loggedIn={false}
+        privateText={MASKED}
       />,
     );
 
@@ -87,6 +91,7 @@ describe('문의 목록', () => {
         productId="p-1"
         inquiries={[inquiry({ isPrivate: true, readable: false, content: '비공개 문의입니다.' })]}
         loggedIn={false}
+        privateText={MASKED}
       />,
     );
 
@@ -96,17 +101,17 @@ describe('문의 목록', () => {
 
   it('내 문의에만 삭제가 붙는다', () => {
     const { rerender } = render(
-      <InquirySection productId="p-1" inquiries={[inquiry()]} loggedIn />,
+      <InquirySection productId="p-1" inquiries={[inquiry()]} loggedIn privateText={MASKED} />,
     );
     expect(screen.queryByRole('button', { name: '내 문의 삭제' })).toBeNull();
 
-    rerender(<InquirySection productId="p-1" inquiries={[inquiry({ isMine: true })]} loggedIn />);
+    rerender(<InquirySection productId="p-1" inquiries={[inquiry({ isMine: true })]} loggedIn privateText={MASKED} />);
     expect(screen.getByRole('button', { name: '내 문의 삭제' })).toBeDefined();
   });
 
   it('답할 수 있는 사람에게만 답변하기가 붙는다', () => {
     render(
-      <InquirySection productId="p-1" inquiries={[inquiry({ canAnswer: true })]} loggedIn />,
+      <InquirySection productId="p-1" inquiries={[inquiry({ canAnswer: true })]} loggedIn privateText={MASKED} />,
     );
     expect(screen.getByRole('button', { name: '답변하기' })).toBeDefined();
   });
@@ -117,6 +122,7 @@ describe('문의 목록', () => {
         productId="p-1"
         inquiries={[inquiry({ canAnswer: true, answeredAt: new Date(), answer: '있습니다' })]}
         loggedIn
+        privateText={MASKED}
       />,
     );
     expect(screen.queryByRole('button', { name: '답변하기' })).toBeNull();

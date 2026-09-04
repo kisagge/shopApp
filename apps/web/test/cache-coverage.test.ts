@@ -21,6 +21,7 @@ const CACHED_READS = [
   'lib/queries/products.ts',
   'lib/queries/reviews.ts',
   'lib/admin/manage-banner.ts',
+  'lib/queries/support.ts',
 ] as const;
 
 /** 카탈로그를 털어야 하는 쓰기 창구 */
@@ -47,6 +48,12 @@ const REVIEW_WRITERS = [
   'app/api/admin/reviews/[id]/restore/route.ts',
 ] as const;
 
+/** 공지·FAQ 를 털어야 하는 쓰기 창구 */
+const SUPPORT_WRITERS = [
+  'app/api/admin/support/route.ts',
+  'app/api/admin/support/[id]/route.ts',
+] as const;
+
 describe('캐싱한 자리', () => {
   it.each(CACHED_READS)('%s 가 캐시를 쓴다', (rel) => {
     expect(read(rel)).toContain('cachedRead');
@@ -71,6 +78,14 @@ describe('캐싱한 자리', () => {
     expect(read('lib/queries/admin-reviews.ts')).not.toContain('cachedRead');
   });
 
+  it('고객센터도 운영진 목록만은 캐싱하지 않는다 — 초안이 보여야 고친다', () => {
+    const source = read('lib/queries/support.ts');
+    const adminAt = source.indexOf('getAdminSupportPosts');
+    // 어드민 조회는 마지막에 있고, 그 뒤로는 캐시 감싸개가 없어야 한다
+    expect(adminAt).toBeGreaterThan(-1);
+    expect(source.slice(adminAt)).not.toContain('cachedRead');
+  });
+
   it('마이페이지 조회도 캐싱하지 않는다', () => {
     expect(read('lib/queries/mypage.ts')).not.toContain('cachedRead');
   });
@@ -89,9 +104,18 @@ describe('무효화한 자리', () => {
     expect(read(rel)).toContain('revalidateReviews()');
   });
 
+  it.each(SUPPORT_WRITERS)('%s 가 공지·FAQ 를 턴다', (rel) => {
+    expect(read(rel)).toContain('revalidateSupport()');
+  });
+
   it('무효화를 부르는 라우트는 전부 목록에 있다', () => {
     // 반대 방향도 지킨다. 목록에 없는데 부르면 목록이 낡은 것이다.
-    const listed = new Set<string>([...CATALOG_WRITERS, ...BANNER_WRITERS, ...REVIEW_WRITERS]);
+    const listed = new Set<string>([
+      ...CATALOG_WRITERS,
+      ...BANNER_WRITERS,
+      ...REVIEW_WRITERS,
+      ...SUPPORT_WRITERS,
+    ]);
     const found: string[] = [];
 
     const walk = (dir: string, prefix: string) => {

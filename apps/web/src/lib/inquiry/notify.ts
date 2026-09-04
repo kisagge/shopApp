@@ -19,10 +19,16 @@ export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<v
     await getMailer().send(
       inquiryAnswerMail({
         to: inquiry.authorEmail,
-        productName: inquiry.productName,
+        ...(inquiry.productName ? { productName: inquiry.productName } : {}),
         question: inquiry.question,
         answer: inquiry.answer,
-        url: absoluteUrl(`/product/${inquiry.productSlug}`),
+        /*
+         * 상품 없는 문의는 상품 화면으로 보낼 수 없다. 답을 보러 갈 곳이
+         * 없으면 알림이 반쪽이므로 내 문의 목록으로 보낸다.
+         */
+        url: inquiry.productSlug
+          ? absoluteUrl(`/product/${inquiry.productSlug}`)
+          : absoluteUrl('/mypage/inquiries'),
       }),
     );
   } catch (error) {

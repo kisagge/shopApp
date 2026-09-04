@@ -22,16 +22,24 @@ export class InquiryError extends Error {
  * 답해야 하는지 알 수 없고, 답이 왔는지도 알려 줄 수 없다.
  */
 export async function createInquiry(userId: string, input: CreateInquiryInput) {
-  // 매대에 없는 상품에는 물을 것도 없다
-  const product = await prisma.product.findFirst({
-    where: { id: input.productId, deletedAt: null },
-    select: { id: true },
-  });
-  if (!product) throw new InquiryError('PRODUCT_NOT_FOUND', 404);
+  /*
+   * 상품이 붙은 문의만 상품을 확인한다. 고객센터로 들어오는 물음(배송·환불
+   * 같은 것)에는 상품이 없다 — 계약이 "상품이나 갈래 중 하나" 를 이미
+   * 강제하므로 여기서는 있는 쪽만 본다.
+   */
+  if (input.productId != null) {
+    // 매대에 없는 상품에는 물을 것도 없다
+    const product = await prisma.product.findFirst({
+      where: { id: input.productId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!product) throw new InquiryError('PRODUCT_NOT_FOUND', 404);
+  }
 
-  return prisma.productInquiry.create({
+  return prisma.inquiry.create({
     data: {
-      productId: input.productId,
+      productId: input.productId ?? null,
+      topic: input.topic ?? null,
       authorId: userId,
       content: input.content,
       isPrivate: input.isPrivate,
@@ -42,7 +50,7 @@ export async function createInquiry(userId: string, input: CreateInquiryInput) {
 
 /** 답변할 문의와 그 상품의 소속. 권한 판단에 둘 다 필요하다. */
 async function loadForAnswer(inquiryId: string) {
-  const inquiry = await prisma.productInquiry.findFirst({
+  const inquiry = await prisma.inquiry.findFirst({
     where: { id: inquiryId, deletedAt: null },
     select: {
       id: true, authorId: true, answeredAt: true, content: true,
@@ -61,8 +69,9 @@ async function loadForAnswer(inquiryId: string) {
 
 export interface AnsweredInquiry {
   readonly id: string;
-  readonly productName: string;
-  readonly productSlug: string;
+  /** 상품 없는 문의면 null */
+  readonly productName: string | null;
+  readonly productSlug: string | null;
   readonly authorEmail: string;
   readonly authorName: string;
   readonly question: string;
@@ -86,12 +95,18 @@ export async function answerInquiry(
 ): Promise<AnsweredInquiry> {
   const inquiry = await loadForAnswer(inquiryId);
 
-  if (!canAnswerInquiry(actor, { merchantId: inquiry.product.brand.merchantId })) {
+  /*
+   * 상품이 없으면 **소속도 없다.** 그러면 ownsMerchant 가 가맹점을 걸러
+   * 내므로 고객센터 문의는 운영진만 답하게 된다 — 배송·환불은 플랫폼이
+   * 정하는 것이라 그것이 맞다. 규칙을 여기 새로 적지 않아도 그렇게 된다.
+   */
+  const merchantId = inquiry.product?.brand.merchantId ?? null;
+  if (!canAnswerInquiry(actor, { merchantId })) {
     throw new InquiryError('NOT_ALLOWED', 403);
   }
   if (inquiry.answeredAt !== null) throw new InquiryError('ALREADY_ANSWERED', 409);
 
-  const updated = await prisma.productInquiry.update({
+  const updated = await prisma.inquiry.update({
     where: { id: inquiryId },
     data: { answer: input.answer, answeredById: actor.id, answeredAt: new Date() },
     select: { id: true, answer: true },
@@ -99,8 +114,8 @@ export async function answerInquiry(
 
   return {
     id: updated.id,
-    productName: inquiry.product.name,
-    productSlug: inquiry.product.slug,
+    productName: inquiry.product?.name ?? null,
+    productSlug: inquiry.product?.slug ?? null,
     authorEmail: inquiry.author.email,
     authorName: inquiry.author.name,
     question: inquiry.content,
@@ -116,7 +131,7 @@ export async function answerInquiry(
  * 규칙이다.
  */
 export async function deleteInquiry(actor: Actor, inquiryId: string): Promise<void> {
-  const inquiry = await prisma.productInquiry.findFirst({
+  const inquiry = await prisma.inquiry.findFirst({
     where: { id: inquiryId, deletedAt: null },
     select: { id: true, authorId: true },
   });
@@ -124,9 +139,9 @@ export async function deleteInquiry(actor: Actor, inquiryId: string): Promise<vo
   if (!canDeleteInquiry(actor, inquiry)) throw new InquiryError('NOT_OWN_INQUIRY', 403);
 
   if (inquiry.authorId === actor.id) {
-    await prisma.productInquiry.delete({ where: { id: inquiryId } });
+    await prisma.inquiry.delete({ where: { id: inquiryId } });
   } else {
-    await prisma.productInquiry.update({
+    await prisma.inquiry.update({
       where: { id: inquiryId },
       data: { deletedAt: new Date() },
     });

@@ -4,6 +4,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminInquiries } from '~/lib/queries/inquiries';
 import { InquiryAnswerForm } from '~/components/admin/inquiry-answer-form';
 import { Pager } from '../pager';
+import { getT } from '~/lib/i18n/server';
+import { TOPIC_KEY } from '~/lib/i18n/support';
 
 export const metadata: Metadata = { title: '상품 문의' };
 export const dynamic = 'force-dynamic';
@@ -18,6 +20,7 @@ export default async function AdminInquiriesPage({
   searchParams: Promise<{ tab?: string; cursor?: string }>;
 }) {
   const actor = await requireAdmin('inquiry:answer');
+  const t = await getT();
   const params = await searchParams;
 
   // 기본은 미답변이다. 이 화면은 목록이 아니라 처리할 일감이다.
@@ -80,13 +83,29 @@ export default async function AdminInquiriesPage({
               <li key={row.id} className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-5">
                 <article className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
+                    {/*
+                      고객센터로 들어온 문의에는 상품이 없다. 링크를 걸 곳이
+                      없으므로 갈래를 대신 보여 준다 — 제목 자리를 비워 두면
+                      목록에서 무엇에 대한 물음인지 알 수 없다.
+                    */}
                     <h2 className="text-[14px] font-medium">
-                      <Link
-                        href={`/admin/products/${row.productId}`}
-                        className="text-[var(--fg)] no-underline hover:underline"
-                      >
-                        {row.productName}
-                      </Link>
+                      {row.productId && row.productName ? (
+                        <Link
+                          href={`/admin/products/${row.productId}`}
+                          className="text-[var(--fg)] no-underline hover:underline"
+                        >
+                          {row.productName}
+                        </Link>
+                      ) : (
+                        <span>
+                          고객센터
+                          {row.topic && (
+                            <span className="ml-1.5 text-[var(--fg-secondary)]">
+                              · {t(TOPIC_KEY[row.topic])}
+                            </span>
+                          )}
+                        </span>
+                      )}
                     </h2>
                     <p className="flex items-center gap-2 text-[12px] text-[var(--fg-muted)]">
                       {row.isPrivate && <span>🔒 비공개</span>}
@@ -114,7 +133,10 @@ export default async function AdminInquiriesPage({
                       </p>
                     </div>
                   ) : (
-                    <InquiryAnswerForm inquiryId={row.id} productName={row.productName} />
+                    <InquiryAnswerForm
+                      inquiryId={row.id}
+                      productName={row.productName ?? '고객센터'}
+                    />
                   )}
                 </article>
               </li>

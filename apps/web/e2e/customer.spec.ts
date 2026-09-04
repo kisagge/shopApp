@@ -12,6 +12,7 @@ const ADMIN_PATHS = [
   '/admin', '/admin/orders', '/admin/products', '/admin/banners',
   '/admin/coupons', '/admin/settlements', '/admin/merchants',
   '/admin/users', '/admin/points', '/admin/audit', '/admin/traffic',
+  '/admin/support',
 ];
 
 /**
@@ -169,4 +170,29 @@ test('입점 신청 입구가 푸터에 있고 양식이 열린다', async ({ pa
 test('고객은 문의 관리 화면에 들어갈 수 없다', async ({ page }) => {
   await page.goto('/admin/inquiries');
   expect(new URL(page.url()).pathname).not.toBe('/admin/inquiries');
+});
+
+test('고객센터에 물으면 내 문의 내역에 남는다', async ({ page }) => {
+  const asked = `E2E 배송 문의 ${Date.now()}`;
+
+  await page.goto('/support/ask');
+  await page.getByLabel('무엇에 대한 문의인가요?').selectOption('DELIVERY');
+  await page.getByLabel('문의 내용').fill(asked);
+  await page.getByRole('button', { name: '문의 보내기' }).click();
+
+  // 보냈다는 사실은 눈에만 보이면 안 된다
+  await expect(page.getByRole('status').filter({ hasText: /./ })).toContainText('접수');
+
+  await page.goto('/mypage/inquiries');
+  await expect(page.getByText(asked)).toBeVisible();
+  // 아직 아무도 답하지 않았다
+  await expect(page.getByText('답변 대기').first()).toBeVisible();
+});
+
+test('마이페이지에서 문의 내역으로 갈 수 있다', async ({ page }) => {
+  await page.goto('/mypage');
+
+  await page.getByRole('link', { name: '문의 내역' }).click();
+
+  await expect(page).toHaveURL('/mypage/inquiries');
 });

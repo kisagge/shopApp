@@ -6,6 +6,7 @@ config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
 import { prisma } from './client';
 import { seedReviews } from './seed-reviews';
+import { seedSupport } from './seed-support';
 
 /**
  * 개발용 시드. 여러 번 돌려도 같은 상태가 되도록 전부 upsert 로 쓴다.
@@ -329,6 +330,8 @@ async function main(): Promise<void> {
 
   // 계정은 @shop/auth 의 시드가 만든다. 비밀번호 해시를 여기서 흉내 내지 않고
   // 실제 가입 API 를 호출하기 위해서다. pnpm db:seed 가 두 단계를 이어서 돌린다.
+
+  await seedSupport();
 
   await seedReviews();
 

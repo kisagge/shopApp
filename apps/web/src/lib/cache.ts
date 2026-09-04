@@ -19,6 +19,8 @@ export const TAG = {
   catalog: 'catalog',
   /** 홈 배너 */
   banners: 'banners',
+  /** 공지·FAQ */
+  support: 'support',
 } as const;
 
 /**
@@ -31,6 +33,11 @@ export const TAG = {
 export const TTL = {
   catalog: 60,
   banners: 60,
+  /**
+   * 공지와 FAQ 는 하루에 몇 번 바뀌는 글이 아니다. 짧게 잡을 이유가 없고,
+   * 고친 순간에는 태그를 털어 곧바로 반영한다.
+   */
+  support: 300,
 } as const;
 
 interface CacheOptions {
@@ -78,6 +85,9 @@ function bust(tag: string): void {
 
 /** 상품이 바뀌었다 — 목록·상세·카테고리 전부 */
 export const revalidateCatalog = (): void => bust(TAG.catalog);
+
+/** 공지나 FAQ 가 바뀌었다 */
+export const revalidateSupport = (): void => bust(TAG.support);
 
 /** 배너가 바뀌었다 */
 export const revalidateBanners = (): void => bust(TAG.banners);

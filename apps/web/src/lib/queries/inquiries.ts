@@ -2,8 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   canReadInquiry, canAnswerInquiry, assertPermission,
-  PRIVATE_INQUIRY_PLACEHOLDER,
-  type Actor,
+  type Actor, type InquiryTopic,
 } from '@shop/core';
 
 /**
@@ -18,7 +17,12 @@ export interface PublicInquiry {
   readonly id: string;
   readonly content: string;
   readonly isPrivate: boolean;
-  /** 내용을 볼 수 있는가. 못 보면 content 는 대체 문구다. */
+  /**
+   * 내용을 볼 수 있는가.
+   *
+   * 못 보면 `content` 는 **빈 문자열**이다 — 대체 문구를 서버가 골라
+   * 실어 보내면 그 한 줄만 한국어로 굳는다. 뭐라고 적을지는 화면이 정한다.
+   */
   readonly readable: boolean;
   readonly authorName: string;
   readonly createdAt: Date;
@@ -48,7 +52,7 @@ export async function getProductInquiries(
   });
   const scope = { merchantId: product?.brand.merchantId ?? null };
 
-  const rows = await prisma.productInquiry.findMany({
+  const rows = await prisma.inquiry.findMany({
     where: { productId, deletedAt: null },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: PAGE_SIZE + 1,
@@ -70,7 +74,7 @@ export async function getProductInquiries(
       return {
         id: row.id,
         // 볼 수 없으면 내용을 아예 싣지 않는다
-        content: readable ? row.content : PRIVATE_INQUIRY_PLACEHOLDER,
+        content: readable ? row.content : '',
         isPrivate: row.isPrivate,
         readable,
         authorName: maskAuthor(row.author.name),
@@ -87,8 +91,10 @@ export async function getProductInquiries(
 
 export interface AdminInquiryRow {
   readonly id: string;
-  readonly productId: string;
-  readonly productName: string;
+  /** 고객센터로 들어온 문의는 상품이 없다 */
+  readonly productId: string | null;
+  readonly productName: string | null;
+  readonly topic: InquiryTopic | null;
   readonly content: string;
   readonly isPrivate: boolean;
   readonly authorName: string;
@@ -109,6 +115,11 @@ export async function getAdminInquiries(
 ): Promise<{ rows: AdminInquiryRow[]; nextCursor: string | null; pending: number }> {
   assertPermission(actor, 'inquiry:answer');
 
+  /*
+   * 가맹점에게는 **자기 상품의 문의만** 보인다. 고객센터로 들어온 문의는
+   * 상품이 없어 이 조건에 걸리지 않으므로 자연히 빠진다 — 배송·환불은
+   * 플랫폼이 답할 몫이라 그것이 맞다.
+   */
   const scoped = {
     deletedAt: null,
     ...(actor.merchantId ? { product: { brand: { merchantId: actor.merchantId } } } : {}),
@@ -116,7 +127,7 @@ export async function getAdminInquiries(
   const where = { ...scoped, ...(query.unanswered ? { answeredAt: null } : {}) };
 
   const [rows, pending] = await Promise.all([
-    prisma.productInquiry.findMany({
+    prisma.inquiry.findMany({
       where,
       /*
        * 미답변만 볼 때는 오래 기다린 것부터 꺼낸다. 최신순으로 두면 새
@@ -130,11 +141,12 @@ export async function getAdminInquiries(
       select: {
         id: true, content: true, isPrivate: true, createdAt: true,
         answer: true, answeredAt: true,
+        topic: true,
         product: { select: { id: true, name: true } },
         author: { select: { name: true } },
       },
     }),
-    prisma.productInquiry.count({ where: { ...scoped, answeredAt: null } }),
+    prisma.inquiry.count({ where: { ...scoped, answeredAt: null } }),
   ]);
 
   const hasMore = rows.length > 25;
@@ -143,8 +155,9 @@ export async function getAdminInquiries(
   return {
     rows: page.map((row) => ({
       id: row.id,
-      productId: row.product.id,
-      productName: row.product.name,
+      productId: row.product?.id ?? null,
+      productName: row.product?.name ?? null,
+      topic: row.topic,
       // 답할 사람은 비공개 문의도 봐야 한다. 그러라고 있는 자리다.
       content: row.content,
       isPrivate: row.isPrivate,
@@ -155,5 +168,61 @@ export async function getAdminInquiries(
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     pending,
+  };
+}
+
+export interface MyInquiryRow {
+  readonly id: string;
+  readonly content: string;
+  readonly isPrivate: boolean;
+  readonly topic: InquiryTopic | null;
+  readonly productName: string | null;
+  readonly productSlug: string | null;
+  readonly createdAt: Date;
+  readonly answer: string | null;
+  readonly answeredAt: Date | null;
+}
+
+/**
+ * 내가 쓴 문의.
+ *
+ * **상품 문의와 고객센터 문의를 한 줄에 섞어 보여 준다.** 쓴 사람에게는
+ * 둘 다 "내가 물어본 것" 이고, 어디에 썼는지로 나눠 두면 답이 어디 왔는지
+ * 두 곳을 찾아다니게 된다.
+ *
+ * 비공개 여부를 여기서는 보지 않는다 — 내 글이다.
+ */
+export async function getMyInquiries(
+  userId: string,
+  options: { cursor?: string | undefined } = {},
+): Promise<{ items: MyInquiryRow[]; nextCursor: string | null }> {
+  const rows = await prisma.inquiry.findMany({
+    where: { authorId: userId, deletedAt: null },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: PAGE_SIZE + 1,
+    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+    select: {
+      id: true, content: true, isPrivate: true, topic: true, createdAt: true,
+      answer: true, answeredAt: true,
+      product: { select: { name: true, slug: true } },
+    },
+  });
+
+  const hasMore = rows.length > PAGE_SIZE;
+  const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+
+  return {
+    items: page.map((row) => ({
+      id: row.id,
+      content: row.content,
+      isPrivate: row.isPrivate,
+      topic: row.topic,
+      productName: row.product?.name ?? null,
+      productSlug: row.product?.slug ?? null,
+      createdAt: row.createdAt,
+      answer: row.answer,
+      answeredAt: row.answeredAt,
+    })),
+    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };
 }

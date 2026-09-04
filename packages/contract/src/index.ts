@@ -17,3 +17,4 @@ export * from './auth';
 export * from './account';
 export * from './merchant';
 export * from './inquiry';
+export * from './support';

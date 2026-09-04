@@ -143,7 +143,11 @@ export function resetPasswordMail(input: LinkMailInput): MailMessage {
 
 export interface InquiryAnswerMailInput {
   readonly to: string;
-  readonly productName: string;
+  /**
+   * 어떤 상품에 대한 물음이었는가. **없을 수 있다** — 배송이나 환불처럼
+   * 상품과 무관한 문의는 고객센터로 들어온다.
+   */
+  readonly productName?: string | undefined;
   readonly question: string;
   readonly answer: string;
   readonly url: string;
@@ -163,12 +167,14 @@ export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
     value.length > max ? `${value.slice(0, max)}…` : value;
   const question = clip(input.question, 200);
   const answer = clip(input.answer, 400);
+  // 상품 없는 문의도 온다. 이름 자리를 비워 두면 "undefined 문의" 가 나간다.
+  const about = input.productName ?? '고객센터';
 
   return {
     to: input.to,
-    subject: `[PLAIN] ${input.productName} 문의에 답변이 등록되었습니다`,
+    subject: `[PLAIN] ${about} 문의에 답변이 등록되었습니다`,
     text: [
-      `${input.productName} 에 남기신 문의에 답변이 등록되었습니다.`,
+      `${about} 에 남기신 문의에 답변이 등록되었습니다.`,
       '',
       `문의: ${question}`,
       `답변: ${answer}`,
@@ -178,12 +184,12 @@ export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
     html: shell(
       '문의에 답변이 등록되었습니다',
       [
-        `<p style="margin:0"><b>${escapeHtml(input.productName)}</b> 에 남기신 문의에 답변이 등록되었습니다.</p>`,
+        `<p style="margin:0"><b>${escapeHtml(about)}</b> 에 남기신 문의에 답변이 등록되었습니다.</p>`,
         `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">문의</p>`,
         `<p style="margin:4px 0 0">${escapeHtml(question)}</p>`,
         `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">답변</p>`,
         `<p style="margin:4px 0 0">${escapeHtml(answer)}</p>`,
-        button(input.url, '상품에서 보기'),
+        button(input.url, input.productName ? '상품에서 보기' : '문의 내역 보기'),
       ].join(''),
     ),
   };

@@ -279,6 +279,7 @@ export default async function ProductPage({ params }: Params) {
           productId={product.id}
           inquiries={inquiries.items}
           loggedIn={viewer !== null}
+          privateText={t('support.privateMasked')}
         />
       </div>
 

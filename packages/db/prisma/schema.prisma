@@ -81,8 +81,9 @@ model User {
   cartItems            CartItem[]
   reviews              Review[]
   merchantApplications Merchant[]            @relation("MerchantApplicant")
-  inquiries            ProductInquiry[]      @relation("InquiryAuthor")
-  inquiryAnswers       ProductInquiry[]      @relation("InquiryAnswerer")
+  inquiries            Inquiry[]             @relation("InquiryAuthor")
+  inquiryAnswers       Inquiry[]             @relation("InquiryAnswerer")
+  supportPosts         SupportPost[]         @relation("SupportPostAuthor")
   reviewReports        ReviewReport[]        @relation("reporter")
   reviewsJudged        ReviewReport[]        @relation("judge")
   wishlist             WishlistItem[]
@@ -367,10 +368,10 @@ model Product {
   /// 반려 사유. 이유 없이 되돌리면 가맹점은 무엇을 고쳐야 할지 모른다.
   publishRejection  String?
 
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
-  inquiries ProductInquiry[]
+  inquiries Inquiry[]
 
   @@index([status, publishedAt])
   @@index([categoryId, status])
@@ -1178,10 +1179,72 @@ model Verification {
 /// 리뷰는 산 사람만 쓸 수 있어서, 사기 전에 물어볼 자리가 따로 필요하다.
 /// 답변은 한 문의에 하나뿐이라 별도 모델로 두지 않고 여기 담는다 —
 /// 주고받는 대화가 필요한 수준이면 그때 나눈다.
-model ProductInquiry {
-  id        String  @id @default(cuid())
-  productId String
-  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+/// 고객센터 글의 종류.
+///
+/// 공지와 FAQ 를 **한 표에 둔다.** 둘 다 "운영진이 쓰는 공개 글" 이고 담는
+/// 것이 같다 — 제목, 본문, 공개 여부, 쓴 사람. 다른 것은 보여 주는 방식뿐이다:
+/// 공지는 최근 순으로 쌓이고 FAQ 는 주제별로 묶인다. 표를 나누면 목록·작성·
+/// 수정·삭제가 두 벌이 되는데, 그것을 나눠서 얻는 것은 쓰지 않는 칸 두 개를
+/// 지우는 것뿐이다.
+enum SupportPostKind {
+  NOTICE
+  FAQ
+}
+
+/// 무엇에 대한 물음인가. FAQ 분류와 1:1 문의 분류가 같은 목록을 쓴다 —
+/// 자주 묻는 것을 모아 둔 것이 FAQ 이므로 갈래가 달라질 이유가 없다.
+enum InquiryTopic {
+  DELIVERY
+  EXCHANGE
+  PAYMENT
+  ACCOUNT
+  PRODUCT
+  ETC
+}
+
+model SupportPost {
+  id   String          @id @default(cuid())
+  kind SupportPostKind
+
+  title String
+  body  String
+
+  /// FAQ 의 갈래. 공지에는 없다.
+  topic InquiryTopic?
+
+  /// 공지 상단 고정. FAQ 는 쓰지 않는다.
+  pinned    Boolean @default(false)
+  /// FAQ 안에서의 순서. 공지는 날짜로 정렬하므로 쓰지 않는다.
+  sortOrder Int     @default(0)
+
+  /// null 이면 아직 내보내지 않은 글이다. 쓰다 만 공지가 새어 나가지 않게
+  /// 초안과 게시를 상태가 아니라 시각으로 가른다 — 언제 나갔는지도 남는다.
+  publishedAt DateTime?
+
+  /// 쓴 사람. 계정이 사라져도 글은 남긴다.
+  authorId String?
+  author   User?   @relation("SupportPostAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  /// 공지 목록 · FAQ 목록
+  @@index([kind, publishedAt])
+  @@map("support_posts")
+}
+
+model Inquiry {
+  id String @id @default(cuid())
+
+  /// 어떤 상품에 대한 물음인가. **없을 수 있다** — 배송이나 환불처럼 상품과
+  /// 무관한 물음은 고객센터로 들어온다. 그 문의는 파는 사람이 아니라 운영진의
+  /// 몫이라, 상품이 없으면 가맹점 범위에도 걸리지 않는다.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// 무엇에 대한 물음인가. 상품 문의에는 없다 — 이미 상품이 그것을 말한다.
+  topic InquiryTopic?
 
   authorId String
   author   User   @relation("InquiryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
@@ -1207,5 +1270,5 @@ model ProductInquiry {
   @@index([authorId, createdAt])
   /// 운영진의 미답변 대기줄
   @@index([answeredAt, createdAt])
-  @@map("product_inquiries")
+  @@map("inquiries")
 }

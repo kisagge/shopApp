@@ -13,10 +13,20 @@ export function InquirySection({
   productId,
   inquiries,
   loggedIn,
+  privateText,
 }: {
   productId: string;
   inquiries: readonly PublicInquiry[];
   loggedIn: boolean;
+  /**
+   * 볼 수 없는 문의 자리에 넣을 문구.
+   *
+   * **부르는 쪽이 넘긴다.** 조회는 내용을 아예 싣지 않고, 뭐라고 적을지는
+   * 요청의 언어를 아는 화면이 정한다. 여기서 직접 사전을 읽으면 이 조각이
+   * 요청에 매여 서버 컴포넌트가 되고, 그 순간 테스트에서 그릴 수 없다 —
+   * linkComponent 를 주입받는 것과 같은 이유다.
+   */
+  privateText: string;
 }) {
   return (
     <section aria-labelledby="inquiry-title" className="mt-16">
@@ -72,7 +82,8 @@ export function InquirySection({
                     inquiry.readable ? 'whitespace-pre-wrap' : 'text-[var(--fg-muted)]'
                   }`}
                 >
-                  {inquiry.content}
+                  {/* 볼 수 없는 문의는 서버가 내용을 아예 싣지 않는다 */}
+                  {inquiry.readable ? inquiry.content : privateText}
                 </p>
 
                 {inquiry.answer && (
