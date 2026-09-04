@@ -109,19 +109,42 @@ test('탈퇴 화면은 무엇이 지워지고 무엇이 남는지 먼저 말한�
   await expect(page.getByText(/가맹점 정산의 근거입니다/)).toBeVisible();
 });
 
-test('막히는 이유를 확인 문구를 치기 전에 알려 준다', async ({ page }) => {
+test('탈퇴 화면은 막는 이유를 보여 주거나 확인 문구를 요구한다', async ({ page }) => {
   /*
-   * 시드 고객에게는 입금대기(가상계좌) 주문이 있다. 아직 입금될 수 있는
-   * 주문이라 탈퇴를 막는 것이 맞고, 화면은 그 이유를 **양식보다 먼저**
-   * 보여 줘야 한다 — 다 적고 나서 안 된다고 하면 그 시간이 헛것이 된다.
+   * **주문 상태에 기대지 않는다.**
+   *
+   * 처음에는 "입금대기 주문이 있어 막힌다" 로 썼는데, 그건 시드가 아니라
+   * 개발하며 로컬에 쌓인 주문이었다. CI 는 빈 DB 에 시드만 넣고 돌아서
+   * demo 계정에 주문이 하나도 없고, 그대로 깨졌다.
+   *
+   * 막는 규칙 자체는 단위 테스트가 본다. 여기서는 **화면이 둘 중 하나를
+   * 정확히 보여 주는지**를 본다 — 둘 다면 막아 놓고 누를 수 있는 것이고,
+   * 둘 다 없으면 여기서 할 수 있는 일이 없다.
    */
   await page.goto('/mypage/close');
 
-  await expect(page.getByRole('heading', { name: '지금은 탈퇴할 수 없습니다' })).toBeVisible();
-  await expect(page.getByText(/배송이 끝나지 않은 주문/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: '회원 탈퇴', level: 1 })).toBeVisible();
 
-  // 막힌 동안에는 양식 자체가 없다
-  await expect(page.getByRole('button', { name: '탈퇴하기' })).toHaveCount(0);
+  const blocked = page.getByRole('heading', { name: '지금은 탈퇴할 수 없습니다' });
+  const submit = page.getByRole('button', { name: '탈퇴하기' });
+
+  const isBlocked = await blocked.count() > 0;
+  expect(await submit.count(), '막혔으면 양식이 없어야 하고, 아니면 있어야 한다')
+    .toBe(isBlocked ? 0 : 1);
+
+  if (isBlocked) {
+    // 왜 막혔는지 적혀 있어야 한다. 막았다는 말만으로는 고칠 수가 없다.
+    await expect(page.locator('#main')).toContainText(/주문|반품|계정/);
+    return;
+  }
+
+  // 되돌릴 수 없는 동작이라 문구를 옮겨 적기 전에는 누를 수 없다
+  await expect(submit).toBeDisabled();
+  await page.getByRole('textbox').fill('탈퇴');
+  await expect(submit).toBeDisabled();
+  await page.getByRole('textbox').fill('탈퇴합니다');
+  await expect(submit).toBeEnabled();
+  // 실제로 누르지는 않는다 — 시드 계정이 사라지면 나머지 시험이 무너진다
 });
 
 test('입점 신청 입구가 푸터에 있고 양식이 열린다', async ({ page }) => {
