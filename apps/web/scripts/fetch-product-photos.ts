@@ -147,7 +147,30 @@ async function clearPlaceholders(): Promise<number> {
   return count;
 }
 
+/**
+ * 어느 DB·버킷을 건드리는지 먼저 밝힌다.
+ *
+ * **이 프로젝트에서 두 번 당한 자리다.** 운영에 넣으려고 돌렸는데 저장소
+ * .env 의 localhost 로 붙어서, "건너뜀 … 이미 2장" 이 줄줄이 찍히고 성공한
+ * 것처럼 보였다. 사람이 주소를 볼 수 있으면 그 자리에서 알아챈다.
+ *
+ * 비밀번호는 찍지 않는다 — 로그와 터미널 기록에 남는다.
+ */
+function announceTarget(): void {
+  const raw = process.env['DATABASE_URL'] ?? '';
+  let where = '(DATABASE_URL 없음)';
+  try {
+    where = new URL(raw).host;
+  } catch {
+    // 형식이 이상해도 여기서 멈추지 않는다. Prisma 가 곧 제대로 된 오류를 낸다.
+  }
+  console.log(`DB     : ${where}`);
+  console.log(`저장소 : ${bucket || '(S3_BUCKET 없음)'} → ${publicBase || '(공개 주소 없음)'}\n`);
+}
+
 async function main(): Promise<void> {
+  announceTarget();
+
   if (process.argv.includes('--replace')) {
     const removed = await clearPlaceholders();
     console.log(`플레이스홀더 ${removed}장 삭제\n`);
