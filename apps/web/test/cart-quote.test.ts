@@ -213,3 +213,40 @@ describe('배송비', () => {
     expect(q.shippingFee).toBe(3_000);
   });
 });
+
+describe('등급별 적립률', () => {
+  const line = { lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false };
+
+  beforeEach(() => {
+    findManyVariants.mockResolvedValue([variant()]);
+    findFirstUserCoupon.mockResolvedValue(null);
+  });
+
+  it('비회원은 기본 적립률이다', async () => {
+    const q = await quoteCart(line, null);
+    // 289,000 의 1%
+    expect(q.rewardPoints).toBe(2_890);
+  });
+
+  it('적립률을 넘기면 그대로 계산에 붙는다', async () => {
+    /*
+     * 이게 붙지 않아서, 마이페이지가 "적립률 3%" 라고 적어 둔 회원에게
+     * 실제로는 1% 만 쌓였다. 화면이 약속한 것과 실제로 주는 것이 달랐다.
+     */
+    const q = await quoteCart(line, { id: 'u-1', pointBalance: 0, rewardPercent: 3 });
+    expect(q.rewardPoints).toBe(8_670);
+  });
+
+  it('등급이 높을수록 더 쌓인다', async () => {
+    const basic = await quoteCart(line, { id: 'u-1', pointBalance: 0, rewardPercent: 1 });
+    const vip = await quoteCart(line, { id: 'u-1', pointBalance: 0, rewardPercent: 5 });
+
+    expect(vip.rewardPoints).toBeGreaterThan(basic.rewardPoints);
+  });
+
+  it('적립률을 안 넘긴 회원은 기본값으로 떨어진다', async () => {
+    // 부르는 쪽이 빠뜨려도 계산이 깨지지는 않는다
+    const q = await quoteCart(line, { id: 'u-1', pointBalance: 0 });
+    expect(q.rewardPoints).toBe(2_890);
+  });
+});

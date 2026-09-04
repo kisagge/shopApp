@@ -36,7 +36,8 @@ const ORDER_NO_RETRIES = 5;
  */
 export async function createOrder(
   input: CreateOrderRequest,
-  user: { id: string; pointBalance: number },
+  // 적립률까지 함께 받는다 — 견적과 같은 값이어야 한다(getQuoteViewer)
+  user: { id: string; pointBalance: number; rewardPercent?: number },
 ): Promise<CreateOrderResponse> {
   const shipping = await resolveShipping(input, user.id);
 

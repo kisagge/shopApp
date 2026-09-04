@@ -1,6 +1,6 @@
+import { getQuoteViewer } from '~/lib/grade/effective';
 import { createOrderRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
-import { prisma } from '@shop/db';
 import { NextResponse } from 'next/server';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
 
@@ -41,11 +41,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // 포인트 잔액은 세션 캐시가 아니라 DB 를 본다
-  const user = await prisma.user.findUnique({
-    where: { id: sessionUser.id },
-    select: { id: true, pointBalance: true },
-  });
+  /*
+   * 포인트 잔액과 적립률을 DB 에서 다시 낸다.
+   *
+   * 견적과 **같은 함수**를 쓴다. 한쪽만 고치면 화면에 보여 준 적립 예정
+   * 금액과 실제로 쌓이는 금액이 갈라진다.
+   */
+  const user = await getQuoteViewer(sessionUser.id);
   if (!user) {
     return NextResponse.json(
       { code: 'UNAUTHORIZED', message: '계정을 찾을 수 없습니다.' },

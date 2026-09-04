@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
   gradeProgress, won, ORDER_STATUS, type MemberGrade, type OrderStatus, type Won,
 } from '@shop/core';
@@ -30,13 +31,14 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
 
   const now = new Date();
 
-  const [spent, counts, couponCount, wishlistCount, reviewableCount] = await Promise.all([
-    // 등급은 **구매확정된 금액**의 누계로 낸다. 주문하고 취소하기를 반복해
-    // 등급을 올리는 걸 막는다.
-    prisma.order.aggregate({
-      where: { userId, status: 'CONFIRMED' },
-      _sum: { payable: true },
-    }),
+  const [effective, counts, couponCount, wishlistCount, reviewableCount] = await Promise.all([
+    /*
+     * 등급과 적립률은 **견적이 쓰는 것과 같은 함수**에서 낸다.
+     *
+     * 여기서 따로 계산하던 때에는 화면이 "적립률 3%" 라고 적어 놓고 실제
+     * 주문에는 기본 1% 가 붙었다. 같은 곳에서 내면 그렇게 갈라질 수 없다.
+     */
+    getEffectiveGrade(userId, user.grade),
     prisma.order.groupBy({
       by: ['status'],
       where: { userId, status: { in: [...TRACKED_STATUSES] } },
@@ -57,7 +59,7 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
     TRACKED_STATUSES.map((s) => [s, counts.find((c) => c.status === s)?._count._all ?? 0]),
   ) as MyPageSummary['statusCounts'];
 
-  const progress = gradeProgress(won(spent._sum.payable ?? 0), user.grade);
+  const progress = gradeProgress(effective.totalSpent, effective.grade);
 
   return {
     name: user.name,

@@ -2,8 +2,8 @@ import { MoneyError } from '@shop/core';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { cartQuoteRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
-import { prisma } from '@shop/db';
 import { NextResponse } from 'next/server';
+import { getQuoteViewer } from '~/lib/grade/effective';
 import { quoteCart } from '~/lib/queries/cart';
 
 /**
@@ -51,12 +51,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   // 포인트 잔액은 세션이 아니라 DB 를 다시 본다. 세션 캐시가 5분이라 그동안
   // 다른 주문에서 쓴 포인트가 반영되지 않을 수 있다.
-  const viewer = sessionUser
-    ? await prisma.user.findUnique({
-        where: { id: sessionUser.id },
-        select: { id: true, pointBalance: true },
-      })
-    : null;
+  const viewer = sessionUser ? await getQuoteViewer(sessionUser.id) : null;
 
   try {
     return NextResponse.json(await quoteCart(parsed.data, viewer));

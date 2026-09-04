@@ -17,7 +17,16 @@ import {
  */
 export async function quoteCart(
   input: CartQuoteRequest,
-  viewer: { id: string; pointBalance: number } | null,
+  /**
+   * 보는 사람. **적립률을 함께 받는다.**
+   *
+   * 등급별 적립률이 화면에만 있고 계산에는 붙지 않아서, 마이페이지가
+   * &ldquo;적립률 3%&rdquo; 라고 적어 둔 회원에게 실제로는 1% 만 쌓였다.
+   * 여기서 받아 계산에 넘긴다 — 값은 getQuoteViewer 가 낸다.
+   *
+   * 비회원은 null 이고, 그때는 기본 적립률이 적용된다.
+   */
+  viewer: { id: string; pointBalance: number; rewardPercent?: number } | null,
 ): Promise<CartQuoteResponse> {
   const requested = new Map(input.lines.map((l) => [l.variantId, l.quantity]));
 
@@ -136,6 +145,8 @@ export async function quoteCart(
     // 보유 포인트는 세션이 말하는 값만 믿는다
     pointsAvailable,
     isRemoteArea: input.isRemoteArea,
+    // 등급별 적립률. 없으면 calculateCart 가 기본값을 쓴다.
+    ...(viewer?.rewardPercent === undefined ? {} : { rewardPercent: viewer.rewardPercent }),
   });
 
   return {
