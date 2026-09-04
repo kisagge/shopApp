@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { SIZE_FIT_LABEL, type SizeFit } from '@shop/core';
 import type { PublicReview, ReviewSummary } from '~/lib/queries/reviews';
 import { ReviewStars } from './review-stars';
@@ -124,7 +125,7 @@ export function ReviewSection({
                             한 장을 크게 보는 일에 그만한 장치가 필요하지 않다.
                           */}
                           <a href={url} target="_blank" rel="noreferrer">
-                            <img
+                            <Image
                               src={url}
                               /*
                                 작성자가 대체 텍스트를 적지 않는다. 억지로
@@ -133,7 +134,13 @@ export function ReviewSection({
                                 준다 — 없는 것보다 낫고, 거짓을 적지도 않는다.
                               */
                               alt={`${review.authorName} 님의 후기 사진 ${i + 1}`}
-                              loading="lazy"
+                              width={96}
+                              height={96}
+                              /*
+                                크기가 고정이라 sizes 를 주지 않는다. 주면
+                                next/image 가 기기 크기 목록 전체로 후보를
+                                만들고, 빼면 96·192 두 벌만 만든다.
+                              */
                               className="h-24 w-24 rounded-sm border border-[var(--border)] object-cover"
                             />
                           </a>

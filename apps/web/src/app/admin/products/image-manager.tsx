@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
@@ -162,13 +163,11 @@ export function ImageManager({
               key={image.id}
               className="flex gap-3 rounded-sm border border-[var(--border)] p-3"
             >
-              <img
+              <Image
                 src={image.url}
                 alt={image.alt}
                 width={72}
                 height={90}
-                loading="lazy"
-                decoding="async"
                 className="h-[90px] w-[72px] shrink-0 rounded-xs bg-[var(--surface-2)] object-cover"
               />
 

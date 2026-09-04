@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
@@ -56,9 +57,10 @@ export default async function WishlistPage() {
                   className="flex min-w-0 flex-1 items-center gap-4 no-underline"
                 >
                   {item.imageUrl ? (
-                    <img
+                    <Image
                       src={item.imageUrl} alt={item.imageAlt ?? ''}
-                      width={64} height={80} loading="lazy" decoding="async"
+                      // 크기가 고정이라 sizes 를 주지 않는다 — 1x·2x 두 벌만 만들어진다
+                      width={64} height={80}
                       className="h-20 w-16 shrink-0 rounded-xs bg-[var(--surface-2)] object-cover"
                     />
                   ) : (

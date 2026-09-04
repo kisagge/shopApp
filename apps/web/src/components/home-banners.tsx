@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Carousel } from '@shop/ui';
 import { AppLink } from './app-link';
 
@@ -32,15 +33,15 @@ export function HomeBanners({ banners }: { banners: readonly HomeBanner[] }) {
   return (
     <Carousel
       label="기획전 배너"
-      slides={banners.map((banner) => ({
+      slides={banners.map((banner, index) => ({
         id: banner.id,
-        content: <BannerSlide banner={banner} />,
+        content: <BannerSlide banner={banner} index={index} />,
       }))}
     />
   );
 }
 
-function BannerSlide({ banner }: { banner: HomeBanner }) {
+function BannerSlide({ banner, index }: { banner: HomeBanner; index: number }) {
   const tone = TONE_CLASS[banner.tone] ?? 'bg-ph-sand';
 
   return (
@@ -51,13 +52,18 @@ function BannerSlide({ banner }: { banner: HomeBanner }) {
     >
       {banner.imageUrl && (
         <>
-          <img
+          <Image
             src={banner.imageUrl}
             // 배경 이미지의 의미는 옆의 제목이 이미 전달한다. 같은 내용을
             // 두 번 읽히지 않도록 장식으로 둔다.
             alt=""
             aria-hidden="true"
-            className="absolute inset-0 h-full w-full object-cover"
+            fill
+            // 항상 화면 폭을 꽉 채운다
+            sizes="100vw"
+            // 홈의 첫 화면이다. 여기가 늦으면 사이트가 늦은 것으로 보인다.
+            priority={index === 0}
+            className="object-cover"
           />
           {/* 사진 위 글자의 대비를 보장한다. 사진이 밝든 어둡든 읽혀야 한다. */}
           <div

@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
 import { formatWithUnit } from '@shop/core';
@@ -67,10 +68,19 @@ export default async function ProductPage({ params }: Params) {
         <div
           role="img"
           aria-label={`${product.name} 대표 이미지`}
-          className="flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]"
+          className="relative flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]"
         >
           {product.images[0] ? (
-            <img src={product.images[0].url} alt={product.images[0].alt} className="h-full w-full rounded-md object-cover" />
+            <Image
+              src={product.images[0].url}
+              alt={product.images[0].alt}
+              fill
+              // 좁은 화면에서는 폭 전체, 넓은 화면에서는 오른쪽 452px 을 뺀 만큼
+              sizes="(min-width: 1024px) calc(100vw - 452px), 100vw"
+              // 이 화면의 가장 큰 그림이자 첫 화면에 있다. 늦게 받으면 그대로 체감된다.
+              priority
+              className="rounded-md object-cover"
+            />
           ) : (
             <span aria-hidden="true" className="text-[11px] tracking-widest text-n-500">IMAGE</span>
           )}

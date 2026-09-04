@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
@@ -113,13 +114,11 @@ export default async function AdminProductDetailPage({
             <ul className="flex flex-wrap gap-2">
               {images.map((i) => (
                 <li key={i.id}>
-                  <img
+                  <Image
                     src={i.url}
                     alt={i.alt}
                     width={72}
                     height={90}
-                    loading="lazy"
-                    decoding="async"
                     className="h-[90px] w-[72px] rounded-xs bg-[var(--surface-2)] object-cover"
                   />
                 </li>

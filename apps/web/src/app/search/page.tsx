@@ -85,7 +85,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
               <>
                 <TrackedProductList listId="search_results" itemCount={page.items.length}>
                   <div className="mt-8">
-                    <ProductGrid products={page.items} columns="lg:grid-cols-4 xl:grid-cols-5" />
+                    <ProductGrid
+                      products={page.items}
+                      columns="lg:grid-cols-4 xl:grid-cols-5"
+                      // 여기만 xl 에서 5열이라 표시 크기도 달라진다
+                      imageSizes="(min-width: 1280px) 20vw, (min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw"
+                    />
                   </div>
                 </TrackedProductList>
 

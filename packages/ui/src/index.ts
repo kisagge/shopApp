@@ -8,6 +8,8 @@ export {
   type ProductCardProps,
   type LinkLike,
   type LinkLikeProps,
+  type ImageLike,
+  type ImageLikeProps,
 } from './components/product-card';
 export { Carousel, type CarouselProps, type CarouselSlide } from './components/carousel';
 export { VisuallyHidden } from './components/visually-hidden';

@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field } from '@shop/ui';
@@ -252,10 +253,13 @@ function BannerCard({
       {/* 미리보기 — 홈에서 어떻게 보일지 */}
       <div className={`relative flex h-40 w-full shrink-0 items-center overflow-hidden rounded-sm lg:w-72 ${banner.imageUrl ? 'bg-[var(--surface-2)]' : toneClass}`}>
         {banner.imageUrl && (
-          <img
+          <Image
             src={banner.imageUrl}
             alt={banner.imageAlt ?? ''}
-            className="absolute inset-0 h-full w-full object-cover"
+            fill
+            // 좁은 화면에서는 폭 전체, lg 부터는 288px(w-72)
+            sizes="(min-width: 1024px) 288px, 100vw"
+            className="object-cover"
           />
         )}
         <div className="relative z-10 flex flex-col gap-1 px-4">

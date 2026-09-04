@@ -197,7 +197,11 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           <ul className="mt-1 flex flex-wrap gap-2">
             {previews.map((url, i) => (
               <li key={url} className="relative">
-                {/* 미리보기다. 저장된 사진이 아니라 방금 고른 파일이다. */}
+                {/*
+                  방금 고른 파일의 미리보기다. 주소가 blob: 이라 브라우저
+                  안에만 있고 서버가 가져올 수 없다 — next/image 를 쓸 수
+                  없는 유일한 자리다. 어차피 네트워크로 나가지 않는다.
+                */}
                 <img
                   src={url}
                   alt={`고른 사진 ${i + 1}`}

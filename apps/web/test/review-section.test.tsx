@@ -123,7 +123,16 @@ describe('리뷰 사진', () => {
 
     const imgs = screen.getAllByRole('img', { name: /후기 사진/ });
     expect(imgs).toHaveLength(2);
-    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(photos);
+
+    /*
+     * src 는 원본 주소가 아니라 최적화기를 거친 주소다
+     * (/_next/image?url=...). 원본은 url 매개변수 안에 들어 있다.
+     */
+    const originals = imgs.map((img) => {
+      const src = img.getAttribute('src') ?? '';
+      return new URLSearchParams(src.split('?')[1] ?? '').get('url') ?? src;
+    });
+    expect(originals).toEqual(photos);
   });
 
   it('대체 텍스트가 누구의 몇 번째 사진인지 말한다', () => {
