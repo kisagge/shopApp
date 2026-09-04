@@ -43,8 +43,18 @@ const config: CapacitorConfig = {
   },
 
   ios: {
-    // 웹뷰가 스스로 스크롤하게 둔다. 네이티브가 같이 튕기면 두 번 움직인다.
-    contentInset: 'always',
+    /**
+     * 상태바 자리는 **웹이 혼자 맡는다.**
+     *
+     * 'always' 로 두면 네이티브가 웹뷰 자체를 상태바 아래로 밀어 놓는데,
+     * 그 상태에서도 env(safe-area-inset-top) 은 여전히 상태바 높이를
+     * 돌려준다. 헤더에 safe-t 를 붙이는 순간 같은 간격이 두 번 들어가
+     * 위쪽에 빈 띠가 생겼다.
+     *
+     * 'never' 로 두고 viewport-fit=cover + env() 하나로 처리한다.
+     * 안드로이드에는 contentInset 이 아예 없으니 이쪽이 양쪽이 같아진다.
+     */
+    contentInset: 'never',
   },
 
   android: {
