@@ -42,15 +42,30 @@ CAP_SERVER_URL=http://192.168.0.10:3000 pnpm mobile:sync   # 내 컴퓨터를 �
 때는 같은 망의 IP 를 `CAP_SERVER_URL` 로 넘긴다. http 를 줄 때만 평문 로딩이
 함께 켜진다 — 배포본은 https 로만 붙는다.
 
-## 이 저장소에서 확인한 것과 못 한 것
+## 실행해서 확인한 것
 
-- **iOS 빌드 성공** — `xcodebuild -sdk iphonesimulator -configuration Debug`.
-  다만 이 컴퓨터에 **iOS 시뮬레이터 런타임이 없어 실행은 못 했다**
-  (`xcrun simctl list runtimes` 에 watchOS 만 있다).
-- **Android 빌드 실패** — `invalid source release: 21`. Capacitor 8 은 Java 21
-  을 요구하는데 이 컴퓨터의 최신 JDK 는 19 다. JDK 21 을 깔면 풀린다.
+**iOS** — iPhone 17 Pro 시뮬레이터(iOS 26.5)에서 빌드·설치·실행까지 됐다.
+홈이 정상으로 그려지고 안전 영역도 지켜진다.
 
-두 가지 모두 코드 문제가 아니라 이 컴퓨터의 도구 문제다.
+**Android** — Pixel 3a 에뮬레이터(API 34)에서 빌드·설치·실행까지 됐다.
+
+Android 빌드에는 **JDK 21** 이 필요하다. Capacitor 8 이 `source release 21` 로
+컴파일한다. 낮은 JDK 로는 `invalid source release: 21` 에서 멈춘다.
+
+```bash
+export JAVA_HOME=/opt/homebrew/opt/openjdk@21
+```
+
+Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다르다.
+
+## 실행에서 찾은 것
+
+시뮬레이터에서 로그인 입력을 누르니 **화면이 확대되고 그 상태로 남아**
+헤더가 잘렸다. iOS 는 글자가 16px 미만인 입력에 포커스가 가면 자동으로
+확대한다. 폼 컨트롤 글자를 손가락 기기에서만 16px 로 올려 고쳤다
+(`packages/ui/src/styles/theme.css`). 뷰포트에 `maximum-scale=1` 을 박는 흔한
+대처는 쓰지 않았다 — 손가락 확대까지 막아 저시력 사용자의 유일한 확대
+수단을 없앤다.
 
 ## 커밋하지 않는 것
 
