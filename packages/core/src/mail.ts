@@ -140,3 +140,51 @@ export function resetPasswordMail(input: LinkMailInput): MailMessage {
     ),
   };
 }
+
+export interface InquiryAnswerMailInput {
+  readonly to: string;
+  readonly productName: string;
+  readonly question: string;
+  readonly answer: string;
+  readonly url: string;
+}
+
+/**
+ * 문의에 답이 달렸을 때.
+ *
+ * **물어본 내용을 함께 싣는다.** 여러 상품에 물어 두었다면 어느 것에 대한
+ * 답인지가 먼저고, 답만 오면 무슨 말인지 알 수 없다.
+ *
+ * 너무 길면 자른다 — 메일 미리보기에 본문이 통째로 밀려 들어가면 제목
+ * 옆이 지저분해진다.
+ */
+export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
+  const clip = (value: string, max: number) =>
+    value.length > max ? `${value.slice(0, max)}…` : value;
+  const question = clip(input.question, 200);
+  const answer = clip(input.answer, 400);
+
+  return {
+    to: input.to,
+    subject: `[PLAIN] ${input.productName} 문의에 답변이 등록되었습니다`,
+    text: [
+      `${input.productName} 에 남기신 문의에 답변이 등록되었습니다.`,
+      '',
+      `문의: ${question}`,
+      `답변: ${answer}`,
+      '',
+      input.url,
+    ].join('\n'),
+    html: shell(
+      '문의에 답변이 등록되었습니다',
+      [
+        `<p style="margin:0"><b>${escapeHtml(input.productName)}</b> 에 남기신 문의에 답변이 등록되었습니다.</p>`,
+        `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">문의</p>`,
+        `<p style="margin:4px 0 0">${escapeHtml(question)}</p>`,
+        `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">답변</p>`,
+        `<p style="margin:4px 0 0">${escapeHtml(answer)}</p>`,
+        button(input.url, '상품에서 보기'),
+      ].join(''),
+    ),
+  };
+}

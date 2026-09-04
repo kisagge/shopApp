@@ -57,6 +57,12 @@ export const RATE_LIMIT = {
    * 막지만, 여러 리뷰를 훑으며 누르는 것은 그것으로 막히지 않는다.
    */
   report: { limit: 10, windowMs: MINUTE },
+
+  /**
+   * 상품 문의. 사람이 글을 쓰는 동작이라 리뷰와 같은 결이다.
+   * 조금 더 여유를 두는 것은 사기 전에 여러 상품을 놓고 묻는 일이 있어서다.
+   */
+  inquiry: { limit: 8, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

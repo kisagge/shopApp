@@ -12,8 +12,10 @@ import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
 import { getProductBySlug } from '~/lib/queries/products';
 import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
+import { getProductInquiries } from '~/lib/queries/inquiries';
 import { ProductOptions } from '~/components/product-options';
 import { ReviewSection } from '~/components/review-section';
+import { InquirySection } from '~/components/inquiry-section';
 import { WishlistButton } from '~/components/wishlist-button';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 
@@ -53,9 +55,11 @@ export default async function ProductPage({ params }: Params) {
 
   // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
   const viewer = await getSessionUser(await headers());
-  const [summary, reviews, wishlisted, restockOn] = await Promise.all([
+  const [summary, reviews, inquiries, wishlisted, restockOn] = await Promise.all([
     getReviewSummary(product.id),
     getProductReviews(product.id, { viewerId: viewer?.id }),
+    // 비공개 문의를 거를 수 있게 보는 사람을 넘긴다
+    getProductInquiries(product.id, viewer),
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
     // 품절 옵션에 이미 알림을 걸어 뒀는지. 옵션마다 물으면 옵션 수만큼 쿼리가 나간다.
     viewer
@@ -226,6 +230,11 @@ export default async function ProductPage({ params }: Params) {
 
       <div className="pt-16">
         <ReviewSection summary={summary} reviews={reviews.items} />
+        <InquirySection
+          productId={product.id}
+          inquiries={inquiries.items}
+          loggedIn={viewer !== null}
+        />
       </div>
     </div>
   );

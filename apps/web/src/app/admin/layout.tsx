@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 interface NavItem {
   readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
+    | '/admin/inquiries'
     | '/admin/traffic' | '/admin/coupons';
   readonly label: string;
   readonly permission: Permission;
@@ -30,6 +31,8 @@ const NAV: readonly NavItem[] = [
   // 가맹점에게는 보이지 않는다. 자기 상품의 혹평을 내릴 수 있으면
   // 리뷰가 상품 설명의 일부가 된다.
   { href: '/admin/reviews', label: '리뷰', permission: 'review:moderate' },
+  // 가맹점도 본다 — 자기 상품 문의는 파는 사람이 답하는 것이 맞다
+  { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/settlements', label: '정산', permission: 'settlement:read' },
   { href: '/admin/merchants', label: '가맹점', permission: 'merchant:read' },
   { href: '/admin/users', label: '회원', permission: 'user:read' },

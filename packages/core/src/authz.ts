@@ -52,6 +52,8 @@ export const PERMISSION = [
   'settlement:pay',     // 실제 지급 집행
   'review:write',
   'review:moderate',
+  // 상품 문의에 답한다. 가맹점은 자기 상품만.
+  'inquiry:answer',
   // 전체 트래픽 지표. 가맹점은 자기 매출만 보고 플랫폼 전체 방문·전환은 못 본다 —
   // 다른 가맹점의 성과를 역산할 수 있는 값이다.
   'analytics:all',
@@ -79,6 +81,8 @@ const MERCHANT: readonly Permission[] = [
   'order:read', 'order:fulfill',
   'merchant:read', 'merchant:write',
   'settlement:read',
+  // 자기 상품에 들어온 문의에 답한다. 답할 사람이 파는 사람인 것이 맞다.
+  'inquiry:answer',
 ];
 
 /**
@@ -96,6 +100,7 @@ const ADMIN: readonly Permission[] = [
   'banner:read', 'banner:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:moderate',
+  'inquiry:answer',
   'analytics:all',
 ];
 

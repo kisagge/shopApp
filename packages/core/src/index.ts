@@ -23,6 +23,7 @@ export * from './image';
 export * from './banner';
 export * from './catalog';
 export * from './structured-data';
+export * from './inquiry';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';

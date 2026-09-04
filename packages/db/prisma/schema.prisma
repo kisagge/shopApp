@@ -81,6 +81,8 @@ model User {
   cartItems            CartItem[]
   reviews              Review[]
   merchantApplications Merchant[]            @relation("MerchantApplicant")
+  inquiries            ProductInquiry[]      @relation("InquiryAuthor")
+  inquiryAnswers       ProductInquiry[]      @relation("InquiryAnswerer")
   reviewReports        ReviewReport[]        @relation("reporter")
   reviewsJudged        ReviewReport[]        @relation("judge")
   wishlist             WishlistItem[]
@@ -365,9 +367,10 @@ model Product {
   /// 반려 사유. 이유 없이 되돌리면 가맹점은 무엇을 고쳐야 할지 모른다.
   publishRejection  String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
   deletedAt DateTime?
+  inquiries ProductInquiry[]
 
   @@index([status, publishedAt])
   @@index([categoryId, status])
@@ -1168,4 +1171,41 @@ model Verification {
   @@index([identifier])
   @@index([expiresAt])
   @@map("verifications")
+}
+
+/// 상품 문의.
+///
+/// 리뷰는 산 사람만 쓸 수 있어서, 사기 전에 물어볼 자리가 따로 필요하다.
+/// 답변은 한 문의에 하나뿐이라 별도 모델로 두지 않고 여기 담는다 —
+/// 주고받는 대화가 필요한 수준이면 그때 나눈다.
+model ProductInquiry {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User   @relation("InquiryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  content   String
+  /// 비공개 문의. 쓴 사람과 답할 사람만 내용을 본다.
+  /// 사이즈를 물으며 체형을, 배송을 물으며 사는 곳을 적는 일이 흔하다.
+  isPrivate Boolean @default(false)
+
+  answer       String?
+  /// 답한 사람. 계정이 사라져도 답변은 남긴다.
+  answeredById String?
+  answeredBy   User?     @relation("InquiryAnswerer", fields: [answeredById], references: [id], onDelete: SetNull)
+  answeredAt   DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  /// 상품 화면의 목록
+  @@index([productId, createdAt])
+  /// 내가 쓴 문의
+  @@index([authorId, createdAt])
+  /// 운영진의 미답변 대기줄
+  @@index([answeredAt, createdAt])
+  @@map("product_inquiries")
 }

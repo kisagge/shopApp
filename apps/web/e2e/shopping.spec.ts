@@ -92,3 +92,13 @@ test('비로그인은 어드민에 들어갈 수 없다', async ({ page }) => {
   // /login?next=/admin 은 /admin 으로 끝나서, 정규식으로 보면 통과해 버린다.
   expect(new URL(page.url()).pathname).not.toBe('/admin');
 });
+
+test('상품 문의는 사기 전에 물어볼 자리다', async ({ page }) => {
+  await page.goto('/product/short-padding-blouson');
+
+  const section = page.getByRole('heading', { name: /상품 문의/ });
+  await expect(section).toBeVisible();
+
+  // 로그인하지 않았으면 양식 대신 안내가 나와야 한다
+  await expect(page.getByText(/로그인 후 남기실 수 있습니다/)).toBeVisible();
+});

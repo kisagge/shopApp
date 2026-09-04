@@ -16,3 +16,4 @@ export * from './cart-sync';
 export * from './auth';
 export * from './account';
 export * from './merchant';
+export * from './inquiry';

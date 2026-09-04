@@ -59,3 +59,14 @@ test('이미 가맹점이면 신청 화면이 아니라 어드민으로 간다',
   await page.goto('/merchant/apply');
   expect(new URL(page.url()).pathname).toBe('/admin');
 });
+
+test('가맹점은 문의 대기줄을 본다', async ({ page }) => {
+  // 자기 상품 문의는 파는 사람이 답하는 것이 맞다
+  await page.goto('/admin');
+  await expect(page.getByRole('link', { name: '문의' })).toBeVisible();
+
+  await page.goto('/admin/inquiries');
+  await expect(page.getByRole('heading', { name: '상품 문의', level: 1 })).toBeVisible();
+  // 남의 상품 문의가 섞이면 할 일 목록이 되지 않는다
+  await expect(page.getByText('내 브랜드만')).toBeVisible();
+});

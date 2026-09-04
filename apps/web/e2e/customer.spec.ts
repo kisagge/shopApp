@@ -142,3 +142,8 @@ test('입점 신청 입구가 푸터에 있고 양식이 열린다', async ({ pa
   // 로그인한 주소가 미리 채워져야 다시 적다가 오타가 나지 않는다
   await expect(page.getByLabel(/^이메일\* \(필수\)$/)).toHaveValue(/@/);
 });
+
+test('고객은 문의 관리 화면에 들어갈 수 없다', async ({ page }) => {
+  await page.goto('/admin/inquiries');
+  expect(new URL(page.url()).pathname).not.toBe('/admin/inquiries');
+});
