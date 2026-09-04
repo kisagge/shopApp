@@ -68,3 +68,81 @@ test('한 화면에 h1 은 하나다', async ({ page }) => {
   // 제목이 여럿이면 스크린리더가 문서 구조를 잡지 못한다
   await expect(page.locator('h1')).toHaveCount(1);
 });
+
+/**
+ * 좁은 화면의 메뉴.
+ *
+ * 데스크톱 헤더의 카테고리 내비게이션은 md 아래에서 숨는다. 그 자리를 메우는
+ * 것이 이 메뉴라서, **좁은 화면에서 카테고리로 갈 길이 있는지**가 곧 이
+ * 메뉴가 동작하는지다.
+ */
+test.describe('모바일 메뉴', () => {
+  test.use({ viewport: { width: 375, height: 812 } });
+
+  test('좁은 화면에서 카테고리로 갈 길이 있다', async ({ page }) => {
+    await page.goto('/');
+
+    // 열기 전에는 카테고리 링크가 눈에 보이지 않는다
+    const category = page.locator('header a[href^="/category/"]');
+    await expect(category.first()).toBeHidden();
+
+    await page.getByRole('button', { name: '메뉴' }).click();
+
+    await expect(category.first()).toBeVisible();
+    // 검색도 헤더에서는 sm 아래로 숨으므로 여기 있어야 한다
+    await expect(page.locator('header').getByRole('searchbox')).toBeVisible();
+  });
+
+  test('Esc 로 닫히고 포커스가 여는 자리로 돌아온다', async ({ page }) => {
+    await page.goto('/');
+
+    const toggle = page.getByRole('button', { name: '메뉴' });
+    await toggle.click();
+    await expect(page.locator('header a[href^="/category/"]').first()).toBeVisible();
+
+    await page.keyboard.press('Escape');
+
+    await expect(page.locator('header a[href^="/category/"]').first()).toBeHidden();
+    // 닫고 포커스를 잃으면 키보드 사용자는 처음부터 다시 찾아야 한다
+    await expect(toggle).toBeFocused();
+  });
+
+  test('버튼이 열림 상태를 직접 말한다', async ({ page }) => {
+    await page.goto('/');
+
+    const toggle = page.getByRole('button', { name: '메뉴' });
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('스크립트가 없어도 푸터로 카테고리에 닿는다', async ({ browser }) => {
+    // 메뉴 버튼은 자바스크립트가 있어야 열린다. 없을 때의 길이 푸터다.
+    const ctx = await browser.newContext({ javaScriptEnabled: false, viewport: { width: 375, height: 812 } });
+    const page = await ctx.newPage();
+    await page.goto('/');
+
+    const footerLinks = page.getByRole('navigation', { name: '카테고리 (푸터)' }).getByRole('link');
+    await expect(footerLinks.first()).toBeVisible();
+
+    await ctx.close();
+  });
+
+  test('카테고리를 고르면 메뉴가 따라 닫힌다', async ({ page }) => {
+    await page.goto('/');
+
+    await page.getByRole('button', { name: '메뉴' }).click();
+    const first = page.locator('header a[href^="/category/"]').first();
+    const href = await first.getAttribute('href');
+    await first.click();
+
+    await expect(page).toHaveURL(new RegExp(`${href}$`));
+    // 열어 둔 채로 남으면 새 화면을 덮는다
+    await expect(page.locator('header a[href^="/category/"]').first()).toBeHidden();
+  });
+});
+

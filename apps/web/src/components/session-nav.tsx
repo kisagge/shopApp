@@ -10,24 +10,66 @@ import { authClient, signOutEverywhere } from '@shop/auth/client';
  * 서버에서 세션을 읽어 넘길 수도 있지만, 그러면 헤더를 쓰는 모든 페이지가
  * 동적 렌더링으로 묶인다. 이 조각만 클라이언트에서 세션을 읽는다.
  */
-export function SessionNav() {
+/**
+ * 'header' 는 헤더 한 줄에 들어가는 가로 배치,
+ * 'menu' 는 모바일 메뉴 안에 세로로 쌓이는 배치다.
+ */
+type Variant = 'header' | 'menu';
+
+export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
   const { data, isPending } = authClient.useSession();
   const router = useRouter();
 
+  const menu = variant === 'menu';
+
   if (isPending) {
     // 레이아웃이 흔들리지 않게 자리만 잡아 둔다
-    return <span aria-hidden="true" className="inline-block h-5 w-24" />;
+    return <span aria-hidden="true" className={menu ? 'block h-12' : 'inline-block h-5 w-24'} />;
   }
 
   if (!data) {
     return (
-      <Link href="/login" className="shrink-0 whitespace-nowrap text-xs font-medium text-[var(--fg-secondary)]">
+      <Link
+        href="/login"
+        className={
+          menu
+            ? 'flex h-12 items-center text-sm font-medium text-[var(--fg)] no-underline'
+            : 'shrink-0 whitespace-nowrap text-xs font-medium text-[var(--fg-secondary)]'
+        }
+      >
         로그인
       </Link>
     );
   }
 
   const role = (data.user as { role?: string }).role;
+
+  if (menu) {
+    return (
+      <>
+        <p className="flex h-9 items-center gap-1.5 text-sm text-[var(--fg-secondary)]">
+          {data.user.name}
+          {role && role !== 'CUSTOMER' && (
+            <span className="rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
+              {role === 'SUPER_ADMIN' ? '슈퍼관리자' : role === 'ADMIN' ? '관리자' : '가맹점'}
+            </span>
+          )}
+        </p>
+        <Link href="/mypage" className="flex h-12 items-center text-sm text-[var(--fg)] no-underline">
+          마이페이지
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            void signOutEverywhere().then(() => router.refresh());
+          }}
+          className="flex h-12 w-full items-center text-left text-sm text-[var(--fg-muted)]"
+        >
+          로그아웃
+        </button>
+      </>
+    );
+  }
 
   return (
     // 모바일에서 좁아지면 "마이페 / 이지" 처럼 단어 중간에서 끊긴다.

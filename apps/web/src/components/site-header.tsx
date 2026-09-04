@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { getTopCategories } from '~/lib/queries/products';
 import { SessionNav } from './session-nav';
+import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
@@ -17,8 +18,11 @@ export async function SiteHeader() {
    * 배경을 명시한다 — 투명하면 밑으로 지나가는 본문이 비친다.
    */
   return (
-    <header className="safe-t sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
-      <div className="mx-auto flex h-13 w-full max-w-[1280px] items-center justify-between gap-6 px-4 md:h-19 md:px-10">
+    <header className="safe-t relative sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
+      <div className="mx-auto flex h-13 w-full max-w-[1280px] items-center gap-3 px-4 md:h-19 md:gap-6 md:px-10">
+        {/* 좁은 화면에서 카테고리·검색·계정으로 가는 유일한 통로 */}
+        <MobileMenu categories={categories} />
+
         <p className="font-serif text-[21px] font-medium tracking-[0.18em] md:text-[25px]">
           <Link href="/" className="text-[var(--fg)] no-underline">PLAIN</Link>
         </p>
@@ -38,7 +42,7 @@ export async function SiteHeader() {
           </ul>
         </nav>
 
-        <span className="flex shrink-0 items-center gap-4">
+        <span className="ml-auto flex shrink-0 items-center gap-4 md:ml-0">
           {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
           <form method="get" action="/search" role="search" className="hidden sm:block">
             <label htmlFor="site-search" className="sr-only">상품 검색</label>
@@ -51,7 +55,9 @@ export async function SiteHeader() {
               className="h-9 w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500 md:w-48"
             />
           </form>
-          <SessionNav />
+          <span className="hidden md:inline-flex md:items-center">
+            <SessionNav />
+          </span>
           <CartBadge />
         </span>
       </div>

@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
@@ -102,13 +103,18 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]>
 
 
 /** 헤더 내비게이션용 최상위 카테고리 */
-export async function getTopCategories(): Promise<{ slug: string; name: string }[]> {
-  return prisma.category.findMany({
-    where: { parentId: null },
-    orderBy: { sortOrder: 'asc' },
-    select: { slug: true, name: true },
-  });
-}
+/**
+ * 헤더와 푸터가 같은 목록을 쓴다. cache 로 감싸 한 요청에 한 번만 읽는다 —
+ * 감싸지 않으면 모든 페이지가 같은 질의를 두 번 던진다.
+ */
+export const getTopCategories = cache(
+  async (): Promise<{ slug: string; name: string }[]> =>
+    prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: { sortOrder: 'asc' },
+      select: { slug: true, name: true },
+    }),
+);
 
 // ── 상세 ──────────────────────────────────────────────────────
 
