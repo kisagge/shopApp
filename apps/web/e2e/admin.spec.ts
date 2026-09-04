@@ -113,3 +113,34 @@ test.describe('주문 검색', () => {
     await expect(page.locator('tbody tr').first()).toBeVisible();
   });
 });
+
+test('리뷰 관리는 대기줄을 먼저 보여 준다', async ({ page }) => {
+  await page.goto('/admin/reviews');
+
+  await expect(page.getByRole('heading', { name: '리뷰 관리', level: 1 })).toBeVisible();
+
+  // 기본 탭은 "처리 대기" 다. 이 화면은 목록이 아니라 처리할 일감이다.
+  await expect(page.getByRole('link', { name: /처리 대기/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
+test('모르는 탭은 대기줄로 되돌린다', async ({ page }) => {
+  // 주소에 아무 값이나 들어올 수 있다
+  await page.goto('/admin/reviews?tab=%27%20OR%201%3D1');
+
+  await expect(page.getByRole('link', { name: /처리 대기/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
+test('내려간 글 탭은 되돌릴 수 있는 자리를 준다', async ({ page }) => {
+  await page.goto('/admin/reviews?tab=removed');
+
+  await expect(page.getByRole('link', { name: '내려간 글' })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});

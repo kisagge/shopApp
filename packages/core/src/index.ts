@@ -20,6 +20,7 @@ export * from './image';
 export * from './banner';
 export * from './catalog';
 export * from './review';
+export * from './review-report';
 export * from './cart-sync';
 export * from './mail';
 export * from './auth-policy';

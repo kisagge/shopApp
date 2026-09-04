@@ -206,3 +206,27 @@ export async function deleteReview(
     await discardReviewImages(review.imageKeys);
   }
 }
+
+/**
+ * 운영진이 내린 글을 되돌린다.
+ *
+ * **잘못 내리는 일은 실제로 일어난다.** 신고 사유만 보고 눌렀다가 원문을
+ * 읽고 판단이 바뀌는 경우가 대부분이고, 그때 되돌릴 문이 없으면 글쓴이는
+ * 영영 잃는다 — 같은 구매로 다시 쓸 수도 없다(유니크 제약).
+ *
+ * 본인이 지운 글은 행이 없어 여기 걸리지 않는다. 되돌릴 것도 없고,
+ * 다시 쓰면 된다.
+ */
+export async function restoreReview(reviewId: string): Promise<void> {
+  const review = await prisma.review.findFirst({
+    where: { id: reviewId, deletedAt: { not: null } },
+    select: { id: true, productId: true },
+  });
+  if (!review) throw new ReviewError('REVIEW_NOT_FOUND', 404);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.review.update({ where: { id: reviewId }, data: { deletedAt: null } });
+    // 내려간 동안 집계에서 빠져 있었다
+    await recountRating(tx as typeof prisma, review.productId);
+  });
+}

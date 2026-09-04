@@ -16,6 +16,7 @@ const GUARDED = [
   'api/cart/quote/route.ts',
   'api/reviews/route.ts',
   'api/coupons/claim/route.ts',
+  'api/reviews/[id]/report/route.ts',
 ] as const;
 
 const APP = join(process.cwd(), 'src', 'app');

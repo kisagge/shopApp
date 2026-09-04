@@ -19,7 +19,8 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const discard = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/reviews/images', () => ({ discardReviewImages: discard }));
 
-const { createReview, updateReview, deleteReview } = await import('~/lib/reviews/write-review');
+const { createReview, updateReview, deleteReview, restoreReview } =
+  await import('~/lib/reviews/write-review');
 
 const USER = 'u-buyer';
 const input = {
@@ -242,5 +243,37 @@ describe('리뷰 사진', () => {
 
     expect(tx.review.update).toHaveBeenCalled();
     expect(discard).not.toHaveBeenCalled();
+  });
+});
+
+describe('내린 글 되돌리기', () => {
+  it('deletedAt 을 지우고 집계를 다시 센다', async () => {
+    // 내려간 동안 평점 집계에서 빠져 있었다
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', productId: 'p-1' });
+
+    await restoreReview('r-1');
+
+    expect(tx.review.update).toHaveBeenCalledWith({
+      where: { id: 'r-1' }, data: { deletedAt: null },
+    });
+    expect(tx.product.update).toHaveBeenCalled();
+  });
+
+  it('내려가지 않은 글은 되돌릴 것이 없다', async () => {
+    db.review.findFirst.mockResolvedValue(null);
+
+    await expect(restoreReview('r-1')).rejects.toMatchObject({
+      code: 'REVIEW_NOT_FOUND', status: 404,
+    });
+  });
+
+  it('내려간 것만 찾는다', async () => {
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', productId: 'p-1' });
+
+    await restoreReview('r-1');
+
+    expect(db.review.findFirst.mock.calls[0]![0].where).toMatchObject({
+      deletedAt: { not: null },
+    });
   });
 });

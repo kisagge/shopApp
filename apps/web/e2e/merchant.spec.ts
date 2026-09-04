@@ -26,3 +26,14 @@ test('쿠폰은 플랫폼 비용이라 가맹점이 만들지 않는다', async 
   await page.goto('/admin/coupons');
   expect(new URL(page.url()).pathname).not.toBe('/admin/coupons');
 });
+
+test('리뷰 관리는 가맹점에게 없다', async ({ page }) => {
+  await page.goto('/admin');
+
+  // 자기 상품의 혹평을 내릴 수 있으면 리뷰가 상품 설명의 일부가 된다
+  await expect(page.getByRole('link', { name: '리뷰' })).toHaveCount(0);
+
+  // 메뉴를 감추는 것만으로는 부족하다
+  await page.goto('/admin/reviews');
+  expect(new URL(page.url()).pathname).not.toBe('/admin/reviews');
+});

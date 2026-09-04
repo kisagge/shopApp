@@ -48,6 +48,15 @@ export const RATE_LIMIT = {
    * 그것으로 막히지 않는다.
    */
   coupon: { limit: 10, windowMs: MINUTE },
+
+  /**
+   * 리뷰 신고. 사유를 고르고 누르는 동작이라 잦을 이유가 없다.
+   *
+   * 여기가 헐거우면 **신고가 곧 소음**이 된다 — 대기줄이 한 사람의 클릭으로
+   * 채워지면 운영진이 진짜 건을 못 찾는다. 같은 리뷰 중복은 유니크 제약이
+   * 막지만, 여러 리뷰를 훑으며 누르는 것은 그것으로 막히지 않는다.
+   */
+  report: { limit: 10, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

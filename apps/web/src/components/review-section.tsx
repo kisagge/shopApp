@@ -2,6 +2,7 @@ import { SIZE_FIT_LABEL, type SizeFit } from '@shop/core';
 import type { PublicReview, ReviewSummary } from '~/lib/queries/reviews';
 import { ReviewStars } from './review-stars';
 import { ReviewActions } from './review-actions';
+import { ReviewReport } from './review-report';
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
@@ -90,6 +91,9 @@ export function ReviewSection({
                       {dateFormat.format(review.createdAt)}
                     </time>
                     {review.isMine && <ReviewActions reviewId={review.id} />}
+                    {review.canReport && (
+                      <ReviewReport reviewId={review.id} alreadyReported={review.reportedByMe} />
+                    )}
                   </div>
 
                   {(review.optionLabel || review.sizeFit || review.height) && (

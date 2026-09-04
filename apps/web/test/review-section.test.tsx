@@ -13,6 +13,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   sizeFit: 'TRUE', height: 175, weight: 70,
   authorName: '데****자', optionLabel: '오트밀 / M',
   createdAt: new Date('2026-09-01T00:00:00Z'), imageUrls: [], isMine: false,
+  canReport: false, reportedByMe: false,
   ...over,
 });
 

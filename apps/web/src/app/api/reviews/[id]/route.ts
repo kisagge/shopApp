@@ -3,6 +3,7 @@ import { updateReviewSchema } from '@shop/contract';
 import { hasPermission } from '@shop/core';
 import { getActor, getSessionUser } from '@shop/auth/session';
 import { updateReview, deleteReview, ReviewError } from '~/lib/reviews/write-review';
+import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
 
 export async function PATCH(
@@ -63,8 +64,10 @@ export async function DELETE(
     await deleteReview({ userId: actor.id, canModerate }, id);
 
     if (canModerate) {
+      // 이미 끝난 건이 대기줄에 남으면 같은 일을 두 번 처리하게 된다
+      await closeReportsAsRemoved(actor.id, id);
       await recordAudit({
-        actor, action: 'review.delete', targetType: 'product', targetId: id, request,
+        actor, action: 'review.delete', targetType: 'review', targetId: id, request,
       });
     }
     return NextResponse.json({ deleted: true });

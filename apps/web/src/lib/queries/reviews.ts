@@ -23,6 +23,15 @@ export interface PublicReview {
   readonly imageUrls: readonly string[];
   /** 지금 보고 있는 사람이 쓴 리뷰인가 — 수정·삭제 버튼을 그릴지 결정한다 */
   readonly isMine: boolean;
+  /** 신고할 수 있는가 — 로그인했고 내 글이 아니어야 한다 */
+  readonly canReport: boolean;
+  /**
+   * 내가 이미 신고했는가.
+   *
+   * 눌러 보고 나서 "이미 신고했습니다" 를 받는 것과, 처음부터 그렇게
+   * 적혀 있는 것은 다르다. 뒤늦게 막는 화면은 사람을 두 번 헛되게 한다.
+   */
+  readonly reportedByMe: boolean;
 }
 
 export interface ReviewSummary {
@@ -74,6 +83,25 @@ export async function getProductReviews(
   const hasMore = rows.length > PAGE_SIZE;
   const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
 
+  /*
+   * 내가 신고한 글을 따로 한 번 더 묻는다.
+   *
+   * 리뷰 select 안에 조건부로 넣으면 viewerId 유무에 따라 select 모양이
+   * 갈리고, 그러면 Prisma 가 추론하는 타입도 갈린다. 이 목록은 한 쪽에
+   * 열 건이라 질의 하나가 더 도는 편이 낫다.
+   */
+  const mineReported =
+    options.viewerId === undefined || page.length === 0
+      ? new Set<string>()
+      : new Set(
+          (
+            await prisma.reviewReport.findMany({
+              where: { reporterId: options.viewerId, reviewId: { in: page.map((r) => r.id) } },
+              select: { reviewId: true },
+            })
+          ).map((r) => r.reviewId),
+        );
+
   return {
     items: page.map((r) => ({
       id: r.id,
@@ -87,6 +115,8 @@ export async function getProductReviews(
       createdAt: r.createdAt,
       imageUrls: r.imageUrls,
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
+      canReport: options.viewerId !== undefined && r.userId !== options.viewerId,
+      reportedByMe: mineReported.has(r.id),
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };

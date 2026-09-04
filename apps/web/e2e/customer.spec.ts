@@ -84,3 +84,17 @@ test('주소 검색 버튼이 입력칸과 어긋나지 않는다', async ({ pag
   // 힌트 아래를 기준으로 잡아 버튼이 내려간다 — 실제로 그렇게 어긋났었다.
   expect(Math.abs(input!.y + input!.height - (button!.y + button!.height))).toBeLessThan(2);
 });
+
+test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 말한다', async ({ page }) => {
+  await page.goto('/product/wool-double-jacket');
+
+  const report = page.getByRole('button', { name: '신고' }).first();
+  await expect(report).toBeVisible();
+  await expect(report).toHaveAttribute('aria-expanded', 'false');
+
+  await report.click();
+
+  await expect(page.getByRole('group', { name: '신고 사유' })).toBeVisible();
+  // 누른 뒤 아무 변화가 없으면 눌리지 않은 줄 알고 다시 누른다
+  await expect(page.getByText(/글은 그대로 남습니다/)).toBeVisible();
+});

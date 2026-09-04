@@ -80,6 +80,8 @@ model User {
   orders        Order[]
   cartItems     CartItem[]
   reviews       Review[]
+  reviewReports ReviewReport[]        @relation("reporter")
+  reviewsJudged ReviewReport[]        @relation("judge")
   wishlist      WishlistItem[]
   coupons       UserCoupon[]
   pointHistory  PointTransaction[]
@@ -799,6 +801,8 @@ model Review {
   /// ProductImage 가 storageKey 를 따로 두는 것과 같은 이유다.
   imageKeys String[]
 
+  reports ReviewReport[]
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -806,6 +810,50 @@ model Review {
   @@index([productId, createdAt])
   @@index([userId])
   @@map("reviews")
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  IRRELEVANT
+  PRIVACY
+  OTHER
+}
+
+/// 리뷰 신고.
+///
+/// 신고는 **운영진이 먼저 볼 것을 고르는 신호**일 뿐이다. 쌓인다고 글이
+/// 자동으로 내려가지는 않는다 — 그렇게 두면 계정 몇 개로 정당한 혹평을
+/// 지울 수 있다(core 의 AUTO_HIDE_ON_REPORTS).
+model ReviewReport {
+  id       String @id @default(cuid())
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  /// 신고한 사람. 탈퇴하면 신고도 함께 사라진다 — 남겨 둘 근거가 없다.
+  reporterId String
+  reporter   User   @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+
+  reason ReportReason
+  /// 사유가 OTHER 일 때 주로 쓴다. 없어도 된다.
+  detail String?
+
+  /// 처리 시각. null 이면 아직 대기줄에 있다.
+  resolvedAt   DateTime?
+  /// 처리한 운영자. 계정이 사라져도 처리 기록은 남긴다.
+  resolvedById String?
+  resolvedBy   User?     @relation("judge", fields: [resolvedById], references: [id], onDelete: SetNull)
+  /// 'kept'(문제없음) 또는 'removed'(글을 내림)
+  resolution   String?
+
+  createdAt DateTime @default(now())
+
+  /// 한 사람이 같은 리뷰를 여러 번 신고할 수 없다. 없으면 건수가 곧
+  /// 열의 개수가 되어 신고 수를 마음대로 부풀릴 수 있다.
+  @@unique([reviewId, reporterId])
+  /// 대기줄 조회. 처리 안 된 것을 오래된 순으로 꺼낸다.
+  @@index([resolvedAt, createdAt])
+  @@map("review_reports")
 }
 
 model WishlistItem {

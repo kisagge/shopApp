@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RATING_MIN, RATING_MAX, SIZE_FIT, MAX_IMAGES_PER_REVIEW } from '@shop/core';
+import { RATING_MIN, RATING_MAX, SIZE_FIT, MAX_IMAGES_PER_REVIEW, REPORT_REASON } from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -63,3 +63,26 @@ export const reviewListQuerySchema = z.object({
 
 /** 리뷰 사진 개수 한도. 화면이 안내 문구에 쓴다. */
 export const REVIEW_IMAGE_LIMIT = MAX_IMAGES_PER_REVIEW;
+
+/**
+ * 리뷰 신고.
+ *
+ * 사유는 고르게 한다 — 자유 입력만 받으면 분류가 안 되고, 무엇이 문제인지
+ * 매번 읽어야 처리 순서를 정할 수 있다. 설명은 선택이다.
+ */
+export const reportReviewSchema = z.object({
+  reason: z.enum(REPORT_REASON, { error: '신고 사유를 골라 주세요' }),
+  detail: z
+    .string()
+    .trim()
+    .max(500, '500자를 넘을 수 없습니다')
+    .nullable()
+    .default(null),
+});
+export type ReportReviewInput = z.infer<typeof reportReviewSchema>;
+
+/** 운영진의 신고 처리. 글을 내리는 것은 삭제 API 가 따로 맡는다. */
+export const dismissReportsSchema = z.object({
+  note: z.string().trim().max(500).nullable().default(null),
+});
+export type DismissReportsInput = z.infer<typeof dismissReportsSchema>;
