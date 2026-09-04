@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
-import { verifyEmailMail, resetPasswordMail } from '@shop/core';
+import { verifyEmailMail, resetPasswordMail, SIGNUP_POINTS, rewardExpiresAt } from '@shop/core';
 import { getMailer } from '@shop/mail';
 import { prisma } from '@shop/db';
 
@@ -156,6 +156,45 @@ export const auth = betterAuth({
       role: { type: 'string', required: false, defaultValue: 'CUSTOMER', input: false },
       merchantId: { type: 'string', required: false, input: false },
       phone: { type: 'string', required: false, input: true },
+    },
+  },
+
+  databaseHooks: {
+    user: {
+      create: {
+        /**
+         * 가입 축하 포인트.
+         *
+         * **원장으로 준다.** 잔액만 올리면 PointTransaction 합계와 처음부터
+         * 어긋나고, 그 뒤로는 아무도 알아채지 못한다 — 시드가 같은 이유로
+         * 같은 방식을 쓴다.
+         *
+         * after 훅이라 계정은 이미 만들어져 있다. 여기서 실패해도 가입을
+         * 되돌리지 않는다. 포인트를 못 받는 것보다 가입이 실패하는 쪽이
+         * 훨씬 나쁘고, 못 받은 것은 원장을 보면 나중에 채울 수 있다.
+         */
+        async after(user) {
+          try {
+            await prisma.$transaction([
+              prisma.pointTransaction.create({
+                data: {
+                  userId: user.id,
+                  amount: SIGNUP_POINTS,
+                  reason: 'EARN_SIGNUP',
+                  note: '가입 축하 포인트',
+                  expiresAt: rewardExpiresAt(new Date()),
+                },
+              }),
+              prisma.user.update({
+                where: { id: user.id },
+                data: { pointBalance: { increment: SIGNUP_POINTS } },
+              }),
+            ]);
+          } catch (error) {
+            console.error('[auth] 가입 포인트 지급 실패', user.id, error);
+          }
+        },
+      },
     },
   },
 

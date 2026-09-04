@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { LoginForm } from '~/components/login-form';
 
 export const metadata: Metadata = { title: '로그인' };
@@ -14,6 +15,13 @@ export default function LoginPage() {
         </p>
       </div>
       <LoginForm />
+
+      <p className="text-center text-[13px] text-[var(--fg-muted)]">
+        아직 계정이 없으신가요?{' '}
+        <Link href="/signup" className="text-[var(--fg)] underline underline-offset-2">
+          회원가입
+        </Link>
+      </p>
     </div>
   );
 }

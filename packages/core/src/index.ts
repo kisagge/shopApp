@@ -22,3 +22,4 @@ export * from './catalog';
 export * from './review';
 export * from './cart-sync';
 export * from './mail';
+export * from './auth-policy';

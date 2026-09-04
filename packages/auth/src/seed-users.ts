@@ -26,15 +26,13 @@ interface SeedUser {
   /** 가맹점 계정이면 사업자번호로 소속을 찾는다 */
   merchantBusinessNumber?: string;
   grade?: 'BASIC' | 'SILVER' | 'GOLD' | 'VIP';
-  /** 가입 축하 포인트. 잔액만 박지 않고 원장에도 남긴다. */
-  signupPoints?: number;
   phone?: string;
 }
 
 const USERS: SeedUser[] = [
   // 등급은 구매확정 금액에서 계산된다(effectiveGrade). 시드가 임의로 박으면
   // 화면의 배지와 진행률이 어긋난다.
-  { email: 'demo@plain.test', name: '데모 사용자', role: 'CUSTOMER', signupPoints: 3_240, phone: '010-0000-0000' },
+  { email: 'demo@plain.test', name: '데모 사용자', role: 'CUSTOMER', phone: '010-0000-0000' },
   { email: 'super@plain.test', name: '슈퍼관리자', role: 'SUPER_ADMIN' },
   { email: 'admin@plain.test', name: '운영 관리자', role: 'ADMIN' },
   { email: 'contact@studionoon.test', name: '스튜디오눈 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00001' },
@@ -84,31 +82,13 @@ async function main(): Promise<void> {
     });
   }
 
-  // 포인트는 **원장으로 준다.** 잔액만 박으면 User.pointBalance 와
-  // PointTransaction 합계가 처음부터 어긋나고, 그 뒤로는 아무도 알아채지 못한다.
-  for (const u of USERS) {
-    if (!u.signupPoints) continue;
-    const target = await prisma.user.findUniqueOrThrow({ where: { email: u.email } });
-    const already = await prisma.pointTransaction.findFirst({
-      where: { userId: target.id, reason: 'EARN_SIGNUP' },
-    });
-    if (already) continue;
-
-    await prisma.$transaction([
-      prisma.pointTransaction.create({
-        data: {
-          userId: target.id, amount: u.signupPoints, reason: 'EARN_SIGNUP',
-          note: '가입 축하 포인트',
-          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
-        },
-      }),
-      prisma.user.update({
-        where: { id: target.id },
-        data: { pointBalance: { increment: u.signupPoints } },
-      }),
-    ]);
-    console.log(`  포인트 지급: ${u.email} +${u.signupPoints}P`);
-  }
+  /**
+   * 가입 포인트는 **여기서 주지 않는다.**
+   *
+   * signUpEmail 이 인증의 databaseHooks 를 태우고, 그 훅이 원장에 넣는다.
+   * 시드가 따로 주면 지급 규칙이 두 벌이 되고, 진짜 가입 경로가 포인트를
+   * 제대로 주는지는 아무도 확인하지 않게 된다.
+   */
 
   const customer = await prisma.user.findUniqueOrThrow({ where: { email: 'demo@plain.test' } });
   await prisma.address.upsert({
