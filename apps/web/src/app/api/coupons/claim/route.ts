@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRateLimit } from '~/lib/rate-limit';
 import { getSessionUser } from '@shop/auth/session';
 import { claimCouponSchema } from '@shop/contract';
 import { claimCouponByCode, CouponError } from '~/lib/admin/manage-coupon';
@@ -9,6 +10,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
   }
+
+  // 로그인 필수 창구라 사용자 id 로 센다
+  const limited = await enforceRateLimit('coupon', request, user.id);
+  if (limited) return limited;
 
   const parsed = claimCouponSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {

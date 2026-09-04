@@ -1,4 +1,5 @@
 import { isServerOnlyEvent, requiresConsent } from '@shop/core';
+import { enforceRateLimit } from '~/lib/rate-limit';
 import { getSessionUser } from '@shop/auth/session';
 import { prisma } from '@shop/db';
 import { eventBatchSchema, type EventBatchResponse } from '@shop/contract';
@@ -28,6 +29,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 413 },
     );
   }
+
+  // 요청 본문의 userId 는 절대 쓰지 않는다. 세션이 말하는 사람만 믿는다.
+  const sessionUser = await getSessionUser(request.headers);
+
+  /**
+   * 제한을 **본문을 읽기 전에** 건다.
+   *
+   * 검증 뒤에 두면 형식이 틀린 요청은 400 으로 먼저 빠져나가서 세어지지도
+   * 않는다 — 아무 쓰레기나 보내면 제한을 통째로 우회하면서 파싱 비용은
+   * 그대로 우리가 낸다. 실제로 그렇게 만들어 놓고 130번 두드려 보고 알았다.
+   *
+   * 누구인지는 사용자 id 로, 없으면 해시한 IP 로 센다 — 같은 사무실에서
+   * 여러 사람이 쓰면 IP 가 같아서, IP 로만 세면 한 사람이 남의 몫까지 쓴다.
+   */
+  const limited = await enforceRateLimit('events', request, sessionUser?.id ?? null);
+  if (limited) return limited;
 
   let body: unknown;
   try {
@@ -64,8 +81,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // 요청 본문의 userId 는 절대 쓰지 않는다. 세션이 말하는 사람만 믿는다.
-  const sessionUser = await getSessionUser(request.headers);
 
   const ctx: CollectionContext = {
     userId: sessionUser?.id ?? null,

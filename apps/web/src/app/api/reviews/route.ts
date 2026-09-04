@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRateLimit } from '~/lib/rate-limit';
 import { createReviewSchema } from '@shop/contract';
 import { ImageError, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REVIEW } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
@@ -51,6 +52,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!user) {
     return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
   }
+
+  // 로그인 필수 창구라 사용자 id 로 센다
+  const limited = await enforceRateLimit('review', request, user.id);
+  if (limited) return limited;
 
   let body: unknown;
   let files: { bytes: Uint8Array; declaredType: string }[];
