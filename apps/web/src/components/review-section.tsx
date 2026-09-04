@@ -1,9 +1,12 @@
+import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { SIZE_FIT_LABEL, type SizeFit } from '@shop/core';
 import type { PublicReview, ReviewSummary } from '~/lib/queries/reviews';
 import { ReviewStars } from './review-stars';
 import { ReviewActions } from './review-actions';
 import { ReviewReport } from './review-report';
+import { ReviewHelpful } from './review-helpful';
+
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
@@ -11,9 +14,21 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZ
 export function ReviewSection({
   summary,
   reviews,
+  sortTabs,
+  loggedIn = false,
 }: {
   summary: ReviewSummary;
   reviews: readonly PublicReview[];
+  /**
+   * 정렬 줄.
+   *
+   * 여기서 직접 만들지 않고 받아 끼운다 — 그러려면 이 조각이 요청의 언어를
+   * 알아야 하고, 그 순간 서버 컴포넌트가 되어 테스트에서 그릴 수 없다.
+   * 찜 버튼을 ProductCard 에 끼워 넣는 것과 같은 결이다.
+   */
+  sortTabs?: ReactNode;
+  /** 도움돼요를 누를 수 있는 사람인지 판단하는 데 쓴다 */
+  loggedIn?: boolean;
 }) {
   return (
     <section aria-labelledby="reviews-title" className="border-t border-[var(--border)] pt-10">
@@ -78,7 +93,9 @@ export function ReviewSection({
             )}
           </div>
 
-          <ul className="mt-10 flex flex-col">
+          {sortTabs}
+
+          <ul className="flex flex-col">
             {reviews.map((review) => (
               <li key={review.id} className="border-t border-[var(--surface-2)] py-6">
                 <article>
@@ -148,6 +165,16 @@ export function ReviewSection({
                       ))}
                     </ul>
                   )}
+
+                  <div className="mt-4 flex items-center">
+                    <ReviewHelpful
+                      reviewId={review.id}
+                      initialCount={review.helpfulCount}
+                      initialPressed={review.helpfulByMe}
+                      /* 로그인해야 하고 내 글이 아니어야 누를 수 있다 */
+                      canVote={loggedIn && !review.isMine}
+                    />
+                  </div>
                 </article>
               </li>
             ))}

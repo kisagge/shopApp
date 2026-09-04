@@ -154,6 +154,17 @@ export const ko = {
   'support.privateMasked': '비공개 문의입니다.',
   'support.backToList': '목록으로',
 
+  'review.helpful': '도움돼요',
+  'review.helpfulCount': { one: '도움돼요 {count}', other: '도움돼요 {count}' },
+  'review.helpfulOn': '도움됐다고 표시함, 지금 {count}명',
+  'review.helpfulOff': '도움됐다고 표시하기, 지금 {count}명',
+  'review.helpfulLogin': '도움돼요는 로그인 후 누를 수 있습니다.',
+  'review.sort': '리뷰 정렬',
+  'review.sortRecent': '최신순',
+  'review.sortHelpful': '도움순',
+  'review.sortRatingDesc': '높은 평점순',
+  'review.sortRatingAsc': '낮은 평점순',
+
   'topic.DELIVERY': '배송',
   'topic.EXCHANGE': '교환·반품',
   'topic.PAYMENT': '결제',

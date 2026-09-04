@@ -147,6 +147,17 @@ export const en: Dictionary = {
   'support.privateMasked': 'This question is private.',
   'support.backToList': 'Back to the list',
 
+  'review.helpful': 'Helpful',
+  'review.helpfulCount': { one: 'Helpful {count}', other: 'Helpful {count}' },
+  'review.helpfulOn': 'Marked helpful, {count} so far',
+  'review.helpfulOff': 'Mark as helpful, {count} so far',
+  'review.helpfulLogin': 'Please sign in to mark a review helpful.',
+  'review.sort': 'Sort reviews',
+  'review.sortRecent': 'Newest',
+  'review.sortHelpful': 'Most helpful',
+  'review.sortRatingDesc': 'Highest rated',
+  'review.sortRatingAsc': 'Lowest rated',
+
   'topic.DELIVERY': 'Shipping',
   'topic.EXCHANGE': 'Returns & exchanges',
   'topic.PAYMENT': 'Payment',

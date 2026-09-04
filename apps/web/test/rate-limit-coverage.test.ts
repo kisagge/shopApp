@@ -19,6 +19,7 @@ const GUARDED = [
   'api/reviews/[id]/report/route.ts',
   'api/inquiries/route.ts',
   'api/products/recent/route.ts',
+  'api/reviews/[id]/helpful/route.ts',
 ] as const;
 
 const APP = join(process.cwd(), 'src', 'app');
@@ -48,10 +49,19 @@ describe('요청 제한이 붙은 자리', () => {
      * **막을 요청이 일을 다 하고 나서 429 를 받으면 막은 것이 아니다.**
      * 몸통이 없다고 검사에서 빼면 그쪽만 규칙 밖에 놓인다.
      */
-    const body = read(rel).split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/)[1];
-    expect(body).toBeDefined();
+    /*
+     * **핸들러를 하나도 빠뜨리지 않는다.** 예전에는 첫 번째만 봤는데,
+     * 그러면 POST 에는 제한을 걸고 DELETE 에는 안 건 라우트가 그대로
+     * 통과한다. 이 파일에도 PUT 과 DELETE 를 함께 두는 라우트가 생겼다.
+     */
+    const bodies = read(rel).split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/).slice(1);
+    expect(bodies.length).toBeGreaterThan(0);
 
-    const limit = body!.indexOf('await enforceRateLimit');
+    for (const body of bodies) checkOne(body);
+  });
+
+  function checkOne(body: string): void {
+    const limit = body.indexOf('await enforceRateLimit');
     expect(limit).toBeGreaterThan(-1);
 
     /*
@@ -70,10 +80,10 @@ describe('요청 제한이 붙은 자리', () => {
       'prisma.',
     ];
     for (const needle of work) {
-      const at = body!.indexOf(needle);
+      const at = body.indexOf(needle);
       if (at !== -1) expect(at, needle).toBeGreaterThan(limit);
     }
-  });
+  }
 
   it('제한을 건 라우트는 전부 목록에 있다', () => {
     // 반대 방향도 지킨다. 목록에 없는데 붙어 있으면 목록이 낡은 것이다.

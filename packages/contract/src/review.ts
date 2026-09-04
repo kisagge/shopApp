@@ -47,14 +47,17 @@ export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 export const updateReviewSchema = z.object(reviewShape).partial();
 export type UpdateReviewInput = z.infer<typeof updateReviewSchema>;
 
-export const REVIEW_SORT = ['recent', 'rating_desc', 'rating_asc'] as const;
+/**
+ * 리뷰 정렬.
+ *
+ * `helpful` 이 있어야 **좋은 리뷰가 위로 올라올 길**이 생긴다. 그 전에는
+ * 최신순과 별점순뿐이라, 길게 잘 쓴 후기가 하루 만에 뒤로 밀렸다.
+ *
+ * 이름표는 여기 없다 — 화면이 세 나라 말로 나가므로 뭐라고 부를지는 화면이
+ * 정한다. 장바구니 문제 문구표를 옮긴 것과 같은 이유다.
+ */
+export const REVIEW_SORT = ['recent', 'helpful', 'rating_desc', 'rating_asc'] as const;
 export type ReviewSort = (typeof REVIEW_SORT)[number];
-
-export const REVIEW_SORT_LABEL: Readonly<Record<ReviewSort, string>> = {
-  recent: '최신순',
-  rating_desc: '높은 평점순',
-  rating_asc: '낮은 평점순',
-};
 
 export const reviewListQuerySchema = z.object({
   sort: z.enum(REVIEW_SORT).catch('recent'),

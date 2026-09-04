@@ -17,6 +17,7 @@ import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
 import { getProductInquiries } from '~/lib/queries/inquiries';
 import { ProductOptions } from '~/components/product-options';
 import { ReviewSection } from '~/components/review-section';
+import { ReviewSortTabs } from '~/components/review-sort-tabs';
 import { InquirySection } from '~/components/inquiry-section';
 import { WishlistButton } from '~/components/wishlist-button';
 import { RecordRecentView } from '~/components/record-recent-view';
@@ -24,14 +25,16 @@ import { RecentlyViewed } from '~/components/recently-viewed';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
+import { reviewListQuerySchema } from '@shop/contract';
 
 export const dynamic = 'force-dynamic';
 
 interface Params {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
-export async function generateMetadata({ params }: Params): Promise<Metadata> {
+export async function generateMetadata({ params }: Pick<Params, 'params'>): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return { title: (await getT())('product.notFound') };
@@ -54,8 +57,20 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   };
 }
 
-export default async function ProductPage({ params }: Params) {
+export default async function ProductPage({ params, searchParams }: Params) {
   const { slug } = await params;
+  /*
+   * 정렬은 주소에 남긴다. 잘못된 값이 들어와도 화면이 죽지 않게 계약이
+   * 기본값으로 되돌린다(catch).
+   *
+   * 주소에서는 `reviewSort` 라고 부른다 — 이 화면에 나중에 다른 정렬이
+   * 생겨도 서로 부딪히지 않게 하려는 것이다. **계약이 읽는 이름은 `sort`
+   * 이므로 여기서 옮겨 담는다.** 그대로 넘겼더니 계약이 값을 못 찾고
+   * 기본값으로 되돌려서, 탭은 눌리는데 목록은 그대로였다.
+   */
+  const reviewSort = reviewListQuerySchema.parse({
+    sort: (await searchParams)['reviewSort'],
+  }).sort;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
 
@@ -74,7 +89,7 @@ export default async function ProductPage({ params }: Params) {
 
   const [summary, reviews, inquiries, wishlisted, restockOn] = await Promise.all([
     getReviewSummary(product.id),
-    getProductReviews(product.id, { viewerId: viewer?.id }),
+    getProductReviews(product.id, { viewerId: viewer?.id, sort: reviewSort }),
     // 비공개 문의를 거를 수 있게 보는 사람을 넘긴다
     getProductInquiries(product.id, viewer),
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
@@ -274,7 +289,12 @@ export default async function ProductPage({ params }: Params) {
       </section>
 
       <div className="pt-16">
-        <ReviewSection summary={summary} reviews={reviews.items} />
+        <ReviewSection
+          summary={summary}
+          reviews={reviews.items}
+          sortTabs={<ReviewSortTabs sort={reviewSort} basePath={`/product/${slug}`} />}
+          loggedIn={viewer !== null}
+        />
         <InquirySection
           productId={product.id}
           inquiries={inquiries.items}

@@ -26,6 +26,10 @@ export interface PublicReview {
   readonly isMine: boolean;
   /** 신고할 수 있는가 — 로그인했고 내 글이 아니어야 한다 */
   readonly canReport: boolean;
+  /** 도움이 됐다고 누른 사람 수 */
+  readonly helpfulCount: number;
+  /** 내가 이미 눌렀는가 */
+  readonly helpfulByMe: boolean;
   /**
    * 내가 이미 신고했는가.
    *
@@ -51,6 +55,16 @@ function maskAuthor(name: string): string {
 
 function orderFor(sort: ReviewSort) {
   switch (sort) {
+    case 'helpful':
+      /*
+       * 표가 하나도 없을 때는 도움순이 아무 뜻이 없다. 그때 순서가 제멋대로면
+       * 새로고침마다 목록이 뒤집히므로, 표가 같으면 최신순으로 이어 간다.
+       */
+      return [
+        { helpfulCount: 'desc' as const },
+        { createdAt: 'desc' as const },
+        { id: 'desc' as const },
+      ];
     case 'rating_desc':
       return [{ rating: 'desc' as const }, { id: 'desc' as const }];
     case 'rating_asc':
@@ -74,7 +88,7 @@ export async function getProductReviews(
     select: {
       id: true, rating: true, content: true, sizeFit: true,
       height: true, weight: true, createdAt: true, userId: true,
-      imageUrls: true,
+      imageUrls: true, helpfulCount: true,
       user: { select: { name: true } },
       // 어떤 옵션을 산 사람의 후기인지가 사이즈 판단에 도움이 된다
       orderItem: { select: { optionLabel: true } },
@@ -91,17 +105,28 @@ export async function getProductReviews(
    * 갈리고, 그러면 Prisma 가 추론하는 타입도 갈린다. 이 목록은 한 쪽에
    * 열 건이라 질의 하나가 더 도는 편이 낫다.
    */
-  const mineReported =
+  const ids = page.map((r) => r.id);
+  const [mineReported, mineHelpful] =
     options.viewerId === undefined || page.length === 0
-      ? new Set<string>()
-      : new Set(
-          (
-            await prisma.reviewReport.findMany({
-              where: { reporterId: options.viewerId, reviewId: { in: page.map((r) => r.id) } },
+      ? [new Set<string>(), new Set<string>()]
+      : await Promise.all([
+          prisma.reviewReport
+            .findMany({
+              where: { reporterId: options.viewerId, reviewId: { in: ids } },
               select: { reviewId: true },
             })
-          ).map((r) => r.reviewId),
-        );
+            .then((rows) => new Set(rows.map((r) => r.reviewId))),
+          /*
+           * 내가 누른 것도 한 번에 묻는다. 카드마다 물으면 리뷰 수만큼
+           * 질의가 나간다 — 찜 목록을 한 번에 가져오는 것과 같다.
+           */
+          prisma.reviewHelpful
+            .findMany({
+              where: { userId: options.viewerId, reviewId: { in: ids } },
+              select: { reviewId: true },
+            })
+            .then((rows) => new Set(rows.map((r) => r.reviewId))),
+        ]);
 
   return {
     items: page.map((r) => ({
@@ -118,6 +143,8 @@ export async function getProductReviews(
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
       canReport: options.viewerId !== undefined && r.userId !== options.viewerId,
       reportedByMe: mineReported.has(r.id),
+      helpfulCount: r.helpfulCount,
+      helpfulByMe: mineHelpful.has(r.id),
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };

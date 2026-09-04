@@ -143,6 +143,17 @@ export const ja: Dictionary = {
   'support.privateMasked': '非公開のお問い合わせです。',
   'support.backToList': '一覧へ',
 
+  'review.helpful': '役に立った',
+  'review.helpfulCount': { one: '役に立った {count}', other: '役に立った {count}' },
+  'review.helpfulOn': '役に立ったと表示済み、現在{count}人',
+  'review.helpfulOff': '役に立ったと表示する、現在{count}人',
+  'review.helpfulLogin': '「役に立った」はログイン後に押せます。',
+  'review.sort': 'レビューの並び替え',
+  'review.sortRecent': '新着順',
+  'review.sortHelpful': '役に立った順',
+  'review.sortRatingDesc': '評価の高い順',
+  'review.sortRatingAsc': '評価の低い順',
+
   'topic.DELIVERY': '配送',
   'topic.EXCHANGE': '交換・返品',
   'topic.PAYMENT': 'お支払い',
