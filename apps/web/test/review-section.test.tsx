@@ -12,7 +12,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   id: 'r-1', rating: 4, content: '두껍고 따뜻합니다',
   sizeFit: 'TRUE', height: 175, weight: 70,
   authorName: '데****자', optionLabel: '오트밀 / M',
-  createdAt: new Date('2026-09-01T00:00:00Z'), isMine: false,
+  createdAt: new Date('2026-09-01T00:00:00Z'), imageUrls: [], isMine: false,
   ...over,
 });
 
@@ -103,5 +103,49 @@ describe('리뷰 목록', () => {
   it('작성 시각을 time 으로 표시한다', () => {
     const { container } = render(<ReviewSection summary={summary()} reviews={[review()]} />);
     expect(container.querySelector('time')?.getAttribute('dateTime')).toBe('2026-09-01T00:00:00.000Z');
+  });
+});
+
+describe('리뷰 사진', () => {
+  const photos = [
+    'https://cdn.example/reviews/a/1.png',
+    'https://cdn.example/reviews/a/2.png',
+  ];
+
+  it('사진이 없으면 목록 자체를 그리지 않는다', () => {
+    render(<ReviewSection summary={summary()} reviews={[review()]} />);
+    expect(screen.queryByRole('img', { name: /후기 사진/ })).toBeNull();
+  });
+
+  it('올린 순서대로 보여 준다', () => {
+    render(<ReviewSection summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+
+    const imgs = screen.getAllByRole('img', { name: /후기 사진/ });
+    expect(imgs).toHaveLength(2);
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(photos);
+  });
+
+  it('대체 텍스트가 누구의 몇 번째 사진인지 말한다', () => {
+    // 작성자에게 대체 텍스트를 받지 않는다. 억지로 받으면 "사진" 이라고 적힌다.
+    render(<ReviewSection summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+
+    expect(screen.getByAltText('데****자 님의 후기 사진 1')).toBeDefined();
+    expect(screen.getByAltText('데****자 님의 후기 사진 2')).toBeDefined();
+  });
+
+  it('원본은 새 탭으로 연다', () => {
+    render(<ReviewSection summary={summary()} reviews={[review({ imageUrls: [photos[0]!] })]} />);
+
+    const link = screen.getByRole('link', { name: /후기 사진 1/ });
+    expect(link.getAttribute('href')).toBe(photos[0]);
+    // 새 탭으로 열 때 rel 을 빠뜨리면 열린 문서가 원래 창을 조작할 수 있다
+    expect(link.getAttribute('rel')).toContain('noreferrer');
+  });
+
+  it('아래쪽 사진은 늦게 받는다', () => {
+    render(<ReviewSection summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+    for (const img of screen.getAllByRole('img', { name: /후기 사진/ })) {
+      expect(img.getAttribute('loading')).toBe('lazy');
+    }
   });
 });

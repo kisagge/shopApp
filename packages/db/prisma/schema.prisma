@@ -794,6 +794,10 @@ model Review {
   weight  Int?
 
   imageUrls String[]
+  /// 저장소 객체 키. url 과 따로 둔다 — 공개 주소가 바뀌어도 지울 대상은
+  /// 그대로여야 하고, 주소에서 키를 되짚는 방식은 그때 무너진다.
+  /// ProductImage 가 storageKey 를 따로 두는 것과 같은 이유다.
+  imageKeys String[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

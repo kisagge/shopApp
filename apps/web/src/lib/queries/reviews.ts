@@ -20,6 +20,7 @@ export interface PublicReview {
   readonly authorName: string;
   readonly optionLabel: string | null;
   readonly createdAt: Date;
+  readonly imageUrls: readonly string[];
   /** 지금 보고 있는 사람이 쓴 리뷰인가 — 수정·삭제 버튼을 그릴지 결정한다 */
   readonly isMine: boolean;
 }
@@ -63,6 +64,7 @@ export async function getProductReviews(
     select: {
       id: true, rating: true, content: true, sizeFit: true,
       height: true, weight: true, createdAt: true, userId: true,
+      imageUrls: true,
       user: { select: { name: true } },
       // 어떤 옵션을 산 사람의 후기인지가 사이즈 판단에 도움이 된다
       orderItem: { select: { optionLabel: true } },
@@ -83,6 +85,7 @@ export async function getProductReviews(
       authorName: maskAuthor(r.user.name),
       optionLabel: r.orderItem?.optionLabel ?? null,
       createdAt: r.createdAt,
+      imageUrls: r.imageUrls,
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,

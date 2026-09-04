@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  sniffImageType, verifyImageBytes, imageObjectKey, resequence, defaultAlt,
-  isImageContentType, ImageError, MAX_IMAGE_BYTES,
+  sniffImageType, verifyImageBytes, imageObjectKey, resequence, defaultAlt, isImageContentType, ImageError, MAX_IMAGE_BYTES, reviewImageObjectKey, MAX_IMAGES_PER_REVIEW, MAX_IMAGES_PER_PRODUCT,
 } from '../src/image';
 
 const bytes = (...values: number[]) => new Uint8Array(values);
@@ -139,5 +138,32 @@ describe('대체 텍스트 기본값', () => {
     // 같은 문장이 반복되면 스크린리더로 훑을 때 구분이 안 된다
     expect(defaultAlt({ brandName: 'MOOR', productName: '울 코트', index: 2 }))
       .toBe('MOOR 울 코트 상세 이미지 2');
+  });
+});
+
+describe('리뷰 사진 키', () => {
+  const ok = { orderItemId: 'oi-1', contentType: 'image/png' as const, token: 'abcd1234efgh' };
+
+  it('상품과 접두사를 나눈다', () => {
+    // 한 폴더에 섞으면 나중에 "리뷰 사진만 정리" 같은 일을 할 수 없다
+    expect(reviewImageObjectKey(ok)).toBe('reviews/oi-1/abcd1234efgh.png');
+    expect(imageObjectKey({ productId: 'p-1', contentType: 'image/png', token: ok.token }))
+      .toBe('products/p-1/abcd1234efgh.png');
+  });
+
+  it('형식마다 확장자가 따라간다', () => {
+    expect(reviewImageObjectKey({ ...ok, contentType: 'image/webp' })).toMatch(/\.webp$/);
+    expect(reviewImageObjectKey({ ...ok, contentType: 'image/avif' })).toMatch(/\.avif$/);
+  });
+
+  it('이상한 토큰은 거절한다 — 경로 탈출이 여기서 나온다', () => {
+    expect(() => reviewImageObjectKey({ ...ok, token: '../../etc/passwd' })).toThrow();
+    expect(() => reviewImageObjectKey({ ...ok, token: 'short' })).toThrow();
+    expect(() => reviewImageObjectKey({ ...ok, token: 'a/b/c12345678' })).toThrow();
+  });
+
+  it('리뷰 사진 한도는 상품보다 적다', () => {
+    // 상품 사진은 파는 쪽이 고른 것이고 리뷰 사진은 휴대폰으로 찍은 것이다
+    expect(MAX_IMAGES_PER_REVIEW).toBeLessThan(MAX_IMAGES_PER_PRODUCT);
   });
 });

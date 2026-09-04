@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { discardReviewImages } from './images';
 import {
   isReviewableStatus, ratingScore,
   REVIEW_ERROR_MESSAGE, type ReviewErrorCode,
@@ -27,6 +28,7 @@ export interface ReviewRow {
 const select = {
   id: true, rating: true, content: true, sizeFit: true,
   height: true, weight: true, createdAt: true, productId: true,
+  imageUrls: true,
 } as const;
 
 /**
@@ -61,12 +63,20 @@ async function recountRating(tx: typeof prisma, productId: string): Promise<void
  * 세 가지를 확인한다 — 내 주문인가, 배송이 끝났는가, 이미 썼는가.
  * 마지막은 orderItemId 의 유니크 제약이 DB 에서도 한 번 더 막는다.
  */
-export async function createReview(
+/**
+ * 이 사람이 이 주문 항목에 리뷰를 쓸 수 있는가.
+ *
+ * createReview 가 하던 검사를 꺼냈다. **사진을 올리기 전에** 같은 판단이
+ * 필요하기 때문이다 — 순서가 반대면 리뷰를 쓸 수 없는 사람의 파일이
+ * 저장소에 남는다. createReview 는 이 함수를 다시 부른다. 검사가 두 번
+ * 도는 것이 파일이 남는 것보다 낫다.
+ */
+export async function assertCanReview(
   userId: string,
-  input: CreateReviewInput,
-): Promise<ReviewRow> {
+  orderItemId: string,
+): Promise<{ productId: string }> {
   const item = await prisma.orderItem.findUnique({
-    where: { id: input.orderItemId },
+    where: { id: orderItemId },
     select: {
       id: true, status: true,
       // OrderItem 은 상품을 직접 가리키지 않는다. 옵션(변형)을 거쳐야 한다 —
@@ -87,7 +97,21 @@ export async function createReview(
   // 본인이 지운 것은 행이 없으므로 다시 쓸 수 있다.
   if (item.review) throw new ReviewError('ALREADY_REVIEWED', 409);
 
-  const productId = item.variant.productId;
+  return { productId: item.variant.productId };
+}
+
+export async function createReview(
+  userId: string,
+  input: CreateReviewInput,
+  /**
+   * 이미 올라간 사진. 자격 검사를 통과한 뒤에 올린 것만 들어온다.
+   *
+   * 이 함수가 직접 올리지 않는다 — 트랜잭션 안에서 외부 저장소를 두드리면
+   * 롤백해도 파일은 남는다. 올리는 것은 바깥에서, 여기서는 기록만 한다.
+   */
+  images: readonly { url: string; key: string }[] = [],
+): Promise<ReviewRow> {
+  const { productId } = await assertCanReview(userId, input.orderItemId);
 
   return prisma.$transaction(async (tx) => {
     const review = await tx.review.create({
@@ -100,6 +124,8 @@ export async function createReview(
         sizeFit: input.sizeFit,
         height: input.height,
         weight: input.weight,
+        imageUrls: images.map((i) => i.url),
+        imageKeys: images.map((i) => i.key),
       },
       select,
     });
@@ -151,7 +177,7 @@ export async function deleteReview(
 ): Promise<void> {
   const review = await prisma.review.findFirst({
     where: { id: reviewId, deletedAt: null },
-    select: { id: true, userId: true, productId: true },
+    select: { id: true, userId: true, productId: true, imageKeys: true },
   });
   if (!review) throw new ReviewError('REVIEW_NOT_FOUND', 404);
 
@@ -166,4 +192,17 @@ export async function deleteReview(
     }
     await recountRating(tx as typeof prisma, review.productId);
   });
+
+  /**
+   * 사진은 본인이 지웠을 때만 함께 지운다.
+   *
+   * 운영진이 내린 글은 행을 남긴다 — 신고·분쟁 때 원본이 있어야 하기
+   * 때문이다. 그런데 사진을 지워 버리면 남은 것은 반쪽짜리 기록이 된다.
+   *
+   * 저장소 삭제는 실패해도 넘어간다. 화면에서 사라지는 것이 우선이고,
+   * 남은 객체는 눈에 보이는 피해가 없다.
+   */
+  if (isOwner && review.imageKeys.length > 0) {
+    await discardReviewImages(review.imageKeys);
+  }
 }

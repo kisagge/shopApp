@@ -25,6 +25,15 @@ export const REJECTED_CONTENT_TYPE = ['image/svg+xml', 'text/html'] as const;
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGES_PER_PRODUCT = 8;
 
+/**
+ * 리뷰에 붙이는 사진은 상품보다 적게 받는다.
+ *
+ * 상품 이미지는 파는 쪽이 정성껏 고르는 것이고, 리뷰 사진은 산 사람이
+ * 휴대폰으로 찍어 올리는 것이다. 여러 장을 허용할수록 저장소만 커지고
+ * 읽는 사람에게 도움이 되는 양은 늘지 않는다.
+ */
+export const MAX_IMAGES_PER_REVIEW = 5;
+
 const EXTENSION: Readonly<Record<ImageContentType, string>> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -38,6 +47,7 @@ export const IMAGE_ERROR = [
   'TOO_LARGE',
   'EMPTY_FILE',
   'TOO_MANY_IMAGES',
+  'TOO_MANY_REVIEW_IMAGES',
   'ALT_REQUIRED',
 ] as const;
 export type ImageErrorCode = (typeof IMAGE_ERROR)[number];
@@ -48,6 +58,7 @@ export const IMAGE_ERROR_MESSAGE: Readonly<Record<ImageErrorCode, string>> = {
   TOO_LARGE: '이미지는 5MB 를 넘을 수 없습니다',
   EMPTY_FILE: '빈 파일입니다',
   TOO_MANY_IMAGES: `이미지는 상품당 ${MAX_IMAGES_PER_PRODUCT}장까지입니다`,
+  TOO_MANY_REVIEW_IMAGES: `사진은 리뷰당 ${MAX_IMAGES_PER_REVIEW}장까지입니다`,
   ALT_REQUIRED: '대체 텍스트를 입력해 주세요',
 };
 
@@ -132,6 +143,26 @@ export function imageObjectKey(input: {
     throw new ImageError('CONTENT_MISMATCH');
   }
   return `products/${input.productId}/${input.token}.${EXTENSION[input.contentType]}`;
+}
+
+/**
+ * 리뷰 사진의 객체 키.
+ *
+ * 접두사를 상품과 나눈다. 한 폴더에 섞으면 나중에 "리뷰 사진만 정리" 같은
+ * 일을 할 수가 없고, 지금도 버킷을 열었을 때 무엇이 무엇인지 알 수 없다.
+ *
+ * **주문 항목 id 로 묶는다.** 리뷰는 주문 항목당 하나라서 이 값이 곧 그 리뷰의
+ * 신원이고, 리뷰 id 를 쓰면 업로드 시점에 아직 존재하지 않는다.
+ */
+export function reviewImageObjectKey(input: {
+  orderItemId: string;
+  contentType: ImageContentType;
+  token: string;
+}): string {
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(input.token)) {
+    throw new ImageError('CONTENT_MISMATCH');
+  }
+  return `reviews/${input.orderItemId}/${input.token}.${EXTENSION[input.contentType]}`;
 }
 
 /**

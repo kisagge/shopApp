@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RATING_MIN, RATING_MAX, SIZE_FIT } from '@shop/core';
+import { RATING_MIN, RATING_MAX, SIZE_FIT, MAX_IMAGES_PER_REVIEW } from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -24,6 +24,16 @@ const reviewShape = {
   weight: z.int().min(20).max(300).nullable(),
 };
 
+/**
+ * 사진은 **파일로** 받는다.
+ *
+ * 주소를 받으면 안 된다 — 아무 주소나 적어 넣을 수 있고, 그러면 우리 화면이
+ * 남의 서버 이미지를 우리 이름으로 띄우는 자리가 된다. 바이트를 직접 받아
+ * 우리 저장소에 올린 것만 실린다.
+ *
+ * 그래서 이 스키마에는 이미지가 없다. 파일은 multipart 로 오고, 개수와
+ * 형식은 업로드 경로가 검사한다(core 의 image 규칙).
+ */
 export const createReviewSchema = z.object({
   orderItemId: cuidSchema,
   ...reviewShape,
@@ -50,3 +60,6 @@ export const reviewListQuerySchema = z.object({
   sort: z.enum(REVIEW_SORT).catch('recent'),
   cursor: z.string().optional(),
 });
+
+/** 리뷰 사진 개수 한도. 화면이 안내 문구에 쓴다. */
+export const REVIEW_IMAGE_LIMIT = MAX_IMAGES_PER_REVIEW;
