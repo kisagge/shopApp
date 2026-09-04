@@ -23,7 +23,15 @@
         "dist/**"
       ]
     },
+    // dev 도 ^build 를 먼저 돌린다. @shop/db 의 build 가 prisma generate 라,
+    // 이게 없으면 스키마를 바꾼 뒤 dev 를 켰을 때 옛 클라이언트로 돈다 —
+    // 그러면 prisma.newModel 이 undefined 라서 "Cannot read properties of
+    // undefined (reading 'findMany')" 만 보이고 원인이 드러나지 않는다.
+    // 실제로 상품 문의를 붙인 뒤 그렇게 겪었다.
     "dev": {
+      "dependsOn": [
+        "^build"
+      ],
       "cache": false,
       "persistent": true
     },
