@@ -37,3 +37,19 @@ test('리뷰 관리는 가맹점에게 없다', async ({ page }) => {
   await page.goto('/admin/reviews');
   expect(new URL(page.url()).pathname).not.toBe('/admin/reviews');
 });
+
+test('가맹점은 상품을 스스로 매대에 올릴 수 없다', async ({ page }) => {
+  /*
+   * product:publish 를 만들어 두고 어디서도 검사하지 않았다. 게다가 가맹점도
+   * 그 권한을 갖고 있어서, 검사를 넣어도 아무것도 달라지지 않았다.
+   */
+  await page.goto('/admin/products/new');
+
+  const status = page.getByLabel('판매 상태');
+  await expect(status.getByRole('option', { name: '판매중' })).toHaveCount(0);
+  await expect(status.getByRole('option', { name: '품절' })).toHaveCount(0);
+
+  // 대신 요청할 길은 있어야 한다. 없으면 작성만 하고 끝난다.
+  await expect(status.getByRole('option', { name: '검수 대기' })).toHaveCount(1);
+  await expect(page.getByText(/운영진이 확인한 뒤에 됩니다/)).toBeVisible();
+});

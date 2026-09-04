@@ -2,9 +2,25 @@ import { cache } from 'react';
 import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
-  discountRateOf, won, normalizeSearchTerm, normalizePriceRange,
+  discountRateOf, won, normalizeSearchTerm, normalizePriceRange, VISIBLE_STATUS,
   type Won, type ProductSort,
 } from '@shop/core';
+
+/**
+ * 매대에 보이는 상품의 조건.
+ *
+ * **네 쿼리가 모두 이것을 쓴다.** 손으로 적어 두었더니 목록과 검색에는
+ * 상태 조건이 있는데 상세와 정적 경로에는 빠져 있었다. 그래서 숨긴 상품이
+ * 주소로는 그대로 열렸다 — 회수한 상품이나 잘못된 가격을 내려도 링크를
+ * 가진 사람에게는 계속 보인다.
+ */
+const onDisplay = (): Prisma.ProductWhereInput => ({
+  deletedAt: null,
+  publishedAt: { not: null },
+  // 배열을 복사해 넘긴다 — readonly 를 그대로 주면 Prisma 입력 타입과 어긋나고,
+  // 그 여파로 select 추론이 통째로 무너진다(이 파일 아래쪽 주석과 같은 함정).
+  status: { in: [...VISIBLE_STATUS] },
+});
 
 /**
  * 화면이 쓰는 모양. Prisma 모델을 그대로 컴포넌트에 넘기지 않는다 —
@@ -90,7 +106,7 @@ function toListItem(p: ListRow, now: number): ProductListItem {
 export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]> {
   const rows = await prisma.product.findMany({
     where: {
-      deletedAt: null, publishedAt: { not: null }, status: { in: ['ACTIVE', 'SOLD_OUT'] },
+      ...onDisplay(),
       brand: sellableBrand(),
     },
     orderBy: [{ soldCount: 'desc' }, { publishedAt: 'desc' }],
@@ -163,7 +179,7 @@ export interface ProductDetail {
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   const p = await prisma.product.findFirst({
     where: {
-      slug, deletedAt: null, publishedAt: { not: null },
+      slug, ...onDisplay(),
       brand: sellableBrand(),
     },
     select: {
@@ -220,7 +236,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 /** 상세 페이지의 정적 경로 생성에 쓴다 */
 export async function getAllProductSlugs(): Promise<string[]> {
   const rows = await prisma.product.findMany({
-    where: { deletedAt: null, publishedAt: { not: null } },
+    where: onDisplay(),
     select: { slug: true },
   });
   return rows.map((r) => r.slug);
@@ -316,9 +332,7 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
   // (exactOptionalPropertyTypes), 그 여파로 select 추론까지 무너진다.
   // 명시 타입에 하나씩 붙인다.
   const where: Prisma.ProductWhereInput = {
-    deletedAt: null,
-    publishedAt: { not: null },
-    status: { in: ['ACTIVE', 'SOLD_OUT'] },
+    ...onDisplay(),
     brand: sellableBrand(),
   };
 

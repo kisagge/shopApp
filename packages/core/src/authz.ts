@@ -60,9 +60,22 @@ export type Permission = (typeof PERMISSION)[number];
 
 const CUSTOMER: readonly Permission[] = ['product:read', 'order:read', 'review:write'];
 
+/**
+ * 가맹점에게 **product:publish 가 없다.**
+ *
+ * 처음에는 갖고 있었는데, 그러면 product:write 와 아무것도 구분하지 못한다 —
+ * 쓸 수 있는 사람이 곧 올릴 수 있는 사람이라 권한을 둘로 나눈 뜻이 없어진다.
+ * PLAIN 은 한 매대에 여러 브랜드를 올리는 큐레이션 몰이고, 무엇이 그 매대에
+ * 오르는지는 플랫폼이 정한다. 입점 자체를 승인으로 거르면서 상품은 아무나
+ * 올릴 수 있으면 앞뒤가 맞지 않는다.
+ *
+ * 대신 요청하는 길을 준다 — 가맹점은 상태를 PENDING_REVIEW 로 올리고,
+ * 운영진이 그것을 보고 게시한다(product-publish 의 MERCHANT_SELECTABLE_STATUS).
+ * 검수는 **최초 게시 한 번**이다. 그 뒤로는 가맹점이 직접 내리고 올린다.
+ */
 const MERCHANT: readonly Permission[] = [
   'admin:access',
-  'product:read', 'product:write', 'product:publish',
+  'product:read', 'product:write',
   'order:read', 'order:fulfill',
   'merchant:read', 'merchant:write',
   'settlement:read',

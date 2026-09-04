@@ -19,7 +19,7 @@ const initial = {
   listPrice: '413000', salePrice: '289000', status: 'ACTIVE' as const,
 };
 
-function setup(mode: 'create' | 'edit' = 'edit') {
+function setup(mode: 'create' | 'edit' = 'edit', over: Record<string, unknown> = {}) {
   return render(
     <ProductForm
       mode={mode}
@@ -27,6 +27,8 @@ function setup(mode: 'create' | 'edit' = 'edit') {
       brands={brands}
       categories={categories}
       initial={initial}
+      canPublish
+      {...over}
     />,
   );
 }
@@ -156,5 +158,54 @@ describe('제출', () => {
     expect((await screen.findByRole('alert')).textContent).toContain('네트워크');
     // 실패한 뒤에도 다시 누를 수 있어야 한다
     expect(screen.getByRole('button', { name: '변경 사항 저장' }).hasAttribute('disabled')).toBe(false);
+  });
+});
+
+describe('게시 권한이 없는 사람', () => {
+  it('매대에 보이는 상태를 고를 수 없다', () => {
+    /*
+     * 서버도 같은 검사를 하므로 여기서는 고를 수 없는 것을 감출 뿐이다.
+     * 누를 수 있게 두면 눌러 본 뒤에야 안 된다는 것을 안다.
+     */
+    setup('create', { canPublish: false, initial: { ...initial, status: 'DRAFT' as const } });
+
+    const select = screen.getByLabelText('판매 상태');
+    const options = Array.from(select.querySelectorAll('option')).map((o) => o.value);
+
+    expect(options).not.toContain('ACTIVE');
+    expect(options).not.toContain('SOLD_OUT');
+  });
+
+  it('대신 검수를 요청할 수 있다고 알려 준다', () => {
+    setup('create', { canPublish: false, initial: { ...initial, status: 'DRAFT' as const } });
+
+    const options = Array.from(
+      screen.getByLabelText('판매 상태').querySelectorAll('option'),
+    ).map((o) => o.value);
+    expect(options).toContain('PENDING_REVIEW');
+    expect(screen.getByText(/운영진이 확인한 뒤에 됩니다/)).toBeDefined();
+  });
+
+  it('게시 권한이 있으면 모두 고를 수 있다', () => {
+    setup();
+
+    const options = Array.from(
+      screen.getByLabelText('판매 상태').querySelectorAll('option'),
+    ).map((o) => o.value);
+    expect(options).toContain('ACTIVE');
+  });
+});
+
+describe('반려 사유', () => {
+  it('폼 안에서 보여 준다 — 고치는 동안 보여야 한다', () => {
+    setup('edit', { rejection: '사진이 흐립니다' });
+
+    expect(screen.getByRole('heading', { name: '게시가 반려되었습니다' })).toBeDefined();
+    expect(screen.getByText('사진이 흐립니다')).toBeDefined();
+  });
+
+  it('반려된 적이 없으면 아무것도 그리지 않는다', () => {
+    setup();
+    expect(screen.queryByRole('heading', { name: '게시가 반려되었습니다' })).toBeNull();
   });
 });

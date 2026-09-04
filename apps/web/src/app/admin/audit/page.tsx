@@ -13,6 +13,11 @@ const ACTION_LABEL: Readonly<Record<string, string>> = {
   'product.create': '상품 등록',
   'product.update': '상품 수정',
   'product.stock': '재고 조정',
+  'product.publish.approve': '게시 승인',
+  'product.publish.reject': '게시 반려',
+  'review.delete': '리뷰 삭제',
+  'review.restore': '리뷰 복구',
+  'review.reports.dismiss': '리뷰 신고 처리',
   'product.variant.create': '옵션 추가',
   'order.status.preparing': '배송 준비',
   'order.status.shipped': '출고',
@@ -45,6 +50,7 @@ const TARGET_LABEL: Readonly<Record<string, string>> = {
   merchant: '가맹점',
   settlement: '정산',
   banner: '배너',
+  review: '리뷰',
 };
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', {

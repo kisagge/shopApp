@@ -5,6 +5,7 @@ import {
   rangeStart, DASHBOARD_RANGE_LABEL, RAW_RETENTION_DAYS, recentMonths, dayKeyOf,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
   readOrderSearch, readDateRange,
+  type ProductStatus,
 } from '@shop/core';
 
 /**
@@ -522,29 +523,37 @@ export interface AdminProductRow {
   readonly totalStock: number;
   readonly lowStock: boolean;
   readonly createdAt: Date;
+  /** 검수를 요청한 시각. 대기줄 정렬에 쓴다. */
+  readonly reviewRequestedAt: Date | null;
+  readonly publishRejection: string | null;
 }
 
 export async function getAdminProducts(
   actor: Actor,
-  query: { cursor?: string | undefined; take?: number } = {},
-): Promise<Paged<AdminProductRow>> {
+  query: { cursor?: string | undefined; take?: number; status?: ProductStatus | undefined } = {},
+): Promise<Paged<AdminProductRow> & { readonly awaitingReview: number }> {
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
-  const where = {
-    deletedAt: null,
-    ...(scope ? { brand: { merchantId: scope } } : {}),
-  };
+  const scoped = { deletedAt: null, ...(scope ? { brand: { merchantId: scope } } : {}) };
+  const where = { ...scoped, ...(query.status ? { status: query.status } : {}) };
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
     where,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    /*
+     * 검수 대기만 보고 있을 때는 **오래 기다린 것부터** 꺼낸다. 다른
+     * 목록과 같은 최신순으로 두면 새로 들어온 요청이 계속 앞을 막는다.
+     */
+    orderBy:
+      query.status === 'PENDING_REVIEW'
+        ? [{ reviewRequestedAt: 'asc' as const }, { id: 'asc' as const }]
+        : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
     take: take + 1,
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     select: {
       id: true, slug: true, name: true, listPrice: true, salePrice: true,
-      status: true, createdAt: true,
+      status: true, createdAt: true, reviewRequestedAt: true, publishRejection: true,
       brand: { select: { name: true } },
       category: { select: { name: true } },
       variants: { select: { stock: true }, where: { isActive: true } },
@@ -552,6 +561,11 @@ export async function getAdminProducts(
     }),
     prisma.product.count({ where }),
   ]);
+
+  // 탭에 붙는 숫자. 필터와 무관하게 범위 안의 대기 건수를 센다.
+  const awaitingReview = await prisma.product.count({
+    where: { ...scoped, status: 'PENDING_REVIEW' },
+  });
 
   const hasMore = rows.length > take;
   const page = hasMore ? rows.slice(0, take) : rows;
@@ -566,9 +580,12 @@ export async function getAdminProducts(
       totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
       lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= 5),
       createdAt: p.createdAt,
+      reviewRequestedAt: p.reviewRequestedAt,
+      publishRejection: p.publishRejection,
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     total,
+    awaitingReview,
   };
 }
 
@@ -629,6 +646,8 @@ export interface AdminProductDetail {
   readonly listPrice: Won;
   readonly salePrice: Won | null;
   readonly status: string;
+  /** 지난 반려 사유. 고치는 화면에서 보여야 무엇을 고칠지 안다. */
+  readonly publishRejection: string | null;
   readonly variants: readonly {
     readonly id: string;
     readonly sku: string;
@@ -652,7 +671,7 @@ export async function getAdminProductDetail(
     },
     select: {
       id: true, slug: true, name: true, description: true,
-      listPrice: true, salePrice: true, status: true,
+      listPrice: true, salePrice: true, status: true, publishRejection: true,
       brand: { select: { id: true, name: true } },
       category: { select: { id: true, name: true } },
       variants: {
@@ -670,6 +689,7 @@ export async function getAdminProductDetail(
     listPrice: won(p.listPrice),
     salePrice: p.salePrice === null ? null : won(p.salePrice),
     status: p.status,
+    publishRejection: p.publishRejection,
     variants: p.variants.map((v) => ({
       id: v.id, sku: v.sku, optionLabel: v.label, stock: v.stock, isActive: v.isActive,
     })),

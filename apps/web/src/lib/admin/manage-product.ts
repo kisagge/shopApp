@@ -1,6 +1,10 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { canManageProduct, merchantScope, becameAvailable, type Actor } from '@shop/core';
+import {
+  canManageProduct, merchantScope, becameAvailable, hasPermission,
+  needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
+  type Actor, type ProductStatus,
+} from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
 import {
   PRODUCT_ERROR_MESSAGE,
@@ -59,6 +63,27 @@ async function assertBrandAllowed(actor: Actor, brandId: string): Promise<{ name
   return { name: brand.name };
 }
 
+/**
+ * 매대에 올릴 수 있는 사람인가.
+ *
+ * `product:publish` 는 권한 표에만 있고 **어디서도 검사하지 않았다.**
+ * 그래서 상품을 쓸 수 있는 사람은 누구나 그대로 매대에 올릴 수 있었다.
+ *
+ * 판단은 core 가 한다 — 무엇이 "게시" 인지(어떤 상태가 매대에 보이는지)는
+ * 정책이고, 여기서 다시 적으면 스토어프론트 조회와 어긋난다.
+ */
+function assertCanPublish(
+  actor: Actor,
+  to: ProductStatus | undefined,
+  publishedAt: Date | null,
+): void {
+  if (to === undefined) return;
+  if (!needsPublishPermission({ to, publishedAt })) return;
+  if (!hasPermission(actor, PUBLISH_PERMISSION)) {
+    throw new ProductError('PUBLISH_NOT_ALLOWED', 403);
+  }
+}
+
 export async function createProduct(actor: Actor, input: CreateProductInput) {
   const brand = await assertBrandAllowed(actor, input.brandId);
 
@@ -72,6 +97,9 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
   });
   if (taken) throw new ProductError('SLUG_TAKEN', 409);
 
+  // 새 상품은 게시된 적이 없다. 곧바로 매대 상태로 만들려면 권한이 필요하다.
+  assertCanPublish(actor, input.status, null);
+
   return prisma.product.create({
     data: {
       slug: input.slug,
@@ -82,9 +110,17 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
       ...priceFields(input),
       searchText: searchTextFor({ name: input.name, brandName: brand.name }),
       status: input.status,
-      // 공개 상태로 만들 때만 게시 시각을 찍는다. 이 값이 없으면 스토어프론트
-      // 조회에서 걸러진다.
-      publishedAt: input.status === 'DRAFT' ? null : new Date(),
+      /*
+       * 게시 시각은 **매대에 보이는 상태일 때만** 찍는다.
+       *
+       * "DRAFT 가 아니면" 으로 두면 HIDDEN 이나 검수 대기에도 찍힌다. 그건
+       * 원래도 어긋난 값이었지만, 이제는 구멍이 된다 — publishedAt 이 있으면
+       * 검수를 통과한 상품으로 보므로, 가맹점이 검수 대기로 한 번 저장한 뒤
+       * 스스로 판매중으로 올릴 수 있게 된다.
+       */
+      publishedAt: isVisibleStatus(input.status) ? new Date() : null,
+      // 검수를 요청한 시각. 대기줄을 오래된 순으로 꺼내는 데 쓴다.
+      reviewRequestedAt: input.status === 'PENDING_REVIEW' ? new Date() : null,
     },
     select: { id: true, slug: true, name: true, status: true },
   });
@@ -149,7 +185,10 @@ export async function updateProduct(
     if (taken) throw new ProductError('SLUG_TAKEN', 409);
   }
 
-  const goingPublic = input.status !== undefined && input.status !== 'DRAFT';
+  assertCanPublish(actor, input.status, before.publishedAt);
+
+  // 같은 이유로 여기서도 "DRAFT 가 아니면" 이 아니라 "매대에 보이면" 이다
+  const goingPublic = input.status !== undefined && isVisibleStatus(input.status);
 
   const after = await prisma.product.update({
     where: { id: productId },
@@ -174,6 +213,14 @@ export async function updateProduct(
       // 처음 공개할 때만 게시 시각을 찍는다. 다시 공개할 때 덮어쓰면
       // "신상품" 판정이 되살아난다.
       ...(goingPublic && before.publishedAt === null ? { publishedAt: new Date() } : {}),
+      /*
+       * 검수를 다시 요청하면 시각을 새로 찍고 **지난 반려 사유를 지운다.**
+       * 남겨 두면 고쳐서 다시 올린 상품에 옛 반려 사유가 붙어 있어, 가맹점도
+       * 운영진도 지금 상태인 줄 안다.
+       */
+      ...(input.status === 'PENDING_REVIEW'
+        ? { reviewRequestedAt: new Date(), publishRejection: null }
+        : {}),
     },
     select: {
       id: true, slug: true, name: true, description: true,
@@ -300,4 +347,52 @@ export async function createVariant(
     },
     select: { id: true, sku: true, label: true, stock: true },
   });
+}
+
+/**
+ * 게시 검수 처리.
+ *
+ * 운영진이 대기줄의 상품을 매대에 올리거나 되돌린다. 상태를 그냥 고치는
+ * 것과 나눠 둔 이유는 **되돌릴 때 사유가 필요하기 때문**이다 — 이유 없이
+ * DRAFT 로 내려보내면 가맹점은 무엇을 고쳐야 할지 알 수 없고, 그대로 다시
+ * 올려서 같은 일이 반복된다.
+ */
+export async function reviewProduct(
+  actor: Actor,
+  productId: string,
+  input: { approve: boolean; reason?: string | null },
+) {
+  if (!hasPermission(actor, PUBLISH_PERMISSION)) {
+    throw new ProductError('PUBLISH_NOT_ALLOWED', 403);
+  }
+
+  const before = await prisma.product.findFirst({
+    where: { id: productId, deletedAt: null },
+    select: { id: true, name: true, status: true, publishedAt: true },
+  });
+  if (!before) throw new ProductError('PRODUCT_NOT_FOUND', 404);
+
+  // 대기줄에 없는 상품을 처리하면 다른 운영자가 이미 본 것을 두 번 처리한다
+  if (before.status !== 'PENDING_REVIEW') throw new ProductError('NOT_AWAITING_REVIEW', 409);
+
+  const reason = input.reason?.trim() ?? '';
+  if (!input.approve && reason.length === 0) {
+    throw new ProductError('REJECT_REASON_REQUIRED', 400);
+  }
+
+  const after = await prisma.product.update({
+    where: { id: productId },
+    data: input.approve
+      ? {
+          status: 'ACTIVE',
+          reviewRequestedAt: null,
+          publishRejection: null,
+          // 최초 게시에만 찍는다. 두 번째부터는 검수를 다시 받지 않는다.
+          ...(before.publishedAt === null ? { publishedAt: new Date() } : {}),
+        }
+      : { status: 'DRAFT', reviewRequestedAt: null, publishRejection: reason },
+    select: { id: true, name: true, status: true, publishRejection: true },
+  });
+
+  return { before, after };
 }

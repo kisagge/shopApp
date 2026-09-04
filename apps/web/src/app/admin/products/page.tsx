@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Badge } from '@shop/ui';
-import { format, discountRateOf, hasPermission } from '@shop/core';
+import {
+  format, discountRateOf, hasPermission,
+  PRODUCT_STATUS_LABEL, isAwaitingReview, type ProductStatus,
+} from '@shop/core';
+import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin';
 import { Pager } from '../pager';
@@ -9,26 +13,33 @@ import { Pager } from '../pager';
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
 
-const STATUS_LABEL: Record<string, string> = {
-  DRAFT: '작성 중', ACTIVE: '판매중', SOLD_OUT: '품절', HIDDEN: '숨김',
-};
-const STATUS_TONE: Record<string, 'success' | 'danger' | 'neutral'> = {
-  ACTIVE: 'success', SOLD_OUT: 'danger', HIDDEN: 'neutral', DRAFT: 'neutral',
+// 라벨은 core 하나만 본다. 여기 따로 적어 두었더니 상태를 더할 때 이쪽이 남았다.
+const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
+  ACTIVE: 'success', SOLD_OUT: 'danger', PENDING_REVIEW: 'info',
+  HIDDEN: 'neutral', DRAFT: 'neutral',
 };
 
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string }>;
+  searchParams: Promise<{ cursor?: string; status?: string }>;
 }) {
   const actor = await requireAdmin('product:read');
-  const { cursor } = await searchParams;
-  const page = await getAdminProducts(actor, { cursor });
+  const { cursor, status } = await searchParams;
+
+  // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다.
+  const filter: ProductStatus | undefined = status === 'PENDING_REVIEW' ? status : undefined;
+
+  const page = await getAdminProducts(actor, { cursor, status: filter });
   const products = page.rows;
   const canWrite = hasPermission(actor, 'product:write');
+  const canPublish = hasPermission(actor, 'product:publish');
 
   const nextHref = page.nextCursor
-    ? { pathname: '/admin/products' as const, query: { cursor: page.nextCursor } }
+    ? {
+        pathname: '/admin/products' as const,
+        query: { ...(filter ? { status: filter } : {}), cursor: page.nextCursor },
+      }
     : null;
 
   return (
@@ -52,11 +63,37 @@ export default async function AdminProductsPage({
         )}
       </header>
 
-      <div className="p-8">
+      <div className="flex flex-col gap-5 p-8">
+        <nav aria-label="상품 상태" className="flex gap-1 border-b border-[var(--border)]">
+          {([undefined, 'PENDING_REVIEW'] as const).map((tab) => {
+            const current = filter === tab;
+            return (
+              <Link
+                key={tab ?? 'all'}
+                href={{
+                  pathname: '/admin/products',
+                  query: tab ? { status: tab } : {},
+                }}
+                aria-current={current ? 'page' : undefined}
+                className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] no-underline ${
+                  current
+                    ? 'border-[var(--brand)] font-medium text-[var(--fg)]'
+                    : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg)]'
+                }`}
+              >
+                {tab ? '검수 대기' : '전체'}
+                {tab && page.awaitingReview > 0 && (
+                  <span className="ml-1.5 text-accent">{page.awaitingReview}</span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
           {products.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-              등록된 상품이 없습니다.
+              {filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
             </p>
           ) : (
             <table>
@@ -68,6 +105,9 @@ export default async function AdminProductsPage({
                   <th scope="col" className="w-32 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">판매가</th>
                   <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">재고</th>
                   <th scope="col" className="w-24 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
+                  {canPublish && (
+                    <th scope="col" className="w-56 px-4 py-3 text-xs text-[var(--fg-secondary)]">검수</th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -112,9 +152,20 @@ export default async function AdminProductsPage({
                       </td>
                       <td className="px-4 py-3 text-center">
                         <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>
-                          {STATUS_LABEL[p.status] ?? p.status}
+                          {PRODUCT_STATUS_LABEL[p.status as ProductStatus] ?? p.status}
                         </Badge>
                       </td>
+                      {canPublish && (
+                        <td className="px-4 py-3">
+                          {isAwaitingReview(p.status as ProductStatus) ? (
+                            <ProductReview productId={p.id} productName={p.name} />
+                          ) : (
+                            <span className="text-[11px] text-[var(--fg-muted)]">
+                              {p.publishRejection ? '반려함' : '—'}
+                            </span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}

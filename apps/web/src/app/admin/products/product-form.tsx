@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { PRODUCT_STATUS, PRODUCT_STATUS_LABEL, type ProductStatusInput } from '@shop/contract';
+import { MERCHANT_SELECTABLE_STATUS } from '@shop/core';
 import { discountRateOf, won } from '@shop/core';
 
 export interface ProductFormOption {
@@ -28,6 +29,16 @@ interface Props {
   readonly brands: readonly ProductFormOption[];
   readonly categories: readonly ProductFormOption[];
   readonly initial: ProductFormValues;
+  /**
+   * 매대에 직접 올릴 수 있는 사람인가(product:publish).
+   *
+   * 없으면 고를 수 있는 상태가 줄고 대신 검수를 요청한다. 서버도 같은
+   * 검사를 하므로 여기서는 **고를 수 없는 것을 감출 뿐**이다 — 누를 수
+   * 있게 두면 눌러 본 뒤에야 안 된다는 것을 안다.
+   */
+  readonly canPublish: boolean;
+  /** 지난 반려 사유. 무엇을 고쳐야 하는지 폼 안에서 보여야 한다. */
+  readonly rejection?: string | null;
 }
 
 type FieldErrors = Readonly<Record<string, string>>;
@@ -41,7 +52,9 @@ const EMPTY: FieldErrors = {};
  * 한 번 더 검증하지 않는 이유는 **계약이 서버에 있기 때문**이다. 두 벌로
  * 두면 반드시 어긋난다.
  */
-export function ProductForm({ mode, productId, brands, categories, initial }: Props) {
+export function ProductForm({
+  mode, productId, brands, categories, initial, canPublish, rejection = null,
+}: Props) {
   const router = useRouter();
   const [values, setValues] = useState<ProductFormValues>(initial);
   const [errors, setErrors] = useState<FieldErrors>(EMPTY);
@@ -116,6 +129,19 @@ export function ProductForm({ mode, productId, brands, categories, initial }: Pr
 
   return (
     <form onSubmit={(e) => onSubmit(e)} noValidate className="flex flex-col gap-8">
+      {rejection && (
+        // 반려 사유가 폼 밖에 있으면 고치는 동안 보이지 않는다
+        <section
+          aria-labelledby="rejection-title"
+          className="rounded-sm border border-accent/40 bg-accent/8 px-4 py-3"
+        >
+          <h2 id="rejection-title" className="text-[13px] font-semibold text-accent">
+            게시가 반려되었습니다
+          </h2>
+          <p className="mt-1 text-[13px] leading-relaxed">{rejection}</p>
+        </section>
+      )}
+
       {formError && (
         // 폼 전체 에러는 제출 직후 읽혀야 한다
         <p
@@ -248,12 +274,19 @@ export function ProductForm({ mode, productId, brands, categories, initial }: Pr
             id={statusId}
             value={values.status}
             onChange={(e) => set('status', e.target.value as ProductStatusInput)}
+            aria-describedby={canPublish ? undefined : `${statusId}-hint`}
             className="h-12 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm text-[var(--fg)] sm:w-56"
           >
-            {PRODUCT_STATUS.map((s) => (
+            {(canPublish ? PRODUCT_STATUS : MERCHANT_SELECTABLE_STATUS).map((s) => (
               <option key={s} value={s}>{PRODUCT_STATUS_LABEL[s]}</option>
             ))}
           </select>
+          {!canPublish && (
+            <p id={`${statusId}-hint`} className="text-[11px] text-[var(--fg-muted)]">
+              매대에 올리는 것은 운영진이 확인한 뒤에 됩니다. 준비가 되면 &lsquo;검수
+              대기&rsquo;로 저장해 주세요.
+            </p>
+          )}
         </div>
       </fieldset>
 

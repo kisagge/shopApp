@@ -75,6 +75,8 @@ export default async function AdminProductDetailPage({
                 salePrice: product.salePrice === null ? '' : String(product.salePrice),
                 status: product.status as ProductStatusInput,
               }}
+              canPublish={hasPermission(actor, 'product:publish')}
+              rejection={product.publishRejection}
             />
           ) : (
             <dl className="grid grid-cols-[120px_1fr] gap-y-3 text-[13px]">

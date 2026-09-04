@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { hasPermission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getProductFormOptions } from '~/lib/admin/manage-product';
 import { ProductForm } from '../product-form';
@@ -45,6 +46,7 @@ export default async function NewProductPage() {
                 brandId: options.brands.length === 1 ? (options.brands[0]?.id ?? '') : '',
                 categoryId: '', listPrice: '', salePrice: '', status: 'DRAFT',
               }}
+              canPublish={hasPermission(actor, 'product:publish')}
             />
           )}
         </div>

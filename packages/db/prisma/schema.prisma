@@ -277,6 +277,8 @@ model Category {
 
 enum ProductStatus {
   DRAFT
+  /// 가맹점이 게시를 요청한 상태. 운영진이 보고 올린다.
+  PENDING_REVIEW
   ACTIVE
   SOLD_OUT
   HIDDEN
@@ -345,10 +347,17 @@ model Product {
   reviews      Review[]
   wishedBy     WishlistItem[]
 
-  publishedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  /// 최초 게시 시각. 이 값이 있으면 검수를 이미 통과한 상품이다 —
+  /// 그 뒤로는 가맹점이 직접 내리고 올릴 수 있다.
+  publishedAt       DateTime?
+  /// 검수를 요청한 시각. 대기줄을 오래된 순으로 꺼내는 데 쓴다.
+  reviewRequestedAt DateTime?
+  /// 반려 사유. 이유 없이 되돌리면 가맹점은 무엇을 고쳐야 할지 모른다.
+  publishRejection  String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   @@index([status, publishedAt])
   @@index([categoryId, status])

@@ -144,3 +144,20 @@ test('내려간 글 탭은 되돌릴 수 있는 자리를 준다', async ({ page
     'page',
   );
 });
+
+test('상품 관리에 검수 대기줄이 있다', async ({ page }) => {
+  await page.goto('/admin/products?status=PENDING_REVIEW');
+
+  await expect(page.getByRole('link', { name: /검수 대기/ })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+});
+
+test('운영진은 판매 상태를 모두 고를 수 있다', async ({ page }) => {
+  await page.goto('/admin/products/new');
+
+  const status = page.getByLabel('판매 상태');
+  await expect(status.getByRole('option', { name: '판매중' })).toHaveCount(1);
+  await expect(page.getByText(/운영진이 확인한 뒤에 됩니다/)).toHaveCount(0);
+});

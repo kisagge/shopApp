@@ -1,4 +1,10 @@
 import { z } from 'zod';
+import {
+  PRODUCT_STATUS as CORE_PRODUCT_STATUS,
+  PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL,
+  type ProductStatus as CoreProductStatus,
+  PUBLISH_ERROR,
+} from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
 
 /**
@@ -7,15 +13,16 @@ import { cuidSchema, wonSchema } from './common';
  * 판매가는 정가보다 클 수 없고, 슬러그는 URL 에 그대로 들어가므로 형식을 제한한다.
  */
 
-export const PRODUCT_STATUS = ['DRAFT', 'ACTIVE', 'SOLD_OUT', 'HIDDEN'] as const;
-export type ProductStatusInput = (typeof PRODUCT_STATUS)[number];
-
-export const PRODUCT_STATUS_LABEL: Readonly<Record<ProductStatusInput, string>> = {
-  DRAFT: '작성 중',
-  ACTIVE: '판매중',
-  SOLD_OUT: '품절',
-  HIDDEN: '숨김',
-};
+/**
+ * 상태 목록은 **core 하나만 본다.**
+ *
+ * 여기 따로 적어 두었더니 core 에 상태를 더할 때 이쪽이 남았다. 그러면
+ * 계약이 통과시키는 값과 정책이 아는 값이 갈라지고, 갈라진 줄은 아무도
+ * 모른다 — 이 작업이 고치려는 결함과 같은 모양이다.
+ */
+export const PRODUCT_STATUS = CORE_PRODUCT_STATUS;
+export type ProductStatusInput = CoreProductStatus;
+export const PRODUCT_STATUS_LABEL = CORE_PRODUCT_STATUS_LABEL;
 
 const slugSchema = z
   .string()
@@ -110,6 +117,7 @@ export type CreateVariantInput = z.infer<typeof createVariantSchema>;
 
 export const PRODUCT_ERROR = [
   'SLUG_TAKEN', 'BRAND_NOT_ALLOWED', 'PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'SKU_TAKEN',
+  'PUBLISH_NOT_ALLOWED', 'NOT_AWAITING_REVIEW', 'REJECT_REASON_REQUIRED',
 ] as const;
 export type ProductErrorCode = (typeof PRODUCT_ERROR)[number];
 
@@ -119,4 +127,15 @@ export const PRODUCT_ERROR_MESSAGE: Readonly<Record<ProductErrorCode, string>> =
   PRODUCT_NOT_FOUND: '상품을 찾을 수 없습니다',
   CATEGORY_NOT_FOUND: '카테고리를 찾을 수 없습니다',
   SKU_TAKEN: '이미 사용 중인 SKU 입니다',
+  PUBLISH_NOT_ALLOWED: PUBLISH_ERROR.PUBLISH_NOT_ALLOWED,
+  NOT_AWAITING_REVIEW: PUBLISH_ERROR.NOT_AWAITING_REVIEW,
+  REJECT_REASON_REQUIRED: PUBLISH_ERROR.REJECT_REASON_REQUIRED,
 };
+
+/** 게시 검수 결정 */
+export const reviewProductSchema = z.object({
+  approve: z.boolean(),
+  /** 반려할 때만 쓴다. 승인에는 필요 없다. */
+  reason: z.string().trim().max(500, '500자를 넘을 수 없습니다').nullable().default(null),
+});
+export type ReviewProductInput = z.infer<typeof reviewProductSchema>;

@@ -15,8 +15,10 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { createProduct, updateProduct, updateStock, createVariant, getProductFormOptions } =
-  await import('~/lib/admin/manage-product');
+const {
+  createProduct, updateProduct, updateStock, createVariant, getProductFormOptions,
+  reviewProduct,
+} = await import('~/lib/admin/manage-product');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const merchantA: Actor = { id: 'u-a', role: 'MERCHANT', merchantId: 'm-a' };
@@ -33,6 +35,18 @@ const input = createProductSchema.parse({
   listPrice: 413_000, salePrice: 289_000, status: 'ACTIVE',
 });
 const patch = (raw: unknown) => updateProductSchema.parse(raw);
+
+/**
+ * 가맹점이 실제로 보낼 수 있는 입력.
+ *
+ * 가맹점에게는 product:publish 가 없어서 ACTIVE 로는 등록할 수 없다.
+ * 브랜드 범위나 가격 계산을 보는 테스트에 게시 권한을 섞지 않는다.
+ */
+const draftInput = createProductSchema.parse({
+  slug: 'oat-coat', name: '오트 코트',
+  brandId: 'clh1abc2300000000000000000', categoryId: 'clh1abc2300000000000000001',
+  listPrice: 413_000, salePrice: 289_000, status: 'DRAFT',
+});
 
 const existing = {
   id: 'p-1', slug: 'oat-coat', name: '오트 코트', description: '',
@@ -56,7 +70,7 @@ beforeEach(() => {
 
 describe('상품 등록 — 브랜드 소유 검증', () => {
   it('자기 브랜드에는 등록할 수 있다', async () => {
-    await expect(createProduct(merchantA, input)).resolves.toMatchObject({ id: 'p-new' });
+    await expect(createProduct(merchantA, draftInput)).resolves.toMatchObject({ id: 'p-new' });
   });
 
   it('남의 브랜드에는 등록할 수 없다', async () => {
@@ -97,7 +111,7 @@ describe('상품 등록 — 브랜드 소유 검증', () => {
   });
 
   it('ACTIVE 로 등록하면 게시 시각을 찍는다', async () => {
-    await createProduct(merchantA, input);
+    await createProduct(admin, input);
     expect(db.product.create.mock.calls[0]?.[0].data.publishedAt).toBeInstanceOf(Date);
   });
 });
@@ -133,13 +147,13 @@ describe('상품 수정', () => {
   });
 
   it('이미 게시된 상품을 다시 공개해도 게시 시각을 덮어쓰지 않는다', async () => {
-    await updateProduct(merchantA, 'p-1', patch({ status: 'ACTIVE' }));
+    await updateProduct(admin, 'p-1', patch({ status: 'ACTIVE' }));
     expect(db.product.update.mock.calls[0]?.[0].data.publishedAt).toBeUndefined();
   });
 
   it('처음 공개할 때는 게시 시각을 찍는다', async () => {
     db.product.findFirst.mockResolvedValue({ ...existing, publishedAt: null, status: 'DRAFT' });
-    await updateProduct(merchantA, 'p-1', patch({ status: 'ACTIVE' }));
+    await updateProduct(admin, 'p-1', patch({ status: 'ACTIVE' }));
     expect(db.product.update.mock.calls[0]?.[0].data.publishedAt).toBeInstanceOf(Date);
   });
 
@@ -253,17 +267,17 @@ describe('파생 컬럼 — 정렬과 검색을 위해 저장하는 값', () => 
 
   it('등록 시 판매가를 함께 저장한다', async () => {
     // Prisma 는 COALESCE 로 정렬할 수 없어 파생값을 컬럼으로 둔다
-    await createProduct(merchantA, input);
+    await createProduct(merchantA, draftInput);
     expect(db.product.create.mock.calls[0]?.[0].data.sellingPrice).toBe(289_000);
   });
 
   it('할인이 없으면 정가가 판매가다', async () => {
-    await createProduct(merchantA, { ...input, salePrice: null });
+    await createProduct(merchantA, { ...draftInput, salePrice: null });
     expect(db.product.create.mock.calls[0]?.[0].data.sellingPrice).toBe(413_000);
   });
 
   it('등록 시 검색 문자열을 소문자로 만든다', async () => {
-    await createProduct(merchantA, { ...input, name: '오트 코트' });
+    await createProduct(merchantA, { ...draftInput, name: '오트 코트' });
     expect(db.product.create.mock.calls[0]?.[0].data.searchText).toBe('오트 코트 moor');
   });
 
@@ -293,5 +307,145 @@ describe('파생 컬럼 — 정렬과 검색을 위해 저장하는 값', () => 
   it('가격을 안 바꾸면 판매가도 건드리지 않는다', async () => {
     await updateProduct(merchantA, 'p-1', patch({ name: '새 이름' }));
     expect(db.product.update.mock.calls[0]?.[0].data.sellingPrice).toBeUndefined();
+  });
+});
+
+describe('게시 권한', () => {
+  it('가맹점은 상품을 곧바로 매대에 올릴 수 없다', async () => {
+    /*
+     * product:publish 는 권한 표에만 있고 어디서도 검사하지 않았다. 게다가
+     * 가맹점도 그 권한을 갖고 있어서, 검사를 넣어도 아무것도 달라지지
+     * 않았다 — 구분하지 않는 권한은 없는 권한과 같다.
+     */
+    await expect(createProduct(merchantA, input)).rejects.toMatchObject({
+      code: 'PUBLISH_NOT_ALLOWED', status: 403,
+    });
+    expect(db.product.create).not.toHaveBeenCalled();
+  });
+
+  it('품절도 매대에 보이는 상태라 막는다', async () => {
+    await expect(
+      createProduct(merchantA, { ...input, status: 'SOLD_OUT' }),
+    ).rejects.toMatchObject({ code: 'PUBLISH_NOT_ALLOWED' });
+  });
+
+  it('검수 대기로는 등록할 수 있다 — 요청할 길은 열어 둔다', async () => {
+    await createProduct(merchantA, { ...input, status: 'PENDING_REVIEW' });
+
+    const data = db.product.create.mock.calls[0]![0].data;
+    expect(data.status).toBe('PENDING_REVIEW');
+    // 매대에 보이지 않으므로 게시 시각은 찍지 않는다
+    expect(data.publishedAt).toBeNull();
+    expect(data.reviewRequestedAt).toBeInstanceOf(Date);
+  });
+
+  it('검수 대기로 저장해도 게시 도장이 찍히지 않는다', async () => {
+    /*
+     * "DRAFT 가 아니면 찍는다" 로 두면 여기서 publishedAt 이 생기고, 그러면
+     * 검수를 통과한 상품으로 보여서 가맹점이 스스로 판매중으로 올릴 수 있다.
+     */
+    db.product.findFirst.mockResolvedValue({ ...existing, publishedAt: null });
+    await updateProduct(merchantA, 'p-1', patch({ status: 'PENDING_REVIEW' }));
+
+    expect(db.product.update.mock.calls[0]![0].data.publishedAt).toBeUndefined();
+  });
+
+  it('숨김으로 내리는 것은 막지 않는다', async () => {
+    // 자기 상품을 못 내리면 곤란하다. 내리는 것은 매대에 올리는 것이 아니다.
+    db.product.findFirst.mockResolvedValue({ ...existing, publishedAt: null });
+    await expect(
+      updateProduct(merchantA, 'p-1', patch({ status: 'HIDDEN' })),
+    ).resolves.toBeDefined();
+  });
+
+  it('한 번 게시된 상품은 가맹점이 다시 올릴 수 있다', async () => {
+    /*
+     * 심사는 최초 한 번이다. 매번 막으면 품절 처리나 사진 교체 때마다
+     * 운영진을 기다려야 한다 — 검수가 아니라 발목이다.
+     */
+    db.product.findFirst.mockResolvedValue({ ...existing, publishedAt: new Date('2026-01-01') });
+
+    await expect(
+      updateProduct(merchantA, 'p-1', patch({ status: 'ACTIVE' })),
+    ).resolves.toBeDefined();
+  });
+
+  it('운영진은 곧바로 올릴 수 있다', async () => {
+    await expect(createProduct(admin, input)).resolves.toBeDefined();
+  });
+});
+
+describe('게시 검수 처리', () => {
+  beforeEach(() => {
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: null,
+    });
+    db.product.update.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'ACTIVE', publishRejection: null,
+    });
+  });
+
+  it('가맹점은 검수를 처리할 수 없다', async () => {
+    await expect(reviewProduct(merchantA, 'p-1', { approve: true })).rejects.toMatchObject({
+      code: 'PUBLISH_NOT_ALLOWED', status: 403,
+    });
+  });
+
+  it('승인하면 판매중으로 올리고 게시 시각을 찍는다', async () => {
+    await reviewProduct(admin, 'p-1', { approve: true });
+
+    const data = db.product.update.mock.calls[0]![0].data;
+    expect(data.status).toBe('ACTIVE');
+    expect(data.publishedAt).toBeInstanceOf(Date);
+    expect(data.reviewRequestedAt).toBeNull();
+  });
+
+  it('이미 게시된 적이 있으면 시각을 덮어쓰지 않는다', async () => {
+    // 덮어쓰면 "신상품" 판정이 되살아난다
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: new Date('2026-01-01'),
+    });
+
+    await reviewProduct(admin, 'p-1', { approve: true });
+
+    expect(db.product.update.mock.calls[0]![0].data.publishedAt).toBeUndefined();
+  });
+
+  it('반려에는 사유가 있어야 한다', async () => {
+    // 이유 없이 되돌리면 가맹점은 무엇을 고쳐야 할지 모른다
+    await expect(
+      reviewProduct(admin, 'p-1', { approve: false, reason: '   ' }),
+    ).rejects.toMatchObject({ code: 'REJECT_REASON_REQUIRED', status: 400 });
+    expect(db.product.update).not.toHaveBeenCalled();
+  });
+
+  it('반려하면 작성 중으로 되돌리고 사유를 남긴다', async () => {
+    await reviewProduct(admin, 'p-1', { approve: false, reason: '사진이 흐립니다' });
+
+    const data = db.product.update.mock.calls[0]![0].data;
+    expect(data.status).toBe('DRAFT');
+    expect(data.publishRejection).toBe('사진이 흐립니다');
+  });
+
+  it('대기줄에 없는 상품은 처리하지 않는다', async () => {
+    // 다른 운영자가 이미 본 것을 두 번 처리하게 된다
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'ACTIVE', publishedAt: new Date(),
+    });
+
+    await expect(reviewProduct(admin, 'p-1', { approve: true })).rejects.toMatchObject({
+      code: 'NOT_AWAITING_REVIEW', status: 409,
+    });
+  });
+
+  it('다시 요청하면 지난 반려 사유를 지운다', async () => {
+    // 고쳐서 다시 올린 상품에 옛 사유가 붙어 있으면 지금 상태인 줄 안다
+    db.product.findFirst.mockResolvedValue({
+      ...existing, publishedAt: null, publishRejection: '사진이 흐립니다',
+    });
+
+    await updateProduct(merchantA, 'p-1', patch({ status: 'PENDING_REVIEW' }));
+
+    expect(db.product.update.mock.calls[0]![0].data.publishRejection).toBeNull();
   });
 });
