@@ -24,3 +24,4 @@ export * from './cart-sync';
 export * from './mail';
 export * from './auth-policy';
 export * from './error-report';
+export * from './order-search';

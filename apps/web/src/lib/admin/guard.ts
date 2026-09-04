@@ -15,7 +15,20 @@ export async function requireAdmin(permission: Permission = 'admin:access'): Pro
   const actor = await getActor(await headers());
   if (!actor) redirect('/login?next=/admin');
 
-  if (!hasPermission(actor, permission)) {
+  /**
+   * 콘솔 진입 권한을 **항상** 함께 본다.
+   *
+   * 예전에는 넘겨받은 권한만 확인했다. 그런데 CUSTOMER 도 order:read 와
+   * product:read 를 갖고 있어서, 고객이 /admin/orders 를 열면 이 가드를
+   * 그대로 통과했다. 화면은 레이아웃 리다이렉트가 막아 줬지만 **페이지는
+   * 이미 DB 를 치고 그 뒤에서 던졌다** — 오류 추적을 붙이고 나서야 로그에
+   * fatal 로 쌓이는 것을 보고 알았다.
+   *
+   * 두 권한은 뜻이 다르다. order:read 는 "주문을 볼 수 있다" 이고
+   * admin:access 는 "운영 콘솔에 들어올 수 있다" 다. 고객은 앞의 것만 가진다.
+   */
+  const allowed = hasPermission(actor, 'admin:access') && hasPermission(actor, permission);
+  if (!allowed) {
     // 권한이 없다는 사실 자체를 알려 주지 않는다. 어드민 경로의 존재를
     // 확인해 주는 셈이 되기 때문이다.
     redirect('/');

@@ -131,3 +131,30 @@ export function pruneSeen(
 export function severityOf(routeType: string): ErrorSeverity {
   return routeType === 'render' ? 'fatal' : 'error';
 }
+
+/**
+ * 보고하지 않을 오류.
+ *
+ * **브라우저가 요청을 끊은 것은 우리 오류가 아니다.** Next 는 프리페치가
+ * 진행 중인데 사용자가 다른 곳으로 넘어가면 스트림을 닫고 오류를 던진다.
+ * 화면 렌더 경로라 심각도가 fatal 로 잡히는데, 실제로는 지극히 평범한 일이다.
+ *
+ * 작은 E2E 한 번에 8건이 났다. 이대로 두면 로그가 이것으로 덮이고 알림도
+ * 나가서, **진짜 오류가 묻힌다** — 오류 추적을 붙인 이유가 사라진다.
+ *
+ * 목록은 **실제로 관찰한 것만** 넣는다. 짐작으로 늘리면 언젠가 진짜 오류를
+ * 조용히 버리게 되고, 그건 안 잡는 것보다 나쁘다.
+ */
+const IGNORED_MESSAGES = [
+  // 프리페치 도중 사용자가 이동. Next 15/16 의 문구다.
+  'The destination stream closed early',
+];
+
+export function isIgnorableError(error: unknown): boolean {
+  if (error instanceof Error) {
+    // 표준 취소 신호. 우리가 만든 것이든 런타임이 만든 것이든 뜻은 하나다.
+    if (error.name === 'AbortError') return true;
+    return IGNORED_MESSAGES.some((needle) => error.message.includes(needle));
+  }
+  return false;
+}

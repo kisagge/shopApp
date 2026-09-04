@@ -4,6 +4,7 @@ import {
   merchantScope, computeFunnel, won, FUNNEL_STEP, assertPermission,
   rangeStart, DASHBOARD_RANGE_LABEL, RAW_RETENTION_DAYS, recentMonths, dayKeyOf,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
+  readOrderSearch, readDateRange,
 } from '@shop/core';
 
 /**
@@ -367,14 +368,52 @@ const MAX_PAGE_SIZE = 50;
 
 export async function getAdminOrders(
   actor: Actor,
-  query: { status?: OrderStatus | undefined; cursor?: string | undefined; take?: number } = {},
+  query: {
+    status?: OrderStatus | undefined;
+    cursor?: string | undefined;
+    take?: number;
+    /** 주문번호이거나 주문자 이름. 어느 쪽인지는 core 가 판단한다 */
+    q?: string | undefined;
+    from?: string | undefined;
+    to?: string | undefined;
+  } = {},
 ): Promise<Paged<AdminOrderRow>> {
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
+  const term = readOrderSearch(query.q);
+  const range = readDateRange(query.from, query.to);
+
+  /**
+   * 검색 조건은 **범위 제한과 AND 로 묶인다.**
+   *
+   * 가맹점은 자기 상품이 든 주문만 볼 수 있는데, 검색을 OR 로 얹으면 그
+   * 제한이 풀려 남의 주문이 나온다. 조건을 늘릴 때 가장 쉽게 깨지는 자리다.
+   */
+  const search =
+    term.kind === 'orderNo'
+      ? { orderNo: term.value }
+      : term.kind === 'orderNoPartial'
+        ? { orderNo: { contains: term.value } }
+        : term.kind === 'buyer'
+          ? { user: { name: { contains: term.value, mode: 'insensitive' as const } } }
+          : {};
+
+  const placedAt =
+    range.from || range.until
+      ? {
+          placedAt: {
+            ...(range.from ? { gte: range.from } : {}),
+            ...(range.until ? { lt: range.until } : {}),
+          },
+        }
+      : {};
+
   const where = {
     ...(query.status ? { status: query.status } : {}),
     ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    ...search,
+    ...placedAt,
   };
 
   const [rows, total] = await Promise.all([

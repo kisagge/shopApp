@@ -162,3 +162,18 @@ describe('메일 싱크', () => {
     expect(text).toMatch(/로그에서 .+ 로 찾을 수 있습니다/);
   });
 });
+
+describe('거를 오류', () => {
+  it('싱크까지 가지 않는다', async () => {
+    await reportError(input({ error: new Error('The destination stream closed early.') }));
+    expect(captured).toHaveLength(0);
+  });
+
+  it('null 을 돌려준다 — 부르는 쪽이 보고 여부를 알 수 있다', async () => {
+    const skipped = await reportError(input({ error: new Error('The destination stream closed early.') }));
+    const kept = await reportError(input());
+
+    expect(skipped).toBeNull();
+    expect(kept).not.toBeNull();
+  });
+});

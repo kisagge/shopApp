@@ -1,7 +1,7 @@
 import 'server-only';
 import {
   fingerprintOf, redactHeaders, redactPath, severityOf,
-  shouldNotify, pruneSeen, type ErrorReport,
+  shouldNotify, pruneSeen, isIgnorableError, type ErrorReport,
 } from '@shop/core';
 import { getMailer } from '@shop/mail';
 
@@ -147,8 +147,17 @@ interface ReportInput {
  * **절대 던지지 않는다.** 오류를 보고하다 오류가 나서 요청이 더 깨지면
  * 원래 문제를 찾기만 더 어려워진다.
  */
-export async function reportError(input: ReportInput): Promise<ErrorReport> {
+export async function reportError(input: ReportInput): Promise<ErrorReport | null> {
   const err = input.error;
+
+  /**
+   * 브라우저가 끊은 요청은 보고하지 않는다.
+   *
+   * 걸러 내지 않으면 프리페치 취소 하나하나가 fatal 로 쌓여 진짜 오류를
+   * 덮는다. 로그도 알림도 그때부터 쓸모가 없어진다.
+   */
+  if (isIgnorableError(err)) return null;
+
   const name = err instanceof Error ? err.name : typeof err;
   const message = err instanceof Error ? err.message : String(err);
   const digest =

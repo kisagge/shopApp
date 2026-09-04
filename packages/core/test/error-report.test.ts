@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   fingerprintOf, redactHeaders, redactPath, severityOf,
-  shouldNotify, pruneSeen, NOTIFY_WINDOW_MS,
+  shouldNotify, pruneSeen, NOTIFY_WINDOW_MS, isIgnorableError,
 } from '../src/error-report';
 
 describe('지문', () => {
@@ -115,5 +115,29 @@ describe('심각도', () => {
   it('API 한 건은 error 다 — 나머지 화면은 살아 있다', () => {
     expect(severityOf('route')).toBe('error');
     expect(severityOf('action')).toBe('error');
+  });
+});
+
+describe('보고하지 않을 오류', () => {
+  it('브라우저가 끊은 프리페치는 우리 오류가 아니다', () => {
+    // 작은 E2E 한 번에 8건이 났다. 이대로 두면 진짜 오류가 묻힌다.
+    expect(isIgnorableError(new Error('The destination stream closed early.'))).toBe(true);
+  });
+
+  it('표준 취소 신호도 거른다', () => {
+    const err = new Error('취소됨');
+    err.name = 'AbortError';
+    expect(isIgnorableError(err)).toBe(true);
+  });
+
+  it('그 밖의 오류는 그대로 보고한다', () => {
+    // 짐작으로 목록을 늘리면 진짜 오류를 조용히 버리게 된다
+    expect(isIgnorableError(new Error('주문을 찾을 수 없습니다'))).toBe(false);
+    expect(isIgnorableError(new TypeError('undefined 의 속성을 읽을 수 없음'))).toBe(false);
+  });
+
+  it('Error 가 아닌 것은 거르지 않는다', () => {
+    expect(isIgnorableError('문자열 오류')).toBe(false);
+    expect(isIgnorableError(null)).toBe(false);
   });
 });
