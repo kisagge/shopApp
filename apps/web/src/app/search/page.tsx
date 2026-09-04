@@ -7,6 +7,7 @@ import { TrackedProductList } from '~/components/tracked-product-list';
 import { TrackedSearch } from '~/components/tracked-search';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
+import { NO_INDEX } from '~/lib/no-index';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,8 @@ export async function generateMetadata({
   const raw = await searchParams;
   const q = typeof raw['q'] === 'string' ? raw['q'] : '';
   const term = normalizeSearchTerm(q);
-  return { title: term ? `"${term}" 검색 결과` : '검색' };
+  // 검색어마다 다른 주소가 되어 같은 상품이 여러 번 잡힌다
+  return { title: term ? `"${term}" 검색 결과` : '검색', ...NO_INDEX };
 }
 
 export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {

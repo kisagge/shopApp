@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ResetPasswordForm } from '~/components/reset-password-form';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '비밀번호 재설정' };
+export const metadata: Metadata = {
+  title: '비밀번호 재설정',
+  ...NO_INDEX,
+};
 
 /**
  * 메일의 링크가 도착하는 곳.

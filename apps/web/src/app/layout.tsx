@@ -7,6 +7,7 @@ import { NativeSession } from '~/components/native-session';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
+import { absoluteUrl } from '~/lib/urls';
 
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
@@ -22,9 +23,25 @@ const serif = Hahmlet({
   display: 'swap',
 });
 
+const DESCRIPTION = '오래 두고 입을 것만 골라 담은 편집숍';
+
 export const metadata: Metadata = {
+  /**
+   * 상대 주소를 절대 주소로 바꿀 기준.
+   *
+   * 이게 없으면 openGraph 이미지가 상대 경로로 나가고, 카카오톡·슬랙 같은
+   * 곳은 그걸 불러오지 못해 **링크를 붙여도 미리보기가 뜨지 않는다.**
+   */
+  metadataBase: new URL(absoluteUrl('/')),
   title: { default: 'PLAIN', template: '%s | PLAIN' },
-  description: '오래 두고 입을 것만 골라 담은 편집숍',
+  description: DESCRIPTION,
+  openGraph: {
+    type: 'website',
+    siteName: 'PLAIN',
+    locale: 'ko_KR',
+    title: 'PLAIN',
+    description: DESCRIPTION,
+  },
 };
 
 export const viewport: Viewport = {

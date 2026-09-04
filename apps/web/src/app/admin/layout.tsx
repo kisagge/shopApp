@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react';
+import type { Metadata } from 'next';
 import Link from 'next/link';
 import { hasPermission, USER_ROLE_LABEL, type Permission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { AdminSignOut } from '~/components/admin-sign-out';
+import { NO_INDEX } from '~/lib/no-index';
+
+/** 운영 화면은 검색 결과에 뜰 일이 없다 */
+export const metadata: Metadata = NO_INDEX;
 
 export const dynamic = 'force-dynamic';
 

@@ -3,8 +3,12 @@ import Link from 'next/link';
 import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { LoginForm } from '~/components/login-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '로그인' };
+export const metadata: Metadata = {
+  title: '로그인',
+  ...NO_INDEX,
+};
 
 /**
  * 소셜 로그인이 실패했을 때 인증 서버가 붙여 보내는 코드.

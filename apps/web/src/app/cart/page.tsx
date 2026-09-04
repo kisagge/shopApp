@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import { CartView } from '~/components/cart-view';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '장바구니' };
+export const metadata: Metadata = {
+  title: '장바구니',
+  ...NO_INDEX,
+};
 
 export default function CartPage() {
   return (

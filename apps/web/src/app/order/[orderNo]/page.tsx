@@ -12,8 +12,12 @@ import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { getOrderForUser } from '~/lib/queries/orders';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '주문 완료' };
+export const metadata: Metadata = {
+  title: '주문 완료',
+  ...NO_INDEX,
+};
 export const dynamic = 'force-dynamic';
 
 export default async function OrderPage({ params }: { params: Promise<{ orderNo: string }> }) {

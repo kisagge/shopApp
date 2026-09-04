@@ -6,8 +6,12 @@ import { SIGNUP_POINTS } from '@shop/core';
 import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { SignUpForm } from '~/components/signup-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '회원가입' };
+export const metadata: Metadata = {
+  title: '회원가입',
+  ...NO_INDEX,
+};
 
 export default async function SignUpPage() {
   // 이미 로그인한 사람에게 가입 화면을 보여 줄 이유가 없다

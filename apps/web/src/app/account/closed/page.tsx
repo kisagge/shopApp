@@ -1,7 +1,11 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '탈퇴 완료' };
+export const metadata: Metadata = {
+  title: '탈퇴 완료',
+  ...NO_INDEX,
+};
 
 /**
  * 탈퇴가 끝났다는 것만 말하는 화면.

@@ -1,8 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ForgotPasswordForm } from '~/components/forgot-password-form';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '비밀번호 찾기' };
+export const metadata: Metadata = {
+  title: '비밀번호 찾기',
+  ...NO_INDEX,
+};
 
 export default function ForgotPasswordPage() {
   return (

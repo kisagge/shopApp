@@ -3,9 +3,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
-import { formatWithUnit } from '@shop/core';
+import {
+  formatWithUnit, productStructuredData, breadcrumbStructuredData,
+} from '@shop/core';
 import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
+import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
 import { getProductBySlug } from '~/lib/queries/products';
 import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
@@ -24,10 +27,22 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) return { title: '상품을 찾을 수 없습니다' };
+  const summary = product.description.slice(0, 120);
+  const path = `/product/${slug}`;
+
   return {
     title: product.name,
-    description: product.description.slice(0, 120),
-    openGraph: { title: `${product.brand} ${product.name}`, description: product.description.slice(0, 120) },
+    description: summary,
+    // 같은 상품이 여러 주소로 잡히지 않게 정본을 알려 준다
+    alternates: { canonical: path },
+    openGraph: {
+      type: 'website',
+      url: path,
+      title: `${product.brand} ${product.name}`,
+      description: summary,
+      // 링크를 붙였을 때 뜨는 그림. 없으면 글자만 나간다.
+      ...(product.images[0] ? { images: [{ url: product.images[0].url, alt: product.images[0].alt }] } : {}),
+    },
   };
 }
 
@@ -48,8 +63,46 @@ export default async function ProductPage({ params }: Params) {
       : Promise.resolve(new Set<string>()),
   ]);
 
+  /*
+   * 검색엔진이 읽는 구조화 데이터.
+   *
+   * 화면이 이미 쓰는 값을 그대로 넘긴다 — 여기서 따로 계산하면 화면과
+   * 어긋나고, 어긋난 구조화 데이터는 리치 결과가 통째로 빠지는 이유가 된다.
+   */
+  const url = absoluteUrl(`/product/${slug}`);
+  const jsonLd = [
+    productStructuredData({
+      url,
+      name: product.name,
+      description: product.description,
+      brand: product.brand,
+      images: product.images.map((image) => image.url),
+      price: product.price,
+      soldOut: product.soldOut,
+      rating: product.rating,
+      reviewCount: product.reviewCount,
+    }),
+    breadcrumbStructuredData([
+      { name: '홈', url: absoluteUrl('/') },
+      { name: product.categoryName, url: absoluteUrl(`/category/${product.categorySlug}`) },
+      { name: product.name, url },
+    ]),
+  ];
+
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
+      {/*
+        JSON.stringify 의 결과를 그대로 넣는다. 상품명·설명은 운영자가
+        입력하는 값이라 </script> 가 들어올 수 있는데, `<` 를 이스케이프하면
+        그 자리에서 스크립트가 끊기는 일을 막는다.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c'),
+        }}
+      />
+
       <nav aria-label="현재 위치" className="py-5">
         <ol className="flex items-center gap-2">
           <li><Link href="/" className="text-xs text-[var(--fg-muted)]">홈</Link></li>
