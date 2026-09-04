@@ -12,7 +12,8 @@
     "test/**/*.tsx",
     "scripts/**/*.ts",
     "e2e/**/*.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "instrumentation.ts"
   ],
   "exclude": ["node_modules"]
 }
