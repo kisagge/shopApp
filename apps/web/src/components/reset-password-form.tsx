@@ -6,10 +6,12 @@ import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { resetPasswordSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
+import { useT } from '~/lib/i18n/client';
 
 type FieldName = 'password' | 'passwordConfirm';
 
 export function ResetPasswordForm({ token }: { token: string }) {
+  const t = useT();
   const router = useRouter();
   const [values, setValues] = useState({ password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -55,7 +57,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         setExpired(true);
         return;
       }
-      setError('비밀번호를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.');
+      setError(t('auth.resetFailed'));
       return;
     }
 
@@ -68,13 +70,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
     return (
       <div role="alert" className="flex flex-col gap-4">
         <p className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
-          링크가 만료되었거나 이미 사용되었습니다.
+          {t('auth.linkExpired')}
         </p>
         <Link
           href="/forgot-password"
           className="inline-flex h-12 items-center justify-center rounded-sm bg-[var(--brand)] text-sm font-medium text-[var(--bg)] no-underline"
         >
-          링크 다시 받기
+          {t('auth.resendLink')}
         </Link>
       </div>
     );
@@ -83,17 +85,17 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-5" noValidate>
       <Field
-        label="새 비밀번호"
+        label={t('auth.newPassword')}
         type="password"
         autoComplete="new-password"
         required
         value={values.password}
         error={fieldErrors.password}
-        hint="8자 이상"
+        hint={t('auth.passwordHint')}
         onChange={(e) => set('password', e.target.value)}
       />
       <Field
-        label="새 비밀번호 확인"
+        label={t('auth.newPasswordConfirm')}
         type="password"
         autoComplete="new-password"
         required
@@ -109,7 +111,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       )}
 
       <Button type="submit" block aria-disabled={pending}>
-        {pending ? '바꾸는 중…' : '비밀번호 바꾸기'}
+        {pending ? t('auth.resetting') : t('auth.resetSubmit')}
       </Button>
     </form>
   );

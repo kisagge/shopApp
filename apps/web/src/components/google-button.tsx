@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { authClient } from '@shop/auth/client';
 import { isNativeShell, nativeGoogleIdToken, type GoogleClientIds } from '@shop/native';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 구글로 계속하기.
@@ -18,6 +19,7 @@ export function GoogleButton({
   /** 네이티브 셸에서만 쓴다. 공개 값이라 화면으로 내려도 된다. */
   nativeIds?: GoogleClientIds | undefined;
 }) {
+  const t = useT();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
 
@@ -73,7 +75,7 @@ export function GoogleButton({
     <>
     {error && (
       <p role="alert" className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
-        구글 로그인에 실패했습니다. 연결을 확인하고 다시 시도해 주세요.
+        {t('auth.googleFailed')}
       </p>
     )}
     <button
@@ -89,7 +91,7 @@ export function GoogleButton({
         <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z" />
         <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.9 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z" />
       </svg>
-      {pending ? '이동 중…' : '구글로 계속하기'}
+      {pending ? t('auth.googleMoving') : t('auth.google')}
     </button>
     </>
   );
@@ -97,10 +99,11 @@ export function GoogleButton({
 
 /** 소셜 버튼과 이메일 폼 사이의 구분선. */
 export function OrDivider() {
+  const t = useT();
   return (
     <div className="flex items-center gap-3" aria-hidden="true">
       <span className="h-px flex-1 bg-[var(--border)]" />
-      <span className="text-[11px] text-[var(--fg-muted)]">또는</span>
+      <span className="text-[11px] text-[var(--fg-muted)]">{t('auth.or')}</span>
       <span className="h-px flex-1 bg-[var(--border)]" />
     </div>
   );

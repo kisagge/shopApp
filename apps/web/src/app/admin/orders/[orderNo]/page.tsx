@@ -4,8 +4,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL,
-  PAYMENT_STATUS_LABEL, MEMBER_GRADE_LABEL,
-  RETURN_TYPE_LABEL, RETURN_REASON_LABEL, RETURN_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
@@ -13,6 +12,8 @@ import { ReturnActions } from './return-actions';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
+import { getT } from '~/lib/i18n/server';
+import { GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
 export const metadata: Metadata = { title: '주문 상세' };
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export default async function AdminOrderDetail({
   params: Promise<{ orderNo: string }>;
 }) {
   const actor = await requireAdmin('order:read');
+  const t = await getT();
   const { orderNo } = await params;
   const order = await getAdminOrder(actor, orderNo);
   if (!order) notFound();
@@ -117,7 +119,7 @@ export default async function AdminOrderDetail({
                 <Row label="이름" value={order.user.name} />
                 {/* 가맹점에게는 이메일을 주지 않는다. 배송에 필요한 정보가 아니다. */}
                 {order.user.email && <Row label="이메일" value={order.user.email} />}
-                <Row label="등급" value={MEMBER_GRADE_LABEL[order.user.grade]} />
+                <Row label="등급" value={t(GRADE_KEY[order.user.grade])} />
               </dl>
             </section>
 
@@ -156,14 +158,14 @@ export default async function AdminOrderDetail({
             >
               <div className="mb-4 flex items-baseline justify-between gap-4">
                 <h2 id="return-title" className="text-base font-semibold">
-                  {RETURN_TYPE_LABEL[activeReturn.type as ReturnType]} 신청
+                  {t(RETURN_TYPE_KEY[activeReturn.type as ReturnType])} 신청
                 </h2>
                 <span className="text-xs text-[var(--fg-muted)]">
-                  {RETURN_STATUS_LABEL[activeReturn.status as ReturnStatus]}
+                  {t(RETURN_STATUS_KEY[activeReturn.status as ReturnStatus])}
                 </span>
               </div>
               <dl className="flex flex-col">
-                <Row label="사유" value={RETURN_REASON_LABEL[activeReturn.reason as ReturnReason]} />
+                <Row label="사유" value={t(RETURN_REASON_KEY[activeReturn.reason as ReturnReason])} />
                 <Row
                   label="반송비"
                   value={activeReturn.shippingBorneBy === 'CUSTOMER' ? '고객 부담' : '판매자 부담'}

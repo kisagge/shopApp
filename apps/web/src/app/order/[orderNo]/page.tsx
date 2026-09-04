@@ -4,8 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
 import {
-  format, won, ORDER_STATUS_LABEL, isCancellableByCustomer, canRequestReturn,
-  RETURN_TYPE_LABEL, RETURN_REASON_LABEL, RETURN_STATUS_LABEL,
+  format, won, isCancellableByCustomer, canRequestReturn,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -13,6 +12,8 @@ import { CancelOrderButton } from '~/components/cancel-order-button';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { getOrderForUser } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
+import { getT } from '~/lib/i18n/server';
+import { ORDER_STATUS_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
 export const metadata: Metadata = {
   title: '주문 완료',
@@ -25,7 +26,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
   const user = await getSessionUser(await headers());
   if (!user) redirect('/login');
 
-  const order = await getOrderForUser(orderNo, user.id);
+  const [order, t] = await Promise.all([getOrderForUser(orderNo, user.id), getT()]);
   if (!order) notFound();
 
   const row = (label: string, value: string, accent = false) => (
@@ -82,7 +83,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         </span>
         <h1 className="font-serif text-2xl font-medium tracking-tight">{headline}</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-          현재 상태는 <strong className="font-semibold">{ORDER_STATUS_LABEL[order.status]}</strong>입니다.
+          현재 상태는 <strong className="font-semibold">{t(ORDER_STATUS_KEY[order.status])}</strong>입니다.
           {nextStep && (
             <>
               <br />
@@ -164,18 +165,18 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
           className="mt-8 rounded-sm border border-[var(--border)] p-4"
         >
           <h2 id="return-title" className="mb-3 text-sm font-semibold">
-            {RETURN_TYPE_LABEL[activeReturn.type as ReturnType]} 신청
+            {t(RETURN_TYPE_KEY[activeReturn.type as ReturnType])} 신청
           </h2>
           <dl className="flex flex-col gap-2 text-[13px]">
             <div className="flex gap-3">
               <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">상태</dt>
               <dd className="font-medium">
-                {RETURN_STATUS_LABEL[activeReturn.status as ReturnStatus]}
+                {t(RETURN_STATUS_KEY[activeReturn.status as ReturnStatus])}
               </dd>
             </div>
             <div className="flex gap-3">
               <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">사유</dt>
-              <dd>{RETURN_REASON_LABEL[activeReturn.reason as ReturnReason]}</dd>
+              <dd>{t(RETURN_REASON_KEY[activeReturn.reason as ReturnReason])}</dd>
             </div>
             <div className="flex gap-3">
               <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">반송비</dt>

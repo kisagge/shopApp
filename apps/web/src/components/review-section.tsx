@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
-import { SIZE_FIT_LABEL, type SizeFit } from '@shop/core';
+import type { SizeFit } from '@shop/core';
 import type { PublicReview, ReviewSummary } from '~/lib/queries/reviews';
 import { ReviewStars } from './review-stars';
 import { ReviewActions } from './review-actions';
@@ -16,6 +16,7 @@ export function ReviewSection({
   reviews,
   sortTabs,
   loggedIn = false,
+  sizeFitLabel = (fit) => fit,
 }: {
   summary: ReviewSummary;
   reviews: readonly PublicReview[];
@@ -29,6 +30,13 @@ export function ReviewSection({
   sortTabs?: ReactNode;
   /** 도움돼요를 누를 수 있는 사람인지 판단하는 데 쓴다 */
   loggedIn?: boolean;
+  /**
+   * 사이즈 표현의 이름표.
+   *
+   * 이 조각은 요청의 언어를 몰라야 테스트에서 그릴 수 있다. 정렬 줄을
+   * 받아 끼우는 것과 같은 이유로, 이름 붙이는 일도 부르는 쪽이 한다.
+   */
+  sizeFitLabel?: (fit: SizeFit) => string;
 }) {
   return (
     <section aria-labelledby="reviews-title" className="border-t border-[var(--border)] pt-10">
@@ -83,7 +91,7 @@ export function ReviewSection({
                   {summary.sizeFit.map((s) => (
                     <div key={s.fit} className="flex items-center justify-between gap-3">
                       <dt className="text-[12px] text-[var(--fg-secondary)]">
-                        {SIZE_FIT_LABEL[s.fit]}
+                        {sizeFitLabel(s.fit)}
                       </dt>
                       <dd className="tnum text-[12px] font-medium">{s.percent}%</dd>
                     </div>
@@ -118,7 +126,7 @@ export function ReviewSection({
                     <p className="mt-1.5 text-[11px] text-[var(--fg-muted)]">
                       {[
                         review.optionLabel,
-                        review.sizeFit && SIZE_FIT_LABEL[review.sizeFit as SizeFit],
+                        review.sizeFit && sizeFitLabel(review.sizeFit as SizeFit),
                         review.height && review.weight
                           ? `${review.height}cm · ${review.weight}kg`
                           : null,

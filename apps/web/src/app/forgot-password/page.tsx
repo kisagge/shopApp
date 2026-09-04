@@ -2,19 +2,21 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ForgotPasswordForm } from '~/components/forgot-password-form';
 import { NO_INDEX } from '~/lib/no-index';
+import { getT } from '~/lib/i18n/server';
 
-export const metadata: Metadata = {
-  title: '비밀번호 찾기',
-  ...NO_INDEX,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('auth.forgotHeading'), ...NO_INDEX };
+}
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage() {
+  const t = await getT();
+
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-8 px-4 py-16">
       <div className="flex flex-col gap-2">
-        <h1 className="font-serif text-3xl font-medium tracking-tight">비밀번호 찾기</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight">{t('auth.forgotHeading')}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          가입할 때 쓴 이메일로 재설정 링크를 보내 드립니다.
+          {t('auth.forgotLead')}
         </p>
       </div>
 
@@ -22,7 +24,7 @@ export default function ForgotPasswordPage() {
 
       <p className="text-center text-[13px] text-[var(--fg-muted)]">
         <Link href="/login" className="text-[var(--fg)] underline underline-offset-2">
-          로그인으로 돌아가기
+          {t('auth.backToLogin')}
         </Link>
       </p>
     </div>

@@ -26,6 +26,7 @@ import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { reviewListQuerySchema } from '@shop/contract';
+import { SIZE_FIT_KEY } from '~/lib/i18n/enum-labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -294,6 +295,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
           reviews={reviews.items}
           sortTabs={<ReviewSortTabs sort={reviewSort} basePath={`/product/${slug}`} />}
           loggedIn={viewer !== null}
+          sizeFitLabel={(fit) => t(SIZE_FIT_KEY[fit])}
         />
         <InquirySection
           productId={product.id}

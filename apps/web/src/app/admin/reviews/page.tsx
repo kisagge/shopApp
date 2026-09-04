@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  REPORT_REASON_LABEL, MODERATION_STATE_LABEL, type ModerationState,
+  MODERATION_STATE_LABEL, type ModerationState,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import {
@@ -9,6 +9,8 @@ import {
 } from '~/lib/queries/admin-reviews';
 import { ReviewModeration } from '~/components/admin/review-moderation';
 import { Pager } from '../pager';
+import { getT } from '~/lib/i18n/server';
+import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
 
 export const metadata: Metadata = { title: '리뷰 관리' };
 export const dynamic = 'force-dynamic';
@@ -36,6 +38,7 @@ export default async function AdminReviewsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const actor = await requireAdmin('review:moderate');
+  const t = await getT();
   const params = await searchParams;
 
   const tab: ReviewTab = isReviewTab(params.tab) ? params.tab : 'reported';
@@ -189,7 +192,7 @@ export default async function AdminReviewsPage({
                         {row.reports.map((report) => (
                           <li key={report.id} className="text-[12px]">
                             <p className="flex flex-wrap items-baseline gap-2">
-                              <b className="font-medium">{REPORT_REASON_LABEL[report.reason]}</b>
+                              <b className="font-medium">{t(REPORT_REASON_KEY[report.reason])}</b>
                               <span className="text-[var(--fg-muted)]">{report.reporterName}</span>
                               <time
                                 dateTime={report.createdAt.toISOString()}

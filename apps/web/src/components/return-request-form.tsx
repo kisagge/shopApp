@@ -4,10 +4,12 @@ import { useId, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import {
-  RETURN_TYPE, RETURN_TYPE_LABEL, RETURN_REASON, RETURN_REASON_LABEL,
+  RETURN_TYPE, RETURN_REASON,
   shippingBorneBy, returnWindowDays,
   type ReturnReason, type ReturnType,
 } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
+import { RETURN_TYPE_KEY, RETURN_REASON_KEY } from '~/lib/i18n/enum-labels';
 
 /**
  * 반품·교환 신청.
@@ -20,6 +22,7 @@ import {
  */
 export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
   const router = useRouter();
+  const t = useT();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<ReturnType>('RETURN');
@@ -95,20 +98,21 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
           무엇을 원하시나요
         </legend>
         <div className="flex gap-2">
-          {RETURN_TYPE.map((t) => (
+          {/* 반복 변수를 kind 라고 부른다 — t 로 두면 문구 함수를 가린다 */}
+          {RETURN_TYPE.map((kind) => (
             <label
-              key={t}
+              key={kind}
               className="flex flex-1 cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
             >
               <input
                 type="radio"
                 name="type"
-                value={t}
-                checked={type === t}
-                onChange={() => setType(t)}
+                value={kind}
+                checked={type === kind}
+                onChange={() => setType(kind)}
                 className="accent-[var(--brand)]"
               />
-              {RETURN_TYPE_LABEL[t]}
+              {t(RETURN_TYPE_KEY[kind])}
             </label>
           ))}
         </div>
@@ -129,7 +133,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
               onChange={() => setReason(r)}
               className="accent-[var(--brand)]"
             />
-            {RETURN_REASON_LABEL[r]}
+            {t(RETURN_REASON_KEY[r])}
           </label>
         ))}
       </fieldset>

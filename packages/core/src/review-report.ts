@@ -7,13 +7,14 @@
 export const REPORT_REASON = ['SPAM', 'ABUSE', 'IRRELEVANT', 'PRIVACY', 'OTHER'] as const;
 export type ReportReason = (typeof REPORT_REASON)[number];
 
-export const REPORT_REASON_LABEL: Readonly<Record<ReportReason, string>> = {
-  SPAM: '광고 · 도배',
-  ABUSE: '욕설 · 비방',
-  IRRELEVANT: '상품과 무관한 내용',
-  PRIVACY: '개인정보 노출',
-  OTHER: '기타',
-};
+/*
+ * 이름표는 여기 없다.
+ *
+ * 무엇이 있는지는 규칙이고 뭐라고 부를지는 화면이다. 화면이 세 나라 말로
+ * 나가면서 이 자리의 한국어 표는 맞지 않게 됐다 —
+ * apps/web 의 lib/i18n/enum-labels 가 값 목록에서 열쇠를 만들고, 사전이
+ * 그 열쇠를 세 벌로 가진다.
+ */
 
 export function isReportReason(value: string): value is ReportReason {
   return (REPORT_REASON as readonly string[]).includes(value);

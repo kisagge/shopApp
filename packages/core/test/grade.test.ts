@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { won } from '../src/money';
 import {
-  MEMBER_GRADE, MEMBER_GRADE_LABEL, GRADE_THRESHOLD, GRADE_REWARD_PERCENT,
+  MEMBER_GRADE, GRADE_THRESHOLD, GRADE_REWARD_PERCENT,
   gradeFor, nextGrade, gradeProgress, effectiveGrade,
 } from '../src/grade';
 
@@ -25,11 +25,9 @@ describe('등급 산정', () => {
     }
   });
 
-  it('모든 등급에 라벨과 적립률이 있다', () => {
-    for (const g of MEMBER_GRADE) {
-      expect(MEMBER_GRADE_LABEL[g]).toBeTruthy();
-      expect(GRADE_REWARD_PERCENT[g]).toBeGreaterThan(0);
-    }
+  it('모든 등급에 적립률이 있다', () => {
+    // 이름표는 사전이 가진다 — apps/web 의 enum-labels 검사가 지킨다
+    for (const g of MEMBER_GRADE) expect(GRADE_REWARD_PERCENT[g]).toBeGreaterThan(0);
   });
 
   it('등급이 오를수록 적립률도 오른다', () => {

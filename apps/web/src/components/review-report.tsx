@@ -1,7 +1,9 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { REPORT_REASON, REPORT_REASON_LABEL, type ReportReason } from '@shop/core';
+import { REPORT_REASON, type ReportReason } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
+import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
 
 /**
  * 리뷰 신고.
@@ -19,6 +21,7 @@ export function ReviewReport({
   reviewId: string;
   alreadyReported: boolean;
 }) {
+  const t = useT();
   const formId = useId();
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState(alreadyReported);
@@ -89,7 +92,7 @@ export function ReviewReport({
         {REPORT_REASON.map((reason: ReportReason, index) => (
           <label key={reason} className="flex items-center gap-2 text-[12px]">
             <input type="radio" name="reason" value={reason} defaultChecked={index === 0} required />
-            {REPORT_REASON_LABEL[reason]}
+            {t(REPORT_REASON_KEY[reason])}
           </label>
         ))}
       </fieldset>

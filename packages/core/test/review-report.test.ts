@@ -1,16 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
   reportPriority, moderationState, isReportReason,
-  AUTO_HIDE_ON_REPORTS, REPORT_REASON, REPORT_REASON_LABEL,
+  AUTO_HIDE_ON_REPORTS,
 } from '../src/review-report';
 
 describe('신고 사유', () => {
-  it('모든 사유에 사람이 읽는 이름이 있다', () => {
-    for (const reason of REPORT_REASON) {
-      expect(REPORT_REASON_LABEL[reason]).toBeTruthy();
-    }
-  });
-
   it('모르는 값은 사유가 아니다', () => {
     expect(isReportReason('SPAM')).toBe(true);
     expect(isReportReason('spam')).toBe(false);

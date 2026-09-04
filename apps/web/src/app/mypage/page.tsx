@@ -4,10 +4,12 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
-  format, ORDER_STATUS_LABEL, MEMBER_GRADE_LABEL, GRADE_REWARD_PERCENT,
+  format, GRADE_REWARD_PERCENT,
 } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
 import { getMyPageSummary, getMyOrders, TRACKED_STATUSES } from '~/lib/queries/mypage';
+import { getT } from '~/lib/i18n/server';
+import { ORDER_STATUS_KEY, GRADE_KEY } from '~/lib/i18n/enum-labels';
 
 export const metadata: Metadata = { title: '마이페이지' };
 export const dynamic = 'force-dynamic';
@@ -16,9 +18,10 @@ export default async function MyPage() {
   const session = await getSessionUser(await headers());
   if (!session) redirect('/login?next=/mypage');
 
-  const [summary, recent] = await Promise.all([
+  const [summary, recent, t] = await Promise.all([
     getMyPageSummary(session.id),
     getMyOrders(session.id, undefined, 1),
+    getT(),
   ]);
   if (!summary) redirect('/login');
 
@@ -40,7 +43,7 @@ export default async function MyPage() {
           <div className="flex flex-1 flex-col gap-1.5">
             <p className="flex items-center gap-2">
               <span className="text-[17px] font-semibold">{summary.name}</span>
-              <Badge tone="new">{MEMBER_GRADE_LABEL[summary.grade]}</Badge>
+              <Badge tone="new">{t(GRADE_KEY[summary.grade])}</Badge>
             </p>
             <p className="text-xs text-[var(--fg-muted)]">{summary.email}</p>
           </div>
@@ -51,7 +54,7 @@ export default async function MyPage() {
             <>
               <p className="mb-2 flex items-baseline justify-between text-[13px]">
                 <span className="text-[var(--fg-secondary)]">
-                  {MEMBER_GRADE_LABEL[gp.next]}까지{' '}
+                  {t(GRADE_KEY[gp.next])}까지{' '}
                   <strong className="tnum font-semibold text-[var(--fg)]">
                     {format(gp.remaining)}원
                   </strong>
@@ -63,7 +66,7 @@ export default async function MyPage() {
                 aria-valuenow={gp.percent}
                 aria-valuemin={0}
                 aria-valuemax={100}
-                aria-label={`${MEMBER_GRADE_LABEL[gp.next]} 등급까지 진행률`}
+                aria-label={`${t(GRADE_KEY[gp.next])} 등급까지 진행률`}
                 className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]"
               >
                 <span className="block h-full bg-n-900" style={{ width: `${gp.percent}%` }} />
@@ -127,7 +130,7 @@ export default async function MyPage() {
                     {count}
                   </span>
                   <span className="text-center text-[10px] text-[var(--fg-muted)]">
-                    {ORDER_STATUS_LABEL[s]}
+                    {t(ORDER_STATUS_KEY[s])}
                   </span>
                 </Link>
               </li>
@@ -143,7 +146,7 @@ export default async function MyPage() {
             <div className="mb-3 flex items-center justify-between">
               <p className="flex items-center gap-2">
                 <Badge tone={recent[0].status === 'CANCELLED' || recent[0].status === 'REFUNDED' ? 'neutral' : 'info'}>
-                  {ORDER_STATUS_LABEL[recent[0].status]}
+                  {t(ORDER_STATUS_KEY[recent[0].status])}
                 </Badge>
                 <span className="tnum text-[11px] text-[var(--fg-muted)]">
                   {recent[0].placedAt.toLocaleDateString('ko-KR')}

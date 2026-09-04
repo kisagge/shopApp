@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   ORDER_STATUS, ORDER_STATUS_LABEL, USER_ROLE, USER_ROLE_LABEL,
   PAYMENT_STATUS_CODE, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_CODE,
-  MEMBER_GRADE, MEMBER_GRADE_LABEL,
+  MEMBER_GRADE,
 } from '@shop/core';
 import { OrderStatus, UserRole, PaymentStatus, PaymentMethod, MemberGrade } from '../src/generated/enums';
 
@@ -49,7 +49,5 @@ describe('MemberGrade 정합성', () => {
     expect(Object.values(MemberGrade).toSorted()).toEqual([...MEMBER_GRADE].toSorted());
   });
 
-  it('모든 등급에 한글 라벨이 있다', () => {
-    for (const g of Object.values(MemberGrade)) expect(MEMBER_GRADE_LABEL[g]).toBeTruthy();
-  });
+  // 등급 이름표는 사전이 가진다 — apps/web 의 enum-labels 검사가 지킨다
 });

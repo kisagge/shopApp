@@ -63,12 +63,14 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const;
 export type ReturnStatus = (typeof RETURN_STATUS)[number];
 
-export const RETURN_STATUS_LABEL: Readonly<Record<ReturnStatus, string>> = {
-  REQUESTED: '접수됨',
-  APPROVED: '승인 · 회수 대기',
-  REJECTED: '반려됨',
-  COMPLETED: '처리 완료',
-};
+/*
+ * 이름표는 여기 없다.
+ *
+ * 무엇이 있는지는 규칙이고 뭐라고 부를지는 화면이다. 화면이 세 나라 말로
+ * 나가면서 이 자리의 한국어 표는 맞지 않게 됐다 —
+ * apps/web 의 lib/i18n/enum-labels 가 값 목록에서 열쇠를 만들고, 사전이
+ * 그 열쇠를 세 벌로 가진다.
+ */
 
 export type ReturnEligibility =
   | { readonly ok: true; readonly deadline: Date; readonly borneBy: ReturnShippingParty }

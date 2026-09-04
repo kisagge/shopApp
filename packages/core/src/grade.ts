@@ -9,15 +9,17 @@ import { type Won, won, ZERO } from './money';
  * 산정 기준은 구매확정된 금액의 누계다. 결제만 하고 취소한 건 빠진다 —
  * 주문했다 취소하기를 반복해 등급을 올리는 걸 막는다.
  */
+
 export const MEMBER_GRADE = ['BASIC', 'SILVER', 'GOLD', 'VIP'] as const;
 export type MemberGrade = (typeof MEMBER_GRADE)[number];
 
-export const MEMBER_GRADE_LABEL: Readonly<Record<MemberGrade, string>> = {
-  BASIC: '베이직',
-  SILVER: '실버',
-  GOLD: '골드',
-  VIP: 'VIP',
-};
+/*
+ * 등급 이름표는 여기 없다.
+ *
+ * 무엇이 있는지는 규칙이고 뭐라고 부를지는 화면이다. 화면이 세 나라 말로
+ * 나가면서 이 자리의 한국어 표는 맞지 않게 됐다 — apps/web 의
+ * lib/i18n/enum-labels 가 값 목록에서 열쇠를 만들고, 사전이 세 벌로 가진다.
+ */
 
 /** 등급별 최소 누적 구매액 */
 export const GRADE_THRESHOLD: Readonly<Record<MemberGrade, Won>> = {

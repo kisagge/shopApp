@@ -7,11 +7,13 @@ import { Button, Field } from '@shop/ui';
 import { signUpSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
 import { track } from '~/lib/analytics/client';
+import { useT } from '~/lib/i18n/client';
 
 type FieldName = 'email' | 'name' | 'password' | 'passwordConfirm';
 
 export function SignUpForm() {
   const router = useRouter();
+  const t = useT();
   const [values, setValues] = useState({ email: '', name: '', password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function SignUpForm() {
 
     if (authError) {
       if (authError.status === 429) {
-        setError('요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.');
+        setError(t('auth.tooMany'));
         return;
       }
       /**
@@ -60,10 +62,10 @@ export function SignUpForm() {
        * 가입된 주소인지는 비밀번호 재설정 화면에서도 어차피 드러난다.
        */
       if (authError.status === 422 || authError.code === 'USER_ALREADY_EXISTS') {
-        setFieldErrors({ email: '이미 가입된 이메일입니다' });
+        setFieldErrors({ email: t('auth.emailTaken') });
         return;
       }
-      setError('가입에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      setError(t('auth.signupFailed'));
       return;
     }
 
@@ -75,7 +77,7 @@ export function SignUpForm() {
   return (
     <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-5" noValidate>
       <Field
-        label="이메일"
+        label={t('auth.email')}
         type="email"
         autoComplete="email"
         required
@@ -84,7 +86,7 @@ export function SignUpForm() {
         onChange={(e) => set('email', e.target.value)}
       />
       <Field
-        label="이름"
+        label={t('auth.name')}
         autoComplete="name"
         required
         value={values.name}
@@ -92,7 +94,7 @@ export function SignUpForm() {
         onChange={(e) => set('name', e.target.value)}
       />
       <Field
-        label="비밀번호"
+        label={t('auth.password')}
         type="password"
         /**
          * new-password 라야 비밀번호 관리자가 새 비밀번호를 제안한다.
@@ -102,11 +104,11 @@ export function SignUpForm() {
         required
         value={values.password}
         error={fieldErrors.password}
-        hint="8자 이상"
+        hint={t('auth.passwordHint')}
         onChange={(e) => set('password', e.target.value)}
       />
       <Field
-        label="비밀번호 확인"
+        label={t('auth.passwordConfirm')}
         type="password"
         autoComplete="new-password"
         required
@@ -122,13 +124,13 @@ export function SignUpForm() {
       )}
 
       <Button type="submit" block aria-disabled={pending}>
-        {pending ? '가입 중…' : '가입하기'}
+        {pending ? t('auth.signingUp') : t('auth.signupSubmit')}
       </Button>
 
       <p className="text-center text-[13px] text-[var(--fg-muted)]">
-        이미 계정이 있으신가요?{' '}
+        {t('auth.haveAccount')}{' '}
         <Link href="/login" className="text-[var(--fg)] underline underline-offset-2">
-          로그인
+          {t('auth.login')}
         </Link>
       </p>
     </form>

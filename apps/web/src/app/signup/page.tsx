@@ -7,23 +7,26 @@ import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { SignUpForm } from '~/components/signup-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
 import { NO_INDEX } from '~/lib/no-index';
+import { formatNumber } from '@shop/i18n';
+import { getLocale, getT } from '~/lib/i18n/server';
 
-export const metadata: Metadata = {
-  title: '회원가입',
-  ...NO_INDEX,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('auth.signup'), ...NO_INDEX };
+}
 
 export default async function SignUpPage() {
   // 이미 로그인한 사람에게 가입 화면을 보여 줄 이유가 없다
   const user = await getSessionUser(await headers());
   if (user) redirect('/');
 
+  const [locale, t] = await Promise.all([getLocale(), getT()]);
+
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-6 px-4 py-16">
       <div className="flex flex-col gap-2">
-        <h1 className="font-serif text-3xl font-medium tracking-tight">회원가입</h1>
+        <h1 className="font-serif text-3xl font-medium tracking-tight">{t('auth.signup')}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          가입하면 <b className="tnum text-[var(--fg-secondary)]">{SIGNUP_POINTS.toLocaleString('ko-KR')}P</b> 를 드립니다.
+          {t('auth.signupBonus', { points: `${formatNumber(locale, SIGNUP_POINTS)}P` })}
         </p>
       </div>
       {googleEnabled() && (

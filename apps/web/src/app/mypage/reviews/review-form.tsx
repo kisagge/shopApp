@@ -4,9 +4,11 @@ import { useEffect, useId, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import {
-  SIZE_FIT, SIZE_FIT_LABEL, RATING_MAX, MAX_IMAGES_PER_REVIEW, MAX_IMAGE_BYTES,
+  SIZE_FIT, RATING_MAX, MAX_IMAGES_PER_REVIEW, MAX_IMAGE_BYTES,
   IMAGE_CONTENT_TYPE, type SizeFit,
 } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
+import { SIZE_FIT_KEY } from '~/lib/i18n/enum-labels';
 
 export interface ReviewTarget {
   readonly orderItemId: string;
@@ -25,6 +27,7 @@ export interface ReviewTarget {
  */
 export function ReviewForm({ target }: { target: ReviewTarget }) {
   const router = useRouter();
+  const t = useT();
   const [rating, setRating] = useState(0);
   const [content, setContent] = useState('');
   const [sizeFit, setSizeFit] = useState<SizeFit | ''>('');
@@ -236,7 +239,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
                 checked={sizeFit === fit}
                 onChange={() => setSizeFit(fit)}
               />
-              {SIZE_FIT_LABEL[fit]}
+              {t(SIZE_FIT_KEY[fit])}
             </label>
           ))}
         </div>

@@ -83,7 +83,17 @@ describe('리뷰 목록', () => {
   });
 
   it('옵션·사이즈·체형을 함께 보여 준다 — 사이즈 판단에 쓰인다', () => {
-    render(<ReviewSection summary={summary()} reviews={[review()]} />);
+    /*
+     * 사이즈 표현의 이름표는 부르는 쪽이 넘긴다. 이 조각은 요청의 언어를
+     * 몰라야 테스트에서 그릴 수 있다.
+     */
+    render(
+      <ReviewSection
+        summary={summary()}
+        reviews={[review()]}
+        sizeFitLabel={() => '정사이즈'}
+      />,
+    );
     expect(screen.getByText(/오트밀 \/ M · 정사이즈 · 175cm · 70kg/)).toBeDefined();
   });
 

@@ -4,8 +4,10 @@ import { useState, type FormEvent } from 'react';
 import { Button, Field } from '@shop/ui';
 import { forgotPasswordSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
+import { useT } from '~/lib/i18n/client';
 
 export function ForgotPasswordForm() {
+  const t = useT();
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [sent, setSent] = useState(false);
@@ -45,10 +47,9 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <div role="status" className="flex flex-col gap-3 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-5">
-        <p className="text-sm font-medium">메일을 보냈습니다.</p>
+        <p className="text-sm font-medium">{t('auth.mailSent')}</p>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-          <b>{email}</b> 으로 재설정 링크를 보냈습니다. 가입된 주소가 아니라면 메일이 가지 않습니다.
-          몇 분 안에 오지 않으면 스팸함도 확인해 주세요.
+          {t('auth.mailSentDetail', { email })}
         </p>
       </div>
     );
@@ -57,7 +58,7 @@ export function ForgotPasswordForm() {
   return (
     <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-5" noValidate>
       <Field
-        label="이메일"
+        label={t('auth.email')}
         type="email"
         autoComplete="email"
         required
@@ -66,7 +67,7 @@ export function ForgotPasswordForm() {
         onChange={(e) => { setEmail(e.target.value); setFieldError(undefined); }}
       />
       <Button type="submit" block aria-disabled={pending}>
-        {pending ? '보내는 중…' : '재설정 링크 받기'}
+        {pending ? t('auth.forgotSending') : t('auth.forgotSubmit')}
       </Button>
     </form>
   );
