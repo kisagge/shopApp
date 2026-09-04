@@ -2,9 +2,9 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { format, won } from '@shop/core';
+import { format, won, EXPIRY_NOTICE_DAYS } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
-import { getPointHistory, getMyPageSummary } from '~/lib/queries/mypage';
+import { getPointHistory, getMyPageSummary, getExpiringPoints } from '~/lib/queries/mypage';
 
 export const metadata: Metadata = { title: '포인트 내역' };
 export const dynamic = 'force-dynamic';
@@ -23,9 +23,10 @@ export default async function PointsPage() {
   const session = await getSessionUser(await headers());
   if (!session) redirect('/login?next=/mypage/points');
 
-  const [summary, history] = await Promise.all([
+  const [summary, history, expiring] = await Promise.all([
     getMyPageSummary(session.id),
     getPointHistory(session.id),
+    getExpiringPoints(session.id),
   ]);
   if (!summary) redirect('/login');
 
@@ -42,6 +43,13 @@ export default async function PointsPage() {
           {format(summary.pointBalance)}
           <span className="ml-1 text-lg">P</span>
         </span>
+        {expiring > 0 && (
+          // 말없이 사라지면 잔액이 왜 줄었는지 알 수 없다
+          <span className="mt-2 block text-[12px] text-accent">
+            이 중 <span className="tnum">{format(won(expiring))}P</span> 가 {EXPIRY_NOTICE_DAYS}일
+            안에 사라집니다
+          </span>
+        )}
       </p>
 
       <section aria-labelledby="history-title" className="mt-8">

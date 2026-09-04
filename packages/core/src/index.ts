@@ -17,6 +17,7 @@ export * from './order-draft';
 export * from './payment';
 export * from './grade';
 export * from './restock';
+export * from './point-expiry';
 export * from './reward';
 export * from './settlement';
 export * from './image';

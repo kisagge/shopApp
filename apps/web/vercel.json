@@ -9,6 +9,10 @@
   ],
   "crons": [
     {
+      "path": "/api/cron/expire-points",
+      "schedule": "0 17 * * *"
+    },
+    {
       "path": "/api/cron/settlements",
       "schedule": "0 20 1 * *"
     },

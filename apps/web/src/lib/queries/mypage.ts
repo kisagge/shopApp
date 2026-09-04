@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
-  gradeProgress, won, ORDER_STATUS, type MemberGrade, type OrderStatus, type Won,
+  gradeProgress, won, ORDER_STATUS, expiringSoonAmount,
+  type MemberGrade, type OrderStatus, type Won,
 } from '@shop/core';
 
 /** 마이페이지 상단의 주문 처리 현황 — 시안의 5칸 */
@@ -135,4 +136,22 @@ export async function getPointHistory(userId: string, take = 30): Promise<PointE
     take,
     select: { amount: true, reason: true, note: true, createdAt: true },
   });
+}
+
+/**
+ * 곧 사라질 포인트.
+ *
+ * **말없이 사라지면 잔액이 왜 줄었는지 알 수 없다.** 소멸 배치가 도는 것과
+ * 별개로, 화면이 미리 알려 줘야 쓸 기회가 생긴다.
+ *
+ * 짝을 지으려면 원장 전체를 봐야 한다 — 어떤 사용이 어떤 적립을 썼는지
+ * 원장에 적혀 있지 않아서 core 가 기한이 가까운 것부터 소진했다고 본다.
+ */
+export async function getExpiringPoints(userId: string, now = new Date()): Promise<number> {
+  const entries = await prisma.pointTransaction.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'asc' },
+    select: { amount: true, createdAt: true, expiresAt: true },
+  });
+  return expiringSoonAmount(entries, now);
 }
