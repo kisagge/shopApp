@@ -19,7 +19,8 @@
     "@shop/core": "workspace:*",
     "@shop/db": "workspace:*",
     "better-auth": "1.7.2",
-    "@shop/native": "workspace:*"
+    "@shop/native": "workspace:*",
+    "@shop/mail": "workspace:*"
   },
   "devDependencies": {
     "@shop/config": "workspace:*",

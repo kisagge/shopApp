@@ -1,6 +1,8 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
+import { verifyEmailMail, resetPasswordMail } from '@shop/core';
+import { getMailer } from '@shop/mail';
 import { prisma } from '@shop/db';
 
 /**
@@ -26,7 +28,7 @@ const https = (host: string | undefined): string | undefined =>
  * 운영에서 VERCEL_URL 을 쓰면 사용자가 실제로 접속하는 안정 도메인과
  * 어긋나 Invalid origin 이 난다. 실제로 그렇게 막혔다.
  */
-function resolveBaseUrl(): string | undefined {
+export function resolveBaseUrl(): string | undefined {
   const explicit = process.env.BETTER_AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
   if (explicit) return explicit;
 
@@ -84,8 +86,48 @@ export const auth = betterAuth({
     enabled: true,
     minPasswordLength: 8,
     maxPasswordLength: 128,
-    // 포트폴리오라 메일 발송을 붙이지 않았다. 실서비스에서는 반드시 켠다.
+    /**
+     * 확인 메일을 강제하지 않는다.
+     *
+     * 메일 발송은 붙였지만, 도메인 인증 전에는 발송 사업자가 계정 주인에게만
+     * 배달한다. 여기서 강제하면 **시연용 계정으로 로그인조차 못 하게 된다.**
+     * 실서비스에서는 반드시 켠다.
+     */
     requireEmailVerification: false,
+    async sendResetPassword({ user, url }) {
+      // 실패하면 그대로 던진다. 오지 않는 메일을 기다리게 두면 안 된다.
+      await getMailer().send(
+        resetPasswordMail({ to: user.email, name: user.name, url }),
+      );
+    },
+  },
+
+  emailVerification: {
+    /**
+     * 가입 직후 한 번 보낸다.
+     *
+     * 강제하지는 않지만(위 requireEmailVerification) 주소가 맞는지 확인할
+     * 기회는 준다. 확인하지 않아도 쓸 수 있다.
+     */
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    async sendVerificationEmail({ user, url }) {
+      /**
+       * 여기서는 삼킨다. 재설정 메일과 반대다.
+       *
+       * 이 메일은 가입 요청 안에서 나가는데, 실패를 그대로 던지면 **메일이
+       * 반송됐다는 이유로 가입 자체가 실패한다.** 확인은 필수가 아니므로
+       * 계정은 만들어지는 것이 맞다. 재설정 메일은 그 메일이 곧 목적이라
+       * 실패를 알려야 하고, 이쪽은 곁다리다.
+       *
+       * 시드가 만드는 계정은 전부 .test 주소(RFC 6761)라 실제로 반송된다.
+       */
+      try {
+        await getMailer().send(verifyEmailMail({ to: user.email, name: user.name, url }));
+      } catch (error) {
+        console.error('[auth] 확인 메일 발송 실패', error);
+      }
+    },
   },
 
   session: {

@@ -1,0 +1,10 @@
+{
+  "extends": "@shop/config/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // fetch·Response 는 DOM 선언에서, process.env 는 node 선언에서 온다.
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

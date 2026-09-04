@@ -21,3 +21,4 @@ export * from './banner';
 export * from './catalog';
 export * from './review';
 export * from './cart-sync';
+export * from './mail';

@@ -31,7 +31,8 @@
     "server-only": "0.0.1",
     "zod": "4.5.4",
     "zustand": "5.0.15",
-    "@shop/native": "workspace:*"
+    "@shop/native": "workspace:*",
+    "@shop/mail": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

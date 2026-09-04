@@ -1,16 +1,17 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
+import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS, restockMail } from '@shop/core';
+import { getMailer } from '@shop/mail';
+import { absoluteUrl } from '~/lib/urls';
 
 /**
  * 재입고 알림.
  *
- * **바깥으로 보내는 경로는 아직 없다.** 메일·문자 연동이 저장소에 없고,
- * 그걸 지어내는 대신 자리만 만들어 뒀다. 지금은 알림이 생기면 원장에
- * 시각을 찍고 마이페이지에서 보여 준다 — 사용자가 다시 들어왔을 때는
- * 확실히 알 수 있다.
+ * 두 곳으로 나간다 — 원장에 시각을 찍어 마이페이지에서 보여 주고, 메일을
+ * 보낸다. 화면에만 남기면 사용자가 다시 들어와야 알 수 있는데, 재입고는
+ * 늦게 알면 의미가 없는 종류의 소식이다.
  *
- * 밖으로 보낼 때는 RestockNotifier 를 하나 더 구현해 sinks 에 넣으면 된다.
+ * 다른 경로를 더할 때는 RestockNotifier 를 하나 더 구현해 넣으면 된다.
  * 이벤트 싱크와 같은 구조다.
  */
 
@@ -36,24 +37,36 @@ export interface RestockNotifier {
 }
 
 /**
- * 개발용. 무엇이 나갔어야 하는지 로그로 남긴다.
+ * 메일로 보낸다.
  *
- * 조용히 아무것도 안 하면 "보냈다" 고 착각하게 된다. 밖으로 나가는 경로가
- * 없다는 사실이 로그에 남아야 한다.
+ * 한 사람이 실패해도 나머지는 보낸다 — 한 통이 반송된다고 같은 배치의
+ * 다른 사람들까지 못 받을 이유가 없다. 실패는 로그로만 남긴다. 이 함수를
+ * 부르는 자리에서는 이미 알림 발송 표시가 끝나 있어 되돌릴 수도 없다.
  */
-const consoleNotifier: RestockNotifier = {
-  name: 'console',
-  send(notices) {
-    for (const n of notices) {
-      console.info(
-        `[restock] ${n.email} 에게 알림 (미발송 — 발송 연동 없음): ${n.productName} ${n.optionLabel}`,
-      );
+const mailNotifier: RestockNotifier = {
+  name: 'mail',
+  async send(notices) {
+    const mailer = getMailer();
+    const results = await Promise.allSettled(
+      notices.map((n) =>
+        mailer.send(
+          restockMail({
+            to: n.email,
+            productName: n.productName,
+            optionLabel: n.optionLabel,
+            url: absoluteUrl(`/product/${n.productSlug}`),
+          }),
+        ),
+      ),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    if (failed > 0) {
+      console.error(`[restock] 재입고 메일 ${failed}/${notices.length}건 실패`);
     }
-    return Promise.resolve();
   },
 };
 
-let notifiers: RestockNotifier[] = [consoleNotifier];
+let notifiers: RestockNotifier[] = [mailNotifier];
 
 /** 테스트나 실제 연동에서 갈아 끼운다 */
 export function setRestockNotifiers(list: RestockNotifier[]): void {
