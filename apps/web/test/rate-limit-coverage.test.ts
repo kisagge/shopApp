@@ -18,6 +18,7 @@ const GUARDED = [
   'api/coupons/claim/route.ts',
   'api/reviews/[id]/report/route.ts',
   'api/inquiries/route.ts',
+  'api/products/recent/route.ts',
 ] as const;
 
 const APP = join(process.cwd(), 'src', 'app');
@@ -38,21 +39,39 @@ describe('요청 제한이 붙은 자리', () => {
    *
    * 눈으로 보고 넘어갈 수 있는 실수라 자리를 검사로 박아 둔다.
    */
-  it.each(GUARDED)('%s 는 본문을 읽기 전에 제한을 건다', (rel) => {
+  it.each(GUARDED)('%s 는 일을 시작하기 전에 제한을 건다', (rel) => {
     /*
      * 핸들러 본문만 본다. 위에 정의한 헬퍼(예: reviews 의 readBody)에도
      * request.json() 이 나오는데, 그건 정의일 뿐 그때 실행되지 않는다.
+     *
+     * GET 도 함께 본다. 읽기 창구에는 본문이 없지만 규칙은 같다 —
+     * **막을 요청이 일을 다 하고 나서 429 를 받으면 막은 것이 아니다.**
+     * 몸통이 없다고 검사에서 빼면 그쪽만 규칙 밖에 놓인다.
      */
-    const body = read(rel).split(/export async function (?:POST|PUT|PATCH|DELETE)\b/)[1];
+    const body = read(rel).split(/export async function (?:GET|POST|PUT|PATCH|DELETE)\b/)[1];
     expect(body).toBeDefined();
 
     const limit = body!.indexOf('await enforceRateLimit');
     expect(limit).toBeGreaterThan(-1);
 
-    // 본문을 만지는 자리는 어느 것이든 제한보다 뒤에 있어야 한다.
-    for (const needle of ['request.json()', 'JSON.parse(raw)', 'readBody(', '.safeParse(']) {
+    /*
+     * 요청을 뜯거나 DB 를 부르는 자리는 어느 것이든 제한보다 뒤에 있어야 한다.
+     *
+     * 세션 읽기는 예외다 — 제한 자체가 "누구의 요청인가" 를 알아야 하므로
+     * 반드시 앞에 온다. 같은 사무실에서 여러 사람이 쓰면 IP 가 같아서,
+     * 로그인한 사람은 IP 가 아니라 자기 id 로 세어야 한다.
+     */
+    const work = [
+      'request.json()',
+      'JSON.parse(raw)',
+      'readBody(',
+      '.safeParse(',
+      'new URL(request.url)',
+      'prisma.',
+    ];
+    for (const needle of work) {
       const at = body!.indexOf(needle);
-      if (at !== -1) expect(at).toBeGreaterThan(limit);
+      if (at !== -1) expect(at, needle).toBeGreaterThan(limit);
     }
   });
 

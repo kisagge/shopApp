@@ -37,8 +37,16 @@ test('홈에서 상품을 골라 장바구니에 담는다', async ({ page }) =>
   );
   await addToCart.click();
 
-  // 담긴 결과는 눈에만 보이면 안 된다 — role="status" 로 알린다
-  await expect(page.getByRole('status')).toHaveText('장바구니에 담았습니다');
+  /*
+   * 담긴 결과는 눈에만 보이면 안 된다 — role="status" 로 알린다.
+   *
+   * 글이 든 알림만 고른다. 이 화면에는 최근 본 상품이 쓰는 **비어 있는**
+   * 알림 자리도 함께 있다 — 그쪽은 지웠을 때만 글이 생기고, 미리 자리를
+   * 잡아 두지 않으면 낭독기가 그 글을 놓친다.
+   */
+  await expect(page.getByRole('status').filter({ hasText: /./ })).toHaveText(
+    '장바구니에 담았습니다',
+  );
 
   // 헤더의 개수도 따라 올라간다
   await expect(page.getByRole('link', { name: /장바구니, 상품 \d+개/ })).toBeVisible();

@@ -122,6 +122,11 @@ export const en: Dictionary = {
   'product.shippingValue': 'Free over {threshold} · {surcharge} extra for Jeju and remote areas',
   'product.info': 'Details',
 
+  'recent.heading': 'Recently viewed',
+  'recent.clear': 'Clear history',
+  'recent.cleared': 'Recently viewed items cleared',
+  'recent.note': 'This list stays on this device and is never sent to us.',
+
   'cartIssue.NOT_FOUND': 'No longer for sale',
   'cartIssue.INACTIVE': 'This option is no longer sold',
   'cartIssue.SOLD_OUT': 'Sold out',

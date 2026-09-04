@@ -129,6 +129,11 @@ export const ko = {
   'product.info': '상품 정보',
 
   // ── 장바구니 ────────────────────────────────────────────
+  'recent.heading': '최근 본 상품',
+  'recent.clear': '기록 지우기',
+  'recent.cleared': '최근 본 상품을 지웠습니다',
+  'recent.note': '이 목록은 이 기기에만 남고 서버로 보내지 않습니다.',
+
   'cartIssue.NOT_FOUND': '판매가 종료된 상품입니다',
   'cartIssue.INACTIVE': '판매가 중지된 옵션입니다',
   'cartIssue.SOLD_OUT': '품절되었습니다',

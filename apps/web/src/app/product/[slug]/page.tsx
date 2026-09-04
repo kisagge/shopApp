@@ -19,6 +19,8 @@ import { ProductOptions } from '~/components/product-options';
 import { ReviewSection } from '~/components/review-section';
 import { InquirySection } from '~/components/inquiry-section';
 import { WishlistButton } from '~/components/wishlist-button';
+import { RecordRecentView } from '~/components/record-recent-view';
+import { RecentlyViewed } from '~/components/recently-viewed';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -256,6 +258,9 @@ export default async function ProductPage({ params }: Params) {
             loggedIn={viewer !== null}
             restockOn={[...restockOn]}
           />
+
+          {/* 이 상품을 봤다고 기기에 적는다. 화면에는 나오지 않는다. */}
+          <RecordRecentView slug={product.slug} />
         </div>
       </div>
 
@@ -276,6 +281,9 @@ export default async function ProductPage({ params }: Params) {
           loggedIn={viewer !== null}
         />
       </div>
+
+      {/* 지금 보고 있는 상품은 빼고 보여 준다 */}
+      <RecentlyViewed excludeSlug={product.slug} />
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { getLiveBanners } from '~/lib/admin/manage-banner';
 import { HomeBanners } from '~/components/home-banners';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
+import { RecentlyViewed } from '~/components/recently-viewed';
 
 /**
  * 화면은 매 요청마다 그리되 **읽기는 캐싱한다**(lib/cache).
@@ -74,6 +75,14 @@ export default async function HomePage() {
           />
         </TrackedProductList>
       </section>
+
+      {/*
+        본 적이 없으면 이 줄은 통째로 그려지지 않는다 — 처음 온 사람에게는
+        "아직 없습니다" 를 띄우느니 자리를 비우는 편이 낫다.
+      */}
+      <div className="px-4 md:px-10">
+        <RecentlyViewed />
+      </div>
     </div>
   );
 }

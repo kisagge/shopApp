@@ -203,6 +203,38 @@ export interface ProductDetail {
   }[];
 }
 
+/**
+ * slug 목록으로 상품을 가져온다. 최근 본 상품이 쓴다.
+ *
+ * **캐싱하지 않는다.** 열쇠가 사람마다 다른 조합이라 캐시가 거의 맞지 않고,
+ * 맞지 않는 캐시는 메모리만 먹는다.
+ *
+ * **보이는 상품 조건을 그대로 건다.** 어제 본 상품이 오늘 내려갔다면 오늘은
+ * 보이지 않아야 한다 — 최근 본 목록이 숨긴 상품으로 들어가는 뒷문이 되면,
+ * 상세 화면에 조건을 건 뜻이 없어진다.
+ *
+ * 준 순서대로 돌려준다. DB 는 순서를 지켜 주지 않는데, 이 목록에서는
+ * **순서 자체가 내용이다** — 방금 본 것이 앞에 와야 한다.
+ */
+export async function getProductsBySlugs(
+  slugs: readonly string[],
+): Promise<ProductListItem[]> {
+  if (slugs.length === 0) return [];
+
+  const rows = await prisma.product.findMany({
+    where: { slug: { in: [...slugs] }, ...onDisplay(), brand: sellableBrand() },
+    select: listSelect,
+  });
+
+  const now = Date.now();
+  const bySlug = new Map(rows.map((r) => [r.slug, toListItem(r, now)]));
+  // 내려간 상품은 지도에 없으므로 자연히 빠진다
+  return slugs.flatMap((slug) => {
+    const item = bySlug.get(slug);
+    return item ? [item] : [];
+  });
+}
+
 const productRow = cachedRead(
   (slug: string) =>
     prisma.product.findFirst({

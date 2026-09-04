@@ -118,6 +118,11 @@ export const ja: Dictionary = {
   'product.shippingValue': '{threshold} 以上で送料無料 · 済州・離島は{surcharge}追加',
   'product.info': '商品情報',
 
+  'recent.heading': '最近見た商品',
+  'recent.clear': '履歴を消す',
+  'recent.cleared': '最近見た商品を消しました',
+  'recent.note': 'この一覧はこの端末にだけ残り、サーバーには送りません。',
+
   'cartIssue.NOT_FOUND': '販売が終了した商品です',
   'cartIssue.INACTIVE': '販売を停止したオプションです',
   'cartIssue.SOLD_OUT': '売り切れました',
