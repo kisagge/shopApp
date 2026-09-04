@@ -2,8 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   COMMERCE_EVENT, isCommerceEvent, isServerOnlyEvent, requiresConsent,
   FUNNEL_STEP, FUNNEL_STEP_LABEL, computeFunnel, fanOut, AllSinksFailedError,
-  type EventSink, type SessionEventNames, type TrackedEvent,
-} from '../src/events';
+  type EventSink, type SessionEventNames, type TrackedEvent, funnelFromCounts } from '../src/events';
 
 describe('이벤트 분류', () => {
   it('알 수 없는 이름을 걸러낸다', () => {
@@ -147,5 +146,39 @@ describe('fanOut', () => {
     const a = sink('a');
     await fanOut([a]).send([]);
     expect(a.send).not.toHaveBeenCalled();
+  });
+});
+
+describe('누적 수에서 퍼널 만들기', () => {
+  it('세션 목록으로 센 것과 같은 결과를 낸다', () => {
+    /*
+     * 대시보드는 SQL 로 세고 그 수를 이 함수에 넘긴다. 두 경로가 다른
+     * 수를 말하면 같은 화면이 기간에 따라 다른 이야기를 하게 된다.
+     */
+    const sessions = [
+      { sessionId: 's1', names: ['view_item', 'add_to_cart', 'begin_checkout', 'purchase'] },
+      { sessionId: 's2', names: ['view_item', 'add_to_cart'] },
+      { sessionId: 's3', names: ['view_item'] },
+      { sessionId: 's4', names: ['add_to_cart'] },
+    ];
+
+    expect(funnelFromCounts([3, 2, 1, 1])).toEqual(computeFunnel(sessions));
+  });
+
+  it('아무 일도 없으면 비율이 0 이다 — 0으로 나누지 않는다', () => {
+    const result = funnelFromCounts([0, 0, 0, 0]);
+    expect(result.map((r) => r.rateFromStart)).toEqual([0, 0, 0, 0]);
+    expect(result.map((r) => r.sessions)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('모자란 값은 0 으로 본다', () => {
+    // SQL 이 행을 하나도 안 돌려주는 경우가 있다
+    expect(funnelFromCounts([]).map((r) => r.sessions)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('이탈 수는 앞 단계와의 차이다', () => {
+    const result = funnelFromCounts([100, 40, 10, 3]);
+    expect(result.map((r) => r.droppedFromPrevious)).toEqual([0, 60, 30, 7]);
+    expect(result.map((r) => r.rateFromPrevious)).toEqual([100, 40, 25, 30]);
   });
 });

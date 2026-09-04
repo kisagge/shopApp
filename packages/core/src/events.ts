@@ -92,20 +92,23 @@ const round1 = (n: number): number => Math.round(n * 10) / 10;
  * "그 이벤트가 있으면 도달"로 느슨하게 세면 상품 상세를 안 거치고 바로 장바구니로
  * 온 세션 때문에 뒤 단계가 앞 단계보다 커져서 전환율이 100%를 넘는 표가 나온다.
  */
-export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelStepResult[] {
-  let remaining = sessions.map((s) => new Set(s.names));
+/**
+ * 단계별 **누적** 세션 수에서 결과를 만든다.
+ *
+ * 누적이란 앞 단계를 모두 밟은 세션만 다음 단계에 남는다는 뜻이다 —
+ * 장바구니에 담았지만 상품을 본 기록이 없는 세션은 2단계에 세지 않는다.
+ *
+ * 세는 일과 비율 내는 일을 나눈 이유는 **세는 곳이 둘이기 때문**이다.
+ * 작은 데이터는 메모리에서 세고(computeFunnel), 대시보드는 SQL 로 센다.
+ * 비율까지 두 벌로 두면 두 화면이 다른 수를 말하게 된다.
+ */
+export function funnelFromCounts(cumulative: readonly number[]): FunnelStepResult[] {
   const results: FunnelStepResult[] = [];
-  let startCount = 0;
-  let previousCount = 0;
+  const startCount = cumulative[0] ?? 0;
+  let previousCount = startCount;
 
   for (const [i, step] of FUNNEL_STEP.entries()) {
-    remaining = remaining.filter((names) => names.has(step));
-    const count = remaining.length;
-
-    if (i === 0) {
-      startCount = count;
-      previousCount = count;
-    }
+    const count = cumulative[i] ?? 0;
 
     results.push({
       step,
@@ -120,6 +123,23 @@ export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelSte
   }
 
   return results;
+}
+
+/**
+ * 세션 목록에서 퍼널을 낸다.
+ *
+ * 행을 전부 들고 있을 수 있을 때만 쓴다. 대시보드처럼 기간이 길어지면
+ * SQL 로 세고 funnelFromCounts 에 넘긴다.
+ */
+export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelStepResult[] {
+  let remaining = sessions.map((s) => new Set(s.names));
+
+  const cumulative = FUNNEL_STEP.map((step) => {
+    remaining = remaining.filter((names) => names.has(step));
+    return remaining.length;
+  });
+
+  return funnelFromCounts(cumulative);
 }
 
 // ── 싱크 ──────────────────────────────────────────────────────
