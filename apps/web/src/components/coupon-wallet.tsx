@@ -74,7 +74,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
   return (
     <div className="flex flex-col gap-6">
       <form
-        onSubmit={(e) => void onClaim(e)}
+        onSubmit={(e) => onClaim(e)}
         className="flex items-end gap-2 rounded-sm border border-[var(--border)] p-4"
       >
         <Field

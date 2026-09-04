@@ -239,7 +239,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         )}
       </section>
 
-      <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-8" noValidate>
+      <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-8" noValidate>
         {/*
           제목을 따로 두지 않는다. Field 의 라벨이 이미 "배송 요청사항" 이라
           제목을 붙이면 스크린리더가 같은 말을 두 번 읽는다.

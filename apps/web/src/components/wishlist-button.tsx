@@ -72,7 +72,7 @@ export function WishlistButton({
     <>
       <button
         type="button"
-        onClick={() => void toggle()}
+        onClick={() => toggle()}
         disabled={pending}
         aria-label={wishlisted ? `${productName} 찜 해제` : `${productName} 찜하기`}
         className={`flex items-center justify-center rounded-full border border-n-900/12 bg-n-0/85 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${box}`}

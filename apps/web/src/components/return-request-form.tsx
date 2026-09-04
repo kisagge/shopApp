@@ -79,7 +79,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
   return (
     <form
       id={formId}
-      onSubmit={(e) => void onSubmit(e)}
+      onSubmit={(e) => onSubmit(e)}
       className="flex flex-col gap-5 rounded-sm border border-[var(--border)] p-4"
     >
       <h3 className="text-sm font-semibold">반품 · 교환 신청</h3>

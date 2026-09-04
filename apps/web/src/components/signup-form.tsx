@@ -73,7 +73,7 @@ export function SignUpForm() {
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-5" noValidate>
       <Field
         label="이메일"
         type="email"

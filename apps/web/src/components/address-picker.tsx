@@ -129,7 +129,7 @@ export function AddressPicker({
       </fieldset>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => void apply()} disabled={pending || selected === null}>
+        <Button type="button" onClick={() => apply()} disabled={pending || selected === null}>
           {pending ? '바꾸는 중…' : '이 주소로 배송받기'}
         </Button>
         <Button type="button" variant="secondary" onClick={() => setAdding(true)}>

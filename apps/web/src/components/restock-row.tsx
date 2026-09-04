@@ -44,7 +44,7 @@ export function RestockRow({
         disabled={pending}
         // "삭제" 만 있으면 스크린리더로는 어느 줄의 삭제인지 알 수 없다
         aria-label={`${productName} 재입고 알림 삭제`}
-        onClick={() => void remove()}
+        onClick={() => remove()}
       >
         삭제
       </Button>

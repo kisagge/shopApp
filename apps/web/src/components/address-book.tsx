@@ -113,7 +113,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                     variant="secondary"
                     size="sm"
                     disabled={busy !== null}
-                    onClick={() => void makeDefault(a)}
+                    onClick={() => makeDefault(a)}
                   >
                     기본으로
                   </Button>
@@ -128,7 +128,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                   size="sm"
                   disabled={busy !== null}
                   aria-label={`${a.recipient} 님의 배송지 삭제`}
-                  onClick={() => void remove(a)}
+                  onClick={() => remove(a)}
                 >
                   삭제
                 </Button>

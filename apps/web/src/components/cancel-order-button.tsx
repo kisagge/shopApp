@@ -76,7 +76,7 @@ export function CancelOrderButton({ orderNo }: { orderNo: string }) {
         <Button variant="secondary" block onClick={() => setConfirming(false)} aria-disabled={pending}>
           돌아가기
         </Button>
-        <Button variant="accent" block onClick={() => void cancel()} aria-disabled={pending}>
+        <Button variant="accent" block onClick={() => cancel()} aria-disabled={pending}>
           {pending ? '취소 중…' : '주문 취소'}
         </Button>
       </div>

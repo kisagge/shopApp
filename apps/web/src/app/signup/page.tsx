@@ -3,7 +3,9 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
 import { SIGNUP_POINTS } from '@shop/core';
+import { googleEnabled } from '@shop/auth';
 import { SignUpForm } from '~/components/signup-form';
+import { GoogleButton, OrDivider } from '~/components/google-button';
 
 export const metadata: Metadata = { title: '회원가입' };
 
@@ -13,13 +15,20 @@ export default async function SignUpPage() {
   if (user) redirect('/');
 
   return (
-    <div className="mx-auto flex w-full max-w-[420px] flex-col gap-8 px-4 py-16">
+    <div className="mx-auto flex w-full max-w-[420px] flex-col gap-6 px-4 py-16">
       <div className="flex flex-col gap-2">
         <h1 className="font-serif text-3xl font-medium tracking-tight">회원가입</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
           가입하면 <b className="tnum text-[var(--fg-secondary)]">{SIGNUP_POINTS.toLocaleString('ko-KR')}P</b> 를 드립니다.
         </p>
       </div>
+      {googleEnabled() && (
+        <>
+          <GoogleButton />
+          <OrDivider />
+        </>
+      )}
+
       <SignUpForm />
     </div>
   );

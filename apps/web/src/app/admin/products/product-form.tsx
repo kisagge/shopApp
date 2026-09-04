@@ -115,7 +115,7 @@ export function ProductForm({ mode, productId, brands, categories, initial }: Pr
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} noValidate className="flex flex-col gap-8">
+    <form onSubmit={(e) => onSubmit(e)} noValidate className="flex flex-col gap-8">
       {formError && (
         // 폼 전체 에러는 제출 직후 읽혀야 한다
         <p

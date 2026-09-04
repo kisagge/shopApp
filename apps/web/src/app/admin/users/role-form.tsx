@@ -73,7 +73,7 @@ export function RoleForm({
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-2">
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-2">
       <label htmlFor={roleId} className="sr-only">{userName} 권한</label>
       <div className="flex flex-wrap items-center gap-2">
         <select

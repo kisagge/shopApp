@@ -33,7 +33,7 @@ export function ReviewActions({ reviewId }: { reviewId: string }) {
   return confirming ? (
     <span className="flex items-center gap-2 text-[11px]">
       <span className="text-[var(--fg-muted)]">삭제할까요?</span>
-      <button type="button" onClick={() => void remove()} disabled={pending} className="text-accent underline">
+      <button type="button" onClick={() => remove()} disabled={pending} className="text-accent underline">
         {pending ? '삭제 중…' : '삭제'}
       </button>
       <button type="button" onClick={() => setConfirming(false)} className="text-[var(--fg-muted)] underline">

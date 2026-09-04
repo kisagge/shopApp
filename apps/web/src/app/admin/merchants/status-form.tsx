@@ -57,7 +57,7 @@ export function MerchantStatusForm({
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-2">
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-2">
       <label htmlFor={statusId} className="sr-only">
         {merchantName} 입점 상태
       </label>

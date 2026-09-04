@@ -142,7 +142,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
         <p className="text-[12px] text-[var(--fg-muted)]">
           위에 있는 배너가 홈에서 먼저 나옵니다. 노출 중인 배너가 하나면 캐러셀 조작 장치는 그리지 않습니다.
         </p>
-        <Button type="button" size="md" onClick={() => void create()} disabled={busy !== null || banners.length >= 6}>
+        <Button type="button" size="md" onClick={() => create()} disabled={busy !== null || banners.length >= 6}>
           {banners.length >= 6 ? '6개까지' : '배너 추가'}
         </Button>
       </div>
@@ -164,9 +164,9 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
                 busy={busy !== null}
                 toneClass={TONE_CLASS[banner.tone] ?? 'bg-ph-sand'}
                 statusTone={STATUS_TONE[banner.status] ?? 'neutral'}
-                onSave={(body) => void patch(banner.id, body)}
-                onMove={(dir) => void move(index, dir)}
-                onDelete={() => void remove(banner)}
+                onSave={(body) => patch(banner.id, body)}
+                onMove={(dir) => move(index, dir)}
+                onDelete={() => remove(banner)}
                 onUploaded={(updated) => {
                   setBanners(banners.map((b) => (b.id === updated.id ? updated : b)));
                   setStatus('배경 이미지를 바꿨습니다.');
@@ -382,7 +382,7 @@ function BannerCard({
               accept="image/jpeg,image/png,image/webp,image/avif"
               className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-n-300 file:bg-[var(--bg)] file:px-3 file:text-[12px]" />
           </div>
-          <Button type="button" size="md" variant="secondary" disabled={uploading} onClick={() => void upload()}>
+          <Button type="button" size="md" variant="secondary" disabled={uploading} onClick={() => upload()}>
             {uploading ? '올리는 중…' : '이미지 교체'}
           </Button>
 

@@ -67,7 +67,7 @@ export function RestockButton({
         variant="secondary"
         block
         disabled={pending}
-        onClick={() => void toggle()}
+        onClick={() => toggle()}
         // 상태를 색으로만 알리지 않는다. 이름 자체가 지금 무엇이 되는지 말한다.
         aria-label={
           on ? `${optionLabel} 재입고 알림 해제` : `${optionLabel} 재입고 알림 신청`

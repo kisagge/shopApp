@@ -268,7 +268,7 @@ export function CouponBoard({
                       variant="secondary"
                       size="sm"
                       disabled={pending}
-                      onClick={() => void toggleActive(c)}
+                      onClick={() => toggleActive(c)}
                       aria-label={`${c.name} 쿠폰 ${c.isActive ? '중지' : '재개'}`}
                     >
                       {c.isActive ? '중지' : '재개'}
@@ -283,7 +283,7 @@ export function CouponBoard({
 
       {creating ? (
         <form
-          onSubmit={(e) => void onCreate(e)}
+          onSubmit={(e) => onCreate(e)}
           className="flex flex-col gap-4 rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
         >
           <h2 className="text-base font-semibold">새 쿠폰</h2>
@@ -464,7 +464,7 @@ export function CouponBoard({
                   placeholder="상품명으로 검색"
                   className="h-10 w-[240px] rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
                 />
-                <Button type="button" variant="secondary" size="md" onClick={() => void searchProducts()}>
+                <Button type="button" variant="secondary" size="md" onClick={() => searchProducts()}>
                   {searching ? '찾는 중…' : '검색'}
                 </Button>
               </div>

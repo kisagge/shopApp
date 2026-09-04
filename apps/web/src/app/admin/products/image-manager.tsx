@@ -184,7 +184,7 @@ export function ImageManager({
                   id={`alt-${image.id}`}
                   value={alts[image.id] ?? ''}
                   onChange={(e) => setAlts((prev) => ({ ...prev, [image.id]: e.target.value }))}
-                  onBlur={() => void saveAlt(image)}
+                  onBlur={() => saveAlt(image)}
                   maxLength={200}
                   className="h-9 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
                 />
@@ -197,7 +197,7 @@ export function ImageManager({
                     type="button" size="sm" variant="ghost"
                     aria-label={`${index + 1}번째 이미지를 앞으로`}
                     disabled={index === 0 || busy !== null}
-                    onClick={() => void move(index, -1)}
+                    onClick={() => move(index, -1)}
                   >
                     <span aria-hidden="true">↑</span>
                   </Button>
@@ -205,7 +205,7 @@ export function ImageManager({
                     type="button" size="sm" variant="ghost"
                     aria-label={`${index + 1}번째 이미지를 뒤로`}
                     disabled={index === images.length - 1 || busy !== null}
-                    onClick={() => void move(index, 1)}
+                    onClick={() => move(index, 1)}
                   >
                     <span aria-hidden="true">↓</span>
                   </Button>
@@ -213,7 +213,7 @@ export function ImageManager({
                     type="button" size="sm" variant="danger"
                     aria-label={`${index + 1}번째 이미지 삭제`}
                     disabled={busy !== null}
-                    onClick={() => void remove(image)}
+                    onClick={() => remove(image)}
                   >
                     삭제
                   </Button>
@@ -224,7 +224,7 @@ export function ImageManager({
         </ol>
       )}
 
-      <form onSubmit={(e) => void upload(e)} className="flex flex-col gap-3 border-t border-[var(--surface-2)] pt-5">
+      <form onSubmit={(e) => upload(e)} className="flex flex-col gap-3 border-t border-[var(--surface-2)] pt-5">
         <label htmlFor={fileId} className="text-xs font-medium text-[var(--fg-secondary)]">
           이미지 추가
         </label>

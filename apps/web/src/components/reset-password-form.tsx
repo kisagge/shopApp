@@ -81,7 +81,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-5" noValidate>
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-5" noValidate>
       <Field
         label="새 비밀번호"
         type="password"

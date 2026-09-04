@@ -161,7 +161,7 @@ export function AddressForm({
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-4">
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-4">
       {/*
         오류는 폼 맨 위에 두고 role="alert" 로 알린다. 칸 옆에만 적으면
         스크린리더 사용자는 제출 뒤 무슨 일이 일어났는지 모른 채 남는다.

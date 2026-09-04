@@ -93,7 +93,7 @@ export function ReturnActions({ orderNo }: { orderNo: string }) {
             type="button"
             size="md"
             disabled={pending}
-            onClick={() => void send({ action: 'APPROVE' })}
+            onClick={() => send({ action: 'APPROVE' })}
           >
             {pending ? '처리 중…' : '반품 승인'}
           </Button>

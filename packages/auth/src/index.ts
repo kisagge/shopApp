@@ -71,6 +71,19 @@ function resolveTrustedOrigins(): string[] {
  * 명시적으로 끈다 — 실수로 꺼지는 일이 없도록 값을 정확히 'off' 로 적어야
  * 하고, 운영에서는 이 변수를 아예 두지 않는다.
  */
+/**
+ * 구글 로그인이 켜져 있는가.
+ *
+ * 화면이 버튼을 그릴지 정하는 데 쓴다. **눌러도 안 되는 버튼을 보여 주는
+ * 것보다 없는 편이 낫다** — 설정이 빠진 배포에서 사용자가 실패를 대신
+ * 확인해 주는 셈이 된다.
+ *
+ * 키는 서버에서만 읽는다. NEXT_PUBLIC_ 을 붙이면 시크릿이 브라우저 번들에
+ * 들어가므로, 화면에는 이 불리언만 서버가 넘겨준다.
+ */
+export const googleEnabled = (): boolean =>
+  Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+
 export const rateLimitEnabled = (): boolean => process.env.AUTH_RATE_LIMIT !== 'off';
 
 export const auth = betterAuth({
@@ -158,6 +171,39 @@ export const auth = betterAuth({
       phone: { type: 'string', required: false, input: true },
     },
   },
+
+  /**
+   * 소셜 로그인.
+   *
+   * 키가 없으면 등록조차 하지 않는다. 반쯤 설정된 상태로 켜 두면 사용자가
+   * 구글 화면까지 갔다가 오류를 받는다.
+   *
+   * 스코프는 Better Auth 기본값(email·profile·openid)을 그대로 쓴다. 셋 다
+   * 민감 스코프가 아니라 구글 심사 없이 게시할 수 있다 — 더 달라고 하는
+   * 순간 심사가 붙는다.
+   */
+  ...(googleEnabled()
+    ? {
+        socialProviders: {
+          google: {
+            clientId: process.env.GOOGLE_CLIENT_ID as string,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+          },
+        },
+      }
+    : {}),
+
+  /**
+   * 계정 연결은 **기본값(거부)을 그대로 둔다.**
+   *
+   * 같은 이메일로 비밀번호 가입이 이미 있고 그 주소가 확인되지 않았으면,
+   * 구글로 들어와도 그 계정에 붙이지 않는다. 붙이면 이런 일이 생긴다 —
+   * 누군가 남의 주소로 미리 비밀번호 가입을 해 두면, 진짜 주인이 구글로
+   * 로그인했을 때 **그 사람이 비밀번호를 아는 계정 안으로 들어가게 된다.**
+   *
+   * 대신 막힌 사용자가 갇히지 않도록 화면에서 다음 행동을 알려 준다
+   * (login 화면의 account_not_linked 처리).
+   */
 
   databaseHooks: {
     user: {

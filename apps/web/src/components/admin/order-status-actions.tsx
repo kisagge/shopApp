@@ -71,7 +71,7 @@ export function OrderStatusActions({
               block
               variant={to === 'CANCELLED' ? 'danger' : 'primary'}
               aria-disabled={pending !== null}
-              onClick={() => void move(to)}
+              onClick={() => move(to)}
             >
               {pending === to ? '처리 중…' : `${ORDER_STATUS_LABEL[to]}(으)로 변경`}
             </Button>

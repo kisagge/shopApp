@@ -74,6 +74,26 @@ export const baseConfig = tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
 
+      /**
+       * JSX 속성에 async 함수를 바로 넘기는 것은 허용한다.
+       *
+       * 규칙의 취지는 "반환된 Promise 를 아무도 안 본다" 는 것인데, JSX
+       * 이벤트 핸들러에서는 **어차피 아무도 못 본다.** React 는 핸들러의
+       * 반환값을 기다리지 않고, 이 규칙을 켜 둔 상태의 회피책인
+       * `onClick={() => void f()}` 도 정확히 똑같이 방치한다 — 표기만
+       * 늘어날 뿐 처리되는 것은 없다.
+       *
+       * 그래서 껍데기를 걷어내고 `onClick={f}` 로 쓴다. 대신 **문장 자리의
+       * no-floating-promises 는 그대로 둔다** — 거기서는 실제로 처리할 수
+       * 있고, 실제로 결함을 잡아냈다.
+       *
+       * 핸들러 안의 실패는 핸들러가 직접 처리하는 것이 규칙이다.
+       */
+      '@typescript-eslint/no-misused-promises': [
+        'error',
+        { checksVoidReturn: { attributes: false } },
+      ],
+
       /** 템플릿 문자열에 숫자를 넣는 것은 흔하고 안전하다 */
       '@typescript-eslint/restrict-template-expressions': [
         'error',

@@ -65,7 +65,7 @@ export function ShipmentForm({
   }
 
   return (
-    <form onSubmit={(e) => void onSubmit(e)} className="flex flex-col gap-3">
+    <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-3">
       {error && (
         <p role="alert" className="text-[13px] text-accent">
           {error}
