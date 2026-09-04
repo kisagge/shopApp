@@ -10,6 +10,8 @@ export default defineConfig({
       // RSC 경계가 없는 테스트 환경에서는 가드를 무력화한다.
       // 진짜 검증은 next build 가 한다.
       'server-only': fileURLToPath(new URL('./test/stubs/server-only.ts', import.meta.url)),
+      // 데이터 캐시도 같은 이유로 대체한다 — 자세한 것은 stubs/next-cache.ts
+      'next/cache': fileURLToPath(new URL('./test/stubs/next-cache.ts', import.meta.url)),
     },
   },
   test: {

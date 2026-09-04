@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { setBannerImage, BannerError } from '~/lib/admin/manage-banner';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
+import { revalidateBanners } from '~/lib/cache';
 
 /** 배너 배경 이미지 교체 */
 export async function POST(
@@ -45,6 +46,7 @@ export async function POST(
       { bytes: new Uint8Array(await file.arrayBuffer()), declaredType: file.type },
       typeof alt === 'string' ? alt : '',
     );
+    revalidateBanners();
     await recordAudit({
       actor, action: 'banner.image', targetType: 'banner', targetId: id,
       after: { imageAlt: banner.imageAlt }, request,

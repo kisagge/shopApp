@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { cachedRead, TAG, TTL } from '~/lib/cache';
 import { ratingBreakdown, sizeFitSummary, averageRating } from '@shop/core';
 import type { ReviewSort } from '@shop/contract';
 
@@ -128,8 +129,16 @@ export async function getProductReviews(
  * 분포는 별점별로 세어 온다. 상품 행의 ratingSum·reviewCount 는 평균에만
  * 쓸 수 있고, 5점이 몇 개인지는 알려 주지 않는다.
  */
-export async function getReviewSummary(productId: string): Promise<ReviewSummary> {
-  const [byRating, fits] = await Promise.all([
+/**
+ * 요약에 쓰는 집계 두 개.
+ *
+ * **사용자와 무관한 값만 있다.** 이 파일의 다른 조회(getProductReviews)는
+ * viewerId 를 받아 "내 리뷰인지"를 담으므로 절대 캐싱하면 안 된다 —
+ * 한 사람의 화면이 다음 사람에게 그대로 나간다.
+ */
+const reviewAggregates = cachedRead(
+  (productId: string) =>
+    Promise.all([
     prisma.review.groupBy({
       by: ['rating'],
       where: { productId, deletedAt: null },
@@ -140,7 +149,12 @@ export async function getReviewSummary(productId: string): Promise<ReviewSummary
       select: { sizeFit: true },
       take: 500,
     }),
-  ]);
+    ]),
+  { key: ['review-summary'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+export async function getReviewSummary(productId: string): Promise<ReviewSummary> {
+  const [byRating, fits] = await reviewAggregates(productId);
 
   const counts: Record<number, number> = {};
   let sum = 0;

@@ -3,6 +3,7 @@ import { createVariantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { createVariant, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 /** 옵션 추가 */
 export async function POST(
@@ -37,6 +38,7 @@ export async function POST(
 
   try {
     const variant = await createVariant(actor, id, parsed.data);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.variant.create',

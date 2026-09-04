@@ -3,6 +3,7 @@ import { updateProductSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 /** 상품 수정. 재고는 여기서 못 고친다 — /stock 으로 따로 간다. */
 export async function PATCH(
@@ -37,6 +38,7 @@ export async function PATCH(
 
   try {
     const { before, after } = await updateProduct(actor, id, parsed.data);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.update',

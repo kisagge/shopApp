@@ -4,6 +4,7 @@ import { updateBannerSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateBanner, deleteBanner, BannerError } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
+import { revalidateBanners } from '~/lib/cache';
 
 function fail(error: unknown): NextResponse | null {
   if (error instanceof BannerError) {
@@ -52,6 +53,7 @@ export async function PATCH(
 
   try {
     const { before, after } = await updateBanner(actor, id, parsed.data);
+    revalidateBanners();
     await recordAudit({
       actor, action: 'banner.update', targetType: 'banner', targetId: id,
       before: { headline: before.headline, isActive: before.isActive, href: before.href },
@@ -84,6 +86,7 @@ export async function DELETE(
 
   try {
     await deleteBanner(actor, id);
+    revalidateBanners();
     await recordAudit({
       actor, action: 'banner.delete', targetType: 'banner', targetId: id, request,
     });

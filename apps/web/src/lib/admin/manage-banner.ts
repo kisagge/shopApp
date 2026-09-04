@@ -1,6 +1,7 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
+import { cachedRead, TAG, TTL } from '~/lib/cache';
 import {
   assertPermission, resequence, verifyImageBytes, imageObjectKey,
   isBannerLive, bannerStatus, MAX_BANNERS,
@@ -69,8 +70,33 @@ export async function getAdminBanners(actor: Actor, now = new Date()): Promise<B
  * 시작 전, 종료 후)라 SQL 로 쓰면 읽기 어렵고, 같은 규칙을 어드민 상태 표시와
  * 두 벌로 유지하게 된다. 배너는 몇 개뿐이라 전부 읽어도 부담이 없다.
  */
+/**
+ * 배너 행 전체. 개수 상한이 있어(MAX_BANNERS) 통째로 읽어도 된다.
+ *
+ * **게시 기간 판정은 캐시 밖에 둔다.** 걸러진 결과를 캐싱하면 시작·종료
+ * 시각이 캐시 수명만큼 늦어져서, 끝난 기획전이 계속 걸려 있거나 시작한
+ * 배너가 안 뜬다.
+ */
+const bannerRows = cachedRead(
+  () => prisma.banner.findMany({ orderBy: { sortOrder: 'asc' }, select }),
+  { key: ['live-banners'], tags: [TAG.banners], revalidate: TTL.banners },
+);
+
 export async function getLiveBanners(now = new Date()): Promise<BannerRow[]> {
-  const rows = await prisma.banner.findMany({ orderBy: { sortOrder: 'asc' }, select });
+  /*
+   * **캐시를 지나온 날짜를 되살린다.**
+   *
+   * 캐시는 값을 JSON 으로 저장하므로 Date 가 문자열이 되어 돌아온다. core 의
+   * isBannerLive 는 Date 를 요구하고, 그 요구는 옳다 — 정책이 문자열도
+   * 받아 주기 시작하면 어디서 무엇이 들어오는지 알 수 없게 된다. 그래서
+   * 경계인 여기서 되돌린다.
+   */
+  const rows = (await bannerRows()).map((b) => ({
+    ...b,
+    startsAt: b.startsAt === null ? null : new Date(b.startsAt),
+    endsAt: b.endsAt === null ? null : new Date(b.endsAt),
+  }));
+
   return rows.filter((b) => isBannerLive(b, now)).map((b) => toRow(b, now));
 }
 

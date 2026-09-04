@@ -1,5 +1,6 @@
 import { cache } from 'react';
 import 'server-only';
+import { cachedRead, TAG, TTL } from '~/lib/cache';
 import { prisma, Prisma } from '@shop/db';
 import {
   discountRateOf, won, normalizeSearchTerm, normalizePriceRange, VISIBLE_STATUS,
@@ -71,11 +72,22 @@ function sellableBrand() {
 type ListRow = {
   id: string;
   slug: string; name: string; listPrice: number; salePrice: number | null;
-  ratingSum: number; reviewCount: number; publishedAt: Date | null;
+  ratingSum: number; reviewCount: number;
+  /**
+   * 캐시를 지나므로 **Date 가 아니라 문자열**로 올 수 있다.
+   *
+   * 캐시는 값을 JSON 으로 저장한다. Date 로 선언해 두었더니 캐싱을 붙인
+   * 순간 홈이 통째로 500 이 났다 — getTime is not a function.
+   */
+  publishedAt: Date | string | null;
   brand: { name: string };
   images: { url: string; alt: string }[];
   variants: { stock: number }[];
 };
+
+/** 캐시를 지나온 값은 문자열일 수 있다. 양쪽을 같게 다룬다. */
+const epochOf = (value: Date | string): number =>
+  value instanceof Date ? value.getTime() : new Date(value).getTime();
 
 function toListItem(p: ListRow, now: number): ProductListItem {
   const listPrice = won(p.listPrice);
@@ -96,23 +108,32 @@ function toListItem(p: ListRow, now: number): ProductListItem {
     rating: p.reviewCount > 0 ? p.ratingSum / p.reviewCount : undefined,
     reviewCount: p.reviewCount,
     soldOut: p.variants.length > 0 && p.variants.every((v) => v.stock <= 0),
-    isNew: p.publishedAt !== null && now - p.publishedAt.getTime() < NEW_WINDOW_MS,
+    isNew: p.publishedAt !== null && now - epochOf(p.publishedAt) < NEW_WINDOW_MS,
     imageUrl: image?.url,
     imageAlt: image?.alt,
   };
 }
 
-/** 홈 화면 — 많이 팔린 순 */
+/**
+ * 홈 화면 — 많이 팔린 순.
+ *
+ * **행만 캐싱하고 화면 값은 매번 만든다.** toListItem 은 `now` 를 받아
+ * "신상품" 여부를 정하는데, 그 결과까지 캐싱하면 캐시가 만들어진 시각에
+ * 신상품이던 것이 계속 신상품으로 남는다.
+ */
+const featuredRows = cachedRead(
+  (limit: number) =>
+    prisma.product.findMany({
+      where: { ...onDisplay(), brand: sellableBrand() },
+      orderBy: [{ soldCount: 'desc' }, { publishedAt: 'desc' }],
+      take: limit,
+      select: listSelect,
+    }),
+  { key: ['featured-products'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
 export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]> {
-  const rows = await prisma.product.findMany({
-    where: {
-      ...onDisplay(),
-      brand: sellableBrand(),
-    },
-    orderBy: [{ soldCount: 'desc' }, { publishedAt: 'desc' }],
-    take: limit,
-    select: listSelect,
-  });
+  const rows = await featuredRows(limit);
   const now = Date.now();
   return rows.map((r) => toListItem(r, now));
 }
@@ -176,8 +197,9 @@ export interface ProductDetail {
   readonly images: readonly { url: string; alt: string }[];
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
-  const p = await prisma.product.findFirst({
+const productRow = cachedRead(
+  (slug: string) =>
+    prisma.product.findFirst({
     where: {
       slug, ...onDisplay(),
       brand: sellableBrand(),
@@ -206,7 +228,22 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
         },
       },
     },
-  });
+  }),
+  { key: ['product-detail'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+/**
+ * 상품 상세.
+ *
+ * 행 읽기만 캐싱한다. 이 함수는 **사용자와 무관한 값만** 돌려주므로 캐싱해도
+ * 안전하다 — 찜 여부·내 리뷰인지·알림 신청 여부는 화면이 따로 읽고, 그것들은
+ * 캐시에 들어가지 않는다.
+ *
+ * 재고는 최대 TTL 만큼 늦는다. 목록에서 잠깐 늦게 품절로 바뀔 뿐이고,
+ * 주문을 만들 때 서버가 재고를 다시 보므로 초과 판매로 이어지지 않는다.
+ */
+export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+  const p = await productRow(slug);
   if (!p) return null;
 
   const listPrice = won(p.listPrice);
@@ -328,41 +365,17 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
     return { items: [], nextCursor: null, total: 0, term };
   }
 
-  // 조건부 스프레드로 조립하면 선택 속성이 생겨 Prisma 입력 타입과 어긋나고
-  // (exactOptionalPropertyTypes), 그 여파로 select 추론까지 무너진다.
-  // 명시 타입에 하나씩 붙인다.
-  const where: Prisma.ProductWhereInput = {
-    ...onDisplay(),
-    brand: sellableBrand(),
-  };
-
-  if (categoryIds) where.categoryId = { in: categoryIds };
-
-  if (range.min !== null || range.max !== null) {
-    const bounds: Prisma.IntFilter = {};
-    if (range.min !== null) bounds.gte = range.min;
-    if (range.max !== null) bounds.lte = range.max;
-    where.sellingPrice = bounds;
-  }
-
-  if (term) {
-    // 상품명과 브랜드명을 합쳐 둔 한 컬럼을 본다. 두 테이블에 OR 를 걸면
-    // Postgres 가 어느 인덱스도 못 쓰고 전체를 훑는다.
-    // 소문자로 저장해 두므로 여기서도 소문자로 맞춘다.
-    where.searchText = { contains: term.toLowerCase() };
-  }
-
-  const [rows, total] = await Promise.all([
-    prisma.product.findMany({
-      where,
-      orderBy: orderFor(sort),
-      take: take + 1,
-      ...(filter.cursor ? { cursor: { id: filter.cursor }, skip: 1 } : {}),
-      select: listSelect,
-    }),
-    // 첫 쪽에서만 센다. 커서가 있으면 이미 화면이 총 건수를 알고 있다.
-    filter.cursor ? Promise.resolve(null) : prisma.product.count({ where }),
-  ]);
+  /*
+   * **검색어가 있으면 캐싱하지 않는다.**
+   *
+   * 캐시 키에 검색어가 들어가면 키 공간이 무한해진다 — 아무 말이나 넣어
+   * 두드리면 캐시가 쓰레기로 찬다. 카테고리·정렬·가격대는 화면이 만들 수
+   * 있는 조합이 한정돼 있어 캐싱해도 안전하다.
+   */
+  const { rows, total } = await (term === null ? cachedCatalogPage : catalogPage)({
+    categoryIds, min: range.min, max: range.max, term,
+    sort, take, cursor: filter.cursor ?? null,
+  });
 
   const hasMore = rows.length > take;
   const page = hasMore ? rows.slice(0, take) : rows;
@@ -376,12 +389,77 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
   };
 }
 
-/** 카테고리와 그 하위까지. 부모를 고르면 자식 상품도 나와야 한다. */
-async function categoryIdsFor(slug: string): Promise<string[] | null> {
-  const category = await prisma.category.findUnique({
-    where: { slug },
-    select: { id: true, children: { select: { id: true } } },
-  });
-  if (!category) return null;
-  return [category.id, ...category.children.map((c) => c.id)];
+interface CatalogQuery {
+  readonly categoryIds: string[] | null;
+  readonly min: number | null;
+  readonly max: number | null;
+  readonly term: string | null;
+  readonly sort: ProductSort;
+  readonly take: number;
+  readonly cursor: string | null;
 }
+
+/**
+ * 목록 한 쪽을 읽는다.
+ *
+ * where 조립을 이 안에 둔 이유는 **캐시 키가 인자에서 나오기 때문**이다.
+ * 조립된 where 객체를 넘기면 키가 그 객체의 모양에 따라 흔들린다.
+ */
+async function catalogPage(q: CatalogQuery) {
+  // 조건부 스프레드로 조립하면 선택 속성이 생겨 Prisma 입력 타입과 어긋나고
+  // (exactOptionalPropertyTypes), 그 여파로 select 추론까지 무너진다.
+  // 명시 타입에 하나씩 붙인다.
+  const where: Prisma.ProductWhereInput = {
+    ...onDisplay(),
+    brand: sellableBrand(),
+  };
+
+  if (q.categoryIds) where.categoryId = { in: q.categoryIds };
+
+  if (q.min !== null || q.max !== null) {
+    const bounds: Prisma.IntFilter = {};
+    if (q.min !== null) bounds.gte = q.min;
+    if (q.max !== null) bounds.lte = q.max;
+    where.sellingPrice = bounds;
+  }
+
+  if (q.term) {
+    // 상품명과 브랜드명을 합쳐 둔 한 컬럼을 본다. 두 테이블에 OR 를 걸면
+    // Postgres 가 어느 인덱스도 못 쓰고 전체를 훑는다.
+    // 소문자로 저장해 두므로 여기서도 소문자로 맞춘다.
+    where.searchText = { contains: q.term.toLowerCase() };
+  }
+
+  const [rows, total] = await Promise.all([
+    prisma.product.findMany({
+      where,
+      orderBy: orderFor(q.sort),
+      take: q.take + 1,
+      ...(q.cursor ? { cursor: { id: q.cursor }, skip: 1 } : {}),
+      select: listSelect,
+    }),
+    // 첫 쪽에서만 센다. 커서가 있으면 이미 화면이 총 건수를 알고 있다.
+    q.cursor ? Promise.resolve(null) : prisma.product.count({ where }),
+  ]);
+
+  return { rows, total };
+}
+
+const cachedCatalogPage = cachedRead(catalogPage, {
+  key: ['catalog-page'],
+  tags: [TAG.catalog],
+  revalidate: TTL.catalog,
+});
+
+/** 카테고리와 그 하위까지. 부모를 고르면 자식 상품도 나와야 한다. */
+const categoryIdsFor = cachedRead(
+  async (slug: string): Promise<string[] | null> => {
+    const category = await prisma.category.findUnique({
+      where: { slug },
+      select: { id: true, children: { select: { id: true } } },
+    });
+    if (!category) return null;
+    return [category.id, ...category.children.map((c) => c.id)];
+  },
+  { key: ['category-ids'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);

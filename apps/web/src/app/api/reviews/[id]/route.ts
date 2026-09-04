@@ -5,6 +5,7 @@ import { getActor, getSessionUser } from '@shop/auth/session';
 import { updateReview, deleteReview, ReviewError } from '~/lib/reviews/write-review';
 import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
+import { revalidateReviews } from '~/lib/cache';
 
 export async function PATCH(
   request: Request,
@@ -33,7 +34,9 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    return NextResponse.json(await updateReview(user.id, id, parsed.data));
+    const updated = await updateReview(user.id, id, parsed.data);
+    revalidateReviews();
+    return NextResponse.json(updated);
   } catch (error) {
     if (error instanceof ReviewError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
@@ -62,6 +65,7 @@ export async function DELETE(
 
   try {
     await deleteReview({ userId: actor.id, canModerate }, id);
+    revalidateReviews();
 
     if (canModerate) {
       // 이미 끝난 건이 대기줄에 남으면 같은 일을 두 번 처리하게 된다

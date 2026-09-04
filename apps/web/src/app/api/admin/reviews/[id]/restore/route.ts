@@ -3,6 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { assertPermission, ForbiddenError } from '@shop/core';
 import { restoreReview, ReviewError } from '~/lib/reviews/write-review';
 import { recordAudit } from '~/lib/audit';
+import { revalidateReviews } from '~/lib/cache';
 
 /** 내린 글을 되돌린다. 잘못 내린 것을 고칠 수 있어야 한다. */
 export async function POST(
@@ -19,6 +20,8 @@ export async function POST(
   try {
     assertPermission(actor, 'review:moderate');
     await restoreReview(id);
+    // 별점이 목록에도 나온다
+    revalidateReviews();
 
     await recordAudit({
       actor, action: 'review.restore', targetType: 'review', targetId: id, request,

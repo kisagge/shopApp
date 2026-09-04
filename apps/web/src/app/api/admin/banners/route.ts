@@ -4,6 +4,7 @@ import { createBannerSchema, reorderBannerSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { createBanner, reorderBanners, BannerError } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
+import { revalidateBanners } from '~/lib/cache';
 
 function fail(error: unknown): NextResponse | null {
   if (error instanceof BannerError) {
@@ -47,6 +48,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const banner = await createBanner(actor, parsed.data);
+    revalidateBanners();
     await recordAudit({
       actor, action: 'banner.create', targetType: 'banner', targetId: banner.id,
       after: { headline: banner.headline, isActive: banner.isActive }, request,
@@ -85,6 +87,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
   try {
     const banners = await reorderBanners(actor, parsed.data.orderedIds);
+    revalidateBanners();
     await recordAudit({
       actor, action: 'banner.reorder', targetType: 'banner', targetId: 'all',
       after: { order: banners.map((b) => b.id) }, request,

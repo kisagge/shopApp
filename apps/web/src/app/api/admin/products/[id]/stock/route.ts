@@ -3,6 +3,7 @@ import { updateStockSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateStock, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 /** 재고 조정. 실사 결과를 덮어쓰는 동작이라 절대값을 받는다. */
 export async function PATCH(
@@ -33,6 +34,7 @@ export async function PATCH(
 
   try {
     const { before, after } = await updateStock(actor, id, parsed.data);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.stock',

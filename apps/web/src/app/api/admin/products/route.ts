@@ -3,6 +3,7 @@ import { createProductSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { createProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 /** 상품 등록. 가맹점은 자기 브랜드에만 등록할 수 있다. */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -32,6 +33,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const product = await createProduct(actor, parsed.data);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.create',

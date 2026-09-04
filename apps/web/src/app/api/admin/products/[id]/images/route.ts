@@ -8,6 +8,7 @@ import {
 import { ProductError } from '~/lib/admin/manage-product';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
@@ -78,6 +79,8 @@ export async function POST(
       typeof altInput === 'string' ? altInput : undefined,
     );
 
+    revalidateCatalog();
+
     await recordAudit({
       actor,
       action: 'product.image.add',
@@ -124,6 +127,7 @@ export async function PATCH(
 
   try {
     const images = await reorderProductImages(actor, id, parsed.data.orderedIds);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.image.reorder',

@@ -6,6 +6,7 @@ import { deleteProductImage, updateImageAlt } from '~/lib/admin/manage-images';
 import { ProductError } from '~/lib/admin/manage-product';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 const altSchema = z.object({ alt: z.string().trim().min(1, '대체 텍스트를 입력해 주세요').max(200) });
 
@@ -54,6 +55,7 @@ export async function PATCH(
 
   try {
     const image = await updateImageAlt(actor, id, imageId, parsed.data.alt);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.image.alt',
@@ -84,6 +86,7 @@ export async function DELETE(
 
   try {
     const { remaining } = await deleteProductImage(actor, id, imageId);
+    revalidateCatalog();
     await recordAudit({
       actor,
       action: 'product.image.delete',

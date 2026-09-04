@@ -3,6 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { reviewProductSchema } from '@shop/contract';
 import { reviewProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
+import { revalidateCatalog } from '~/lib/cache';
 
 /**
  * 게시 검수 결정.
@@ -31,6 +32,8 @@ export async function POST(
 
   try {
     const { before, after } = await reviewProduct(actor, id, parsed.data);
+
+    revalidateCatalog();
 
     await recordAudit({
       actor,

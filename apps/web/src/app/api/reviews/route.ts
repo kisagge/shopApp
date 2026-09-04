@@ -5,6 +5,7 @@ import { ImageError, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REVIEW } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
 import { createReview, assertCanReview, ReviewError } from '~/lib/reviews/write-review';
 import { uploadReviewImages, discardReviewImages } from '~/lib/reviews/images';
+import { revalidateReviews } from '~/lib/cache';
 
 /**
  * 사진이 있으면 multipart, 없으면 JSON 으로 온다.
@@ -97,6 +98,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const review = await createReview(user.id, parsed.data, uploaded);
+    // 별점과 리뷰 수가 목록에도 나온다
+    revalidateReviews();
     return NextResponse.json(review, { status: 201 });
   } catch (error) {
     // 리뷰가 만들어지지 않았으면 올린 사진도 되돌린다
