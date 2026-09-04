@@ -4,6 +4,7 @@ import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
 import { CartSync } from '~/components/cart-sync';
 import { NativeSession } from '~/components/native-session';
+import { ServiceWorker } from '~/components/service-worker';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
@@ -79,6 +80,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartSync />
           {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
           <NativeSession />
+          <ServiceWorker />
         </Providers>
       </body>
     </html>
