@@ -1,3 +1,5 @@
+import { siteStructuredData } from '@shop/core';
+import { absoluteUrl } from '~/lib/urls';
 import { getFeaturedProducts } from '~/lib/queries/products';
 import { getLiveBanners } from '~/lib/admin/manage-banner';
 import { HomeBanners } from '~/components/home-banners';
@@ -5,9 +7,11 @@ import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 
 /**
- * 지금은 매 요청마다 DB를 읽는다.
- * ISR(revalidate)로 바꾸면 빌드 시점에 DB가 필요해지는데 CI에는 DB가 없어서
- * 빌드가 깨진다. 캐싱은 CI에 서비스 컨테이너를 붙이면서 같이 손볼 것.
+ * 화면은 매 요청마다 그리되 **읽기는 캐싱한다**(lib/cache).
+ *
+ * ISR 로 바꾸지 않은 이유는 빌드가 DB 에 닿아야 하기 때문이다 — 설정 하나가
+ * 어긋나면 배포가 통째로 실패하는 쪽으로 바뀐다. 문제였던 "매 요청 DB 를
+ * 친다" 는 읽기 캐싱으로 사라졌다.
  */
 export const dynamic = 'force-dynamic';
 
@@ -19,8 +23,27 @@ export default async function HomePage() {
     getLiveBanners(),
   ]);
 
+  /*
+   * 사이트 자체에 대한 구조화 데이터.
+   *
+   * 검색 결과에서 도메인 대신 사이트 이름이 뜨고, 사이트 내 검색이 함께
+   * 붙는 경우가 있다. 상품 페이지의 구조화 데이터와 같은 결이다.
+   */
+  const jsonLd = siteStructuredData({
+    name: 'PLAIN',
+    url: absoluteUrl('/'),
+    description: '오래 두고 입을 것만 골라 담은 편집숍',
+    searchPath: '/search?q=',
+  });
+
   return (
     <div className="mx-auto flex w-full max-w-[1280px] flex-col">
+      {/* 상품명·설명과 달리 고정 문자열뿐이지만, 넣는 방식은 같게 둔다 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+
       {/*
         페이지에는 h1 이 하나 있어야 하는데, 배너 제목을 h1 으로 쓰면
         슬라이드를 넘길 때마다 문서의 제목이 바뀐다. 화면에는 브랜드와

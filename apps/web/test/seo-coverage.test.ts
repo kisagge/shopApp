@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { DISALLOWED_PATHS } from '@shop/core';
+import { DISALLOWED_PATHS, isDisallowedPath } from '@shop/core';
 
 /**
  * 색인 정책이 화면과 어긋나지 않는지 지킨다.
@@ -49,9 +49,29 @@ describe('색인에서 빼는 경로', () => {
     expect(readFileSync(join(APP, 'robots.ts'), 'utf8')).toContain('DISALLOWED_PATHS');
   });
 
-  it('사이트맵에 검색 화면을 넣지 않는다', () => {
+  it('사이트맵에 넣는 경로가 robots 와 모순되지 않는다', () => {
+    /*
+     * **긁지 말라고 해 놓고 사이트맵에 넣으면 서로 반대말을 한다.**
+     * 검색엔진은 그런 사이트맵을 통째로 의심한다.
+     *
+     * 사이트맵이 만드는 경로 모양을 소스에서 뽑아 막는 목록과 대조한다 —
+     * 나중에 누가 한 줄을 더할 때 여기서 걸린다.
+     */
     const source = readFileSync(join(APP, 'sitemap.ts'), 'utf8');
-    expect(source).not.toMatch(/['"`]\/search/);
+    const paths = [...source.matchAll(/absoluteUrl\(['"`](\/[\w[\]./${}-]*)/g)]
+      .map((m) => m[1]!)
+      // 템플릿 자리를 대표값으로 바꾼다: `/product/${slug}` → /product/x
+      .map((path) => path.replace(/\$\{[^}]*\}/g, 'x').replace(/\/+$/, '') || '/');
+
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.filter(isDisallowedPath)).toEqual([]);
+  });
+
+  it('막는 목록에 있는 경로는 실제로 막힌 것으로 판정된다', () => {
+    // 판정 함수와 목록이 갈라지면 위 검사가 조용히 무력해진다
+    for (const path of DISALLOWED_PATHS) {
+      expect(isDisallowedPath(path), path).toBe(true);
+    }
   });
 });
 
