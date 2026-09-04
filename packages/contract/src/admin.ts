@@ -55,7 +55,7 @@ export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 
 export const ADMIN_ERROR = [
   'MERCHANT_NOT_FOUND', 'USER_NOT_FOUND', 'CANNOT_CHANGE_OWN_ROLE',
-  'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED',
+  'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED', 'USER_CLOSED',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR)[number];
 
@@ -65,4 +65,5 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
   CANNOT_CHANGE_OWN_ROLE: '자기 권한은 바꿀 수 없습니다',
   CANNOT_EDIT_SUPER_ADMIN: '슈퍼관리자 계정은 수정할 수 없습니다',
   MERCHANT_NOT_APPROVED: '승인되지 않은 가맹점에는 계정을 붙일 수 없습니다',
+  USER_CLOSED: '탈퇴한 계정에는 권한을 줄 수 없습니다',
 };

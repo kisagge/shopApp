@@ -87,9 +87,18 @@ export async function assignRole(
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, email: true, role: true, merchantId: true },
+    select: { id: true, name: true, email: true, role: true, merchantId: true, deletedAt: true },
   });
   if (!target) throw new AccessError('USER_NOT_FOUND', 404);
+
+  /*
+   * 탈퇴한 계정에는 권한을 주지 않는다.
+   *
+   * 행이 남아 있어서 목록에도 보이고 id 도 그대로다. 막지 않으면 들어올
+   * 길이 없는 계정에 운영 권한이 붙고, 나중에 그 계정이 되살아나면 그
+   * 권한을 그대로 들고 들어온다.
+   */
+  if (target.deletedAt !== null) throw new AccessError('USER_CLOSED', 409);
 
   if (!canAssignRole(actor, target, input.role)) {
     throw new AccessError('CANNOT_CHANGE_OWN_ROLE', 403);

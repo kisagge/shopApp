@@ -205,6 +205,20 @@ export default async function MyPage() {
           </li>
         </ul>
       </nav>
+
+      {/*
+        탈퇴는 목록 안에 섞지 않는다. 되돌릴 수 없는 동작이 "쿠폰함" 옆에
+        같은 모양으로 있으면 잘못 눌린다. 대신 숨기지도 않는다 — 찾을 수
+        없는 탈퇴 버튼은 탈퇴를 막는 것과 같다.
+      */}
+      <p className="mt-10 border-t border-[var(--border)] pt-5 text-center">
+        <Link
+          href="/mypage/close"
+          className="text-xs text-[var(--fg-muted)] underline underline-offset-2"
+        >
+          회원 탈퇴
+        </Link>
+      </p>
     </div>
   );
 }

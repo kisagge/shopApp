@@ -736,6 +736,8 @@ export interface AdminUserRow {
   readonly merchantName: string | null;
   readonly orderCount: number;
   readonly createdAt: Date;
+  /** 탈퇴 시각. 행은 남으므로 목록에서 구분할 수 있어야 한다. */
+  readonly closedAt: Date | null;
 }
 
 export interface AdminUserPage {
@@ -765,7 +767,7 @@ export async function getAdminUsers(
     take: take + 1,
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     select: {
-      id: true, name: true, email: true, role: true, createdAt: true,
+      id: true, name: true, email: true, role: true, createdAt: true, deletedAt: true,
       merchant: { select: { id: true, name: true } },
       _count: { select: { orders: true } },
     },
@@ -781,6 +783,7 @@ export async function getAdminUsers(
       merchantName: u.merchant?.name ?? null,
       orderCount: u._count.orders,
       createdAt: u.createdAt,
+      closedAt: u.deletedAt,
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };

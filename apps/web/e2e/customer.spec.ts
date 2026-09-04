@@ -98,3 +98,28 @@ test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 �
   // 누른 뒤 아무 변화가 없으면 눌리지 않은 줄 알고 다시 누른다
   await expect(page.getByText(/글은 그대로 남습니다/)).toBeVisible();
 });
+
+test('탈퇴 화면은 무엇이 지워지고 무엇이 남는지 먼저 말한다', async ({ page }) => {
+  await page.goto('/mypage');
+  await page.getByRole('link', { name: '회원 탈퇴' }).click();
+
+  await expect(page.getByRole('heading', { name: '회원 탈퇴', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '지워지는 것' })).toBeVisible();
+  // 왜 남는지 말하지 않으면 지우지 않은 것으로 읽힌다
+  await expect(page.getByText(/가맹점 정산의 근거입니다/)).toBeVisible();
+});
+
+test('막히는 이유를 확인 문구를 치기 전에 알려 준다', async ({ page }) => {
+  /*
+   * 시드 고객에게는 입금대기(가상계좌) 주문이 있다. 아직 입금될 수 있는
+   * 주문이라 탈퇴를 막는 것이 맞고, 화면은 그 이유를 **양식보다 먼저**
+   * 보여 줘야 한다 — 다 적고 나서 안 된다고 하면 그 시간이 헛것이 된다.
+   */
+  await page.goto('/mypage/close');
+
+  await expect(page.getByRole('heading', { name: '지금은 탈퇴할 수 없습니다' })).toBeVisible();
+  await expect(page.getByText(/배송이 끝나지 않은 주문/)).toBeVisible();
+
+  // 막힌 동안에는 양식 자체가 없다
+  await expect(page.getByRole('button', { name: '탈퇴하기' })).toHaveCount(0);
+});

@@ -27,7 +27,8 @@ beforeEach(() => {
   db.merchant.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: MERCHANT_ID, name: '무어', approvedAt: null, ...data }));
   db.user.findUnique.mockResolvedValue({
-    id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'CUSTOMER', merchantId: null,
+    id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'CUSTOMER',
+    merchantId: null, deletedAt: null,
   });
   db.user.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: 'u-target', name: '홍길동', email: 'a@b.test', ...data }));
@@ -108,7 +109,8 @@ describe('권한 부여', () => {
 
   it('자기 권한은 못 바꾼다', async () => {
     db.user.findUnique.mockResolvedValue({
-      id: 'u-super', name: '나', email: 's@b.test', role: 'SUPER_ADMIN', merchantId: null,
+      id: 'u-super', name: '나', email: 's@b.test', role: 'SUPER_ADMIN',
+      merchantId: null, deletedAt: null,
     });
     await expect(assignRole(superAdmin, 'u-super', role(grant))).rejects.toMatchObject({
       code: 'CANNOT_CHANGE_OWN_ROLE', status: 403,
@@ -120,6 +122,22 @@ describe('권한 부여', () => {
     await expect(assignRole(superAdmin, 'u-x', role(grant))).rejects.toMatchObject({
       code: 'USER_NOT_FOUND', status: 404,
     });
+  });
+
+  it('탈퇴한 계정에는 권한을 주지 않는다', async () => {
+    /*
+     * 탈퇴해도 행은 남아 목록에 보이고 id 도 그대로다. 막지 않으면 들어올
+     * 길이 없는 계정에 운영 권한이 붙고, 나중에 되살아나면 그대로 들고 온다.
+     */
+    db.user.findUnique.mockResolvedValue({
+      id: 'u-target', name: '탈퇴한 회원', email: 'withdrawn-u-target@removed.invalid',
+      role: 'CUSTOMER', merchantId: null, deletedAt: new Date('2026-09-01'),
+    });
+
+    await expect(assignRole(superAdmin, 'u-target', role(grant))).rejects.toMatchObject({
+      code: 'USER_CLOSED', status: 409,
+    });
+    expect(db.user.update).not.toHaveBeenCalled();
   });
 
   it('가맹점으로 올릴 때 소속을 확인한다', async () => {
@@ -143,7 +161,8 @@ describe('권한 부여', () => {
 
   it('가맹점에서 내릴 때 소속을 끊는다', async () => {
     db.user.findUnique.mockResolvedValue({
-      id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'MERCHANT', merchantId: MERCHANT_ID,
+      id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'MERCHANT',
+      merchantId: MERCHANT_ID, deletedAt: null,
     });
     await assignRole(superAdmin, 'u-target', role({ role: 'CUSTOMER', reason: '퇴사' }));
     // 소속이 남으면 권한만 내려가고 범위는 그대로인 계정이 된다

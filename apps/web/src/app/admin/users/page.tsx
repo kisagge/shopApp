@@ -93,7 +93,16 @@ export default async function AdminUsersPage({
                 {page.rows.map((u) => (
                   <tr key={u.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
                     <td className="px-4 py-3">
-                      <span className="block text-[13px]">{u.name}</span>
+                      <span className="block text-[13px]">
+                        {u.name}
+                        {u.closedAt && (
+                          // 행은 남으므로 목록에서 구분되지 않으면 살아 있는
+                          // 계정으로 읽힌다
+                          <span className="ml-1.5 text-[11px] text-[var(--fg-muted)]">
+                            · 탈퇴 {dateFormat.format(u.closedAt)}
+                          </span>
+                        )}
+                      </span>
                       <span className="block text-[11px] text-[var(--fg-muted)]">{u.email}</span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -118,7 +127,13 @@ export default async function AdminUsersPage({
                           merchants={merchants}
                           // 자기 권한은 바꿀 수 없다. 서버에서도 막지만
                           // 누를 수 있게 두면 왜 안 되는지 알 수 없다.
-                          disabledReason={u.id === actor.id ? '본인 계정' : undefined}
+                          disabledReason={
+                            u.id === actor.id
+                              ? '본인 계정'
+                              : u.closedAt
+                                ? '탈퇴한 계정'
+                                : undefined
+                          }
                         />
                       </td>
                     )}
