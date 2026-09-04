@@ -706,8 +706,13 @@ export interface MerchantRow {
   readonly businessNumber: string;
   readonly representative: string;
   readonly contactEmail: string;
+  readonly contactPhone: string;
   readonly commissionPercent: number;
   readonly brandNames: readonly string[];
+  /** 신청서에 적은 브랜드 이름. 운영진이 직접 만든 가맹점에는 없다. */
+  readonly appliedBrandName: string | null;
+  /** 신청한 사람. 승인하면 이 계정이 가맹점 계정이 된다. */
+  readonly applicant: { readonly name: string; readonly email: string } | null;
   readonly userCount: number;
   readonly approvedAt: Date | null;
   readonly createdAt: Date;
@@ -725,8 +730,11 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
     select: {
       id: true, name: true, status: true,
       businessName: true, businessNumber: true, representative: true,
-      contactEmail: true, commissionPercent: true,
+      contactEmail: true, contactPhone: true, commissionPercent: true,
       approvedAt: true, createdAt: true,
+      // 신청으로 들어온 건인지, 운영진이 직접 만든 것인지 구분한다
+      brandName: true,
+      applicant: { select: { name: true, email: true } },
       brands: { select: { name: true } },
       _count: { select: { users: true } },
     },
@@ -739,8 +747,11 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
     businessNumber: m.businessNumber.replace(/\d{2}$/, '**'),
     representative: m.representative,
     contactEmail: m.contactEmail,
+    contactPhone: m.contactPhone,
     commissionPercent: m.commissionPercent,
     brandNames: m.brands.map((b) => b.name),
+    appliedBrandName: m.brandName,
+    applicant: m.applicant,
     userCount: m._count.users,
     approvedAt: m.approvedAt,
     createdAt: m.createdAt,

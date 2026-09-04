@@ -3,6 +3,7 @@ export * from './shipping';
 export * from './cart';
 export * from './order-state';
 export * from './authz';
+export * from './merchant-application';
 export * from './product-publish';
 export * from './account-closure';
 export * from './address';

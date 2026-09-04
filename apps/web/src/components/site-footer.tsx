@@ -27,7 +27,20 @@ export async function SiteFooter() {
           </ul>
         </nav>
 
-        <p className="mt-6 font-serif text-lg font-medium tracking-[0.18em]">PLAIN</p>
+        {/*
+          입점 신청 입구. 헤더에 두기에는 고객이 쓸 일이 아니고, 아예 없으면
+          브랜드가 찾아올 방법이 없다 — 쇼핑몰 푸터의 흔한 자리다.
+        */}
+        <p className="mt-6">
+          <Link
+            href="/merchant/apply"
+            className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+          >
+            입점 신청
+          </Link>
+        </p>
+
+        <p className="mt-4 font-serif text-lg font-medium tracking-[0.18em]">PLAIN</p>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--fg-muted)]">
           포트폴리오 목적으로 제작된 화면입니다. 브랜드명과 사업자 정보는 플레이스홀더입니다.
         </p>

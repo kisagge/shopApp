@@ -8,6 +8,9 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/merchant/apply', () => ({ activateApprovedMerchant: activate }));
+
 const { updateMerchantStatus, assignRole } = await import('~/lib/admin/manage-access');
 
 const superAdmin: Actor = { id: 'u-super', role: 'SUPER_ADMIN', merchantId: null };
@@ -189,5 +192,25 @@ describe('권한 부여 — 계약', () => {
   it('사유는 필수다 — 감사 로그에 왜 가 빠지면 나중에 판단할 수 없다', () => {
     expect(assignRoleSchema.safeParse({ role: 'ADMIN' }).success).toBe(false);
     expect(assignRoleSchema.safeParse({ role: 'ADMIN', reason: '   ' }).success).toBe(false);
+  });
+});
+
+describe('승인하면 계정과 브랜드가 이어진다', () => {
+  it('APPROVED 로 바꿀 때만 활성화를 부른다', async () => {
+    /*
+     * 상태만 바꾸면 승인된 가맹점이 로그인해도 아무것도 할 수 없고, 결국
+     * 운영진이 계정과 브랜드를 손으로 만들어 줘야 한다.
+     */
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
+    expect(activate).toHaveBeenCalledWith(MERCHANT_ID);
+  });
+
+  it('정지·해지에는 부르지 않는다', async () => {
+    for (const s of ['SUSPENDED', 'TERMINATED'] as const) {
+      activate.mockClear();
+      // 불이익을 주는 처분에는 사유가 필요하다(계약이 강제한다)
+      await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '시험' }));
+      expect(activate, s).not.toHaveBeenCalled();
+    }
   });
 });

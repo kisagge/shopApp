@@ -62,7 +62,14 @@ export default async function AdminMerchantsPage() {
                   <td className="px-4 py-3">
                     <span className="block text-[13px]">{m.name}</span>
                     <span className="block text-[11px] text-[var(--fg-muted)]">
-                      {m.brandNames.join(' · ') || '브랜드 없음'} · 계정 {m.userCount}개
+                      {/*
+                        승인 전에는 브랜드가 아직 없다. 그때는 신청서에 적은
+                        이름을 보여 준다 — 무엇을 승인하는지 알아야 한다.
+                      */}
+                      {m.brandNames.join(' · ')
+                        || (m.appliedBrandName ? `${m.appliedBrandName} (신청)` : '브랜드 없음')}
+                      {' · 계정 '}
+                      {m.userCount}개
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -70,6 +77,12 @@ export default async function AdminMerchantsPage() {
                     <span className="tnum block text-[11px] text-[var(--fg-muted)]">
                       {m.businessNumber} · {m.representative}
                     </span>
+                    {m.applicant && (
+                      // 승인하면 이 계정이 가맹점 계정이 된다. 누구인지 보여야 한다.
+                      <span className="block text-[11px] text-[var(--fg-muted)]">
+                        신청 {m.applicant.name} · {m.applicant.email}
+                      </span>
+                    )}
                   </td>
                   <td className="tnum px-4 py-3 text-right text-[13px]">{m.commissionPercent}%</td>
                   <td className="px-4 py-3 text-center">

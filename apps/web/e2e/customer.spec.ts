@@ -123,3 +123,22 @@ test('막히는 이유를 확인 문구를 치기 전에 알려 준다', async (
   // 막힌 동안에는 양식 자체가 없다
   await expect(page.getByRole('button', { name: '탈퇴하기' })).toHaveCount(0);
 });
+
+test('입점 신청 입구가 푸터에 있고 양식이 열린다', async ({ page }) => {
+  /*
+   * 실제로 신청하지는 않는다 — 시드 고객이 가맹점이 되면 나머지 시험이
+   * 전부 무너진다. 입구가 있고 양식이 그려지는지만 본다.
+   */
+  await page.goto('/');
+  await page.getByRole('link', { name: '입점 신청' }).click();
+
+  await expect(page.getByRole('heading', { name: '입점 신청', level: 1 })).toBeVisible();
+
+  // 입력이 많아 묶지 않으면 어디까지가 한 묶음인지 알 수 없다
+  for (const name of ['브랜드', '사업자 정보', '연락처']) {
+    await expect(page.getByRole('group', { name })).toBeVisible();
+  }
+
+  // 로그인한 주소가 미리 채워져야 다시 적다가 오타가 나지 않는다
+  await expect(page.getByLabel(/^이메일\* \(필수\)$/)).toHaveValue(/@/);
+});

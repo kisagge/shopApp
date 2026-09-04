@@ -53,3 +53,9 @@ test('가맹점은 상품을 스스로 매대에 올릴 수 없다', async ({ pa
   await expect(status.getByRole('option', { name: '검수 대기' })).toHaveCount(1);
   await expect(page.getByText(/운영진이 확인한 뒤에 됩니다/)).toBeVisible();
 });
+
+test('이미 가맹점이면 신청 화면이 아니라 어드민으로 간다', async ({ page }) => {
+  // 여기서 할 수 있는 일이 없는데 화면만 띄우면 막다른 길이 된다
+  await page.goto('/merchant/apply');
+  expect(new URL(page.url()).pathname).toBe('/admin');
+});

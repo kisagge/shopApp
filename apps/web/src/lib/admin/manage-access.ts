@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { assertPermission, canAssignRole, canEditUser, type Actor, type UserRole } from '@shop/core';
+import { activateApprovedMerchant } from '~/lib/merchant/apply';
 import {
   ADMIN_ERROR_MESSAGE,
   type AdminErrorCode,
@@ -64,6 +65,17 @@ export async function updateMerchantStatus(
     },
     select: { id: true, name: true, status: true, approvedAt: true },
   });
+
+  /*
+   * 승인하면 신청자의 계정과 브랜드를 함께 만든다.
+   *
+   * 상태만 바꾸면 승인된 가맹점이 로그인해도 아무것도 할 수 없고, 결국
+   * 운영진이 계정과 브랜드를 손으로 만들어 줘야 한다 — 신청 입구를 만든
+   * 뜻이 없어진다. 운영진이 직접 만든 가맹점(신청자 없음)은 그냥 지나간다.
+   */
+  if (input.status === 'APPROVED') {
+    await activateApprovedMerchant(merchantId);
+  }
 
   return { before, after };
 }

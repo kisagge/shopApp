@@ -76,20 +76,21 @@ model User {
   /// 매번 합계를 구하면 마이페이지가 느려져서 캐시하되, 정합성은 배치로 검증한다.
   pointBalance Int @default(0)
 
-  addresses     Address[]
-  orders        Order[]
-  cartItems     CartItem[]
-  reviews       Review[]
-  reviewReports ReviewReport[]        @relation("reporter")
-  reviewsJudged ReviewReport[]        @relation("judge")
-  wishlist      WishlistItem[]
-  coupons       UserCoupon[]
-  pointHistory  PointTransaction[]
-  restockAlerts RestockNotification[]
-  events        EventLog[]
-  auditLogs     AdminAuditLog[]       @relation("AuditActor")
-  sessions      Session[]
-  accounts      Account[]
+  addresses            Address[]
+  orders               Order[]
+  cartItems            CartItem[]
+  reviews              Review[]
+  merchantApplications Merchant[]            @relation("MerchantApplicant")
+  reviewReports        ReviewReport[]        @relation("reporter")
+  reviewsJudged        ReviewReport[]        @relation("judge")
+  wishlist             WishlistItem[]
+  coupons              UserCoupon[]
+  pointHistory         PointTransaction[]
+  restockAlerts        RestockNotification[]
+  events               EventLog[]
+  auditLogs            AdminAuditLog[]       @relation("AuditActor")
+  sessions             Session[]
+  accounts             Account[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -150,6 +151,15 @@ model Merchant {
   settlementBank    String?
   settlementAccount String?
   settlementHolder  String?
+
+  /// 입점을 신청한 사람.
+  ///
+  /// 승인하면 이 계정이 가맹점 계정이 된다. 승인 전에는 users 에 넣지
+  /// 않는다 — 넣는 순간 아직 심사 중인 사람에게 범위가 생긴다.
+  applicantId String?
+  applicant   User?   @relation("MerchantApplicant", fields: [applicantId], references: [id], onDelete: SetNull)
+  /// 신청서에 적은 브랜드 이름. 승인할 때 이 이름으로 브랜드를 만든다.
+  brandName   String?
 
   users       User[]
   brands      Brand[]
