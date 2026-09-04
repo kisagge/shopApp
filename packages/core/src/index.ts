@@ -21,6 +21,7 @@ export * from './settlement';
 export * from './image';
 export * from './banner';
 export * from './catalog';
+export * from './structured-data';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';
