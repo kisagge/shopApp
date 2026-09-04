@@ -18,6 +18,21 @@ interface CapacitorBridge {
       set(options: { key: string; value: string }): Promise<void>;
       remove(options: { key: string }): Promise<void>;
     };
+    /**
+     * @capgo/capacitor-social-login. 셸이 등록해 주는 것만 쓴다.
+     *
+     * 타입을 여기 손으로 적는다. 패키지를 import 하면 이 패키지의 "의존성
+     * 0개" 가 깨지고, 브라우저로 들어온 사람에게까지 그 코드가 나간다.
+     */
+    SocialLogin?: {
+      initialize(options: {
+        google?: { webClientId?: string; iOSClientId?: string; iOSServerClientId?: string };
+      }): Promise<void>;
+      login(options: { provider: 'google'; options: Record<string, unknown> }): Promise<{
+        provider: string;
+        result: { idToken?: string | null };
+      }>;
+    };
   };
 }
 
@@ -109,4 +124,45 @@ export async function clearSessionToken(): Promise<void> {
 /** 테스트에서 메모리 상태를 되돌린다 */
 export function resetSessionTokenForTest(): void {
   cached = null;
+}
+
+// ── 구글 로그인 (네이티브) ─────────────────────────────────────
+
+export interface GoogleClientIds {
+  /** 안드로이드와 서버 검증의 기준이 되는 값 */
+  readonly webClientId: string;
+  /** iOS 전용. 없으면 iOS 에서 뜨지 않는다. */
+  readonly iosClientId: string;
+}
+
+/**
+ * 네이티브 구글 로그인으로 ID 토큰을 받는다.
+ *
+ * **웹뷰 안에서 구글 OAuth 를 열 수 없다.** 구글이 임베디드 웹뷰를 정책으로
+ * 막는다(disallowed_useragent). 그래서 계정 선택은 OS 가 띄우는 네이티브
+ * 화면이 맡고, 여기서는 그 결과인 ID 토큰만 받아 온다.
+ *
+ * **검증은 서버가 한다.** 이 토큰은 그냥 문자열이고 여기서 뜯어 보지 않는다 —
+ * 클라이언트가 읽은 값으로 신원을 정하면 아무나 만들어 낼 수 있다.
+ *
+ * 셸 밖이거나 플러그인이 없으면 null 을 준다. 부르는 쪽이 웹 방식으로
+ * 넘어갈 수 있게 예외 대신 값으로 알린다.
+ */
+export async function nativeGoogleIdToken(ids: GoogleClientIds): Promise<string | null> {
+  if (!isNativeShell()) return null;
+
+  const plugin = bridge()?.Plugins?.SocialLogin;
+  if (!plugin) return null;
+
+  await plugin.initialize({
+    google: {
+      webClientId: ids.webClientId,
+      iOSClientId: ids.iosClientId,
+      // iOS 오프라인 모드가 요구하는 값. 웹 클라이언트 ID 와 같아야 한다.
+      iOSServerClientId: ids.webClientId,
+    },
+  });
+
+  const { result } = await plugin.login({ provider: 'google', options: {} });
+  return result.idToken ?? null;
 }

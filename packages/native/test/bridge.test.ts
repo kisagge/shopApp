@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isNativeShell, nativePlatform, hydrateSessionToken, sessionToken,
-  saveSessionToken, clearSessionToken, resetSessionTokenForTest,
+  saveSessionToken, clearSessionToken, resetSessionTokenForTest, nativeGoogleIdToken,
 } from '../src/index';
 
 /** 셸이 웹뷰에 주입해 주는 것을 흉내 낸다 */
@@ -119,5 +119,57 @@ describe('토큰 — 셸 안', () => {
 
     await expect(saveSessionToken('t-1')).resolves.toBeUndefined();
     await expect(hydrateSessionToken()).resolves.toBeNull();
+  });
+});
+
+describe('네이티브 구글 로그인', () => {
+  const ids = { webClientId: 'web-1', iosClientId: 'ios-1' };
+
+  function installSocial(result: { idToken?: string | null }, over: Record<string, unknown> = {}) {
+    const plugin = {
+      initialize: vi.fn(async () => {}),
+      login: vi.fn(async () => ({ provider: 'google', result })),
+      ...over,
+    };
+    installBridge({ Plugins: { SocialLogin: plugin } });
+    return plugin;
+  }
+
+  it('웹에서는 아무것도 하지 않는다', async () => {
+    // 브라우저에서는 평범한 OAuth 이동을 쓴다. 여기서 예외를 던지면
+    // 부르는 쪽이 그 사실을 알기 어렵다.
+    expect(await nativeGoogleIdToken(ids)).toBeNull();
+  });
+
+  it('플러그인이 없으면 null 을 준다 — 웹 방식으로 넘어갈 수 있게', async () => {
+    installBridge({ Plugins: {} });
+    expect(await nativeGoogleIdToken(ids)).toBeNull();
+  });
+
+  it('ID 토큰을 그대로 돌려준다', async () => {
+    installSocial({ idToken: 'jwt-1' });
+    expect(await nativeGoogleIdToken(ids)).toBe('jwt-1');
+  });
+
+  it('iOS 서버 클라이언트 ID 는 웹 것과 같아야 한다', async () => {
+    const plugin = installSocial({ idToken: 'jwt-1' });
+
+    await nativeGoogleIdToken(ids);
+
+    expect(plugin.initialize).toHaveBeenCalledWith({
+      google: { webClientId: 'web-1', iOSClientId: 'ios-1', iOSServerClientId: 'web-1' },
+    });
+  });
+
+  it('토큰이 비면 null 이다', async () => {
+    // 취소하거나 계정 선택만 하고 나온 경우다. 로그인된 척하면 안 된다.
+    installSocial({ idToken: null });
+    expect(await nativeGoogleIdToken(ids)).toBeNull();
+  });
+
+  it('로그인 실패는 그대로 던진다 — 부르는 쪽이 사용자에게 알려야 한다', async () => {
+    installSocial({ idToken: null }, { login: vi.fn(() => Promise.reject(new Error('취소'))) });
+
+    await expect(nativeGoogleIdToken(ids)).rejects.toThrow('취소');
   });
 });

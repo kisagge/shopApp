@@ -81,6 +81,25 @@ function resolveTrustedOrigins(): string[] {
  * 키는 서버에서만 읽는다. NEXT_PUBLIC_ 을 붙이면 시크릿이 브라우저 번들에
  * 들어가므로, 화면에는 이 불리언만 서버가 넘겨준다.
  */
+/**
+ * 네이티브 셸에 넘겨줄 구글 클라이언트 ID.
+ *
+ * **비밀이 아니다.** 앱 바이너리에 그대로 박히는 값이라 누구나 꺼낼 수 있고,
+ * 구글도 네이티브 클라이언트에는 시크릿을 발급하지 않는다. 그래서 화면으로
+ * 내려도 된다 — 시크릿은 여기 없다.
+ *
+ * 그래도 NEXT_PUBLIC_ 은 쓰지 않는다. 서버가 읽어 필요한 화면에만 넘기면
+ * 되는데 굳이 모든 번들에 상수로 박을 이유가 없다.
+ */
+export function googleNativeClientIds(): { webClientId: string; iosClientId: string } | null {
+  const webClientId = process.env.GOOGLE_CLIENT_ID;
+  const iosClientId = process.env.GOOGLE_IOS_CLIENT_ID;
+  // 안드로이드는 웹 클라이언트 ID 로 동작한다(서명 지문으로 앱을 알아본다).
+  // iOS 는 전용 ID 가 없으면 뜨지 않으므로 둘 다 있을 때만 넘긴다.
+  if (!webClientId || !iosClientId) return null;
+  return { webClientId, iosClientId };
+}
+
 export const googleEnabled = (): boolean =>
   Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 

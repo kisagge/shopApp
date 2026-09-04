@@ -35,6 +35,9 @@ importers:
       '@capacitor/preferences':
         specifier: 8.0.0
         version: 8.0.0(@capacitor/core@8.0.0)
+      '@capgo/capacitor-social-login':
+        specifier: 8.5.5
+        version: 8.5.5(@capacitor/core@8.0.0)
     devDependencies:
       '@capacitor/cli':
         specifier: 8.0.0
@@ -650,6 +653,11 @@ packages:
 
   '@capacitor/preferences@8.0.0':
     resolution: {integrity: sha512-NsE7Srk9Zr0SxiVelHGiAJR7M238eyCD6dI/sDhu3ckKwFrXn8/GRyGr+SZcnGLlQKy948li8Pfcfr0dqxNf1g==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+
+  '@capgo/capacitor-social-login@8.5.5':
+    resolution: {integrity: sha512-HNaWdyJGD+fpdo9MwylFLtbcjs9hqrROeG34goVYr0vqHB9egw34ZPzmmnEha2OIMLDFLosaHSCftz2EfYI1dw==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -4322,6 +4330,11 @@ snapshots:
   '@capacitor/preferences@8.0.0(@capacitor/core@8.0.0)':
     dependencies:
       '@capacitor/core': 8.0.0
+
+  '@capgo/capacitor-social-login@8.5.5(@capacitor/core@8.0.0)':
+    dependencies:
+      '@capacitor/core': 8.0.0
+      tslib: 2.8.1
 
   '@csstools/color-helpers@6.1.1': {}
 

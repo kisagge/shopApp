@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { authClient } from '@shop/auth/client';
+import { isNativeShell, nativeGoogleIdToken, type GoogleClientIds } from '@shop/native';
 
 /**
  * 구글로 계속하기.
@@ -9,7 +10,14 @@ import { authClient } from '@shop/auth/client';
  * 로그인과 가입이 같은 버튼이다 — 구글 계정으로 처음 오면 계정이 만들어지고,
  * 있으면 그대로 들어온다. 사용자에게 둘을 고르게 할 이유가 없다.
  */
-export function GoogleButton({ next }: { next?: string | undefined }) {
+export function GoogleButton({
+  next,
+  nativeIds,
+}: {
+  next?: string | undefined;
+  /** 네이티브 셸에서만 쓴다. 공개 값이라 화면으로 내려도 된다. */
+  nativeIds?: GoogleClientIds | undefined;
+}) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
 
@@ -17,6 +25,30 @@ export function GoogleButton({ next }: { next?: string | undefined }) {
     setError(false);
     setPending(true);
     try {
+      /**
+       * 앱에서는 브라우저로 넘기지 않는다.
+       *
+       * 구글이 임베디드 웹뷰의 OAuth 를 막기 때문에 여기서 이동하면
+       * "안전하지 않은 브라우저" 화면에서 끝난다. 대신 OS 가 띄우는 네이티브
+       * 계정 선택에서 ID 토큰만 받아 **이 웹뷰에서** 서버로 보낸다 —
+       * 요청이 웹뷰에서 나가야 세션 토큰도 웹뷰로 돌아온다.
+       */
+      if (nativeIds && isNativeShell()) {
+        const idToken = await nativeGoogleIdToken(nativeIds);
+        if (!idToken) throw new Error('NO_ID_TOKEN');
+
+        const { error: authError } = await authClient.signIn.social({
+          provider: 'google',
+          idToken: { token: idToken },
+        });
+        if (authError) throw new Error('SIGN_IN_FAILED');
+
+        // typedRoutes 는 임의 문자열을 경로로 받지 않는다. 통째로 새로
+        // 여는 편이 안전하기도 하다 — 세션이 바뀌었으니 서버 렌더도 새로 받는다.
+        window.location.assign(next ?? '/');
+        return;
+      }
+
       await authClient.signIn.social({
         provider: 'google',
         callbackURL: next ?? '/',
@@ -41,7 +73,7 @@ export function GoogleButton({ next }: { next?: string | undefined }) {
     <>
     {error && (
       <p role="alert" className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
-        구글로 이동하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.
+        구글 로그인에 실패했습니다. 연결을 확인하고 다시 시도해 주세요.
       </p>
     )}
     <button

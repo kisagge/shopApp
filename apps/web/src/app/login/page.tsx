@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { googleEnabled } from '@shop/auth';
+import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { LoginForm } from '~/components/login-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
 
@@ -51,7 +51,7 @@ export default async function LoginPage({
 
       {googleEnabled() && (
         <>
-          <GoogleButton next={next} />
+          <GoogleButton next={next} nativeIds={googleNativeClientIds() ?? undefined} />
           <OrDivider />
         </>
       )}

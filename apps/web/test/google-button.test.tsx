@@ -1,16 +1,25 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const social = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/auth/client', () => ({ authClient: { signIn: { social } } }));
 
+const isNativeShell = vi.hoisted(() => vi.fn<() => boolean>());
+const nativeGoogleIdToken = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('@shop/native', () => ({ isNativeShell, nativeGoogleIdToken }));
+
 const { GoogleButton } = await import('~/components/google-button');
+
+const NATIVE_IDS = { webClientId: 'web-1', iosClientId: 'ios-1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
   social.mockResolvedValue({ error: null });
+  isNativeShell.mockReturnValue(false);
+  nativeGoogleIdToken.mockResolvedValue('jwt-1');
+  vi.stubGlobal('location', { assign: vi.fn() });
 });
 
 describe('구글 버튼', () => {
@@ -61,5 +70,57 @@ describe('구글 버튼', () => {
 
     // 구글로 넘어가기까지 시간이 걸린다. 아무 반응이 없으면 다시 누른다.
     expect(screen.getByRole('button', { name: '이동 중…' }).getAttribute('aria-disabled')).toBe('true');
+  });
+});
+
+describe('앱에서는 브라우저로 넘기지 않는다', () => {
+  it('네이티브면 ID 토큰을 받아 그 자리에서 로그인한다', async () => {
+    // 웹뷰 안에서 구글 OAuth 를 열면 "안전하지 않은 브라우저" 로 끝난다
+    isNativeShell.mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<GoogleButton nativeIds={NATIVE_IDS} />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    await waitFor(() => expect(social).toHaveBeenCalledWith({
+      provider: 'google',
+      idToken: { token: 'jwt-1' },
+    }));
+    // 이동(callbackURL)을 쓰지 않는다
+    expect(social.mock.calls[0]?.[0]).not.toHaveProperty('callbackURL');
+  });
+
+  it('셸이어도 ID 가 없으면 웹 방식으로 간다', async () => {
+    isNativeShell.mockReturnValue(true);
+    const user = userEvent.setup();
+    render(<GoogleButton />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    await waitFor(() => expect(social).toHaveBeenCalledWith(
+      expect.objectContaining({ callbackURL: '/' }),
+    ));
+    expect(nativeGoogleIdToken).not.toHaveBeenCalled();
+  });
+
+  it('브라우저에서는 네이티브 경로를 타지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<GoogleButton nativeIds={NATIVE_IDS} />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    expect(nativeGoogleIdToken).not.toHaveBeenCalled();
+  });
+
+  it('취소하면 로그인된 척하지 않고 알린다', async () => {
+    isNativeShell.mockReturnValue(true);
+    nativeGoogleIdToken.mockResolvedValue(null);
+    const user = userEvent.setup();
+    render(<GoogleButton nativeIds={NATIVE_IDS} />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('실패'));
+    expect(social).not.toHaveBeenCalled();
   });
 });

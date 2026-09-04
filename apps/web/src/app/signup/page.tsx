@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
 import { SIGNUP_POINTS } from '@shop/core';
-import { googleEnabled } from '@shop/auth';
+import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { SignUpForm } from '~/components/signup-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
 
@@ -24,7 +24,7 @@ export default async function SignUpPage() {
       </div>
       {googleEnabled() && (
         <>
-          <GoogleButton />
+          <GoogleButton nativeIds={googleNativeClientIds() ?? undefined} />
           <OrDivider />
         </>
       )}

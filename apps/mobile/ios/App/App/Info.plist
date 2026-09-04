@@ -45,6 +45,24 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>GIDClientID</key>
+	<string>967606679140-j6l473tnc00qesl2ins5rn7df7oar2si.apps.googleusercontent.com</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!--
+				  구글이 로그인을 마치고 앱으로 돌아올 때 쓰는 주소다.
+				  클라이언트 ID 를 점 단위로 뒤집은 값이라는 것이 구글의 규칙이고,
+				  여기가 없으면 계정 선택 화면에서 돌아오지 못한다.
+				-->
+				<string>com.googleusercontent.apps.967606679140-j6l473tnc00qesl2ins5rn7df7oar2si</string>
+			</array>
+		</dict>
+	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
