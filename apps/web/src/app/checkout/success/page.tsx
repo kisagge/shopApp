@@ -3,8 +3,12 @@ import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
+import { getT } from '~/lib/i18n/server';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '결제 확인 중' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('checkout.confirming'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 /**

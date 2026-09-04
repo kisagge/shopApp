@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field, Price } from '@shop/ui';
-import { format, won } from '@shop/core';
+import { won, MIN_POINTS_USE } from '@shop/core';
 import {
   PAYMENT_METHOD,
   type CreateOrderResponse, type OrderError, type PaymentMethodInput,
@@ -12,17 +12,18 @@ import { AddressPicker } from '~/components/address-picker';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
-import { useT } from '~/lib/i18n/client';
+import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
+import { useLocale, useT } from '~/lib/i18n/client';
 import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
 import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
 import { openPaymentWindow, isUsableClientKey } from '~/lib/payments/client';
 import { useMemo } from 'react';
 
-const METHOD_LABEL: Record<PaymentMethodInput, string> = {
-  CARD: '신용·체크카드',
-  TRANSFER: '계좌이체',
-  VIRTUAL_ACCOUNT: '가상계좌',
-  EASY_PAY: '간편결제',
+const METHOD_KEY: Record<PaymentMethodInput, MessageKey> = {
+  CARD: 'payMethod.CARD',
+  TRANSFER: 'payMethod.TRANSFER',
+  VIRTUAL_ACCOUNT: 'payMethod.VIRTUAL_ACCOUNT',
+  EASY_PAY: 'payMethod.EASY_PAY',
 };
 
 interface SavedAddress {
@@ -32,6 +33,8 @@ interface SavedAddress {
 
 export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
   const t = useT();
+  const locale = useLocale();
+  const money = (amount: number) => formatMoney(locale, amount);
   const router = useRouter();
 
   /**
@@ -105,7 +108,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
     if (!res.ok) {
       const body = (await res.json()) as Partial<OrderError> & { message?: string };
-      setError(body.message ?? '주문에 실패했습니다. 잠시 후 다시 시도해 주세요.');
+      setError(body.message ?? t('checkout.orderFailed'));
       // 재고 문제면 금액을 다시 받아 화면을 갱신한다
       if (body.code === 'OUT_OF_STOCK') void quote.refetch();
       return;
@@ -136,8 +139,8 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
           orderNo: order.orderNo,
           orderName:
             selected.length === 1
-              ? (selected[0]?.productName ?? '주문')
-              : `${selected[0]?.productName ?? '주문'} 외 ${selected.length - 1}건`,
+              ? (selected[0]?.productName ?? t('checkout.orderFallbackName'))
+              : `${selected[0]?.productName ?? t('checkout.orderFallbackName')} ${t('order.moreItems', { count: selected.length - 1 })}`,
           amount: order.payable,
           method,
           origin: window.location.origin,
@@ -165,7 +168,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
     if (!confirmRes.ok) {
       // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 시도할 수 있다.
       const body = (await confirmRes.json()) as { message?: string };
-      setError(`${body.message ?? '결제 승인에 실패했습니다.'} 주문 내역에서 다시 시도할 수 있습니다.`);
+      setError(`${body.message ?? t('checkout.approveFailed')} ${t('checkout.retryFromOrders')}`);
       router.push(`/order/${order.orderNo}`);
       return;
     }
@@ -176,7 +179,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
   if (selected.length === 0) {
     return (
       <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-        주문할 상품이 없습니다. 장바구니에서 상품을 선택해 주세요.
+        {t('checkout.nothing')}
       </p>
     );
   }
@@ -190,7 +193,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         주문 폼의 일부일 이유도 없다 — 나란한 두 개의 폼이 맞다.
       */}
       <section aria-labelledby="addr-title">
-        <h2 id="addr-title" className="mb-3.5 text-sm font-semibold">배송지</h2>
+        <h2 id="addr-title" className="mb-3.5 text-sm font-semibold">{t('checkout.address')}</h2>
         {defaultAddress && !editingAddress ? (
           <div className="flex items-start justify-between gap-4 rounded-sm border border-[var(--border)] p-4">
             <div className="flex flex-col gap-1.5">
@@ -205,7 +208,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
               </p>
               {defaultAddress.isRemoteArea && (
                 <p className="text-[12px] text-[var(--fg-muted)]">
-                  도서산간 지역이라 추가 배송비가 붙습니다.
+                  {t('checkout.addressRemote')}
                 </p>
               )}
             </div>
@@ -215,7 +218,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
               size="sm"
               onClick={() => setEditingAddress(true)}
             >
-              변경
+              {t('checkout.addressChange')}
             </Button>
           </div>
         ) : (
@@ -227,7 +230,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
             */}
             {!defaultAddress && (
               <p className="mb-4 text-[13px] text-[var(--fg-secondary)]">
-                받으실 곳을 입력해 주세요. 다음 주문부터는 다시 입력하지 않아도 됩니다.
+                {t('checkout.addressNew')}
               </p>
             )}
             <AddressPicker
@@ -249,17 +252,17 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         */}
         <section>
           <Field
-            label="배송 요청사항"
+            label={t('checkout.memo')}
             value={memo}
             onChange={(e) => setMemo(e.target.value)}
-            placeholder="부재 시 문 앞에 놓아주세요"
+            placeholder={t('checkout.memoPlaceholder')}
             maxLength={100}
           />
         </section>
 
       <section aria-labelledby="items-title">
         <h2 id="items-title" className="mb-3.5 text-sm font-semibold">
-          주문 상품 <span className="tnum text-[var(--fg-muted)]">{selected.length}</span>
+          {t('checkout.items')} <span className="tnum text-[var(--fg-muted)]">{selected.length}</span>
         </h2>
         <ul className="flex flex-col gap-3">
           {selected.map((i) => {
@@ -270,7 +273,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
                   <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brand}</span>
                   <span className="text-[13px]">{i.productName}</span>
                   <span className="text-[11px] text-[var(--fg-muted)]">
-                    {i.optionLabel} · <span className="tnum">{i.quantity}</span>개
+                    {i.optionLabel} · <span className="tnum">{i.quantity}</span>
                   </span>
                   {line?.issue && (
                     <span role="status">
@@ -279,7 +282,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
                   )}
                 </span>
                 <span className="tnum text-sm font-semibold">
-                  {line ? `${format(won(line.subtotal))}원` : '—'}
+                  {line ? money(line.subtotal) : '—'}
                 </span>
               </li>
             );
@@ -289,16 +292,19 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
       {q && q.pointsAvailable > 0 && (
         <section aria-labelledby="point-title">
-          <h2 id="point-title" className="mb-3.5 text-sm font-semibold">포인트</h2>
+          <h2 id="point-title" className="mb-3.5 text-sm font-semibold">{t('checkout.pointsHeading')}</h2>
           <div className="flex gap-2">
             <Field
-              label="사용할 포인트"
+              label={t('checkout.pointsLabel')}
               type="number"
               min={0}
               max={q.pointsAvailable}
               value={pointsToUse === 0 ? '' : String(pointsToUse)}
               onChange={(e) => setPointsToUse(Math.max(0, Number(e.target.value) || 0))}
-              hint={`보유 ${format(won(q.pointsAvailable))}P · 1,000P부터 사용 가능`}
+              hint={t('checkout.pointsHint', {
+                balance: `${formatNumber(locale, q.pointsAvailable)}P`,
+                min: `${formatNumber(locale, MIN_POINTS_USE)}P`,
+              })}
               className="flex-1"
             />
             <Button
@@ -307,14 +313,14 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
               className="mt-7 h-12 w-24 shrink-0"
               onClick={() => setPointsToUse(q.pointsAvailable)}
             >
-              전액사용
+              {t('checkout.pointsAll')}
             </Button>
           </div>
         </section>
       )}
 
       <section aria-labelledby="method-title">
-        <h2 id="method-title" className="mb-3.5 text-sm font-semibold">결제 수단</h2>
+        <h2 id="method-title" className="mb-3.5 text-sm font-semibold">{t('checkout.method')}</h2>
         <ul role="radiogroup" aria-labelledby="method-title" className="grid grid-cols-2 gap-2">
           {methods.map((m) => (
             <li key={m}>
@@ -330,7 +336,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
                     : 'border-n-300 bg-[var(--bg)]',
                 ].join(' ')}
               >
-                {METHOD_LABEL[m]}
+                {t(METHOD_KEY[m])}
               </button>
             </li>
           ))}
@@ -343,31 +349,38 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         <p className="mt-3 rounded-sm bg-[var(--surface)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-secondary)]">
           {realGateway ? (
             <>
-              결제하기를 누르면 <strong className="font-semibold">토스 결제창</strong>이 열립니다.
-              테스트 키로 연결돼 있어 실제 청구는 발생하지 않습니다.
+              {t('checkout.tossOn')}
             </>
           ) : (
             <>
-              결제 키가 설정되지 않아 <strong className="font-semibold">결제창 없이</strong> 주문이
-              완료됩니다. 실제 결제는 발생하지 않습니다.
+              {t('checkout.tossOff')}
             </>
           )}
         </p>
       </section>
 
       <section aria-labelledby="total-title">
-        <h2 id="total-title" className="mb-3.5 text-sm font-semibold">결제 금액</h2>
+        <h2 id="total-title" className="mb-3.5 text-sm font-semibold">{t('checkout.total')}</h2>
         {quote.isPending || !q ? (
-          <p className="text-[13px] text-[var(--fg-muted)]">계산 중…</p>
+          <p className="text-[13px] text-[var(--fg-muted)]">{t('cart.calculating')}</p>
         ) : (
           <dl className="flex flex-col gap-2.5">
-            <Row label="상품 금액" value={`${format(won(q.listTotal))}원`} />
-            {q.productDiscount > 0 && <Row label="상품 할인" value={`-${format(won(q.productDiscount))}원`} accent />}
-            {q.couponDiscount > 0 && <Row label="쿠폰 할인" value={`-${format(won(q.couponDiscount))}원`} accent />}
-            {q.pointsUsed > 0 && <Row label="포인트 사용" value={`-${format(won(q.pointsUsed))}원`} accent />}
-            <Row label="배송비" value={q.shippingFee === 0 ? '무료' : `${format(won(q.shippingFee))}원`} />
+            <Row label={t('cart.subtotal')} value={money(q.listTotal)} />
+            {q.productDiscount > 0 && (
+              <Row label={t('cart.productDiscount')} value={`-${money(q.productDiscount)}`} accent />
+            )}
+            {q.couponDiscount > 0 && (
+              <Row label={t('cart.couponDiscount')} value={`-${money(q.couponDiscount)}`} accent />
+            )}
+            {q.pointsUsed > 0 && (
+              <Row label={t('cart.pointsUsed')} value={`-${money(q.pointsUsed)}`} accent />
+            )}
+            <Row
+              label={t('cart.shippingFee')}
+              value={q.shippingFee === 0 ? t('cart.freeShipping') : money(q.shippingFee)}
+            />
             <div className="mt-1 flex items-baseline justify-between border-t border-[var(--border)] pt-3.5">
-              <dt className="text-[15px] font-semibold">최종 결제 금액</dt>
+              <dt className="text-[15px] font-semibold">{t('checkout.finalTotal')}</dt>
               <dd><Price amount={won(q.payable)} size="md" /></dd>
             </div>
           </dl>
@@ -375,7 +388,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
       </section>
 
       <section aria-labelledby="agree-title">
-        <h2 id="agree-title" className="sr-only">약관 동의</h2>
+        <h2 id="agree-title" className="sr-only">{t('checkout.terms')}</h2>
         <button
           type="button"
           role="checkbox"
@@ -393,7 +406,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
             {agreed ? '✓' : ''}
           </span>
           <span className="text-[13px] leading-relaxed">
-            주문 내용을 확인했으며 개인정보 수집·이용 및 결제대행 서비스 약관에 동의합니다
+            {t('checkout.agree')}
           </span>
         </button>
       </section>
@@ -406,10 +419,10 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
       <Button type="submit" block aria-disabled={!canOrder}>
         {pending
-          ? '주문 처리 중…'
+          ? t('checkout.submitting')
           : q
-            ? `${format(won(q.payable))}원 결제하기`
-            : '주문하기'}
+            ? t('checkout.pay', { amount: money(q.payable) })
+            : t('checkout.submit')}
       </Button>
       </form>
     </div>

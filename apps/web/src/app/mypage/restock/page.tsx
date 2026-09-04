@@ -6,8 +6,12 @@ import { prisma } from '@shop/db';
 import { getSessionUser } from '@shop/auth/session';
 import { Badge } from '@shop/ui';
 import { RestockRow } from '~/components/restock-row';
+import { getT } from '~/lib/i18n/server';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '재입고 알림' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('my.restockHeading'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 async function load(userId: string) {
@@ -42,24 +46,26 @@ async function load(userId: string) {
 export default async function RestockPage() {
   const user = await getSessionUser(await headers());
   if (!user) redirect('/login?next=/mypage/restock');
+  const t = await getT();
 
   const rows = await load(user.id);
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 pb-24 md:px-10">
-      <h1 className="pt-8 pb-1 text-xl font-semibold tracking-tight md:text-2xl">재입고 알림</h1>
+      <h1 className="pt-8 pb-1 text-xl font-semibold tracking-tight md:text-2xl">
+        {t('my.restockHeading')}
+      </h1>
       {/*
         발송 경로가 없다는 사실을 숨기지 않는다. "알려 드리겠습니다" 라고만
         해 두고 아무 데도 안 오면 그게 더 나쁘다.
       */}
       <p className="pb-6 text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-        재입고되면 이 목록에 표시됩니다. 메일·문자 발송은 아직 연결되지 않아
-        직접 확인해 주셔야 합니다.
+        {t('my.restockLead')}
       </p>
 
       {rows.length === 0 ? (
         <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
-          걸어 둔 알림이 없습니다. 품절된 옵션을 고르면 신청할 수 있습니다.
+          {t('my.restockEmpty')}
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
@@ -75,12 +81,12 @@ export default async function RestockPage() {
                     {r.productName}
                   </Link>
                   {/* 상태를 색으로만 알리지 않는다 */}
-                  {r.notifiedAt !== null && <Badge tone="success">재입고됨</Badge>}
+                  {r.notifiedAt !== null && <Badge tone="success">{t('my.restocked')}</Badge>}
                 </p>
                 <p className="text-[13px] text-[var(--fg-secondary)]">{r.optionLabel}</p>
                 {r.notifiedAt !== null && !r.inStock && (
                   <p className="text-[12px] text-[var(--fg-muted)]">
-                    알림 이후 다시 품절됐습니다. 상품 화면에서 다시 신청할 수 있습니다.
+                    {t('my.restockedThenOut')}
                   </p>
                 )}
               </div>

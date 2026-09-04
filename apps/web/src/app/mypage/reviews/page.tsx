@@ -6,8 +6,12 @@ import Link from 'next/link';
 import { getSessionUser } from '@shop/auth/session';
 import { getReviewableItems } from '~/lib/queries/reviews';
 import { ReviewForm } from './review-form';
+import { getT } from '~/lib/i18n/server';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '리뷰 쓰기' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('my.writeReview'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
@@ -16,23 +20,25 @@ export default async function WriteReviewsPage() {
   const user = await getSessionUser(await headers());
   if (!user) redirect('/login?next=/mypage/reviews');
 
-  const items = await getReviewableItems(user.id);
+  const [items, t] = await Promise.all([getReviewableItems(user.id), getT()]);
 
   return (
     <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:px-10">
       <header className="flex flex-col gap-2 py-8">
-        <nav aria-label="현재 위치">
-          <Link href="/mypage" className="text-xs text-[var(--fg-muted)]">마이페이지</Link>
+        <nav aria-label={t('nav.breadcrumb')}>
+          <Link href="/mypage" className="text-xs text-[var(--fg-muted)]">
+            {t('nav.mypage')}
+          </Link>
         </nav>
-        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">리뷰 쓰기</h1>
+        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{t('my.writeReview')}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          배송이 완료된 상품에 후기를 남길 수 있습니다.
+          {t('my.reviewLead')}
         </p>
       </header>
 
       {items.length === 0 ? (
         <p className="py-24 text-center text-[13px] text-[var(--fg-muted)]">
-          지금 리뷰를 쓸 수 있는 상품이 없습니다.
+          {t('my.reviewNone')}
         </p>
       ) : (
         <ul className="flex flex-col gap-8">
@@ -59,7 +65,7 @@ export default async function WriteReviewsPage() {
                         <time dateTime={item.deliveredAt.toISOString()}>
                           {dateFormat.format(item.deliveredAt)}
                         </time>{' '}
-                        배송 완료
+                        {t('my.delivered')}
                       </span>
                     )}
                   </div>

@@ -4,8 +4,12 @@ import type { Metadata } from 'next';
 import { prisma } from '@shop/db';
 import { getSessionUser } from '@shop/auth/session';
 import { CouponWallet } from '~/components/coupon-wallet';
+import { getT } from '~/lib/i18n/server';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '쿠폰함' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('my.couponsHeading'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 /**
@@ -46,14 +50,17 @@ async function loadWallet(userId: string) {
 export default async function CouponsPage() {
   const user = await getSessionUser(await headers());
   if (!user) redirect('/login?next=/mypage/coupons');
+  const t = await getT();
 
   const coupons = await loadWallet(user.id);
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 pb-24 md:px-10">
-      <h1 className="pt-8 pb-1 text-xl font-semibold tracking-tight md:text-2xl">쿠폰함</h1>
+      <h1 className="pt-8 pb-1 text-xl font-semibold tracking-tight md:text-2xl">
+        {t('my.couponsHeading')}
+      </h1>
       <p className="pb-6 text-[13px] text-[var(--fg-secondary)]">
-        주문서에서 쓸 쿠폰을 고를 수 있습니다.
+        {t('my.couponsLead')}
       </p>
       <CouponWallet initial={coupons} />
     </div>

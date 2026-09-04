@@ -1,8 +1,8 @@
 import {
   ORDER_STATUS, MEMBER_GRADE, RETURN_TYPE, RETURN_REASON, RETURN_STATUS,
-  SIZE_FIT, REPORT_REASON,
+  SIZE_FIT, REPORT_REASON, POINT_REASON,
   type OrderStatus, type MemberGrade, type ReturnType, type ReturnReason,
-  type ReturnStatus, type SizeFit, type ReportReason,
+  type ReturnStatus, type SizeFit, type ReportReason, type PointReason,
 } from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 
@@ -37,4 +37,8 @@ export const SIZE_FIT_KEY: Record<SizeFit, MessageKey> = keysOf(SIZE_FIT, 'sizeF
 export const REPORT_REASON_KEY: Record<ReportReason, MessageKey> = keysOf(
   REPORT_REASON,
   'reportReason',
+);
+export const POINT_REASON_KEY: Record<PointReason, MessageKey> = keysOf(
+  POINT_REASON,
+  'pointReason',
 );

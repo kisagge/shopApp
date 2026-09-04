@@ -4,7 +4,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
 import {
-  format, won, isCancellableByCustomer, canRequestReturn,
+  isCancellableByCustomer, canRequestReturn,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -12,13 +12,13 @@ import { CancelOrderButton } from '~/components/cancel-order-button';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { getOrderForUser } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
-import { getT } from '~/lib/i18n/server';
+import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
+import { getLocale, getT } from '~/lib/i18n/server';
 import { ORDER_STATUS_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
-export const metadata: Metadata = {
-  title: '주문 완료',
-  ...NO_INDEX,
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('order.heading'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 export default async function OrderPage({ params }: { params: Promise<{ orderNo: string }> }) {
@@ -26,8 +26,14 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
   const user = await getSessionUser(await headers());
   if (!user) redirect('/login');
 
-  const [order, t] = await Promise.all([getOrderForUser(orderNo, user.id), getT()]);
+  const [order, locale, t] = await Promise.all([
+    getOrderForUser(orderNo, user.id),
+    getLocale(),
+    getT(),
+  ]);
   if (!order) notFound();
+
+  const money = (amount: number) => formatMoney(locale, amount);
 
   const row = (label: string, value: string, accent = false) => (
     <div key={label} className="flex items-center justify-between">
@@ -43,20 +49,22 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
    */
   const headline =
     order.status === 'PENDING'
-      ? '주문이 접수되었습니다'
+      ? t('order.placedHeading')
       : order.status === 'CANCELLED' || order.status === 'REFUNDED'
-        ? '주문이 종료되었습니다'
-        : '주문 내역';
+        ? t('order.closedHeading')
+        : t('order.heading');
 
-  const NEXT_STEP: Partial<Record<typeof order.status, string>> = {
-    PENDING: '결제가 확인되면 배송 준비를 시작합니다.',
-    PAID: '곧 배송 준비를 시작합니다.',
-    PREPARING: '상품을 준비하고 있습니다. 출고되면 송장번호를 알려 드립니다.',
-    SHIPPED: '배송이 시작되었습니다. 아래에서 배송 상황을 조회할 수 있습니다.',
-    DELIVERED: '배송이 완료되었습니다. 이상이 없으면 구매를 확정해 주세요.',
-    CONFIRMED: '구매가 확정되었습니다.',
+  /** 다음에 무엇이 일어나는지. 갈래로 빠진 상태에는 할 말이 없다. */
+  const NEXT_STEP: Partial<Record<typeof order.status, MessageKey>> = {
+    PENDING: 'orderNote.PENDING',
+    PAID: 'orderNote.PAID',
+    PREPARING: 'orderNote.PREPARING',
+    SHIPPED: 'orderNote.SHIPPED',
+    DELIVERED: 'orderNote.DELIVERED',
+    CONFIRMED: 'orderNote.CONFIRMED',
   };
-  const nextStep = NEXT_STEP[order.status] ?? null;
+  const nextStepKey = NEXT_STEP[order.status];
+  const nextStep = nextStepKey ? t(nextStepKey) : null;
 
   const activeReturn = order.returnRequests[0] ?? null;
   /**
@@ -83,7 +91,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         </span>
         <h1 className="font-serif text-2xl font-medium tracking-tight">{headline}</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-          현재 상태는 <strong className="font-semibold">{t(ORDER_STATUS_KEY[order.status])}</strong>입니다.
+          {t('order.currentStatus', { status: t(ORDER_STATUS_KEY[order.status]) })}
           {nextStep && (
             <>
               <br />
@@ -92,7 +100,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
           )}
         </p>
         <p className="inline-flex h-9 items-center gap-2 rounded-full bg-[var(--surface)] px-3.5">
-          <span className="text-xs text-[var(--fg-muted)]">주문번호</span>
+          <span className="text-xs text-[var(--fg-muted)]">{t('order.number')}</span>
           <span className="tnum text-xs font-semibold">{order.orderNo}</span>
         </p>
       </div>
@@ -109,7 +117,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
 
       <section aria-labelledby="items-title" className="border-t border-[var(--border)] pt-6">
         <h2 id="items-title" className="mb-3.5 text-sm font-semibold">
-          주문 상품 <span className="tnum text-[var(--fg-muted)]">{order.items.length}</span>
+          {t('checkout.items')} <span className="tnum text-[var(--fg-muted)]">{order.items.length}</span>
         </h2>
         <ul className="flex flex-col gap-3">
           {order.items.map((i, idx) => (
@@ -118,40 +126,50 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
                 <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brandName}</span>
                 <span className="text-[13px]">{i.productName}</span>
                 <span className="text-[11px] text-[var(--fg-muted)]">
-                  {i.optionLabel} · <span className="tnum">{i.quantity}</span>개
+                  {i.optionLabel} · <span className="tnum">{i.quantity}</span>
                 </span>
               </span>
-              <span className="tnum text-sm font-semibold">{format(won(i.subtotal))}원</span>
+              <span className="tnum text-sm font-semibold">{money(i.subtotal)}</span>
             </li>
           ))}
         </ul>
       </section>
 
       <section aria-labelledby="pay-title" className="mt-8 border-t border-[var(--border)] pt-6">
-        <h2 id="pay-title" className="mb-3.5 text-sm font-semibold">결제 정보</h2>
+        <h2 id="pay-title" className="mb-3.5 text-sm font-semibold">{t('order.payInfo')}</h2>
         <dl className="flex flex-col gap-2.5">
-          {row('상품 금액', `${format(won(order.listTotal))}원`)}
-          {order.productDiscount > 0 && row('상품 할인', `-${format(won(order.productDiscount))}원`, true)}
-          {order.couponDiscount > 0 && row('쿠폰 할인', `-${format(won(order.couponDiscount))}원`, true)}
-          {order.pointsUsed > 0 && row('포인트 사용', `-${format(won(order.pointsUsed))}원`, true)}
-          {row('배송비', order.shippingFee === 0 ? '무료' : `${format(won(order.shippingFee))}원`)}
+          {row(t('cart.subtotal'), money(order.listTotal))}
+          {order.productDiscount > 0 &&
+            row(t('cart.productDiscount'), `-${money(order.productDiscount)}`, true)}
+          {order.couponDiscount > 0 &&
+            row(t('cart.couponDiscount'), `-${money(order.couponDiscount)}`, true)}
+          {order.pointsUsed > 0 && row(t('cart.pointsUsed'), `-${money(order.pointsUsed)}`, true)}
+          {row(
+            t('cart.shippingFee'),
+            order.shippingFee === 0 ? t('cart.freeShipping') : money(order.shippingFee),
+          )}
           <div className="mt-1 flex items-baseline justify-between border-t border-[var(--border)] pt-3.5">
-            <dt className="text-[15px] font-semibold">결제 금액</dt>
-            <dd className="tnum text-xl font-semibold">{format(won(order.payable))}원</dd>
+            <dt className="text-[15px] font-semibold">{t('order.payable')}</dt>
+            <dd className="tnum text-xl font-semibold">{money(order.payable)}</dd>
           </div>
         </dl>
         <p className="mt-2.5 text-right text-[11px] text-[var(--fg-muted)]">
-          구매 확정 시 <span className="tnum">{format(won(order.rewardPoints))}</span>P 적립
+          {t('order.rewardOnConfirm', { points: formatNumber(locale, order.rewardPoints) })}
         </p>
       </section>
 
       <section aria-labelledby="ship-title" className="mt-8 border-t border-[var(--border)] pt-6">
-        <h2 id="ship-title" className="mb-3.5 text-sm font-semibold">배송지</h2>
+        <h2 id="ship-title" className="mb-3.5 text-sm font-semibold">{t('order.shipTo')}</h2>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
           {order.recipient} · <span className="tnum">{order.recipientPhone}</span>
           <br />
           {order.address1} {order.address2} <span className="tnum">({order.postalCode})</span>
-          {order.deliveryMemo && <><br />요청사항: {order.deliveryMemo}</>}
+          {order.deliveryMemo && (
+            <>
+              <br />
+              {t('order.memoPrefix')}: {order.deliveryMemo}
+            </>
+          )}
         </p>
       </section>
 
@@ -165,35 +183,47 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
           className="mt-8 rounded-sm border border-[var(--border)] p-4"
         >
           <h2 id="return-title" className="mb-3 text-sm font-semibold">
-            {t(RETURN_TYPE_KEY[activeReturn.type as ReturnType])} 신청
+            {t('order.returnRequest', {
+              type: t(RETURN_TYPE_KEY[activeReturn.type as ReturnType]),
+            })}
           </h2>
           <dl className="flex flex-col gap-2 text-[13px]">
             <div className="flex gap-3">
-              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">상태</dt>
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                {t('order.returnStatusLabel')}
+              </dt>
               <dd className="font-medium">
                 {t(RETURN_STATUS_KEY[activeReturn.status as ReturnStatus])}
               </dd>
             </div>
             <div className="flex gap-3">
-              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">사유</dt>
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                {t('order.returnReasonLabel')}
+              </dt>
               <dd>{t(RETURN_REASON_KEY[activeReturn.reason as ReturnReason])}</dd>
             </div>
             <div className="flex gap-3">
-              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">반송비</dt>
+              <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                {t('order.returnShipping')}
+              </dt>
               <dd>
-                {activeReturn.shippingBorneBy === 'CUSTOMER' ? '고객 부담' : '판매자 부담'}
+                {activeReturn.shippingBorneBy === 'CUSTOMER'
+                  ? t('order.borneByCustomer')
+                  : t('order.borneBySeller')}
               </dd>
             </div>
             {activeReturn.detail && (
               <div className="flex gap-3">
-                <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">설명</dt>
+                <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                  {t('order.returnDetail')}
+                </dt>
                 <dd className="leading-relaxed text-[var(--fg-secondary)]">{activeReturn.detail}</dd>
               </div>
             )}
           </dl>
           {activeReturn.status === 'REJECTED' && activeReturn.rejectReason && (
             <p className="mt-3 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
-              반려 사유: {activeReturn.rejectReason}
+              {t('order.rejectReason')}: {activeReturn.rejectReason}
             </p>
           )}
         </section>
@@ -209,13 +239,13 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
             href="/mypage/orders"
             className="inline-flex h-12 flex-1 items-center justify-center rounded-sm border border-n-300 text-sm font-medium no-underline"
           >
-            주문 내역
+            {t('order.heading')}
           </Link>
           <Link
             href="/"
             className="inline-flex h-12 flex-1 items-center justify-center rounded-sm bg-n-900 text-sm font-medium text-n-0 no-underline"
           >
-            쇼핑 계속하기
+            {t('order.keepShopping')}
           </Link>
         </div>
       </div>

@@ -26,6 +26,7 @@ export * from './catalog';
 export * from './structured-data';
 export * from './inquiry';
 export * from './support';
+export * from './point';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';
