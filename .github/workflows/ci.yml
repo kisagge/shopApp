@@ -75,6 +75,12 @@ jobs:
       # 때문이다. 빈 DB 로 빌드하면 통과는 하지만 푸터가 빈 화면이 구워진다.
       - name: DB 준비
         run: |
+          # **먼저 Prisma 클라이언트를 만든다.**
+          #
+          # 시드가 그것을 임포트한다. 예전에는 turbo 가 lint 를 돌리며
+          # ^build 로 함께 생성해 줬는데, DB 준비를 검사 앞으로 옮기면서
+          # 그 순서가 끊겼다. 생성물은 저장소에 넣지 않으므로 CI 에는 없다.
+          pnpm --filter @shop/db run generate
           pnpm --filter @shop/db exec prisma migrate deploy
           pnpm --filter @shop/db run seed
           pnpm --filter @shop/auth run seed

@@ -1,6 +1,19 @@
 import { test, expect } from '@playwright/test';
 
 /**
+ * **읽기만 하는 검사**는 그림을 기다리지 않는다.
+ *
+ * 기본 goto 는 load 를 기다리는데, 캐시가 빈 상태에서는 상품 사진 원본을
+ * 저장소에서 받아 최적화하느라 첫 방문이 오래 걸린다 — CI 에서 30초를
+ * 넘겨 깨졌다. 마크업만 보는 검사는 DOM 까지만 기다리면 된다.
+ *
+ * **눌러 보는 검사에는 쓰지 않는다.** 그때는 하이드레이션이 끝나야 하고,
+ * DOM 만으로 진행하면 버튼이 아직 반응하지 않는다 — 그렇게 바꿨다가
+ * 모바일 메뉴 검사 넷이 깨졌다.
+ */
+const MARKUP_ONLY = { waitUntil: 'domcontentloaded' } as const;
+
+/**
  * 접근성.
  *
  * 이 저장소의 규칙은 "상태를 색·모양으로만 알리지 않는다" 다. 단위 테스트로
@@ -52,7 +65,7 @@ test('본문 바로가기가 첫 탭에 잡힌다', async ({ page }) => {
 });
 
 test('모든 이미지에 대체 텍스트가 있다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', MARKUP_ONLY);
 
   const missing = await page.evaluate(() =>
     [...document.querySelectorAll('img')]
@@ -63,7 +76,7 @@ test('모든 이미지에 대체 텍스트가 있다', async ({ page }) => {
 });
 
 test('한 화면에 h1 은 하나다', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/', MARKUP_ONLY);
 
   // 제목이 여럿이면 스크린리더가 문서 구조를 잡지 못한다
   await expect(page.locator('h1')).toHaveCount(1);

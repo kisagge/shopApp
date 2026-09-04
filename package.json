@@ -26,7 +26,8 @@
     "mobile:sync": "pnpm --filter @shop/mobile run sync",
     "e2e": "turbo run e2e",
     "mobile:ios": "pnpm --filter @shop/mobile run ios",
-    "mobile:android": "pnpm --filter @shop/mobile run android"
+    "mobile:android": "pnpm --filter @shop/mobile run android",
+    "ci:local": "bash tooling/ci-local.sh"
   },
   "devDependencies": {
     "turbo": "2.10.12",
