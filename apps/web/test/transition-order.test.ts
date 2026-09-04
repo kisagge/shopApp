@@ -240,3 +240,34 @@ describe('구매확정 적립', () => {
     expect(tx.pointTransaction.create).not.toHaveBeenCalled();
   });
 });
+
+describe('환불 우회 차단', () => {
+  /**
+   * 예전에는 이 함수가 REFUNDED 도 받아 줬다. 그래서 어드민이 환불완료로
+   * 바꿔도 PG 취소가 나가지 않은 채 화면에만 환불됐다고 적혔다.
+   * 실수로든 새 코드로든 같은 길이 다시 열리면 여기서 걸린다.
+   */
+  it('상태 변경으로는 환불할 수 없다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('RETURNED'));
+
+    await expect(transitionOrder('20260831-1234567', 'REFUNDED', admin))
+      .rejects.toMatchObject({ code: 'USE_REFUND' });
+  });
+
+  it('권한을 보기도 전에 막는다 — 슈퍼관리자도 예외가 아니다', async () => {
+    const superAdmin: Actor = { id: 'u-s', role: 'SUPER_ADMIN', merchantId: null };
+    db.order.findFirst.mockResolvedValue(mixedOrder('CANCELLED'));
+
+    await expect(transitionOrder('20260831-1234567', 'REFUNDED', superAdmin))
+      .rejects.toMatchObject({ code: 'USE_REFUND' });
+    // 주문을 읽지도 않는다
+    expect(db.order.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('반품완료는 그대로 받는다 — 막은 것은 환불뿐이다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('RETURN_REQUESTED'));
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'RETURNED' }, { status: 'RETURNED' }]);
+
+    await expect(transitionOrder('20260831-1234567', 'RETURNED', admin)).resolves.toBeDefined();
+  });
+});

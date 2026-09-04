@@ -79,3 +79,27 @@ describe('slowestFulfillmentStatus — 주문 전체 상태는 가장 뒤처진 
     expect(slowestFulfillmentStatus([])).toBeNull();
   });
 });
+
+describe('환불로 들어오는 길', () => {
+  /**
+   * 환불 코드가 "어디서 왔는지" 로 재고 복원을 판단한다.
+   *
+   * 취소는 그 자리에서 이미 재고를 풀었고 반품은 아무도 풀지 않았기 때문인데,
+   * 이 판단은 **REFUNDED 로 들어오는 길이 둘뿐일 때만** 성립한다.
+   * 길이 하나 더 생기면 여기서 먼저 깨져야 한다.
+   */
+  it('취소와 반품완료에서만 온다', () => {
+    const incoming = ORDER_STATUS.filter((from) => canTransition(from, 'REFUNDED'));
+    expect(incoming).toEqual(['CANCELLED', 'RETURNED']);
+  });
+
+  it('환불은 종착이다 — 되돌릴 방법을 두지 않는다', () => {
+    expect(isTerminal('REFUNDED')).toBe(true);
+  });
+
+  it('구매확정된 주문은 환불로 갈 수 없다', () => {
+    // 적립이 이미 나간 뒤라, 갈 수 있게 하려면 회수 경로가 먼저 필요하다
+    expect(canTransition('CONFIRMED', 'REFUNDED')).toBe(false);
+    expect(isTerminal('CONFIRMED')).toBe(true);
+  });
+});

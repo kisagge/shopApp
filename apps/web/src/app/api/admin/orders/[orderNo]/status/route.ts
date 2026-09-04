@@ -3,6 +3,7 @@ import { ORDER_STATUS } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
+import { refundOrder, RefundError } from '~/lib/admin/refund-order';
 import { recordAudit } from '~/lib/audit';
 
 const bodySchema = z.object({
@@ -38,6 +39,35 @@ export async function POST(
   const { orderNo } = await params;
 
   try {
+    /**
+     * 환불만 다른 길로 보낸다.
+     *
+     * 화면에서는 같은 상태 선택으로 보이지만, 이것만 돈이 실제로 나간다.
+     * transitionOrder 는 REFUNDED 를 아예 거절하므로 여기서 갈라 주지 않으면
+     * 환불이 되지 않는다 — 조용히 상태만 바뀌던 예전으로 돌아가지 않도록
+     * 일부러 그렇게 막아 뒀다.
+     */
+    if (parsed.data.to === 'REFUNDED') {
+      const refund = await refundOrder(orderNo, actor, parsed.data.note ?? '어드민 환불');
+
+      await recordAudit({
+        actor,
+        action: 'order.refund',
+        targetType: 'order',
+        targetId: orderNo,
+        after: {
+          orderStatus: refund.orderStatus,
+          refunded: refund.refunded,
+          stockRestored: refund.stockRestored,
+          pointsReturned: refund.pointsReturned,
+          note: parsed.data.note,
+        },
+        request,
+      });
+
+      return NextResponse.json(refund);
+    }
+
     const result = await transitionOrder(orderNo, parsed.data.to, actor, parsed.data.note);
 
     await recordAudit({
@@ -56,7 +86,7 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof TransitionError) {
+    if (error instanceof TransitionError || error instanceof RefundError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
     throw error;

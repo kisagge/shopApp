@@ -47,6 +47,24 @@ export async function transitionOrder(
   actor: Actor,
   note?: string,
 ): Promise<TransitionResult> {
+  /**
+   * 환불은 여기서 할 수 없다.
+   *
+   * 이 함수는 상태를 옮길 뿐 돈을 움직이지 않는다. 예전에는 REFUNDED 도
+   * 받아 줘서, 어드민이 환불완료로 바꿔도 **PG 취소가 나가지 않은 채**
+   * 화면에만 환불됐다고 적혔다. 재고도 포인트도 그대로였다.
+   *
+   * 막아 두지 않으면 실수로든 새 코드로든 같은 우회가 다시 생긴다.
+   * 환불은 refundOrder 하나로만 간다.
+   */
+  if (to === 'REFUNDED') {
+    throw new TransitionError(
+      'USE_REFUND',
+      '환불은 상태 변경이 아니라 환불 처리로 진행해야 합니다.',
+      400,
+    );
+  }
+
   const permission = permissionFor(to);
   if (!hasPermission(actor, permission)) {
     throw new TransitionError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
