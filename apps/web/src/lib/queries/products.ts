@@ -194,7 +194,13 @@ export interface ProductDetail {
   readonly soldOut: boolean;
   readonly optionGroups: readonly ProductOptionGroup[];
   readonly variants: readonly ProductVariantView[];
-  readonly images: readonly { url: string; alt: string }[];
+  readonly images: readonly {
+    url: string;
+    alt: string;
+    /** 우리가 찍지 않은 사진의 출처. 없으면 표기하지 않는다. */
+    credit: string | null;
+    creditUrl: string | null;
+  }[];
 }
 
 const productRow = cachedRead(
@@ -209,7 +215,10 @@ const productRow = cachedRead(
       listPrice: true, salePrice: true, ratingSum: true, reviewCount: true,
       brand: { select: { name: true, slug: true } },
       category: { select: { name: true, slug: true } },
-      images: { select: { url: true, alt: true }, orderBy: { sortOrder: 'asc' } },
+      images: {
+        select: { url: true, alt: true, credit: true, creditUrl: true },
+        orderBy: { sortOrder: 'asc' },
+      },
       optionGroups: {
         orderBy: { sortOrder: 'asc' },
         select: {

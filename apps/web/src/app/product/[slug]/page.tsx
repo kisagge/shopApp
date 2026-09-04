@@ -84,6 +84,30 @@ export default async function ProductPage({ params }: Params) {
           ) : (
             <span aria-hidden="true" className="text-[11px] tracking-widest text-n-500">IMAGE</span>
           )}
+
+          {/*
+            우리가 찍지 않은 사진에는 출처를 밝힌다.
+            라이선스가 강제하지 않더라도, 남의 결과물을 우리 매대에 쓰면서
+            누구 것인지 적지 않을 이유가 없다.
+          */}
+          {product.images[0]?.credit && (
+            <p className="absolute right-2 bottom-2 rounded-xs bg-n-900/55 px-2 py-1 text-[10px] text-n-0">
+              사진{' '}
+              {product.images[0].creditUrl ? (
+                <a
+                  href={product.images[0].creditUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-n-0 underline"
+                >
+                  {product.images[0].credit}
+                </a>
+              ) : (
+                product.images[0].credit
+              )}
+              {' · Unsplash'}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-5">
