@@ -7,8 +7,17 @@ import { CartBadge } from './cart-badge';
 export async function SiteHeader() {
   const categories = await getTopCategories();
 
+  /*
+   * sticky + safe-t 는 웹뷰 때문이다.
+   *
+   * 앱에는 주소창이 없어서 스크롤하면 헤더가 OS 상태바 밑으로 그대로 지나가
+   * 시계와 글자가 겹친다. 브라우저에서는 크롬이 가려 주던 자리다. 위에
+   * 고정하고 상태바 높이만큼 밀어 둔다.
+   *
+   * 배경을 명시한다 — 투명하면 밑으로 지나가는 본문이 비친다.
+   */
   return (
-    <header className="border-b border-[var(--border)]">
+    <header className="safe-t sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
       <div className="mx-auto flex h-13 w-full max-w-[1280px] items-center justify-between gap-6 px-4 md:h-19 md:px-10">
         <p className="font-serif text-[21px] font-medium tracking-[0.18em] md:text-[25px]">
           <Link href="/" className="text-[var(--fg)] no-underline">PLAIN</Link>
