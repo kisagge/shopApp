@@ -1,4 +1,11 @@
-import { format, type Won } from '@shop/core';
+import type { Won } from '@shop/core';
+import {
+  createTranslator,
+  moneyParts,
+  formatMoney,
+  DEFAULT_LOCALE,
+  type Locale,
+} from '@shop/i18n';
 import { cn } from '../lib/cn';
 import { VisuallyHidden } from './visually-hidden';
 
@@ -8,6 +15,14 @@ export interface PriceProps {
   readonly listPrice?: Won | undefined;
   readonly discountPercent?: number | undefined;
   readonly size?: 'sm' | 'md' | 'lg';
+  /**
+   * 어느 말로 읽을지.
+   *
+   * 이 패키지는 요청을 모르므로 **쓰는 쪽이 알려 준다** — linkComponent 를
+   * 주입받는 것과 같은 이유다. 기본값을 둬서 Storybook 처럼 요청이 없는
+   * 곳에서도 그대로 그려진다.
+   */
+  readonly locale?: Locale;
   readonly className?: string;
 }
 
@@ -21,27 +36,37 @@ const SIZE = {
  * 금액은 tabular-nums로 자릿수를 고정한다. 목록에서 세로로 흔들리면 비교가 어렵다.
  * "원"은 화면에 보이지 않을 때도 스크린리더가 읽도록 VisuallyHidden으로 덧댄다.
  */
-export function Price({ amount, listPrice, discountPercent, size = 'md', className }: PriceProps) {
+export function Price({
+  amount,
+  listPrice,
+  discountPercent,
+  size = 'md',
+  className,
+  locale = DEFAULT_LOCALE,
+}: PriceProps) {
   const s = SIZE[size];
+  const t = createTranslator(locale);
+  const money = moneyParts(locale, amount);
   const hasDiscount = listPrice !== undefined && discountPercent !== undefined && discountPercent > 0;
 
   return (
     <p className={cn('flex flex-col gap-0.5', className)}>
       {hasDiscount && (
         <span className={cn('tnum text-n-500', s.strike)}>
-          <VisuallyHidden>정가 </VisuallyHidden>
-          <s>{format(listPrice)}원</s>
+          <VisuallyHidden>{t('price.listPrice')} </VisuallyHidden>
+          <s>{formatMoney(locale, listPrice)}</s>
         </span>
       )}
       <span className="flex items-baseline gap-1.5">
         {hasDiscount && (
           <span className={cn('tnum font-semibold text-accent', s.current)}>
-            {discountPercent}%<VisuallyHidden> 할인</VisuallyHidden>
+            {discountPercent}%<VisuallyHidden> {t('price.discount')}</VisuallyHidden>
           </span>
         )}
         <span className={cn('tnum font-semibold text-[var(--fg)]', s.current)}>
-          {format(amount)}
-          <span className={cn('font-medium', s.unit)}>원</span>
+          {money.prefix && <span className={cn('font-medium', s.unit)}>{money.prefix}</span>}
+          {money.number}
+          {money.suffix && <span className={cn('font-medium', s.unit)}>{money.suffix}</span>}
         </span>
       </span>
     </p>

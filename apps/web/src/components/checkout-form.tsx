@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Badge, Button, Field, Price } from '@shop/ui';
 import { format, won } from '@shop/core';
 import {
-  PAYMENT_METHOD, LINE_ISSUE_MESSAGE,
+  PAYMENT_METHOD,
   type CreateOrderResponse, type OrderError, type PaymentMethodInput,
 } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
+import { useT } from '~/lib/i18n/client';
+import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
 import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
 import { openPaymentWindow, isUsableClientKey } from '~/lib/payments/client';
 import { useMemo } from 'react';
@@ -29,6 +31,7 @@ interface SavedAddress {
 }
 
 export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
+  const t = useT();
   const router = useRouter();
 
   /**
@@ -271,7 +274,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
                   </span>
                   {line?.issue && (
                     <span role="status">
-                      <Badge tone="danger">{LINE_ISSUE_MESSAGE[line.issue]}</Badge>
+                      <Badge tone="danger">{t(CART_ISSUE_KEY[line.issue])}</Badge>
                     </span>
                   )}
                 </span>

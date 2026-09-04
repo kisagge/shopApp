@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authClient, signOutEverywhere } from '@shop/auth/client';
+import type { Translator } from '@shop/i18n';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 헤더의 로그인 상태 영역.
@@ -16,9 +18,16 @@ import { authClient, signOutEverywhere } from '@shop/auth/client';
  */
 type Variant = 'header' | 'menu';
 
+function roleLabel(t: Translator, role: string): string {
+  if (role === 'SUPER_ADMIN') return t('role.superAdmin');
+  if (role === 'ADMIN') return t('role.admin');
+  return t('role.merchant');
+}
+
 export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
   const { data, isPending } = authClient.useSession();
   const router = useRouter();
+  const t = useT();
 
   const menu = variant === 'menu';
 
@@ -37,7 +46,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
             : 'shrink-0 whitespace-nowrap text-xs font-medium text-[var(--fg-secondary)]'
         }
       >
-        로그인
+        {t('nav.login')}
       </Link>
     );
   }
@@ -51,12 +60,12 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
           {data.user.name}
           {role && role !== 'CUSTOMER' && (
             <span className="rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
-              {role === 'SUPER_ADMIN' ? '슈퍼관리자' : role === 'ADMIN' ? '관리자' : '가맹점'}
+              {roleLabel(t, role)}
             </span>
           )}
         </p>
         <Link href="/mypage" className="flex h-12 items-center text-sm text-[var(--fg)] no-underline">
-          마이페이지
+          {t('nav.mypage')}
         </Link>
         <button
           type="button"
@@ -65,7 +74,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
           }}
           className="flex h-12 w-full items-center text-left text-sm text-[var(--fg-muted)]"
         >
-          로그아웃
+          {t('nav.logout')}
         </button>
       </>
     );
@@ -77,13 +86,13 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
     // 이름보다 중요하다.
     <span className="flex items-center gap-3 whitespace-nowrap">
       <Link href="/mypage" className="shrink-0 text-xs text-[var(--fg-secondary)] no-underline">
-        마이페이지
+        {t('nav.mypage')}
       </Link>
       <span className="hidden text-xs text-[var(--fg-secondary)] sm:inline">
         {data.user.name}
         {role && role !== 'CUSTOMER' && (
           <span className="ml-1.5 rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
-            {role === 'SUPER_ADMIN' ? '슈퍼관리자' : role === 'ADMIN' ? '관리자' : '가맹점'}
+            {roleLabel(t, role)}
           </span>
         )}
       </span>
@@ -94,7 +103,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
         }}
         className="shrink-0 text-xs text-[var(--fg-muted)] underline underline-offset-2"
       >
-        로그아웃
+        {t('nav.logout')}
       </button>
     </span>
   );

@@ -51,10 +51,18 @@ describe('ProductCard', () => {
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
   });
 
-  it('리뷰 수를 한국식 천단위로 표시한다', () => {
+  it('리뷰 수를 천단위로 끊어 표시한다', () => {
     render(<ProductCard {...base} rating={4.8} reviewCount={1204} />);
-    expect(screen.getByText('1,204')).toBeInTheDocument();
+    expect(screen.getByText('리뷰 1,204개')).toBeInTheDocument();
     expect(screen.getByText('4.8')).toBeInTheDocument();
+  });
+
+  it('locale 을 넘기면 그 말로 그린다 — 이 패키지는 요청을 모른다', () => {
+    // linkComponent 와 같은 결이다. 쓰는 쪽이 알려 준다.
+    render(<ProductCard {...base} locale="en" soldOut rating={4.8} reviewCount={1} />);
+    expect(screen.getByText('Sold out')).toBeInTheDocument();
+    // 영어는 개수에 따라 모양이 바뀐다
+    expect(screen.getByText('1 review')).toBeInTheDocument();
   });
 
   it('기본은 평범한 a 태그다 — packages/ui 는 라우터를 모른다', () => {

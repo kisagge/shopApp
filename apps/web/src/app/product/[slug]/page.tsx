@@ -4,8 +4,10 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
 import {
-  formatWithUnit, productStructuredData, breadcrumbStructuredData,
+  DEFAULT_SHIPPING, GRADE_REWARD_PERCENT, percentOf,
+  productStructuredData, breadcrumbStructuredData,
 } from '@shop/core';
+import { formatMoney, formatNumber } from '@shop/i18n';
 import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
 import { absoluteUrl } from '~/lib/urls';
@@ -18,6 +20,8 @@ import { ReviewSection } from '~/components/review-section';
 import { InquirySection } from '~/components/inquiry-section';
 import { WishlistButton } from '~/components/wishlist-button';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
+import { getEffectiveGrade } from '~/lib/grade/effective';
+import { getLocale, getT } from '~/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +32,7 @@ interface Params {
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
-  if (!product) return { title: '상품을 찾을 수 없습니다' };
+  if (!product) return { title: (await getT())('product.notFound') };
   const summary = product.description.slice(0, 120);
   const path = `/product/${slug}`;
 
@@ -55,6 +59,17 @@ export default async function ProductPage({ params }: Params) {
 
   // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
   const viewer = await getSessionUser(await headers());
+  const [locale, t] = await Promise.all([getLocale(), getT()]);
+
+  /**
+   * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**
+   *
+   * 예전에는 1% 라고 못 박혀 있었다. 등급이 올라 2% 를 받는 사람에게도
+   * 1% 라고 적혀 있었다는 뜻이다 — 마이페이지에서 고쳤던 것과 같은 어긋남이,
+   * 상품 화면에는 그대로 남아 있었다. 등급을 정하는 곳에서 같이 받아 온다.
+   */
+  const rewardPercent = viewer ? (await getEffectiveGrade(viewer.id)).rewardPercent : GRADE_REWARD_PERCENT.BASIC;
+
   const [summary, reviews, inquiries, wishlisted, restockOn] = await Promise.all([
     getReviewSummary(product.id),
     getProductReviews(product.id, { viewerId: viewer?.id }),
@@ -87,7 +102,7 @@ export default async function ProductPage({ params }: Params) {
       reviewCount: product.reviewCount,
     }),
     breadcrumbStructuredData([
-      { name: '홈', url: absoluteUrl('/') },
+      { name: t('nav.home'), url: absoluteUrl('/') },
       { name: product.categoryName, url: absoluteUrl(`/category/${product.categorySlug}`) },
       { name: product.name, url },
     ]),
@@ -107,9 +122,13 @@ export default async function ProductPage({ params }: Params) {
         }}
       />
 
-      <nav aria-label="현재 위치" className="py-5">
+      <nav aria-label={t('nav.breadcrumb')} className="py-5">
         <ol className="flex items-center gap-2">
-          <li><Link href="/" className="text-xs text-[var(--fg-muted)]">홈</Link></li>
+          <li>
+            <Link href="/" className="text-xs text-[var(--fg-muted)]">
+              {t('nav.home')}
+            </Link>
+          </li>
           <li aria-hidden="true" className="text-[11px] text-n-300">/</li>
           <li>
             <Link href={`/category/${product.categorySlug}`} className="text-xs text-[var(--fg-muted)]">
@@ -124,7 +143,7 @@ export default async function ProductPage({ params }: Params) {
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_452px] lg:gap-10">
         <div
           role="img"
-          aria-label={`${product.name} 대표 이미지`}
+          aria-label={t('product.mainImage', { name: product.name })}
           className="relative flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]"
         >
           {product.images[0] ? (
@@ -149,7 +168,7 @@ export default async function ProductPage({ params }: Params) {
           */}
           {product.images[0]?.credit && (
             <p className="absolute right-2 bottom-2 rounded-xs bg-n-900/55 px-2 py-1 text-[10px] text-n-0">
-              사진{' '}
+              {t('product.photoCredit')}{' '}
               {product.images[0].creditUrl ? (
                 <a
                   href={product.images[0].creditUrl}
@@ -187,10 +206,14 @@ export default async function ProductPage({ params }: Params) {
                 <span aria-hidden="true" className="text-warning-graphic">★</span>
                 <span className="tnum font-semibold text-[var(--fg)]">{product.rating.toFixed(1)}</span>
                 <span aria-hidden="true" className="text-n-300">·</span>
-                <span>리뷰 <span className="tnum">{product.reviewCount.toLocaleString('ko-KR')}</span>개</span>
+                <span>{t('product.reviewCount', { count: product.reviewCount })}</span>
               </p>
             )}
-            {product.soldOut && <Badge tone="danger" className="w-fit">전 옵션 품절</Badge>}
+            {product.soldOut && (
+              <Badge tone="danger" className="w-fit">
+                {t('product.allSoldOut')}
+              </Badge>
+            )}
           </div>
 
           <div className="border-b border-[var(--border)] pb-5">
@@ -199,17 +222,32 @@ export default async function ProductPage({ params }: Params) {
               listPrice={product.discountPercent > 0 ? product.listPrice : undefined}
               discountPercent={product.discountPercent > 0 ? product.discountPercent : undefined}
               size="lg"
+              locale={locale}
             />
           </div>
 
           <dl className="flex flex-col gap-3">
             <div className="flex gap-3.5">
-              <dt className="w-14 shrink-0 text-[13px] text-[var(--fg-muted)]">적립</dt>
-              <dd className="text-[13px]">구매 시 <span className="tnum font-semibold">{formatWithUnit(product.price).replace('원', '')}</span>의 1% 적립</dd>
+              <dt className="w-14 shrink-0 text-[13px] text-[var(--fg-muted)]">
+                {t('product.rewardLabel')}
+              </dt>
+              <dd className="tnum text-[13px]">
+                {t('product.rewardValue', {
+                  points: formatNumber(locale, percentOf(product.price, rewardPercent)),
+                  percent: rewardPercent,
+                })}
+              </dd>
             </div>
             <div className="flex gap-3.5">
-              <dt className="w-14 shrink-0 text-[13px] text-[var(--fg-muted)]">배송</dt>
-              <dd className="text-[13px] leading-relaxed">5만원 이상 무료배송 · 제주·도서산간 3,000원 추가</dd>
+              <dt className="w-14 shrink-0 text-[13px] text-[var(--fg-muted)]">
+                {t('product.shippingLabel')}
+              </dt>
+              <dd className="text-[13px] leading-relaxed">
+                {t('product.shippingValue', {
+                  threshold: formatMoney(locale, DEFAULT_SHIPPING.freeThreshold ?? 0),
+                  surcharge: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+                })}
+              </dd>
             </div>
           </dl>
 
@@ -222,7 +260,9 @@ export default async function ProductPage({ params }: Params) {
       </div>
 
       <section aria-labelledby="desc-title" className="pt-16">
-        <h2 id="desc-title" className="border-b border-[var(--border)] pb-3 text-[15px] font-semibold">상품 정보</h2>
+        <h2 id="desc-title" className="border-b border-[var(--border)] pb-3 text-[15px] font-semibold">
+          {t('product.info')}
+        </h2>
         <p className="max-w-[620px] pt-6 text-[15px] leading-loose text-[var(--fg-secondary)]">
           {product.description}
         </p>

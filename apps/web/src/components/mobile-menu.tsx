@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { categoryName } from '@shop/i18n';
 import { SessionNav } from './session-nav';
+import { useLocale, useT } from '~/lib/i18n/client';
 
 type Category = { slug: string; name: string };
 
@@ -27,6 +29,8 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
+  const locale = useLocale();
+  const t = useT();
 
   /**
    * 여는 순간의 경로를 들고 있고, 지금 경로와 같을 때만 열린 것으로 본다.
@@ -66,7 +70,7 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
       <button
         ref={buttonRef}
         type="button"
-        aria-label="메뉴"
+        aria-label={t('nav.menu')}
         aria-expanded={open}
         aria-controls={PANEL_ID}
         onClick={() => setOpen(!open)}
@@ -85,21 +89,23 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
       >
         {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
         <form method="get" action="/search" role="search" className="flex gap-2">
-          <label htmlFor="menu-search" className="sr-only">상품 검색</label>
+          <label htmlFor="menu-search" className="sr-only">
+            {t('nav.searchLabel')}
+          </label>
           <input
             id="menu-search"
             type="search"
             name="q"
-            placeholder="상품 · 브랜드"
+            placeholder={t('nav.searchPlaceholder')}
             maxLength={60}
             className="h-11 min-w-0 flex-1 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500"
           />
           <button type="submit" className="h-11 shrink-0 rounded-sm bg-[var(--brand)] px-4 text-sm font-medium text-[var(--bg)]">
-            검색
+            {t('common.search')}
           </button>
         </form>
 
-        <nav aria-label="카테고리" className="mt-4 border-t border-[var(--border)]">
+        <nav aria-label={t('nav.categoriesPlain')} className="mt-4 border-t border-[var(--border)]">
           <ul>
             {categories.map((c) => (
               <li key={c.slug}>
@@ -107,7 +113,7 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
                   href={`/category/${c.slug}`}
                   className="flex h-12 items-center text-sm text-[var(--fg)] no-underline"
                 >
-                  {c.name}
+                  {categoryName(locale, c.slug, c.name)}
                 </Link>
               </li>
             ))}

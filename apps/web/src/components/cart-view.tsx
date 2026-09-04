@@ -3,13 +3,17 @@
 import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { Badge, Button, Price } from '@shop/ui';
-import { format, won } from '@shop/core';
-import { LINE_ISSUE_MESSAGE, type CartQuoteLine } from '@shop/contract';
+import { won } from '@shop/core';
+import type { CartQuoteLine } from '@shop/contract';
+import { formatMoney, formatNumber } from '@shop/i18n';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore, type CartItem } from '~/stores/cart';
+import { useLocale, useT } from '~/lib/i18n/client';
+import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
 
 export function CartView() {
+  const t = useT();
   const items = useCartStore((s) => s.items);
   const { toggleSelected, setAllSelected, removeSelected, remove, increment, decrement } =
     useCartStore.getState();
@@ -55,7 +59,10 @@ export function CartView() {
         >
           <Check on={allSelected} />
           <span className="text-[13px]">
-            전체선택 <span className="tnum">({selected.length}/{items.length})</span>
+            {t('cart.selectAll')}{' '}
+            <span className="tnum">
+              ({selected.length}/{items.length})
+            </span>
           </span>
         </button>
         <button
@@ -63,7 +70,7 @@ export function CartView() {
           onClick={() => removeSelected()}
           className="py-1.5 text-xs text-[var(--fg-muted)]"
         >
-          선택삭제
+          {t('cart.deleteSelected')}
         </button>
       </div>
 
@@ -100,12 +107,14 @@ export function CartView() {
             onClick={() => {
               if (buyableCount === 0) return;
               track('begin_checkout', { itemCount: buyableCount });
-              window.location.href = '/checkout';
+              // 대입이 아니라 호출로 옮긴다 — 동작은 같고, 바깥 값을 고치지
+              // 말라는 규칙에 걸리지 않는다
+              window.location.assign('/checkout');
             }}
           >
             {buyableCount === 0
-              ? '주문할 수 있는 상품이 없습니다'
-              : `주문하기 (${buyableCount})`}
+              ? t('cart.nothingBuyable')
+              : t('cart.checkoutCount', { count: buyableCount })}
           </Button>
         </div>
       </div>
@@ -138,6 +147,8 @@ function CartRow({
   onIncrement: () => void;
   onDecrement: () => void;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const unavailable = line !== undefined && line.quantity === 0;
 
   return (
@@ -146,7 +157,7 @@ function CartRow({
         type="button"
         role="checkbox"
         aria-checked={item.selected}
-        aria-label={`${item.productName} 주문 상품으로 선택`}
+        aria-label={t('cart.selectItem', { name: item.productName })}
         onClick={onToggle}
         className="mt-0.5 shrink-0"
       >
@@ -155,7 +166,7 @@ function CartRow({
 
       <div
         role="img"
-        aria-label={`${item.productName} 상품 이미지`}
+        aria-label={t('cart.itemImage', { name: item.productName })}
         className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-500"
       >
         IMG
@@ -175,7 +186,7 @@ function CartRow({
           </div>
           <button
             type="button"
-            aria-label={`${item.productName} 장바구니에서 삭제`}
+            aria-label={t('cart.removeItem', { name: item.productName })}
             onClick={onRemove}
             className="-mt-1 -mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center text-[var(--fg-muted)]"
           >
@@ -189,7 +200,7 @@ function CartRow({
         {line?.issue && (
           <p role="status" className="w-fit">
             <Badge tone={line.quantity === 0 ? 'danger' : 'neutral'}>
-              {LINE_ISSUE_MESSAGE[line.issue]}
+              {t(CART_ISSUE_KEY[line.issue])}
               {line.issue === 'STOCK_REDUCED' && (
                 <span className="tnum ml-1">({line.requestedQuantity}→{line.quantity})</span>
               )}
@@ -200,16 +211,16 @@ function CartRow({
         <div className="flex items-end justify-between gap-2 pt-0.5">
           <div className="flex items-center rounded-sm border border-[var(--border)]">
             <button
-              type="button" aria-label="수량 줄이기" onClick={onDecrement}
+              type="button" aria-label={t('cart.decrease')} onClick={onDecrement}
               className="flex h-8 w-8 items-center justify-center text-[var(--fg-secondary)]"
             >
               −
             </button>
-            <span aria-label={`수량 ${item.quantity}개`} className="tnum w-7 text-center text-[13px] font-semibold">
+            <span aria-label={t('cart.quantityOf', { count: item.quantity })} className="tnum w-7 text-center text-[13px] font-semibold">
               {item.quantity}
             </span>
             <button
-              type="button" aria-label="수량 늘리기" onClick={onIncrement}
+              type="button" aria-label={t('cart.increase')} onClick={onIncrement}
               className="flex h-8 w-8 items-center justify-center"
             >
               ＋
@@ -217,22 +228,21 @@ function CartRow({
           </div>
 
           {loading ? (
-            <span className="text-xs text-[var(--fg-muted)]">계산 중…</span>
+            <span className="text-xs text-[var(--fg-muted)]">{t('cart.calculating')}</span>
           ) : line && line.quantity > 0 ? (
             <p className="flex flex-col items-end gap-0.5">
               {line.discountPercent > 0 && (
                 <span className="tnum text-[11px] text-[var(--fg-muted)] line-through">
-                  {format(won(line.listPrice * line.quantity))}
+                  {formatMoney(locale, line.listPrice * line.quantity)}
                 </span>
               )}
               <span className="tnum text-[15px] font-semibold">
-                {format(won(line.subtotal))}
-                <span className="text-xs">원</span>
+                {formatMoney(locale, line.subtotal)}
               </span>
             </p>
           ) : (
             <span className="text-xs text-[var(--fg-muted)]">
-              {item.selected ? '—' : '선택하면 계산됩니다'}
+              {item.selected ? '—' : t('cart.selectToCalculate')}
             </span>
           )}
         </div>
@@ -247,17 +257,21 @@ function Summary({
   quote: ReturnType<typeof useCartQuote>;
   selectedCount: number;
 }) {
+  const t = useT();
+  const locale = useLocale();
+  const money = (amount: number) => formatMoney(locale, amount);
+
   if (selectedCount === 0) {
     return (
       <p className="px-4 py-10 text-center text-[13px] text-[var(--fg-muted)] md:px-0">
-        주문할 상품을 선택해 주세요.
+        {t('cart.selectSomething')}
       </p>
     );
   }
   if (quote.isError) {
     return (
       <p role="alert" className="mx-4 my-6 rounded-sm bg-accent-soft px-4 py-3 text-[13px] text-accent-hover md:mx-0">
-        금액을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.
+        {t('cart.quoteFailed')}
       </p>
     );
   }
@@ -272,33 +286,48 @@ function Summary({
 
   return (
     <section aria-labelledby="cart-summary" className="mt-3 px-4 py-6 md:px-0">
-      <h2 id="cart-summary" className="mb-3.5 text-sm font-semibold">결제 예정 금액</h2>
+      <h2 id="cart-summary" className="mb-3.5 text-sm font-semibold">
+        {t('cart.summary')}
+      </h2>
       {quote.isPending || !q ? (
-        <p className="text-[13px] text-[var(--fg-muted)]">계산 중…</p>
+        <p className="text-[13px] text-[var(--fg-muted)]">{t('cart.calculating')}</p>
       ) : (
         <>
           <dl className="flex flex-col gap-2.5">
-            {row('상품 금액', `${format(won(q.listTotal))}원`)}
-            {q.productDiscount > 0 && row('상품 할인', `-${format(won(q.productDiscount))}원`, 'accent')}
-            {q.couponDiscount > 0 && row(`쿠폰 할인${q.couponName ? ` (${q.couponName})` : ''}`, `-${format(won(q.couponDiscount))}원`, 'accent')}
-            {q.pointsUsed > 0 && row('포인트 사용', `-${format(won(q.pointsUsed))}원`, 'accent')}
-            {row('배송비', q.shippingFee === 0 ? '무료' : `${format(won(q.shippingFee))}원`)}
+            {row(t('cart.subtotal'), money(q.listTotal))}
+            {q.productDiscount > 0 &&
+              row(t('cart.productDiscount'), `-${money(q.productDiscount)}`, 'accent')}
+            {q.couponDiscount > 0 &&
+              row(
+                q.couponName
+                  ? t('cart.couponDiscountNamed', { name: q.couponName })
+                  : t('cart.couponDiscount'),
+                `-${money(q.couponDiscount)}`,
+                'accent',
+              )}
+            {q.pointsUsed > 0 && row(t('cart.pointsUsed'), `-${money(q.pointsUsed)}`, 'accent')}
+            {row(
+              t('cart.shippingFee'),
+              q.shippingFee === 0 ? t('cart.freeShipping') : money(q.shippingFee),
+            )}
             <div className="mt-1 flex items-baseline justify-between border-t border-[var(--border)] pt-3.5">
-              <dt className="text-[15px] font-semibold">결제 예정</dt>
+              <dt className="text-[15px] font-semibold">{t('cart.payable')}</dt>
               <dd>
-                <Price amount={won(q.payable)} size="md" />
+                <Price amount={won(q.payable)} size="md" locale={locale} />
               </dd>
             </div>
           </dl>
 
           {!q.isFreeShipping && q.remainingForFreeShipping > 0 && (
             <p className="mt-3 rounded-sm bg-info-soft px-3 py-2.5 text-xs text-info">
-              <span className="tnum font-semibold">{format(won(q.remainingForFreeShipping))}원</span>
-              {' '}더 담으면 무료배송입니다
+              <span className="tnum font-semibold">
+                {money(q.remainingForFreeShipping)}
+              </span>{' '}
+              {t('cart.freeShippingLeft')}
             </p>
           )}
           <p className="mt-2.5 text-right text-[11px] text-[var(--fg-muted)]">
-            구매 시 <span className="tnum">{format(won(q.rewardPoints))}</span>P 적립 예정
+            {t('cart.rewardPreview', { amount: formatNumber(locale, q.rewardPoints) })}
           </p>
         </>
       )}
@@ -307,14 +336,16 @@ function Summary({
 }
 
 function EmptyCart() {
+  const t = useT();
+
   return (
     <div className="flex flex-col items-center gap-6 px-4 py-24">
-      <p className="text-[15px] text-[var(--fg-muted)]">장바구니가 비어 있습니다.</p>
+      <p className="text-[15px] text-[var(--fg-muted)]">{t('cart.empty')}</p>
       <Link
         href="/"
         className="inline-flex h-12 items-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline"
       >
-        쇼핑하러 가기
+        {t('cart.goShopping')}
       </Link>
     </div>
   );

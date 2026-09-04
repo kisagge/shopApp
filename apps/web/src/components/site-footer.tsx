@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { categoryName } from '@shop/i18n';
 import { getTopCategories } from '~/lib/queries/products';
+import { getLocale, getT } from '~/lib/i18n/server';
+import { LocaleSwitcher } from './locale-switcher';
 
 export async function SiteFooter() {
-  const categories = await getTopCategories();
+  const [categories, locale, t] = await Promise.all([getTopCategories(), getLocale(), getT()]);
 
   return (
     <footer className="safe-b mt-20 border-t border-[var(--border)] bg-[var(--surface)]">
@@ -12,7 +15,7 @@ export async function SiteFooter() {
           그 버튼은 자바스크립트가 있어야 열린다. 여기 목록은 서버가 그린
           평범한 링크라서, 스크립트가 없거나 실패해도 카테고리로 갈 수 있다.
         */}
-        <nav aria-label="카테고리 (푸터)">
+        <nav aria-label={t('nav.categoriesFooter')}>
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {categories.map((c) => (
               <li key={c.slug}>
@@ -20,7 +23,7 @@ export async function SiteFooter() {
                   href={`/category/${c.slug}`}
                   className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
-                  {c.name}
+                  {categoryName(locale, c.slug, c.name)}
                 </Link>
               </li>
             ))}
@@ -36,14 +39,23 @@ export async function SiteFooter() {
             href="/merchant/apply"
             className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
           >
-            입점 신청
+            {t('nav.merchantApply')}
           </Link>
         </p>
 
         <p className="mt-4 font-serif text-lg font-medium tracking-[0.18em]">PLAIN</p>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--fg-muted)]">
-          포트폴리오 목적으로 제작된 화면입니다. 브랜드명과 사업자 정보는 플레이스홀더입니다.
+          {t('footer.disclaimer')}
         </p>
+
+        {/*
+          언어 선택을 푸터에 둔다. 헤더는 좁은 화면에서 이미 꽉 찼고, 언어는
+          한 번 고르면 다시 건드릴 일이 드문 설정이다 — 매 화면 위쪽 자리를
+          차지할 만한 것이 아니다.
+        */}
+        <div className="mt-6 border-t border-[var(--border)] pt-4">
+          <LocaleSwitcher />
+        </div>
       </div>
     </footer>
   );

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
-import { emptyResultHint, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
+import { emptyResultReason, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
 import { searchProducts } from '~/lib/queries/products';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
@@ -8,6 +8,8 @@ import { TrackedSearch } from '~/components/tracked-search';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
 import { NO_INDEX } from '~/lib/no-index';
+import { getT } from '~/lib/i18n/server';
+import { EMPTY_RESULT_KEY } from '~/lib/i18n/empty-result';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +23,16 @@ export async function generateMetadata({
   const raw = await searchParams;
   const q = typeof raw['q'] === 'string' ? raw['q'] : '';
   const term = normalizeSearchTerm(q);
+  const t = await getT();
   // 검색어마다 다른 주소가 되어 같은 상품이 여러 번 잡힌다
-  return { title: term ? `"${term}" 검색 결과` : '검색', ...NO_INDEX };
+  return { title: term ? t('search.resultsFor', { term }) : t('search.heading'), ...NO_INDEX };
 }
 
 export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {
   const raw = await searchParams;
   const parsed = catalogQuerySchema.parse(raw);
   const term = parsed.q ? normalizeSearchTerm(parsed.q) : null;
+  const t = await getT();
 
   // 검색어가 없거나 너무 짧으면 조회하지 않는다.
   // 한 글자로 카탈로그 전체를 긁는 것은 검색이 아니다.
@@ -47,15 +51,15 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
       <header className="flex flex-col gap-2 py-8">
         <p className="text-[11px] font-medium tracking-[0.16em] text-[var(--fg-muted)]">SEARCH</p>
         <h1 className="text-xl font-semibold tracking-tight md:text-[28px]">
-          {term ? <>&ldquo;{term}&rdquo; 검색 결과</> : '검색'}
+          {term ? t('search.resultsFor', { term }) : t('search.heading')}
         </h1>
       </header>
 
       {!term ? (
         <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
           {parsed.q
-            ? `검색어는 ${MIN_SEARCH_LENGTH}글자 이상 입력해 주세요.`
-            : '찾으시는 상품명이나 브랜드를 입력해 주세요.'}
+            ? t('search.tooShort', { min: MIN_SEARCH_LENGTH })
+            : t('search.prompt')}
         </p>
       ) : (
         <>
@@ -73,13 +77,18 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
 
           {page && page.items.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-24">
-              <p className="text-[15px] font-medium">검색 결과가 없습니다</p>
+              <p className="text-[15px] font-medium">{t('empty.searchTitle')}</p>
               <p className="text-[13px] text-[var(--fg-muted)]">
-                {emptyResultHint({
-                  hasQuery: true,
-                  hasPriceRange: parsed.minPrice !== undefined || parsed.maxPrice !== undefined,
-                  hasCategory: false,
-                })}
+                {t(
+                  EMPTY_RESULT_KEY[
+                    emptyResultReason({
+                      hasQuery: true,
+                      hasPriceRange:
+                        parsed.minPrice !== undefined || parsed.maxPrice !== undefined,
+                      hasCategory: false,
+                    })
+                  ],
+                )}
               </p>
             </div>
           ) : (

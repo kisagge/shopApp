@@ -36,3 +36,23 @@ describe('Price', () => {
     await expectNoA11yViolations(container);
   });
 });
+
+describe('언어별 금액', () => {
+  it('한국어는 단위를 뒤에, 다른 말은 기호를 앞에 붙인다', () => {
+    const { unmount } = render(<Price amount={won(413_000)} />);
+    expect(screen.getByText(/413,000/)).toBeInTheDocument();
+    expect(screen.getByText('원')).toBeInTheDocument();
+    unmount();
+
+    render(<Price amount={won(413_000)} locale="ja" />);
+    expect(screen.getByText('₩')).toBeInTheDocument();
+    // 환율은 다루지 않는다 — 숫자는 그대로 원화다
+    expect(screen.getByText('413,000')).toBeInTheDocument();
+  });
+
+  it('숨은 라벨도 그 말로 읽힌다', () => {
+    render(<Price amount={won(289_000)} listPrice={won(413_000)} discountPercent={30} locale="en" />);
+    expect(screen.getByText('List price')).toBeInTheDocument();
+    expect(screen.getByText('off')).toBeInTheDocument();
+  });
+});

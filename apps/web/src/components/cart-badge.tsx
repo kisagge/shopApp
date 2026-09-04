@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useCartStore, selectItemCount } from '~/stores/cart';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 헤더의 장바구니 링크.
@@ -12,6 +13,7 @@ import { useCartStore, selectItemCount } from '~/stores/cart';
  */
 export function CartBadge() {
   const count = useCartStore(selectItemCount);
+  const t = useT();
   const [mounted, setMounted] = useState(false);
   /**
    * 서버는 localStorage 를 볼 수 없으므로 첫 렌더는 반드시 숫자 없이 나가야
@@ -27,10 +29,10 @@ export function CartBadge() {
   return (
     <Link
       href="/cart"
-      aria-label={mounted && count > 0 ? `장바구니, 상품 ${count}개` : '장바구니'}
+      aria-label={mounted && count > 0 ? t('nav.cartCount', { count }) : t('nav.cart')}
       className="relative inline-flex h-9 items-center text-xs font-medium text-[var(--fg-secondary)] no-underline"
     >
-      장바구니
+      {t('nav.cart')}
       {mounted && count > 0 && (
         <span
           aria-hidden="true"

@@ -2,6 +2,7 @@ import {
   type Won, won, ZERO, add, multiply, min, subtractToZero, percentOf, MoneyError,
 } from './money';
 import { calculateShipping, type ShippingPolicy, type ShippingResult } from './shipping';
+import { GRADE_REWARD_PERCENT } from './grade';
 
 export interface CartLine {
   readonly variantId: string;
@@ -84,7 +85,14 @@ export interface CartTotals {
 
 /** 포인트 최소 사용 단위 */
 export const MIN_POINTS_USE = won(1000);
-const DEFAULT_REWARD_PERCENT = 1;
+/**
+ * 등급을 모를 때 쓰는 적립률.
+ *
+ * 숫자를 여기 다시 적지 않는다 — 기본 등급의 적립률이 곧 이 값이다.
+ * 따로 적어 두면 등급표를 고친 날 이 줄만 옛날 값으로 남고, 화면과 실제
+ * 적립이 갈라진다. 그 어긋남을 한 번 겪었다.
+ */
+const DEFAULT_REWARD_PERCENT = GRADE_REWARD_PERCENT.BASIC;
 
 /**
  * 할인 적용 순서는 금액이 달라지므로 정책이다.

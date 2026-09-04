@@ -34,7 +34,8 @@
     "zod": "4.5.4",
     "zustand": "5.0.15",
     "@shop/native": "workspace:*",
-    "@shop/mail": "workspace:*"
+    "@shop/mail": "workspace:*",
+    "@shop/i18n": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

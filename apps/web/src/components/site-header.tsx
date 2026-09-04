@@ -1,12 +1,14 @@
 import Link from 'next/link';
+import { categoryName } from '@shop/i18n';
 import { getTopCategories } from '~/lib/queries/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';
+import { getLocale, getT } from '~/lib/i18n/server';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
 export async function SiteHeader() {
-  const categories = await getTopCategories();
+  const [categories, locale, t] = await Promise.all([getTopCategories(), getLocale(), getT()]);
 
   /*
    * sticky + safe-t 는 웹뷰 때문이다.
@@ -27,7 +29,7 @@ export async function SiteHeader() {
           <Link href="/" className="text-[var(--fg)] no-underline">PLAIN</Link>
         </p>
 
-        <nav aria-label="주요 카테고리" className="hidden flex-1 md:block">
+        <nav aria-label={t('nav.categories')} className="hidden flex-1 md:block">
           <ul className="flex">
             {categories.map((c) => (
               <li key={c.slug}>
@@ -35,7 +37,7 @@ export async function SiteHeader() {
                   href={`/category/${c.slug}`}
                   className="inline-flex h-11 items-center px-4 text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
-                  {c.name}
+                  {categoryName(locale, c.slug, c.name)}
                 </Link>
               </li>
             ))}
@@ -45,12 +47,14 @@ export async function SiteHeader() {
         <span className="ml-auto flex shrink-0 items-center gap-4 md:ml-0">
           {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
           <form method="get" action="/search" role="search" className="hidden sm:block">
-            <label htmlFor="site-search" className="sr-only">상품 검색</label>
+            <label htmlFor="site-search" className="sr-only">
+              {t('nav.searchLabel')}
+            </label>
             <input
               id="site-search"
               type="search"
               name="q"
-              placeholder="상품 · 브랜드"
+              placeholder={t('nav.searchPlaceholder')}
               maxLength={60}
               className="h-9 w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500 md:w-48"
             />

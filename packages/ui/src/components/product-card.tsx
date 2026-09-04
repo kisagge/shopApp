@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { Won } from '@shop/core';
+import { createTranslator, DEFAULT_LOCALE, type Locale } from '@shop/i18n';
 import { cn } from '../lib/cn';
 import { Badge } from './badge';
 import { Price } from './price';
@@ -58,6 +59,8 @@ export interface ProductCardProps {
   readonly discountPercent?: number | undefined;
   readonly rating?: number | undefined;
   readonly reviewCount?: number | undefined;
+  /** Price 와 같은 이유로 쓰는 쪽이 알려 준다 */
+  readonly locale?: Locale;
   readonly soldOut?: boolean;
   readonly isNew?: boolean;
   /** 상품 이미지. 없으면 톤 블록 플레이스홀더가 들어간다 */
@@ -107,10 +110,11 @@ export function ProductCard({
   href, brand, name, price, listPrice, discountPercent,
   rating, reviewCount, soldOut = false, isNew = false,
   image, placeholderTone = 'sand', linkComponent, wishlistButton, className,
-  imageComponent, imageSizes, imagePriority = false,
+  imageComponent, imageSizes, imagePriority = false, locale = DEFAULT_LOCALE,
 }: ProductCardProps) {
   const Link = linkComponent ?? DefaultLink;
   const Image = imageComponent ?? DefaultImage;
+  const t = createTranslator(locale);
   return (
     <article className={cn('relative flex flex-col gap-2.5', className)}>
       {wishlistButton && (
@@ -151,7 +155,7 @@ export function ProductCard({
           )}
           {soldOut && (
             <span className="absolute inset-0 flex items-center justify-center bg-[var(--bg)]/70 text-sm font-medium text-[var(--fg-secondary)]">
-              품절
+              {t('catalog.soldOut')}
             </span>
           )}
         </div>
@@ -171,6 +175,7 @@ export function ProductCard({
             listPrice={listPrice}
             discountPercent={discountPercent}
             size="sm"
+            locale={locale}
           />
           {rating !== undefined && reviewCount !== undefined && (
             <p className="flex items-center gap-1 text-[11px] text-[var(--fg-muted)]">
@@ -180,7 +185,7 @@ export function ProductCard({
               <span className="tnum">{rating.toFixed(1)}</span>
               <span aria-hidden="true">·</span>
               <span>
-                리뷰 <span className="tnum">{reviewCount.toLocaleString('ko-KR')}</span>
+                {t('product.reviewCount', { count: reviewCount })}
               </span>
             </p>
           )}

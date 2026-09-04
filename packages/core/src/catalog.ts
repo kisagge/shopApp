@@ -13,13 +13,14 @@ export const PRODUCT_SORT = [
 ] as const;
 export type ProductSort = (typeof PRODUCT_SORT)[number];
 
-export const PRODUCT_SORT_LABEL: Readonly<Record<ProductSort, string>> = {
-  recommended: '추천순',
-  newest: '신상품순',
-  price_asc: '낮은 가격순',
-  price_desc: '높은 가격순',
-  rating: '평점순',
-};
+/*
+ * 정렬 이름표는 여기 없다.
+ *
+ * 예전에는 이 옆에 한국어 이름이 있었는데, 화면이 세 나라 말로 나가게 되면서
+ * 그 자리가 맞지 않게 됐다. core 는 요청도 언어도 모르는 순수한 규칙 묶음이다.
+ * 무엇으로 정렬할 수 있는지는 여기가 정하고, 그것을 뭐라고 부를지는 화면이
+ * 정한다 — apps/web 의 CatalogControls 에 있다.
+ */
 
 export const DEFAULT_SORT: ProductSort = 'recommended';
 
@@ -78,21 +79,31 @@ function toBound(value: number | null | undefined): Won | null {
  *
  * "결과 없음" 만 보여 주면 사용자는 검색어를 의심하지만, 실제로는 필터를
  * 좁혀 놓은 경우가 더 많다. 무엇을 풀면 되는지 짚어 준다.
+ *
+ * **문장이 아니라 이유를 돌려준다.** 예전에는 여기서 한국어 문장을 만들었는데,
+ * 화면이 세 나라 말로 나가면서 자리가 맞지 않게 됐다 — 게다가 "가격 범위와
+ * 카테고리를" 처럼 낱말을 이어 붙이는 방식은 조사와 어순이 다른 말로 옮길 수
+ * 없다. 무엇이 원인인지 판단하는 것은 규칙이라 여기 남고, 그것을 어떻게
+ * 말할지는 화면이 정한다.
  */
-export function emptyResultHint(applied: {
+export const EMPTY_RESULT_REASON = [
+  'widen_price',
+  'widen_category',
+  'widen_both',
+  'other_term',
+  'no_products',
+] as const;
+
+export type EmptyResultReason = (typeof EMPTY_RESULT_REASON)[number];
+
+export function emptyResultReason(applied: {
   hasQuery: boolean;
   hasPriceRange: boolean;
   hasCategory: boolean;
-}): string {
-  const filters: string[] = [];
-  if (applied.hasPriceRange) filters.push('가격 범위');
-  if (applied.hasCategory) filters.push('카테고리');
-
-  if (filters.length > 0) {
-    return `${filters.join('와 ')}를 넓혀 보세요.`;
-  }
-  if (applied.hasQuery) {
-    return '다른 검색어를 써 보시거나 철자를 확인해 주세요.';
-  }
-  return '아직 등록된 상품이 없습니다.';
+}): EmptyResultReason {
+  if (applied.hasPriceRange && applied.hasCategory) return 'widen_both';
+  if (applied.hasPriceRange) return 'widen_price';
+  if (applied.hasCategory) return 'widen_category';
+  if (applied.hasQuery) return 'other_term';
+  return 'no_products';
 }

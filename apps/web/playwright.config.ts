@@ -29,6 +29,14 @@ export default defineConfig({
     // 실패했을 때 무엇을 보고 있었는지 알 수 있어야 한다
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    /**
+     * 언어와 시간대를 못 박는다.
+     *
+     * 화면은 브라우저가 보내는 Accept-Language 를 따라 세 나라 말로 나가므로,
+     * 여기를 비워 두면 **테스트가 도는 환경에 따라 화면 언어가 바뀐다** —
+     * 크로미움 기본값은 보통 en-US 다. 한국어 문구를 찾는 검사가 CI 에서만
+     * 깨지는 길이 그것이다. 날짜도 같은 이유로 서울에 고정한다.
+     */
     locale: 'ko-KR',
     timezoneId: 'Asia/Seoul',
   },
@@ -47,7 +55,7 @@ export default defineConfig({
     {
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
-      testMatch: /(auth|shopping|a11y|pwa)\.spec\.ts/,
+      testMatch: /(auth|shopping|a11y|pwa|i18n)\.spec\.ts/,
     },
     {
       name: 'customer',

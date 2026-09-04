@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { LOCALE_TAG, OG_LOCALE } from '@shop/i18n';
 import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
@@ -9,6 +10,8 @@ import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
+import { getLocale, getT } from '~/lib/i18n/server';
+import { LocaleProvider } from '~/lib/i18n/client';
 
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
@@ -26,24 +29,27 @@ const serif = Hahmlet({
 
 const DESCRIPTION = '오래 두고 입을 것만 골라 담은 편집숍';
 
-export const metadata: Metadata = {
-  /**
-   * 상대 주소를 절대 주소로 바꿀 기준.
-   *
-   * 이게 없으면 openGraph 이미지가 상대 경로로 나가고, 카카오톡·슬랙 같은
-   * 곳은 그걸 불러오지 못해 **링크를 붙여도 미리보기가 뜨지 않는다.**
-   */
-  metadataBase: new URL(absoluteUrl('/')),
-  title: { default: 'PLAIN', template: '%s | PLAIN' },
-  description: DESCRIPTION,
-  openGraph: {
-    type: 'website',
-    siteName: 'PLAIN',
-    locale: 'ko_KR',
-    title: 'PLAIN',
+export async function generateMetadata(): Promise<Metadata> {
+  const locale = await getLocale();
+  return {
+    /**
+     * 상대 주소를 절대 주소로 바꿀 기준.
+     *
+     * 이게 없으면 openGraph 이미지가 상대 경로로 나가고, 카카오톡·슬랙 같은
+     * 곳은 그걸 불러오지 못해 **링크를 붙여도 미리보기가 뜨지 않는다.**
+     */
+    metadataBase: new URL(absoluteUrl('/')),
+    title: { default: 'PLAIN', template: '%s | PLAIN' },
     description: DESCRIPTION,
-  },
-};
+    openGraph: {
+      type: 'website',
+      siteName: 'PLAIN',
+      locale: OG_LOCALE[locale],
+      title: 'PLAIN',
+      description: DESCRIPTION,
+    },
+  };
+}
 
 export const viewport: Viewport = {
   // Capacitor 웹뷰에서 safe-area-inset이 동작하려면 viewport-fit=cover가 필요하다
@@ -57,31 +63,36 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const [locale, t] = await Promise.all([getLocale(), getT()]);
+
   return (
-    <html lang="ko" className={`${sans.variable} ${serif.variable}`}>
+    /* lang 이 틀리면 낭독기가 한국어를 영어 발음으로 읽는다 */
+    <html lang={LOCALE_TAG[locale]} className={`${sans.variable} ${serif.variable}`}>
       <body>
         <a
           href="#main"
           className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded-sm focus:bg-[var(--brand)] focus:px-4 focus:py-2 focus:text-sm focus:text-[var(--bg)]"
         >
-          본문 바로가기
+          {t('nav.skipToContent')}
         </a>
-        <Providers>
-          <div className="flex min-h-dvh flex-col">
-            <SiteHeader />
-            <main id="main" className="flex-1">
-              {children}
-            </main>
-            <SiteFooter />
-          </div>
-          <AnalyticsProvider />
-          {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
-          <CartSync />
-          {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
-          <NativeSession />
-          <ServiceWorker />
-        </Providers>
+        <LocaleProvider locale={locale}>
+          <Providers>
+            <div className="flex min-h-dvh flex-col">
+              <SiteHeader />
+              <main id="main" className="flex-1">
+                {children}
+              </main>
+              <SiteFooter />
+            </div>
+            <AnalyticsProvider />
+            {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
+            <CartSync />
+            {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
+            <NativeSession />
+            <ServiceWorker />
+          </Providers>
+        </LocaleProvider>
       </body>
     </html>
   );

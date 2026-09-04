@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { ProductCard } from '@shop/ui';
 import { getSessionUser } from '@shop/auth/session';
+import { getLocale } from '~/lib/i18n/server';
 import type { ProductListItem } from '~/lib/queries/products';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { WishlistButton } from './wishlist-button';
@@ -37,7 +38,7 @@ export async function ProductGrid({
   columns?: string;
   imageSizes?: string;
 }) {
-  const viewer = await getSessionUser(await headers());
+  const [viewer, locale] = await Promise.all([getSessionUser(await headers()), getLocale()]);
   const wishlisted = viewer
     ? await getWishlistedIds(viewer.id, products.map((p) => p.id))
     : new Set<string>();
@@ -47,6 +48,7 @@ export async function ProductGrid({
       {products.map((p, i) => (
         <li key={p.slug} data-product-id={p.id}>
           <ProductCard
+            locale={locale}
             href={`/product/${p.slug}`}
             linkComponent={AppLink}
             imageComponent={AppImage}

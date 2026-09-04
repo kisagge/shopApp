@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeSearchTerm, normalizePriceRange, emptyResultHint,
+  normalizeSearchTerm, normalizePriceRange, emptyResultReason,
   isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH,
 } from '../src/catalog';
 
@@ -75,25 +75,34 @@ describe('정렬 값', () => {
 });
 
 describe('빈 결과 안내', () => {
-  it('필터를 걸었으면 그것부터 풀라고 한다', () => {
+  it('검색어보다 필터를 먼저 짚는다', () => {
     // "결과 없음" 만 보여 주면 검색어를 의심하지만 실제로는 필터가 원인일 때가 많다
-    expect(emptyResultHint({ hasQuery: true, hasPriceRange: true, hasCategory: false }))
-      .toContain('가격 범위');
+    expect(emptyResultReason({ hasQuery: true, hasPriceRange: true, hasCategory: false })).toBe(
+      'widen_price',
+    );
   });
 
-  it('둘 다 걸었으면 둘 다 언급한다', () => {
-    const hint = emptyResultHint({ hasQuery: false, hasPriceRange: true, hasCategory: true });
-    expect(hint).toContain('가격 범위');
-    expect(hint).toContain('카테고리');
+  it('둘 다 걸었으면 둘 다 짚는다', () => {
+    expect(emptyResultReason({ hasQuery: false, hasPriceRange: true, hasCategory: true })).toBe(
+      'widen_both',
+    );
+  });
+
+  it('필터가 카테고리뿐일 수도 있다', () => {
+    expect(emptyResultReason({ hasQuery: false, hasPriceRange: false, hasCategory: true })).toBe(
+      'widen_category',
+    );
   });
 
   it('검색어뿐이면 검색어를 의심하라고 한다', () => {
-    expect(emptyResultHint({ hasQuery: true, hasPriceRange: false, hasCategory: false }))
-      .toContain('검색어');
+    expect(emptyResultReason({ hasQuery: true, hasPriceRange: false, hasCategory: false })).toBe(
+      'other_term',
+    );
   });
 
   it('아무 조건도 없으면 상품이 없는 것이다', () => {
-    expect(emptyResultHint({ hasQuery: false, hasPriceRange: false, hasCategory: false }))
-      .toContain('등록된 상품이 없습니다');
+    expect(emptyResultReason({ hasQuery: false, hasPriceRange: false, hasCategory: false })).toBe(
+      'no_products',
+    );
   });
 });

@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   cartQuoteRequestSchema, cartLineInputSchema, wonSchema,
-  LINE_ISSUE, LINE_ISSUE_MESSAGE,
 } from '../src';
 
 describe('wonSchema', () => {
@@ -76,13 +75,5 @@ describe('cartQuoteRequestSchema', () => {
   it('쿠폰 코드 길이를 제한한다', () => {
     const r = cartQuoteRequestSchema.safeParse({ lines: [line], couponCode: 'x'.repeat(100) });
     expect(r.success).toBe(false);
-  });
-});
-
-describe('담아 둔 사이에 생긴 문제', () => {
-  it('모든 문제 유형에 사람이 읽을 메시지가 있다', () => {
-    for (const issue of LINE_ISSUE) {
-      expect(LINE_ISSUE_MESSAGE[issue]).toBeTruthy();
-    }
   });
 });

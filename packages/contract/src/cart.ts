@@ -28,12 +28,13 @@ export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;
 export const LINE_ISSUE = ['NOT_FOUND', 'INACTIVE', 'SOLD_OUT', 'STOCK_REDUCED'] as const;
 export type LineIssue = (typeof LINE_ISSUE)[number];
 
-export const LINE_ISSUE_MESSAGE: Readonly<Record<LineIssue, string>> = {
-  NOT_FOUND: '판매가 종료된 상품입니다',
-  INACTIVE: '판매가 중지된 옵션입니다',
-  SOLD_OUT: '품절되었습니다',
-  STOCK_REDUCED: '재고가 부족해 수량을 줄였습니다',
-};
+/*
+ * 문구는 여기 없다.
+ *
+ * 계약은 서버와 클라이언트가 주고받는 **모양**을 정하는 곳이고, 그 코드를
+ * 뭐라고 부를지는 화면이 정한다 — 화면이 세 나라 말로 나가기 때문이다.
+ * 이 파일에 한국어 문장을 두면 계약이 한국어 전용이 된다.
+ */
 
 export const cartQuoteLineSchema = z.object({
   variantId: cuidSchema,
