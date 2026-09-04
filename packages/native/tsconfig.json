@@ -1,0 +1,9 @@
+{
+  "extends": "@shop/config/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // window.Capacitor 를 직접 읽는다 — 이 패키지는 브라우저에서만 산다
+    "lib": ["ES2023", "DOM"]
+  },
+  "include": ["src/**/*", "test/**/*"]
+}

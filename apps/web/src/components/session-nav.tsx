@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { authClient } from '@shop/auth/client';
+import { authClient, signOutEverywhere } from '@shop/auth/client';
 
 /**
  * 헤더의 로그인 상태 영역.
@@ -48,7 +48,7 @@ export function SessionNav() {
       <button
         type="button"
         onClick={() => {
-          void authClient.signOut().then(() => router.refresh());
+          void signOutEverywhere().then(() => router.refresh());
         }}
         className="shrink-0 text-xs text-[var(--fg-muted)] underline underline-offset-2"
       >

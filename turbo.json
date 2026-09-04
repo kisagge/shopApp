@@ -53,6 +53,12 @@
         "^build"
       ],
       "cache": false
+    },
+    "sync": {
+      "dependsOn": [
+        "^build"
+      ],
+      "cache": false
     }
   }
 }

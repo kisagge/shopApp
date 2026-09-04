@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PLAIN</title>
+<!--
+  네트워크가 없을 때 나오는 화면.
+
+  server.url 로 원격을 띄우는 셸이라 평소에는 이 파일이 보이지 않는다.
+  하지만 연결이 안 되면 웹뷰는 **아무것도 없는 흰 화면**을 남기고,
+  사용자는 앱이 고장 난 줄 안다. 그 자리를 메우는 것이 전부다.
+
+  바깥에서 아무것도 불러오지 않는다 — 연결이 없을 때 보여 줄 화면이
+  연결을 필요로 하면 뜻이 없다. 글꼴도 시스템 것을 쓴다.
+-->
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+    background: #fdfcfa;
+    color: #2b2926;
+    font: 15px/1.7 -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    body { background: #1a1917; color: #eeece8; }
+    .hint { color: #9a958d; }
+    button { background: #eeece8; color: #1a1917; }
+  }
+  main { max-width: 320px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
+  h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0.16em; }
+  p { margin: 0; font-size: 14px; }
+  .hint { color: #6f6a63; font-size: 13px; }
+  button {
+    margin-top: 10px;
+    height: 48px;
+    border: 0;
+    border-radius: 4px;
+    background: #2b2926;
+    color: #fdfcfa;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>PLAIN</h1>
+    <p>연결할 수 없습니다.</p>
+    <p class="hint">네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
+    <button type="button" onclick="location.reload()">다시 시도</button>
+  </main>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "name": "@shop/mobile",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync": "cap sync",
+    "ios": "cap open ios",
+    "android": "cap open android",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@capacitor/android": "8.0.0",
+    "@capacitor/app": "8.0.0",
+    "@capacitor/core": "8.0.0",
+    "@capacitor/ios": "8.0.0",
+    "@capacitor/preferences": "8.0.0"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.0.0",
+    "@shop/config": "workspace:*",
+    "eslint": "10.9.1",
+    "typescript": "6.0.3",
+    "@types/node": "24.10.1"
+  }
+}

@@ -3,6 +3,7 @@ import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
 import { CartSync } from '~/components/cart-sync';
+import { NativeSession } from '~/components/native-session';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
@@ -59,6 +60,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <AnalyticsProvider />
           {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
           <CartSync />
+          {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
+          <NativeSession />
         </Providers>
       </body>
     </html>

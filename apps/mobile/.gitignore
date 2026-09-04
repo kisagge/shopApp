@@ -1,0 +1,6 @@
+# Capacitor 가 만들어 넣는 것들. 원본은 웹앱과 설정이라 이건 다시 만들 수 있다.
+ios/App/App/public/
+ios/App/Pods/
+android/app/src/main/assets/public/
+android/.gradle/
+android/local.properties

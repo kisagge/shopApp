@@ -1,0 +1,9 @@
+{
+  "extends": "@shop/config/tsconfig/base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    // capacitor.config.ts 는 빌드 시점에 Node 에서 돈다 — process 를 읽는다
+    "types": ["node"]
+  },
+  "include": ["capacitor.config.ts"]
+}
