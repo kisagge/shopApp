@@ -91,11 +91,31 @@ async function main(): Promise<void> {
    */
 
   const customer = await prisma.user.findUniqueOrThrow({ where: { email: 'demo@plain.test' } });
+
+  /*
+   * **id 를 손으로 짓되 id 형식은 지킨다.**
+   *
+   * 예전에는 `${customer.id}-default` 로 만들었는데, 그 값은 계약의 id
+   * 형식(소문자·숫자 20~32자)을 통과하지 못한다. 그래서 **시드 계정은 시드
+   * 주소로 주문을 넣을 수 없었다** — 화면에서는 배송지가 멀쩡히 보이는데
+   * 결제만 400 으로 막혔다. 데모 경로가 통째로 막힌 셈이고, 주문 멱등성을
+   * 확인하는 검사를 쓰다가 드러났다.
+   *
+   * 다시 돌려도 같은 주소가 되도록 값은 고정해 둔다.
+   */
+  const DEMO_ADDRESS_ID = 'seedaddrdemocustomer0001';
+
+  // 옛 모양으로 만들어 둔 주소가 있으면 걷어낸다. 두면 주문할 수 없는
+  // 배송지가 목록에 남는다.
+  await prisma.address.deleteMany({
+    where: { userId: customer.id, id: { endsWith: '-default' } },
+  });
+
   await prisma.address.upsert({
-    where: { id: `${customer.id}-default` },
+    where: { id: DEMO_ADDRESS_ID },
     update: {},
     create: {
-      id: `${customer.id}-default`, userId: customer.id, label: '집',
+      id: DEMO_ADDRESS_ID, userId: customer.id, label: '집',
       recipient: '데모 사용자', phone: '010-0000-0000',
       postalCode: '04766', address1: '서울 성동구 왕십리로 000',
       address2: '101동 1102호', isDefault: true,

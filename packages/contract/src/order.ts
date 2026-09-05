@@ -48,6 +48,16 @@ export const createOrderRequestSchema = z
       .string()
       .regex(/^[A-Za-z0-9_-]{8,64}$/)
       .optional(),
+    /**
+     * 같은 주문을 두 번 만들지 않기 위한 열쇠.
+     *
+     * 화면이 결제 시도마다 하나를 만들어 보낸다. 없어도 주문은 되지만,
+     * 없으면 **버튼을 두 번 누른 만큼 주문이 생긴다.**
+     */
+    idempotencyKey: z
+      .string()
+      .regex(/^[A-Za-z0-9-]{16,64}$/)
+      .optional(),
     paymentMethod: z.enum(PAYMENT_METHOD),
     /** 약관 동의 없이 주문을 만들지 않는다 */
     agreedToTerms: z.literal(true, 'valid.agreeRequired'),

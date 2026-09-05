@@ -13,6 +13,7 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   address: { findFirst: vi.fn<(...a: any[]) => any>() },
+  order: { findFirst: vi.fn<(...a: any[]) => any>() },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>() },
   userCoupon: { findFirst: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
@@ -58,6 +59,7 @@ beforeEach(() => {
     { id: 'v-coat-m', product: { brand: { merchantId: 'm-1' }, images: [{ url: '/coat.jpg' }] } },
   ]);
   db.userCoupon.findFirst.mockResolvedValue(null);
+  db.order.findFirst.mockResolvedValue(null);
   tx.productVariant.updateMany.mockResolvedValue({ count: 1 });
   tx.user.updateMany.mockResolvedValue({ count: 1 });
   tx.userCoupon.updateMany.mockResolvedValue({ count: 1 });
@@ -323,5 +325,72 @@ describe('퍼널 연결', () => {
     const r = await createOrder(request(), user);
     expect(r.orderNo).toBeTruthy();
     expect(tx.order.create.mock.calls[0]![0].data.browserSessionId).toBeNull();
+  });
+});
+
+describe('같은 주문을 두 번 만들지 않는다', () => {
+  const withKey = () => request({ idempotencyKey: 'abcdefgh-1234-5678-9012-abcdefabcdef' });
+
+  it('열쇠가 없으면 예전처럼 그냥 만든다 — 옛 화면도 계속 주문할 수 있어야 한다', async () => {
+    await createOrder(request(), user);
+    expect(db.order.findFirst).not.toHaveBeenCalled();
+    expect(tx.order.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('같은 열쇠로 다시 오면 만들지 않고 먼저 만든 주문을 준다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING',
+    });
+
+    const r = await createOrder(withKey(), user);
+
+    expect(r).toEqual({ orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING' });
+    // 재고를 다시 깎지 않았다는 것이 여기서 지킬 것이다
+    expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  it('남의 주문을 돌려주지 않는다 — 소유자까지 보고 찾는다', async () => {
+    await createOrder(withKey(), user);
+    expect(db.order.findFirst.mock.calls[0]![0].where).toEqual({
+      idempotencyKey: 'abcdefgh-1234-5678-9012-abcdefabcdef',
+      userId: 'u-1',
+    });
+  });
+
+  it('열쇠를 주문에 함께 남긴다', async () => {
+    await createOrder(withKey(), user);
+    expect(tx.order.create.mock.calls[0]![0].data.idempotencyKey).toBe(
+      'abcdefgh-1234-5678-9012-abcdefabcdef',
+    );
+  });
+
+  it('동시에 두 번 들어오면 유니크 제약이 잡고, 먼저 만든 주문을 준다', async () => {
+    // 조회는 둘 다 빈손으로 지나간다 — 그 뒤에 두 번째가 제약에 걸린다
+    db.order.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue({ orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING' });
+    tx.order.create.mockRejectedValueOnce(
+      Object.assign(new Error('unique'), { code: 'P2002', meta: { target: ['idempotencyKey'] } }),
+    );
+
+    const r = await createOrder(withKey(), user);
+
+    expect(r.orderNo).toBe('20260831-1234567');
+  });
+
+  it('주문번호 충돌은 그대로 다시 뽑는다 — 열쇠 충돌과 섞이지 않는다', async () => {
+    tx.order.create
+      .mockRejectedValueOnce(
+        Object.assign(new Error('unique'), { code: 'P2002', meta: { target: ['orderNo'] } }),
+      )
+      .mockResolvedValue({
+        id: 'o-1', orderNo: '20260831-7654321', payable: 289_000, status: 'PENDING',
+      });
+
+    const r = await createOrder(withKey(), user);
+
+    expect(r.orderNo).toBe('20260831-7654321');
+    expect(db.order.findFirst).toHaveBeenCalledTimes(1);
   });
 });

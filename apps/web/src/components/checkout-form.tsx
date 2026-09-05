@@ -31,6 +31,22 @@ interface SavedAddress {
   postalCode: string; address1: string; address2: string | null; isRemoteArea: boolean;
 }
 
+/**
+ * 결제 시도 하나를 가리키는 열쇠.
+ *
+ * randomUUID 는 보안 컨텍스트에서만 있다. 개발 중 http 로 열어 두면 없어서
+ * 여기서 통째로 터지는데, **그러면 주문 화면 자체가 안 열린다** — 중복을
+ * 막으려다 주문을 못 하게 만드는 셈이다. 없으면 난수로 물러난다.
+ */
+function newOrderKey(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
   const t = useT();
   const locale = useLocale();
@@ -70,6 +86,14 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
   const [pointsToUse, setPointsToUse] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  /**
+   * 이 결제 시도의 열쇠.
+   *
+   * **화면이 살아 있는 동안 같은 값을 쓴다.** 그래야 두 번 눌렀거나 응답을
+   * 못 받아 다시 보냈을 때 서버가 같은 시도인 줄 알아본다. 매번 새로 만들면
+   * 열쇠가 있어도 없는 것과 같다.
+   */
+  const [orderKey] = useState(newOrderKey);
 
   const quote = useCartQuote({
     items: selected,
@@ -85,7 +109,15 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!defaultAddress) return;
+    /*
+     * **버튼이 눌리는 것을 막지 않으므로 여기서 막는다.**
+     *
+     * Button 은 disabled 대신 aria-disabled 를 쓴다 — 못 누르는 버튼은
+     * 초점을 못 받아 왜 못 누르는지 들리지 않기 때문이고, 그 판단은 옳다.
+     * 대신 눌리기는 하므로 조건을 핸들러가 지켜야 한다. 예전에는 배송지만
+     * 보고 지나가서, 두 번 누르면 주문이 두 개 만들어졌다.
+     */
+    if (!canOrder || !defaultAddress) return;
     setError(null);
     setPending(true);
 
@@ -100,6 +132,8 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         paymentMethod: method,
         // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다
         browserSessionId: getSessionId(),
+        // 같은 시도를 두 번 보내도 주문은 하나다
+        idempotencyKey: orderKey,
         agreedToTerms: true,
       }),
     });

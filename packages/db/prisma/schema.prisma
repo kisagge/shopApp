@@ -605,6 +605,16 @@ model Order {
   /// 분석용이라 없어도 주문은 성립한다.
   browserSessionId String?
 
+  /// 같은 주문을 두 번 만들지 않기 위한 열쇠.
+  ///
+  /// 화면이 결제 시도마다 하나를 만들어 보낸다. 버튼을 두 번 눌렀거나 응답을
+  /// 못 받아 다시 보냈을 때, **두 번째 요청은 새 주문을 만들지 않고 먼저
+  /// 만들어진 주문을 그대로 돌려받는다.** 없으면 재고가 두 번 깎이고
+  /// 결제되지 않은 주문이 하나 더 남는다.
+  ///
+  /// 옛 주문에는 없으므로 nullable 이다. unique 는 null 을 여럿 허용한다.
+  idempotencyKey String? @unique
+
   usedCouponId String?
   usedCoupon   UserCoupon? @relation(fields: [usedCouponId], references: [id])
 

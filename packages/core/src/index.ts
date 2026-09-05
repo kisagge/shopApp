@@ -22,6 +22,7 @@ export * from './reward';
 export * from './settlement';
 export * from './image';
 export * from './schedule';
+export * from './order-hold';
 export * from './banner';
 export * from './collection';
 export * from './catalog';

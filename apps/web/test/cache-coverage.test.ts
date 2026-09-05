@@ -54,6 +54,15 @@ const COLLECTION_WRITERS = [
   'app/api/admin/collections/[id]/image/route.ts',
 ] as const;
 
+/**
+ * 배치도 카탈로그를 턴다.
+ *
+ * 결제 대기 주문을 풀면 **재고가 늘어난다** — 품절로 보이던 것이 다시
+ * 보여야 하는데, 캐시를 그대로 두면 최대 캐시 수명만큼 품절인 채로 남는다.
+ * 사람이 누른 것이 아니라 배치가 한 일이라 아무도 새로고침하지 않는다.
+ */
+const CRON_WRITERS = ['app/api/cron/release-holds/route.ts'] as const;
+
 /** 별점이 목록에 나오므로 리뷰 쓰기도 카탈로그를 턴다 */
 const REVIEW_WRITERS = [
   'app/api/reviews/route.ts',
@@ -113,6 +122,10 @@ describe('무효화한 자리', () => {
     expect(read(rel)).toContain('revalidateBanners()');
   });
 
+  it.each(CRON_WRITERS)('%s 가 카탈로그를 턴다 — 재고가 늘었다', (rel) => {
+    expect(read(rel)).toContain('revalidateCatalog()');
+  });
+
   it.each(COLLECTION_WRITERS)('%s 가 기획전을 턴다', (rel) => {
     expect(read(rel)).toContain('revalidateCollections()');
   });
@@ -131,6 +144,7 @@ describe('무효화한 자리', () => {
       ...CATALOG_WRITERS,
       ...BANNER_WRITERS,
       ...COLLECTION_WRITERS,
+      ...CRON_WRITERS,
       ...REVIEW_WRITERS,
       ...SUPPORT_WRITERS,
     ]);

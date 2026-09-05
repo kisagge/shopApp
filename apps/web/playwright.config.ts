@@ -61,7 +61,7 @@ export default defineConfig({
     {
       name: 'customer',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.customer },
-      testMatch: /(customer|review-helpful|notifications)\.spec\.ts/,
+      testMatch: /(customer|review-helpful|notifications|order-idempotency)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {

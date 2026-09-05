@@ -184,7 +184,12 @@ export function ProductOptions({
             setAdded(true);
           }}
         >
-          {t('nav.cart')}
+          {/*
+            헤더의 장바구니 링크와 이름이 같으면 낭독기로 훑을 때 어느 쪽이
+            가는 것이고 어느 쪽이 담는 것인지 구분되지 않는다. 사전에는
+            제대로 된 말이 이미 있었는데 쓰이지 않고 있었다.
+          */}
+          {t('product.addToCart')}
         </Button>
         <Button aria-disabled={!canAdd} className="flex-[1.3]">
           {canAdd ? t('product.buyNow') : t('opt.selectFirst')}

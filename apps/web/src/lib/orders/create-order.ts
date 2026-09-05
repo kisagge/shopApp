@@ -39,6 +39,18 @@ export async function createOrder(
   // 적립률까지 함께 받는다 — 견적과 같은 값이어야 한다(getQuoteViewer)
   user: { id: string; pointBalance: number; rewardPercent?: number },
 ): Promise<CreateOrderResponse> {
+  /*
+   * **이미 만든 주문이면 그것을 그대로 돌려준다.**
+   *
+   * 버튼을 두 번 눌렀거나 응답을 못 받아 다시 보낸 경우다. 여기서 걸러
+   * 내지 않으면 재고가 두 번 깎이고, 결제되지 않은 주문이 하나 더 남아
+   * 그 재고를 물고 있는다.
+   */
+  if (input.idempotencyKey) {
+    const already = await findByIdempotencyKey(input.idempotencyKey, user.id);
+    if (already) return already;
+  }
+
   const shipping = await resolveShipping(input, user.id);
 
   const quote = await quoteCart(
@@ -91,103 +103,145 @@ export async function createOrder(
     ? await findUsableCouponId(user.id, input.couponCode)
     : null;
 
-  return withOrderNumberRetry(async (orderNo) =>
-    prisma.$transaction(async (tx) => {
-      // ── 1) 재고 차감. 조건부 UPDATE 로 경쟁을 막는다.
-      //    읽고 나서 쓰면 두 주문이 같은 재고를 보고 둘 다 성공한다.
-      for (const item of items) {
-        const { count } = await tx.productVariant.updateMany({
-          where: { id: item.variantId, stock: { gte: item.quantity }, isActive: true },
-          data: { stock: { decrement: item.quantity } },
-        });
-        if (count === 0) throw new OrderError('OUT_OF_STOCK', [item.variantId]);
-      }
+  /*
+   * 동시에 두 번 들어오면 위의 조회는 둘 다 빈손으로 지나간다. 그때는
+   * 유니크 제약이 두 번째를 막고, **트랜잭션이 통째로 되돌아가므로 재고도
+   * 함께 돌아온다.** 그 뒤에 먼저 만들어진 주문을 읽어 돌려준다.
+   */
+  try {
+    return await createWithRetry();
+  } catch (error) {
+    if (input.idempotencyKey && isIdempotencyConflict(error)) {
+      const already = await findByIdempotencyKey(input.idempotencyKey, user.id);
+      if (already) return already;
+    }
+    throw error;
+  }
 
-      // ── 2) 포인트 차감. 같은 이유로 조건부 UPDATE.
-      if (quote.pointsUsed > 0) {
-        const { count } = await tx.user.updateMany({
-          where: { id: user.id, pointBalance: { gte: quote.pointsUsed } },
-          data: { pointBalance: { decrement: quote.pointsUsed } },
-        });
-        if (count === 0) throw new OrderError('INSUFFICIENT_POINTS');
-      }
+  function createWithRetry(): Promise<CreateOrderResponse> {
+    return withOrderNumberRetry(async (orderNo) =>
+      prisma.$transaction(async (tx) => {
+        // ── 1) 재고 차감. 조건부 UPDATE 로 경쟁을 막는다.
+        //    읽고 나서 쓰면 두 주문이 같은 재고를 보고 둘 다 성공한다.
+        for (const item of items) {
+          const { count } = await tx.productVariant.updateMany({
+            where: { id: item.variantId, stock: { gte: item.quantity }, isActive: true },
+            data: { stock: { decrement: item.quantity } },
+          });
+          if (count === 0) throw new OrderError('OUT_OF_STOCK', [item.variantId]);
+        }
 
-      // ── 3) 쿠폰 사용 처리. 아직 안 쓴 것만 잡히도록 조건을 건다.
-      if (usedCouponId) {
-        const { count } = await tx.userCoupon.updateMany({
-          where: { id: usedCouponId, usedAt: null },
-          data: { usedAt: new Date() },
-        });
-        if (count === 0) throw new OrderError('COUPON_INVALID');
-      }
+        // ── 2) 포인트 차감. 같은 이유로 조건부 UPDATE.
+        if (quote.pointsUsed > 0) {
+          const { count } = await tx.user.updateMany({
+            where: { id: user.id, pointBalance: { gte: quote.pointsUsed } },
+            data: { pointBalance: { decrement: quote.pointsUsed } },
+          });
+          if (count === 0) throw new OrderError('INSUFFICIENT_POINTS');
+        }
 
-      // ── 4) 주문. 모든 값이 스냅샷이다.
-      const order = await tx.order.create({
-        data: {
-          orderNo,
-          userId: user.id,
-          status: INITIAL_ORDER_STATUS,
-          listTotal: quote.listTotal,
-          productDiscount: quote.productDiscount,
-          couponDiscount: quote.couponDiscount,
-          pointsUsed: quote.pointsUsed,
-          shippingFee: quote.shippingFee,
-          payable: quote.payable,
-          rewardPoints: quote.rewardPoints,
-          recipient: shipping.recipient,
-          recipientPhone: shipping.recipientPhone,
-          postalCode: shipping.postalCode,
-          address1: shipping.address1,
-          address2: shipping.address2,
-          isRemoteArea: shipping.isRemoteArea,
-          deliveryMemo: shipping.deliveryMemo,
-          browserSessionId: input.browserSessionId ?? null,
-          usedCouponId,
-          items: {
-            create: items.map((i) => ({
-              variantId: i.variantId,
-              merchantId: i.merchantId,
-              productName: i.productName,
-              brandName: i.brandName,
-              optionLabel: i.optionLabel,
-              imageUrl: i.imageUrl,
-              listPrice: i.listPrice,
-              unitPrice: i.unitPrice,
-              quantity: i.quantity,
-              subtotal: i.subtotal,
-              status: INITIAL_ORDER_STATUS,
-            })),
-          },
-          statusLogs: {
-            create: { from: null, to: INITIAL_ORDER_STATUS, actor: 'system', note: '주문 생성' },
-          },
-          payment: {
-            create: { method: input.paymentMethod, status: 'READY', amount: quote.payable },
-          },
-        },
-        select: { id: true, orderNo: true, payable: true, status: true },
-      });
+        // ── 3) 쿠폰 사용 처리. 아직 안 쓴 것만 잡히도록 조건을 건다.
+        if (usedCouponId) {
+          const { count } = await tx.userCoupon.updateMany({
+            where: { id: usedCouponId, usedAt: null },
+            data: { usedAt: new Date() },
+          });
+          if (count === 0) throw new OrderError('COUPON_INVALID');
+        }
 
-      // ── 5) 포인트 원장. 잔액만 깎고 끝내면 왜 줄었는지 설명할 수 없다.
-      if (quote.pointsUsed > 0) {
-        await tx.pointTransaction.create({
+        // ── 4) 주문. 모든 값이 스냅샷이다.
+        const order = await tx.order.create({
           data: {
+            orderNo,
             userId: user.id,
-            amount: -quote.pointsUsed,
-            reason: 'USE_PURCHASE',
-            orderId: order.id,
-            note: `주문 ${orderNo}`,
+            status: INITIAL_ORDER_STATUS,
+            listTotal: quote.listTotal,
+            productDiscount: quote.productDiscount,
+            couponDiscount: quote.couponDiscount,
+            pointsUsed: quote.pointsUsed,
+            shippingFee: quote.shippingFee,
+            payable: quote.payable,
+            rewardPoints: quote.rewardPoints,
+            recipient: shipping.recipient,
+            recipientPhone: shipping.recipientPhone,
+            postalCode: shipping.postalCode,
+            address1: shipping.address1,
+            address2: shipping.address2,
+            isRemoteArea: shipping.isRemoteArea,
+            deliveryMemo: shipping.deliveryMemo,
+            browserSessionId: input.browserSessionId ?? null,
+            idempotencyKey: input.idempotencyKey ?? null,
+            usedCouponId,
+            items: {
+              create: items.map((i) => ({
+                variantId: i.variantId,
+                merchantId: i.merchantId,
+                productName: i.productName,
+                brandName: i.brandName,
+                optionLabel: i.optionLabel,
+                imageUrl: i.imageUrl,
+                listPrice: i.listPrice,
+                unitPrice: i.unitPrice,
+                quantity: i.quantity,
+                subtotal: i.subtotal,
+                status: INITIAL_ORDER_STATUS,
+              })),
+            },
+            statusLogs: {
+              create: { from: null, to: INITIAL_ORDER_STATUS, actor: 'system', note: '주문 생성' },
+            },
+            payment: {
+              create: { method: input.paymentMethod, status: 'READY', amount: quote.payable },
+            },
           },
+          select: { id: true, orderNo: true, payable: true, status: true },
         });
-      }
 
-      return {
-        orderNo: order.orderNo,
-        payable: order.payable as Won,
-        status: order.status,
-      };
-    }),
-  );
+        // ── 5) 포인트 원장. 잔액만 깎고 끝내면 왜 줄었는지 설명할 수 없다.
+        if (quote.pointsUsed > 0) {
+          await tx.pointTransaction.create({
+            data: {
+              userId: user.id,
+              amount: -quote.pointsUsed,
+              reason: 'USE_PURCHASE',
+              orderId: order.id,
+              note: `주문 ${orderNo}`,
+            },
+          });
+        }
+
+        return {
+          orderNo: order.orderNo,
+          payable: order.payable as Won,
+          status: order.status,
+        };
+      }),
+    );
+  }
+}
+
+/** 같은 열쇠로 이미 만들어진 주문. **남의 주문을 돌려주지 않게 소유자까지 본다.** */
+async function findByIdempotencyKey(
+  key: string,
+  userId: string,
+): Promise<CreateOrderResponse | null> {
+  const order = await prisma.order.findFirst({
+    where: { idempotencyKey: key, userId },
+    select: { orderNo: true, payable: true, status: true },
+  });
+  return order === null
+    ? null
+    : { orderNo: order.orderNo, payable: order.payable, status: order.status };
+}
+
+function isIdempotencyConflict(error: unknown): boolean {
+  const e = error as { code?: string; meta?: { target?: unknown } };
+  if (e?.code !== 'P2002') return false;
+  const target = e.meta?.target;
+  // 주문번호 충돌 판정과 같은 함정을 피한다 — 배열에 String() 을 씌우면
+  // "[object Object]" 가 되어 무엇과도 맞지 않는다.
+  if (Array.isArray(target)) return target.includes('idempotencyKey');
+  return typeof target === 'string' && target.includes('idempotencyKey');
 }
 
 /** 저장된 배송지를 쓰거나, 새로 입력한 값을 쓴다 */
