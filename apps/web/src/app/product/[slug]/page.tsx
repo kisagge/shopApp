@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -13,12 +14,10 @@ import { getSessionUser } from '@shop/auth/session';
 import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
 import { getProductBySlug } from '~/lib/queries/products';
-import { getProductReviews, getReviewSummary } from '~/lib/queries/reviews';
-import { getProductInquiries } from '~/lib/queries/inquiries';
 import { ProductOptions } from '~/components/product-options';
-import { ReviewSection } from '~/components/review-section';
-import { ReviewSortTabs } from '~/components/review-sort-tabs';
-import { InquirySection } from '~/components/inquiry-section';
+import { ProductReviews } from '~/components/product-reviews';
+import { ProductInquiries } from '~/components/product-inquiries';
+import { SectionSkeleton, StripSkeleton } from '~/components/section-skeleton';
 import { WishlistButton } from '~/components/wishlist-button';
 import { RecordRecentView } from '~/components/record-recent-view';
 import { RecentlyViewed } from '~/components/recently-viewed';
@@ -27,7 +26,6 @@ import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { reviewListQuerySchema } from '@shop/contract';
-import { SIZE_FIT_KEY } from '~/lib/i18n/enum-labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -73,12 +71,18 @@ export default async function ProductPage({ params, searchParams }: Params) {
   const reviewSort = reviewListQuerySchema.parse({
     sort: (await searchParams)['reviewSort'],
   }).sort;
-  const product = await getProductBySlug(slug);
+  /*
+   * **상품과 세션은 서로를 기다릴 이유가 없다.** 예전에는 상품을 받고 나서야
+   * 세션을 물어, 왕복 한 번이 그냥 더 붙었다.
+   */
+  const [product, viewer, locale, t] = await Promise.all([
+    getProductBySlug(slug),
+    // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
+    headers().then((h) => getSessionUser(h)),
+    getLocale(),
+    getT(),
+  ]);
   if (!product) notFound();
-
-  // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
-  const viewer = await getSessionUser(await headers());
-  const [locale, t] = await Promise.all([getLocale(), getT()]);
 
   /**
    * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**
@@ -89,11 +93,14 @@ export default async function ProductPage({ params, searchParams }: Params) {
    */
   const rewardPercent = viewer ? (await getEffectiveGrade(viewer.id)).rewardPercent : GRADE_REWARD_PERCENT.BASIC;
 
-  const [summary, reviews, inquiries, wishlisted, restockOn] = await Promise.all([
-    getReviewSummary(product.id),
-    getProductReviews(product.id, { viewerId: viewer?.id, sort: reviewSort }),
-    // 비공개 문의를 거를 수 있게 보는 사람을 넘긴다
-    getProductInquiries(product.id, viewer),
+  /*
+   * **첫 화면에 필요한 것만 기다린다.**
+   *
+   * 예전에는 리뷰·문의까지 여기서 함께 받았다. 그래서 상품 사진과 가격이
+   * 준비된 뒤에도 **화면 아래쪽 조회가 끝날 때까지 아무 픽셀도 나가지
+   * 않았다.** 아래쪽은 Suspense 로 내려보내고 여기서는 히어로만 챙긴다.
+   */
+  const [wishlisted, restockOn] = await Promise.all([
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
     // 품절 옵션에 이미 알림을 걸어 뒀는지. 옵션마다 물으면 옵션 수만큼 쿼리가 나간다.
     viewer
@@ -290,28 +297,34 @@ export default async function ProductPage({ params, searchParams }: Params) {
         </p>
       </section>
 
+      {/*
+        여기부터는 **먼저 그리고 나중에 채운다.**
+        리뷰와 문의는 첫 화면 밖에 있는데, 예전에는 이것들이 끝나야 상품
+        사진 한 장도 나가지 않았다. 각각 따로 감싸는 이유는 하나로 묶으면
+        느린 쪽이 빠른 쪽을 붙잡기 때문이다.
+      */}
       <div className="pt-16">
-        <ReviewSection
-          summary={summary}
-          reviews={reviews.items}
-          sortTabs={<ReviewSortTabs sort={reviewSort} basePath={`/product/${slug}`} />}
-          loggedIn={viewer !== null}
-          sizeFitLabel={(fit) => t(SIZE_FIT_KEY[fit])}
-          t={t}
-        />
-        <InquirySection
-          productId={product.id}
-          inquiries={inquiries.items}
-          loggedIn={viewer !== null}
-          t={t}
-        />
+        <Suspense fallback={<SectionSkeleton height="420px" label={t('review.heading')} />}>
+          <ProductReviews
+            productId={product.id}
+            slug={slug}
+            viewerId={viewer?.id}
+            loggedIn={viewer !== null}
+            sort={reviewSort}
+          />
+        </Suspense>
+        <Suspense fallback={<SectionSkeleton height="280px" label={t('product.inquiries')} />}>
+          <ProductInquiries productId={product.id} viewer={viewer} />
+        </Suspense>
       </div>
 
       {/*
         추천을 최근 본 상품보다 앞에 둔다. 최근 본 것은 이미 아는 상품이고,
         추천은 모르던 것을 보여 준다 — 뒤에 둘 이유가 없다.
       */}
-      <Recommendations productId={product.id} categorySlug={product.categorySlug} />
+      <Suspense fallback={<StripSkeleton height="360px" />}>
+        <Recommendations productId={product.id} categorySlug={product.categorySlug} />
+      </Suspense>
 
       {/* 지금 보고 있는 상품은 빼고 보여 준다 */}
       <RecentlyViewed excludeSlug={product.slug} />
