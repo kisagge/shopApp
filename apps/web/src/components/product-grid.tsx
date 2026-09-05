@@ -26,17 +26,31 @@ const TONES = ['sand', 'stone', 'clay', 'olive', 'mist'] as const;
  */
 const DEFAULT_SIZES = '(min-width: 1024px) 25vw, (min-width: 768px) 33vw, 50vw';
 
-/** 첫 화면에 보이는 카드 수. 이만큼만 먼저 받는다. */
+/**
+ * 첫 화면에 보이는 카드 수. 이만큼만 먼저 받는다.
+ *
+ * 목록 화면(카테고리·검색·브랜드)은 격자가 맨 위라 이 값이 맞다.
+ */
 const ABOVE_FOLD = 4;
 
 export async function ProductGrid({
   products,
   columns = 'lg:grid-cols-4',
   imageSizes = DEFAULT_SIZES,
+  priorityCount = ABOVE_FOLD,
 }: {
   products: readonly ProductListItem[];
   columns?: string;
   imageSizes?: string;
+  /**
+   * 미리 받을 카드 수.
+   *
+   * **격자가 화면 맨 위가 아니면 0 이어야 한다.** 홈은 배너가 먼저라
+   * 격자가 한참 아래에 있는데, 그런데도 넉 장을 미리 받기 목록에 올리고
+   * 있었다 — 배너와 대역폭을 나눠 쓰면서 정작 화면에는 안 보이는 것들이다.
+   * 미리 받기는 화면의 가장 큰 그림 하나를 위한 것이지, 목록이 아니다.
+   */
+  priorityCount?: number;
 }) {
   const [viewer, locale] = await Promise.all([getSessionUser(await headers()), getLocale()]);
   const wishlisted = viewer
@@ -57,7 +71,7 @@ export async function ProductGrid({
              * 앞의 몇 장만 먼저 받는다. 목록 전체에 주면 브라우저가 무엇을
              * 먼저 그릴지 알 수 없어져서 붙이지 않은 것과 같아진다.
              */
-            imagePriority={i < ABOVE_FOLD}
+            imagePriority={i < priorityCount}
             brand={p.brand}
             name={p.name}
             price={p.price}

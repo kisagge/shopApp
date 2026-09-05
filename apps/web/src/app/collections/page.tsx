@@ -46,6 +46,7 @@ export default async function CollectionsPage() {
                   imageUrl={c.imageUrl}
                   imageCredit={c.imageCredit}
                   tone={c.tone}
+                  sizes="(min-width: 768px) 50vw, 100vw" 
                 />
               </Link>
             </li>

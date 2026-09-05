@@ -45,6 +45,8 @@ export default async function CollectionPage({ params }: Params) {
           imageUrl={collection.imageUrl}
           imageCredit={collection.imageCredit}
           tone={collection.tone}
+          sizes="100vw"
+          priority
           headingLevel={1}
         />
       </div>
@@ -80,7 +82,8 @@ export default async function CollectionPage({ params }: Params) {
             listId={`collection_${collection.slug}`}
             itemCount={collection.items.length}
           >
-            <ProductGrid products={collection.items} />
+            {/* 위에 큰 머리 그림이 있다. 격자까지 미리 받으면 그것과 나눠 쓴다. */}
+            <ProductGrid products={collection.items} priorityCount={0} />
           </TrackedProductList>
         )}
       </section>

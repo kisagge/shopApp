@@ -84,6 +84,8 @@ export default async function HomePage() {
         <TrackedProductList listId="home_editors_pick" itemCount={products.length}>
           <ProductGrid products={products}
             columns="lg:grid-cols-4 xl:grid-cols-5"
+            // 배너가 먼저 있고 격자는 한참 아래다. 미리 받을 이유가 없다.
+            priorityCount={0}
           />
         </TrackedProductList>
       </section>

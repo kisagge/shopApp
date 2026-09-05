@@ -39,6 +39,8 @@ export async function CollectionStrip({
                 imageUrl={c.imageUrl}
                 imageCredit={c.imageCredit}
                 tone={c.tone}
+                // md 부터 두 칸이다. 그 아래로는 한 칸.
+                sizes="(min-width: 768px) 50vw, 100vw" 
               />
             </Link>
           </li>

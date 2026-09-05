@@ -20,6 +20,8 @@ export function CollectionHero({
   imageUrl,
   imageCredit,
   tone,
+  sizes,
+  priority = false,
   /**
    * 제목의 단계.
    *
@@ -37,6 +39,23 @@ export function CollectionHero({
   /** 남의 사진을 쓸 때의 작가 표기. 상품 사진과 같은 규칙이다. */
   imageCredit?: string | null;
   tone: string;
+  /**
+   * 이 자리의 표시 크기.
+   *
+   * **격자와 어긋나면 최적화가 헛돈다.** 목록에서는 두 칸짜리 카드인데
+   * `100vw` 로 두었더니, 592px 자리에 3840px 후보를 받아 왔다 —
+   * 1,200px 이면 될 것을 96KB 로 받는다(필요분 50KB). 상품 카드에서 이미
+   * 겪고 적어 둔 함정을 기획전에서 그대로 되풀이했다.
+   */
+  sizes?: string;
+  /**
+   * 먼저 받을 것인가.
+   *
+   * **화면의 가장 큰 그림 하나에만 준다.** 처음에는 늘 켜 두었는데, 그러면
+   * 홈에서 화면 밖 카드까지 미리 받기 목록에 올라 LCP 그림과 대역폭을
+   * 나눠 쓴다 — 우선순위를 일곱으로 나누면 우선순위가 아니다.
+   */
+  priority?: boolean;
   headingLevel?: 1 | 2 | 3;
 }) {
   const Heading = ({ 1: 'h1', 2: 'h2', 3: 'h3' } as const)[headingLevel];
@@ -53,8 +72,8 @@ export function CollectionHero({
             alt=""
             aria-hidden="true"
             fill
-            sizes="100vw"
-            priority
+            sizes={sizes ?? '100vw'}
+            priority={priority}
             className="object-cover"
           />
           {/*
