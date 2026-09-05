@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { applyMerchantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { applyForMerchant, MerchantApplicationError } from '~/lib/merchant/apply';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 입점 신청.
@@ -17,14 +18,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = applyMerchantSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    const fields: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      fields[issue.path.join('.') || '_'] = issue.message;
-    }
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '입력값을 확인해 주세요.', fields },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

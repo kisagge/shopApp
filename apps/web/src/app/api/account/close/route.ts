@@ -3,6 +3,7 @@ import { closeAccountSchema } from '@shop/contract';
 import { auth } from '@shop/auth';
 import { getSessionUser } from '@shop/auth/session';
 import { closeAccount, ClosureError } from '~/lib/account/close-account';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 회원 탈퇴.
@@ -19,10 +20,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = closeAccountSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

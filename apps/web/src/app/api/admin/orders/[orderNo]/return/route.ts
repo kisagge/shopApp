@@ -3,6 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { resolveReturnSchema } from '@shop/contract';
 import { resolveReturn, ReturnError } from '~/lib/orders/return-request';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 운영진의 반품 승인·반려 */
 export async function POST(
@@ -16,14 +17,7 @@ export async function POST(
 
   const parsed = resolveReturnSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_INPUT',
-        message: '처리 내용을 확인해 주세요.',
-        fields: Object.fromEntries(parsed.error.issues.map((i) => [i.path.join('.'), i.message])),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { orderNo } = await params;

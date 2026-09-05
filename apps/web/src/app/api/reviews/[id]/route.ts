@@ -6,6 +6,7 @@ import { updateReview, deleteReview, ReviewError } from '~/lib/reviews/write-rev
 import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 export async function PATCH(
   request: Request,
@@ -25,10 +26,7 @@ export async function PATCH(
 
   const parsed = updateReviewSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

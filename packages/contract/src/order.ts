@@ -21,22 +21,22 @@ export type PaymentMethodInput = (typeof PAYMENT_METHOD)[number];
  * 판정한다 — core 의 isRemoteAreaPostalCode.
  */
 export const shippingAddressSchema = z.object({
-  recipient: z.string().trim().min(1, '받는 분을 입력해 주세요').max(50),
+  recipient: z.string().trim().min(1, 'valid.recipientRequired').max(50),
   phone: z
     .string()
     .trim()
     // 하이픈·공백을 섞어 쓰거나 아예 안 쓰는 사람이 많다. 어차피 저장할 때
     // 한 모양으로 통일하므로(core 의 normalizePhone) 입력 단계에서 막을 이유가 없다.
-    .regex(/^01[016789][-\s]?\d{3,4}[-\s]?\d{4}$/, '휴대폰 번호 형식이 올바르지 않습니다'),
-  postalCode: z.string().trim().regex(/^\d{5}$/, '우편번호는 5자리입니다'),
-  address1: z.string().trim().min(1, '주소를 입력해 주세요').max(200),
+    .regex(/^01[016789][-\s]?\d{3,4}[-\s]?\d{4}$/, 'valid.phoneFormat'),
+  postalCode: z.string().trim().regex(/^\d{5}$/, 'valid.zipFormat'),
+  address1: z.string().trim().min(1, 'valid.addressRequired').max(200),
   address2: z.string().trim().max(200).optional(),
 });
 export type ShippingAddressInput = z.infer<typeof shippingAddressSchema>;
 
 export const createOrderRequestSchema = z
   .object({
-    lines: z.array(cartLineInputSchema).min(1, '주문할 상품이 없습니다').max(100),
+    lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100),
     /** 저장된 배송지를 쓰거나, 새로 입력하거나 — 둘 중 하나여야 한다 */
     addressId: cuidSchema.optional(),
     address: shippingAddressSchema.optional(),
@@ -50,10 +50,10 @@ export const createOrderRequestSchema = z
       .optional(),
     paymentMethod: z.enum(PAYMENT_METHOD),
     /** 약관 동의 없이 주문을 만들지 않는다 */
-    agreedToTerms: z.literal(true, '약관에 동의해야 주문할 수 있습니다'),
+    agreedToTerms: z.literal(true, 'valid.agreeRequired'),
   })
   .refine((v) => v.addressId !== undefined || v.address !== undefined, {
-    message: '배송지를 선택하거나 입력해 주세요',
+    message: 'valid.addressPick',
     path: ['address'],
   });
 export type CreateOrderRequest = z.infer<typeof createOrderRequestSchema>;

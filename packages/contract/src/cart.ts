@@ -16,7 +16,7 @@ export const cartLineInputSchema = z.object({
 export type CartLineInput = z.infer<typeof cartLineInputSchema>;
 
 export const cartQuoteRequestSchema = z.object({
-  lines: z.array(cartLineInputSchema).min(1, '주문할 상품이 없습니다').max(100),
+  lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100),
   /** 쿠폰도 코드만 받는다. 할인 조건은 서버가 안다. */
   couponCode: z.string().trim().min(1).max(64).optional(),
   pointsToUse: wonSchema.optional(),

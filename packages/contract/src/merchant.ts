@@ -20,9 +20,9 @@ export const applyMerchantSchema = z.object({
     .trim()
     // 하이픈을 빼고 적는 사람이 많다. 거절하지 말고 표준 표기로 맞춘다.
     .transform(normalizeBusinessNumber)
-    .refine((v) => BUSINESS_NUMBER_PATTERN.test(v), '사업자등록번호 형식이 아닙니다 (000-00-00000)'),
+    .refine((v) => BUSINESS_NUMBER_PATTERN.test(v), 'valid.bizNumberFormat'),
   representative: trimmed(20),
-  contactEmail: z.email('이메일 형식이 아닙니다').max(120),
+  contactEmail: z.email('valid.emailFormat').max(120),
   contactPhone: trimmed(20),
 });
 export type ApplyMerchantInput = z.infer<typeof applyMerchantSchema>;

@@ -5,6 +5,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { getQuoteViewer } from '~/lib/grade/effective';
 import { quoteCart } from '~/lib/queries/cart';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 장바구니 견적.
@@ -39,14 +40,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = cartQuoteRequestSchema.safeParse(body);
   if (!parsed.success) {
-    const fields: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      fields[issue.path.join('.') || '_'] = issue.message;
-    }
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '요청 값을 확인해 주세요.', fields },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   // 포인트 잔액은 세션이 아니라 DB 를 다시 본다. 세션 캐시가 5분이라 그동안

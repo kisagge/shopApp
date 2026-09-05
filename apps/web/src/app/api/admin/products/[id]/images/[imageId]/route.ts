@@ -7,6 +7,7 @@ import { ProductError } from '~/lib/admin/manage-product';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 const altSchema = z.object({ alt: z.string().trim().min(1, '대체 텍스트를 입력해 주세요').max(200) });
 
@@ -45,10 +46,7 @@ export async function PATCH(
 
   const parsed = altSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'ALT_REQUIRED', message: parsed.error.issues[0]?.message ?? '대체 텍스트를 입력해 주세요' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id, imageId } = await params;

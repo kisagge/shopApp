@@ -1,8 +1,10 @@
 import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
+import { unstable_rethrow } from 'next/navigation';
 import {
   createTranslator,
   resolveLocale,
+  DEFAULT_LOCALE,
   LOCALE_COOKIE,
   type Locale,
   type Translator,
@@ -24,11 +26,30 @@ import {
  * "브라우저 언어를 따른다" 가 아니라 "주소로 정한다" 가 된다.
  */
 export const getLocale = cache(async (): Promise<Locale> => {
-  const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
-  return resolveLocale({
-    cookie: cookieStore.get(LOCALE_COOKIE)?.value,
-    acceptLanguage: headerList.get('accept-language'),
-  });
+  /*
+   * **요청 맥락이 없으면 기본 언어로 물러난다.**
+   *
+   * cookies()·headers() 는 요청 밖에서 부르면 던진다. 배치나 테스트가
+   * 라우트 안의 함수를 직접 부르는 일이 있는데, 그때 언어를 못 정했다고
+   * 통째로 터지면 검증 오류 하나가 500 이 된다 — 사용자에게는 "무엇이
+   * 잘못됐는지" 대신 "서버가 죽었다" 가 간다.
+   *
+   * **다만 Next 가 흐름을 제어하려고 던지는 것은 그대로 넘긴다.** 빌드 중에
+   * cookies() 를 부르면 Next 는 "이 화면은 미리 그릴 수 없다" 는 신호를
+   * 던지는데, 그것까지 삼키면 화면이 정적으로 잡혀 **모두에게 같은 언어가
+   * 나간다.** 실제로 처음 그렇게 적었더니 빌드가 /404 에서 깨졌고, 그게
+   * 아니었으면 조용히 잘못된 화면이 배포됐을 것이다.
+   */
+  try {
+    const [cookieStore, headerList] = await Promise.all([cookies(), headers()]);
+    return resolveLocale({
+      cookie: cookieStore.get(LOCALE_COOKIE)?.value,
+      acceptLanguage: headerList.get('accept-language'),
+    });
+  } catch (error) {
+    unstable_rethrow(error);
+    return DEFAULT_LOCALE;
+  }
 });
 
 /** 이번 요청의 문구 사전 */

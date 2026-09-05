@@ -12,16 +12,16 @@ import {
  */
 export const signUpSchema = z
   .object({
-    email: z.email('이메일 주소를 정확히 입력해 주세요'),
+    email: z.email('valid.emailFormat'),
     name: z
       .string()
       .trim()
-      .min(1, '이름을 입력해 주세요')
-      .max(NAME_MAX_LENGTH, `이름은 ${NAME_MAX_LENGTH}자를 넘을 수 없습니다`),
+      .min(1, 'valid.nameRequired')
+      .max(NAME_MAX_LENGTH, 'valid.nameTooLong'),
     password: z
       .string()
-      .min(PASSWORD_MIN_LENGTH, `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다`)
-      .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 넘을 수 없습니다`),
+      .min(PASSWORD_MIN_LENGTH, 'valid.passwordTooShort')
+      .max(PASSWORD_MAX_LENGTH, 'valid.passwordTooLong'),
     passwordConfirm: z.string(),
   })
   /**
@@ -33,11 +33,11 @@ export const signUpSchema = z
    */
   .refine((v) => v.password === v.passwordConfirm, {
     path: ['passwordConfirm'],
-    message: '비밀번호가 일치하지 않습니다',
+    message: 'valid.passwordMismatch',
   })
   .refine((v) => !isDerivedFromEmail(v.password, v.email), {
     path: ['password'],
-    message: '이메일과 너무 비슷한 비밀번호는 쓸 수 없습니다',
+    message: 'valid.passwordLikeEmail',
   });
 
 export type SignUpInput = z.infer<typeof signUpSchema>;
@@ -52,20 +52,20 @@ export const resetPasswordSchema = z
   .object({
     password: z
       .string()
-      .min(PASSWORD_MIN_LENGTH, `비밀번호는 ${PASSWORD_MIN_LENGTH}자 이상이어야 합니다`)
-      .max(PASSWORD_MAX_LENGTH, `비밀번호는 ${PASSWORD_MAX_LENGTH}자를 넘을 수 없습니다`),
+      .min(PASSWORD_MIN_LENGTH, 'valid.passwordTooShort')
+      .max(PASSWORD_MAX_LENGTH, 'valid.passwordTooLong'),
     passwordConfirm: z.string(),
   })
   .refine((v) => v.password === v.passwordConfirm, {
     path: ['passwordConfirm'],
-    message: '비밀번호가 일치하지 않습니다',
+    message: 'valid.passwordMismatch',
   });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 /** 재설정 메일을 요청하는 폼. */
 export const forgotPasswordSchema = z.object({
-  email: z.email('이메일 주소를 정확히 입력해 주세요'),
+  email: z.email('valid.emailFormat'),
 });
 
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;

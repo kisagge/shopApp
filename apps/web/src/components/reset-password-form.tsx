@@ -6,12 +6,14 @@ import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { resetPasswordSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
-import { useT } from '~/lib/i18n/client';
+import { useIssueText, useT } from '~/lib/i18n/client';
+import type { IssueBounds } from '~/lib/i18n/issue';
 
 type FieldName = 'password' | 'passwordConfirm';
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useT();
+  const issueText = useIssueText();
   const router = useRouter();
   const [values, setValues] = useState({ password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -33,7 +35,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
       const next: Partial<Record<FieldName, string>> = {};
       for (const issue of parsed.error.issues) {
         const key = issue.path[0] as FieldName | undefined;
-        if (key && !next[key]) next[key] = issue.message;
+        if (key && !next[key]) next[key] = issueText(issue.message, issue as IssueBounds);
       }
       setFieldErrors(next);
       return;

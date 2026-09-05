@@ -9,6 +9,7 @@ import { ProductError } from '~/lib/admin/manage-product';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
@@ -117,10 +118,7 @@ export async function PATCH(
 
   const parsed = reorderSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '이미지 순서를 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

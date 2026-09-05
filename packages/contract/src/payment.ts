@@ -12,6 +12,6 @@ export const confirmPaymentRequestSchema = z.object({
 export type ConfirmPaymentRequest = z.infer<typeof confirmPaymentRequestSchema>;
 
 export const cancelOrderRequestSchema = z.object({
-  reason: z.string().trim().min(1, '취소 사유를 입력해 주세요').max(200),
+  reason: z.string().trim().min(1, 'valid.cancelReasonRequired').max(200),
 });
 export type CancelOrderRequest = z.infer<typeof cancelOrderRequestSchema>;

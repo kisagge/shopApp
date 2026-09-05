@@ -3,6 +3,7 @@ import { createOrderRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 주문 생성.
@@ -31,14 +32,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createOrderRequestSchema.safeParse(body);
   if (!parsed.success) {
-    const fields: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      fields[issue.path.join('.') || '_'] = issue.message;
-    }
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '주문 정보를 확인해 주세요.', fields },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   /*

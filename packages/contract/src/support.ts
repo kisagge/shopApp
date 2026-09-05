@@ -14,8 +14,8 @@ import {
 export const supportPostSchema = z
   .object({
     kind: z.enum(SUPPORT_POST_KIND),
-    title: z.string().trim().min(2, '제목을 적어 주세요').max(SUPPORT_TITLE_MAX_LENGTH),
-    body: z.string().trim().min(2, '내용을 적어 주세요').max(SUPPORT_BODY_MAX_LENGTH),
+    title: z.string().trim().min(2, 'valid.titleRequired').max(SUPPORT_TITLE_MAX_LENGTH),
+    body: z.string().trim().min(2, 'valid.bodyRequired').max(SUPPORT_BODY_MAX_LENGTH),
     topic: z.enum(INQUIRY_TOPIC).nullish(),
     pinned: z.boolean().default(false),
     sortOrder: z.number().int().min(0).max(9_999).default(0),
@@ -23,11 +23,11 @@ export const supportPostSchema = z
     published: z.boolean().default(false),
   })
   .refine((v) => !topicRequired(v.kind) || v.topic != null, {
-    message: 'FAQ 는 갈래를 골라 주세요',
+    message: 'valid.faqNeedsTopic',
     path: ['topic'],
   })
   .refine((v) => topicRequired(v.kind) || v.topic == null, {
-    message: '공지에는 갈래를 두지 않습니다',
+    message: 'valid.noticeNoTopic',
     path: ['topic'],
   });
 export type SupportPostInput = z.infer<typeof supportPostSchema>;

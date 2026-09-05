@@ -26,7 +26,7 @@ export const updateMerchantStatusSchema = z
   // 승인은 이유가 없어도 되지만 **불이익을 주는 처분에는 이유를 남긴다.**
   // 정지된 가맹점이 왜 정지됐는지 아무도 모르는 상태가 되면 안 된다.
   .refine((v) => v.status === 'APPROVED' || v.status === 'PENDING' || v.reason.length > 0, {
-    message: '정지·해지에는 사유가 필요합니다',
+    message: 'valid.suspendNeedsReason',
     path: ['reason'],
   });
 export type UpdateMerchantStatusInput = z.infer<typeof updateMerchantStatusSchema>;
@@ -39,16 +39,16 @@ export const assignRoleSchema = z
     role: z.enum(USER_ROLE_INPUT),
     /** MERCHANT 로 올릴 때만 채운다 */
     merchantId: cuidSchema.nullable().default(null),
-    reason: z.string().trim().min(1, '사유를 입력해 주세요').max(300),
+    reason: z.string().trim().min(1, 'valid.reasonRequired').max(300),
   })
   .refine((v) => v.role !== 'MERCHANT' || v.merchantId !== null, {
     // 소속 없는 가맹점 계정은 아무것도 볼 수 없다. hasPermission 이 merchantId
     // 가 비면 false 를 주므로, 만들어 봐야 로그인만 되는 계정이 된다.
-    message: '가맹점 계정에는 소속 가맹점이 필요합니다',
+    message: 'valid.merchantNeedsScope',
     path: ['merchantId'],
   })
   .refine((v) => v.role === 'MERCHANT' || v.merchantId === null, {
-    message: '가맹점 계정이 아니면 소속을 비워야 합니다',
+    message: 'valid.nonMerchantNoScope',
     path: ['merchantId'],
   });
 export type AssignRoleInput = z.infer<typeof assignRoleSchema>;

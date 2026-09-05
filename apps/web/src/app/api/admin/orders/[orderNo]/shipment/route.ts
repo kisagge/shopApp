@@ -3,6 +3,7 @@ import { registerShipmentSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { registerShipment, ShipmentError } from '~/lib/admin/manage-shipment';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 export async function POST(
   request: Request,
@@ -15,14 +16,7 @@ export async function POST(
 
   const parsed = registerShipmentSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_INPUT',
-        message: '입력을 확인해 주세요.',
-        fields: Object.fromEntries(parsed.error.issues.map((i) => [i.path.join('.'), i.message])),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { orderNo } = await params;

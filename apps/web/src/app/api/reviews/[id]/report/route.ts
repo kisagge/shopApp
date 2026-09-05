@@ -3,6 +3,7 @@ import { reportReviewSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { reportReview, ReviewReportError } from '~/lib/reviews/report';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 리뷰 신고.
@@ -25,10 +26,7 @@ export async function POST(
 
   const parsed = reportReviewSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

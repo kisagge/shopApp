@@ -7,6 +7,7 @@ import { NextResponse } from 'next/server';
 import {
   deviceTypeOf, hashIp, recordEvents, toTrackedEvent, type CollectionContext,
 } from '~/lib/analytics/server';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 본문 크기 상한. 배치 20건이면 넉넉하다. */
 const MAX_BODY_BYTES = 64 * 1024;
@@ -58,14 +59,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = eventBatchSchema.safeParse(body);
   if (!parsed.success) {
-    const fields: Record<string, string> = {};
-    for (const issue of parsed.error.issues) {
-      fields[issue.path.join('.') || '_'] = issue.message;
-    }
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '이벤트 형식을 확인해 주세요.', fields },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   // 매출 이벤트는 서버만 기록한다. 한 건이라도 섞여 있으면 배치 전체를 거절한다 —

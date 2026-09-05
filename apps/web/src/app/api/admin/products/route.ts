@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { createProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 상품 등록. 가맹점은 자기 브랜드에만 등록할 수 있다. */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -21,14 +22,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createProductSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

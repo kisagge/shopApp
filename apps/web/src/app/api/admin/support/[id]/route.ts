@@ -4,6 +4,7 @@ import { supportPostSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateSupportPost, deleteSupportPost } from '~/lib/admin/manage-support';
 import { revalidateSupport } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -37,14 +38,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
 
   const parsed = supportPostSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

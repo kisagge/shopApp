@@ -25,8 +25,8 @@ export const createCouponSchema = z.object({
     .string()
     .trim()
     .transform((v) => v.toUpperCase().replace(/[\s-]/g, ''))
-    .refine((v) => COUPON_CODE_PATTERN.test(v), '코드는 영문·숫자 4~20자입니다'),
-  name: z.string().trim().min(1, '쿠폰 이름을 입력해 주세요').max(60),
+    .refine((v) => COUPON_CODE_PATTERN.test(v), 'valid.couponCodeFormat'),
+  name: z.string().trim().min(1, 'valid.couponNameRequired').max(60),
   kind: z.enum(COUPON_KIND),
   value: z.number().int().min(0).max(10_000_000).default(0),
   percent: z.number().int().min(0).max(100).default(0),
@@ -54,10 +54,10 @@ export type UpdateCouponInput = z.infer<typeof updateCouponSchema>;
 
 /** 코드로 직접 받기 */
 export const claimCouponSchema = z.object({
-  code: z.string().trim().min(1, '쿠폰 코드를 입력해 주세요').max(30),
+  code: z.string().trim().min(1, 'valid.couponCodeRequired').max(30),
 });
 
 /** 어드민이 여러 사용자에게 지급 */
 export const issueCouponSchema = z.object({
-  userIds: z.array(z.string()).min(1, '지급할 회원을 골라 주세요').max(500),
+  userIds: z.array(z.string()).min(1, 'valid.pickUsers').max(500),
 });

@@ -12,11 +12,11 @@ export const registerShipmentSchema = z.object({
   trackingNumber: z
     .string()
     .trim()
-    .min(1, '송장번호를 입력해 주세요')
+    .min(1, 'valid.trackingRequired')
     .max(40)
     .refine((v) => {
       const digits = v.replace(/\D/g, '');
       return digits.length >= 9 && digits.length <= 20;
-    }, '송장번호는 숫자 9~20자리입니다'),
+    }, 'valid.trackingFormat'),
 });
 export type RegisterShipmentInput = z.infer<typeof registerShipmentSchema>;

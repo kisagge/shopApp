@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { createVariant, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 옵션 추가 */
 export async function POST(
@@ -24,14 +25,7 @@ export async function POST(
 
   const parsed = createVariantSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: '옵션 정보를 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

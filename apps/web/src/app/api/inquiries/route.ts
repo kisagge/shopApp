@@ -3,6 +3,7 @@ import { createInquirySchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { createInquiry, InquiryError } from '~/lib/inquiry/write';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 상품 문의 작성.
@@ -23,10 +24,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createInquirySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

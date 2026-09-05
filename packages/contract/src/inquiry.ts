@@ -20,8 +20,8 @@ export const createInquirySchema = z
     content: z
       .string()
       .trim()
-      .min(5, '5자 이상 적어 주세요')
-      .max(INQUIRY_MAX_LENGTH, `${INQUIRY_MAX_LENGTH}자를 넘을 수 없습니다`),
+      .min(5, 'valid.tooShortChars')
+      .max(INQUIRY_MAX_LENGTH, 'valid.tooLongChars'),
     isPrivate: z.boolean().default(false),
   })
   /*
@@ -30,7 +30,7 @@ export const createInquirySchema = z
    * 집는다. 어디에도 안 붙는 문의는 대기줄에서 조용히 늙는다.
    */
   .refine((v) => v.productId != null || v.topic != null, {
-    message: '문의할 상품이나 갈래를 정해 주세요',
+    message: 'valid.inquiryTarget',
     path: ['topic'],
   });
 export type CreateInquiryInput = z.infer<typeof createInquirySchema>;
@@ -39,7 +39,7 @@ export const answerInquirySchema = z.object({
   answer: z
     .string()
     .trim()
-    .min(1, '답변을 적어 주세요')
-    .max(ANSWER_MAX_LENGTH, `${ANSWER_MAX_LENGTH}자를 넘을 수 없습니다`),
+    .min(1, 'valid.answerRequired')
+    .max(ANSWER_MAX_LENGTH, 'valid.tooLongChars'),
 });
 export type AnswerInquiryInput = z.infer<typeof answerInquirySchema>;

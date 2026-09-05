@@ -27,11 +27,11 @@ export const PRODUCT_STATUS_LABEL = CORE_PRODUCT_STATUS_LABEL;
 const slugSchema = z
   .string()
   .trim()
-  .min(2, '슬러그는 2자 이상이어야 합니다')
+  .min(2, 'valid.tooShortChars')
   .max(80)
   // URL 에 그대로 들어간다. 한글·공백·대문자를 허용하면 인코딩된 주소가 되고
   // 공유했을 때 읽을 수 없다.
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, '영소문자·숫자·하이픈만 쓸 수 있습니다');
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'valid.slugFormat');
 
 /**
  * 상품 필드. **기본값을 여기 두지 않는다.**
@@ -43,7 +43,7 @@ const slugSchema = z
  */
 const productShape = {
   slug: slugSchema,
-  name: z.string().trim().min(1, '상품명을 입력해 주세요').max(120),
+  name: z.string().trim().min(1, 'valid.productNameRequired').max(120),
   description: z.string().trim().max(4000),
   brandId: cuidSchema,
   categoryId: cuidSchema,
@@ -56,7 +56,7 @@ const productShape = {
 const priceRule = {
   check: (v: { listPrice: number; salePrice: number | null }) =>
     v.salePrice === null || v.salePrice <= v.listPrice,
-  message: '판매가가 정가보다 클 수 없습니다',
+  message: 'valid.salePriceOverList',
   path: ['salePrice'] as const,
 };
 
@@ -86,7 +86,7 @@ export const updateStockSchema = z.object({
     .array(
       z.object({
         variantId: cuidSchema,
-        stock: z.int().min(0, '재고는 0 이상이어야 합니다').max(999_999),
+        stock: z.int().min(0, 'valid.stockMin').max(999_999),
         isActive: z.boolean().optional(),
       }),
     )
@@ -107,10 +107,10 @@ export const createVariantSchema = z.object({
   sku: z
     .string()
     .trim()
-    .min(2, 'SKU 는 2자 이상이어야 합니다')
+    .min(2, 'valid.tooShortChars')
     .max(64)
-    .regex(/^[A-Z0-9][A-Z0-9-]*$/, '영대문자·숫자·하이픈만 쓸 수 있습니다'),
-  optionLabel: z.string().trim().min(1, '옵션명을 입력해 주세요').max(60),
+    .regex(/^[A-Z0-9][A-Z0-9-]*$/, 'valid.upperSlugFormat'),
+  optionLabel: z.string().trim().min(1, 'valid.optionNameRequired').max(60),
   stock: z.int().min(0).max(999_999).default(0),
 });
 export type CreateVariantInput = z.infer<typeof createVariantSchema>;
@@ -136,6 +136,6 @@ export const PRODUCT_ERROR_MESSAGE: Readonly<Record<ProductErrorCode, string>> =
 export const reviewProductSchema = z.object({
   approve: z.boolean(),
   /** 반려할 때만 쓴다. 승인에는 필요 없다. */
-  reason: z.string().trim().max(500, '500자를 넘을 수 없습니다').nullable().default(null),
+  reason: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
 });
 export type ReviewProductInput = z.infer<typeof reviewProductSchema>;

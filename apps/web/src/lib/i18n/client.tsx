@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import { createTranslator, DEFAULT_LOCALE, type Locale, type Translator } from '@shop/i18n';
+import { translateIssue, type IssueBounds } from './issue';
 
 /**
  * 클라이언트 컴포넌트가 쓰는 언어.
@@ -23,4 +24,15 @@ export function useLocale(): Locale {
 export function useT(): Translator {
   const locale = useLocale();
   return useMemo(() => createTranslator(locale), [locale]);
+}
+
+/**
+ * 계약이 돌려준 문구를 이 화면의 말로 바꾼다.
+ *
+ * 폼이 **보내기 전에 스스로 거를 때** 쓴다. 서버가 만든 응답은 이미 번역돼
+ * 있지만, 그 길로 가기 전에 걸린 것은 아직 열쇠 그대로다.
+ */
+export function useIssueText(): (message: string, bounds?: IssueBounds) => string {
+  const t = useT();
+  return (message, bounds) => translateIssue(t, message, bounds);
 }

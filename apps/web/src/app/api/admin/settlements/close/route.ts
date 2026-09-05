@@ -4,6 +4,7 @@ import { ForbiddenError, SettlementError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { closeSettlements, SettlementCloseError } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 const bodySchema = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) });
 
@@ -23,10 +24,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '정산 기간을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

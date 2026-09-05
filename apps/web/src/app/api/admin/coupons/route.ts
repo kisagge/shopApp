@@ -4,6 +4,7 @@ import { createCouponSchema } from '@shop/contract';
 import { ForbiddenError } from '@shop/core';
 import { listCoupons, createCoupon, CouponError } from '~/lib/admin/manage-coupon';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -28,14 +29,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createCouponSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'INVALID_INPUT',
-        message: '쿠폰 내용을 확인해 주세요.',
-        fields: Object.fromEntries(parsed.error.issues.map((i) => [i.path.join('.'), i.message])),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

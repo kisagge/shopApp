@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { updateProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 상품 수정. 재고는 여기서 못 고친다 — /stock 으로 따로 간다. */
 export async function PATCH(
@@ -24,14 +25,7 @@ export async function PATCH(
 
   const parsed = updateProductSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

@@ -14,10 +14,10 @@ import { cuidSchema, orderNoSchema, quantitySchema, wonSchema } from './common';
 /** 브라우저가 만든 식별자. 길이와 문자를 제한해 이상한 값이 들어오는 걸 막는다. */
 const clientIdSchema = z
   .string()
-  .regex(/^[A-Za-z0-9_-]{8,64}$/, '식별자 형식이 올바르지 않습니다');
+  .regex(/^[A-Za-z0-9_-]{8,64}$/, 'valid.idFormat');
 
 /** 앱 내부 경로만 받는다. 절대 URL 을 그대로 저장하면 외부 도메인이 섞인다. */
-const pathSchema = z.string().min(1).max(512).startsWith('/', '경로는 / 로 시작해야 합니다');
+const pathSchema = z.string().min(1).max(512).startsWith('/', 'valid.pathFormat');
 
 const base = z.object({
   occurredAt: z.iso.datetime({ offset: true }),
@@ -63,8 +63,8 @@ export const MAX_EVENTS_PER_BATCH = 20;
 export const eventBatchSchema = z.object({
   events: z
     .array(eventInputSchema)
-    .min(1, '이벤트가 비어 있습니다')
-    .max(MAX_EVENTS_PER_BATCH, `한 번에 ${MAX_EVENTS_PER_BATCH}개까지 보낼 수 있습니다`),
+    .min(1, 'valid.eventsEmpty')
+    .max(MAX_EVENTS_PER_BATCH, 'valid.eventsTooMany'),
 });
 export type EventBatch = z.infer<typeof eventBatchSchema>;
 

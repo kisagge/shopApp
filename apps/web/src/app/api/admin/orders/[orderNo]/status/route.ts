@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { refundOrder, RefundError } from '~/lib/admin/refund-order';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 const bodySchema = z.object({
   to: z.enum(ORDER_STATUS),
@@ -30,10 +31,7 @@ export async function POST(
 
   const parsed = bodySchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '변경할 상태를 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { orderNo } = await params;

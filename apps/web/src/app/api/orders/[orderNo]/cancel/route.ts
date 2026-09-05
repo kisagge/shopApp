@@ -4,6 +4,7 @@ import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 주문 취소·환불. 고객은 출고 전까지, 운영진은 order:refund 권한으로. */
 export async function POST(
@@ -24,10 +25,7 @@ export async function POST(
 
   const parsed = cancelOrderRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '취소 사유를 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { orderNo } = await params;

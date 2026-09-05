@@ -4,6 +4,7 @@ import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { assignRole, AccessError } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 권한 부여. 슈퍼관리자만, 자기 자신은 제외. */
 export async function PATCH(
@@ -24,14 +25,7 @@ export async function PATCH(
 
   const parsed = assignRoleSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

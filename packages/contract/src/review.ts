@@ -11,12 +11,12 @@ import { cuidSchema } from './common';
  */
 
 const reviewShape = {
-  rating: z.int().min(RATING_MIN, '별점을 선택해 주세요').max(RATING_MAX),
+  rating: z.int().min(RATING_MIN, 'valid.ratingRequired').max(RATING_MAX),
   content: z
     .string()
     .trim()
-    .min(10, '10자 이상 적어 주세요')
-    .max(2000, '2000자를 넘을 수 없습니다'),
+    .min(10, 'valid.tooShortChars')
+    .max(2000, 'valid.tooLongChars'),
   sizeFit: z.enum(SIZE_FIT).nullable(),
   /** cm — 체형은 사이즈 판단에 실제로 도움이 된다. 선택 사항이다. */
   height: z.int().min(100).max(250).nullable(),
@@ -78,7 +78,7 @@ export const reportReviewSchema = z.object({
   detail: z
     .string()
     .trim()
-    .max(500, '500자를 넘을 수 없습니다')
+    .max(500, 'valid.tooLongChars')
     .nullable()
     .default(null),
 });

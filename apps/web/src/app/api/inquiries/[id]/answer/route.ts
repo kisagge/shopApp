@@ -3,6 +3,7 @@ import { answerInquirySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { answerInquiry, InquiryError } from '~/lib/inquiry/write';
 import { notifyInquiryAnswered } from '~/lib/inquiry/notify';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 문의 답변.
@@ -21,10 +22,7 @@ export async function POST(
 
   const parsed = answerInquirySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

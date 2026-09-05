@@ -3,6 +3,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 결제 승인. 결제창이 콜백한 paymentKey 를 받아 PG 에 승인을 요청한다. */
 export async function POST(
@@ -23,10 +24,7 @@ export async function POST(
 
   const parsed = confirmPaymentRequestSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '결제 정보를 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { orderNo } = await params;

@@ -49,10 +49,10 @@ describe('cartQuoteRequestSchema', () => {
     expect(cartQuoteRequestSchema.parse({ lines: [line] }).isRemoteArea).toBe(false);
   });
 
-  it('빈 배열은 사람이 읽을 수 있는 메시지로 거부한다', () => {
+  it('빈 배열은 사전 열쇠로 거부한다 — 문구는 응답을 만들 때 붙는다', () => {
     const r = cartQuoteRequestSchema.safeParse({ lines: [] });
     expect(r.success).toBe(false);
-    expect(r.error?.issues[0]?.message).toBe('주문할 상품이 없습니다');
+    expect(r.error?.issues[0]?.message).toBe('valid.noItems');
   });
 
   it('줄 수를 제한한다', () => {

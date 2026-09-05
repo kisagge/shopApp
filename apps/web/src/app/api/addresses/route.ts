@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { addressInputSchema } from '@shop/contract';
 import { listAddresses, createAddress, AddressError } from '~/lib/addresses/manage-address';
+import { validationFailed } from '~/lib/i18n/validation';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
@@ -21,16 +22,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!parsed.success) {
     // 어느 칸이 틀렸는지 함께 준다. "입력이 올바르지 않습니다" 만으로는
     // 사용자가 무엇을 고쳐야 할지 알 수 없다.
-    return NextResponse.json(
-      {
-        code: 'INVALID_INPUT',
-        message: '입력을 확인해 주세요.',
-        fields: Object.fromEntries(
-          parsed.error.issues.map((i) => [i.path.join('.'), i.message]),
-        ),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {

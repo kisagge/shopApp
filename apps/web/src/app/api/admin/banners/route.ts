@@ -5,6 +5,7 @@ import { getActor } from '@shop/auth/session';
 import { createBanner, reorderBanners, BannerError } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 function fail(error: unknown): NextResponse | null {
   if (error instanceof BannerError) {
@@ -36,14 +37,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createBannerSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   try {
@@ -82,7 +76,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
   const parsed = reorderBannerSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ code: 'VALIDATION_FAILED', message: '순서를 확인해 주세요.' }, { status: 400 });
+    return validationFailed(parsed.error);
   }
 
   try {

@@ -5,6 +5,7 @@ import { getActor } from '@shop/auth/session';
 import { updateBanner, deleteBanner, BannerError } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 function fail(error: unknown): NextResponse | null {
   if (error instanceof BannerError) {
@@ -39,14 +40,7 @@ export async function PATCH(
 
   const parsed = updateBannerSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

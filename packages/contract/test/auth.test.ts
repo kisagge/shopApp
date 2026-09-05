@@ -25,23 +25,23 @@ describe('가입 계약', () => {
   });
 
   it('공백만 적은 이름은 거절한다 — 걷어내면 빈 값이다', () => {
-    expect(messageAt({ ...valid, name: '   ' }, 'name')).toBe('이름을 입력해 주세요');
+    expect(messageAt({ ...valid, name: '   ' }, 'name')).toBe('valid.nameRequired');
   });
 
   it('짧은 비밀번호는 거절한다', () => {
     expect(messageAt({ ...valid, password: 'short7', passwordConfirm: 'short7' }, 'password'))
-      .toContain('8자 이상');
+      .toBe('valid.passwordTooShort');
   });
 
   it('확인이 다르면 확인 칸을 가리킨다', () => {
     // 폼 전체 오류로 두면 어느 칸을 고쳐야 하는지 화면이 가리킬 수 없다
     expect(messageAt({ ...valid, passwordConfirm: 'other-value-1' }, 'passwordConfirm'))
-      .toBe('비밀번호가 일치하지 않습니다');
+      .toBe('valid.passwordMismatch');
   });
 
   it('이메일에서 나온 비밀번호는 비밀번호 칸을 가리킨다', () => {
     expect(messageAt({ ...valid, password: 'buyer-1234', passwordConfirm: 'buyer-1234' }, 'password'))
-      .toContain('이메일과 너무 비슷한');
+      .toBe('valid.passwordLikeEmail');
   });
 
   it('이메일 형식을 본다', () => {

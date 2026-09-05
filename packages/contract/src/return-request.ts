@@ -26,9 +26,9 @@ export const resolveReturnSchema = z.discriminatedUnion('action', [
      * 원문("expected string, received undefined")이 그대로 화면에 나간다.
      */
     rejectReason: z
-      .string({ error: '반려 사유를 입력해 주세요' })
+      .string({ error: 'valid.rejectReasonRequired' })
       .trim()
-      .min(1, '반려 사유를 입력해 주세요')
+      .min(1, 'valid.rejectReasonRequired')
       .max(300),
   }),
 ]);

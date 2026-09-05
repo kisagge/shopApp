@@ -7,13 +7,15 @@ import { Button, Field } from '@shop/ui';
 import { signUpSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
 import { track } from '~/lib/analytics/client';
-import { useT } from '~/lib/i18n/client';
+import { useIssueText, useT } from '~/lib/i18n/client';
+import type { IssueBounds } from '~/lib/i18n/issue';
 
 type FieldName = 'email' | 'name' | 'password' | 'passwordConfirm';
 
 export function SignUpForm() {
   const router = useRouter();
   const t = useT();
+  const issueText = useIssueText();
   const [values, setValues] = useState({ email: '', name: '', password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function SignUpForm() {
       for (const issue of parsed.error.issues) {
         const key = issue.path[0] as FieldName | undefined;
         // 같은 칸에 여러 개가 걸리면 첫 번째만 보여 준다. 한 번에 하나씩 고치게 한다.
-        if (key && !next[key]) next[key] = issue.message;
+        if (key && !next[key]) next[key] = issueText(issue.message, issue as IssueBounds);
       }
       setFieldErrors(next);
       return;

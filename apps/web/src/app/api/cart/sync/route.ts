@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { cartSyncSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { mergeServerCart } from '~/lib/cart/server-cart';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 로그인 직후 장바구니 병합.
@@ -24,10 +25,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = cartSyncSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '장바구니 내용을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   return NextResponse.json({ items: await mergeServerCart(user.id, parsed.data.lines) });

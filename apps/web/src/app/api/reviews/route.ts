@@ -6,6 +6,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { createReview, assertCanReview, ReviewError } from '~/lib/reviews/write-review';
 import { uploadReviewImages, discardReviewImages } from '~/lib/reviews/images';
 import { revalidateReviews } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 사진이 있으면 multipart, 없으면 JSON 으로 온다.
@@ -73,14 +74,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const parsed = createReviewSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      {
-        code: 'VALIDATION_FAILED',
-        message: parsed.error.issues[0]?.message ?? '입력값을 확인해 주세요.',
-        fields: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
-      },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   /**

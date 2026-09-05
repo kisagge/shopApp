@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { updateStock, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /** 재고 조정. 실사 결과를 덮어쓰는 동작이라 절대값을 받는다. */
 export async function PATCH(
@@ -24,10 +25,7 @@ export async function PATCH(
 
   const parsed = updateStockSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json(
-      { code: 'VALIDATION_FAILED', message: '재고 값을 확인해 주세요.' },
-      { status: 400 },
-    );
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

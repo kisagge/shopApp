@@ -22,7 +22,7 @@ const internalPath = z
   .trim()
   .max(200)
   // eslint-disable-next-line no-control-regex
-  .regex(/^\/(?![/\\])[^\u0000-\u001f\\]*$/, '내부 경로(/로 시작)만 넣을 수 있습니다');
+  .regex(/^\/(?![/\\])[^\u0000-\u001f\\]*$/, 'valid.internalPathOnly');
 
 const dateInput = z
   .union([z.iso.datetime({ offset: true }), z.iso.datetime(), z.literal('')])
@@ -31,7 +31,7 @@ const dateInput = z
 
 const bannerShape = {
   eyebrow: z.string().trim().max(40).nullable(),
-  headline: z.string().trim().min(1, '제목을 입력해 주세요').max(60),
+  headline: z.string().trim().min(1, 'valid.titleRequired').max(60),
   subcopy: z.string().trim().max(200).nullable(),
   ctaLabel: z.string().trim().max(20).nullable(),
   href: internalPath.nullable(),
@@ -67,16 +67,16 @@ export const createBannerSchema = z
     startsAt: bannerShape.startsAt.default(null),
     endsAt: bannerShape.endsAt.default(null),
   })
-  .refine(ctaPaired, { message: '버튼 문구를 넣으면 링크도 필요합니다', path: ['href'] })
-  .refine(windowOrdered, { message: '종료가 시작보다 빠릅니다', path: ['endsAt'] });
+  .refine(ctaPaired, { message: 'valid.ctaNeedsHref', path: ['href'] })
+  .refine(windowOrdered, { message: 'valid.endBeforeStart', path: ['endsAt'] });
 export type CreateBannerInput = z.infer<typeof createBannerSchema>;
 
 /** 기본값을 붙이지 않는다 — .partial() 은 .default() 를 걷어내지 않는다. */
 export const updateBannerSchema = z
   .object(bannerShape)
   .partial()
-  .refine(ctaPaired, { message: '버튼 문구를 넣으면 링크도 필요합니다', path: ['href'] })
-  .refine(windowOrdered, { message: '종료가 시작보다 빠릅니다', path: ['endsAt'] });
+  .refine(ctaPaired, { message: 'valid.ctaNeedsHref', path: ['href'] })
+  .refine(windowOrdered, { message: 'valid.endBeforeStart', path: ['endsAt'] });
 export type UpdateBannerInput = z.infer<typeof updateBannerSchema>;
 
 export const reorderBannerSchema = z.object({
