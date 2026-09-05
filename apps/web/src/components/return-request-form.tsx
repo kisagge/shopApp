@@ -52,13 +52,13 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
       });
       const result = (await response.json()) as { message?: string };
       if (!response.ok) {
-        setError(result.message ?? '신청하지 못했습니다.');
+        setError(result.message ?? t('ret.failed'));
         return;
       }
       setOpen(false);
       router.refresh();
     } catch {
-      setError('네트워크 오류로 신청하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -74,7 +74,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
         aria-expanded={false}
         aria-controls={formId}
       >
-        반품 · 교환 신청
+        {t('ret.request')}
       </Button>
     );
   }
@@ -85,7 +85,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
       onSubmit={(e) => onSubmit(e)}
       className="flex flex-col gap-5 rounded-sm border border-[var(--border)] p-4"
     >
-      <h3 className="text-sm font-semibold">반품 · 교환 신청</h3>
+      <h3 className="text-sm font-semibold">{t('ret.request')}</h3>
 
       {error && (
         <p role="alert" className="rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[13px] text-accent">
@@ -95,7 +95,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">
-          무엇을 원하시나요
+          {t('ret.what')}
         </legend>
         <div className="flex gap-2">
           {/* 반복 변수를 kind 라고 부른다 — t 로 두면 문구 함수를 가린다 */}
@@ -119,7 +119,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
       </fieldset>
 
       <fieldset className="flex flex-col gap-2">
-        <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">사유</legend>
+        <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">{t('ret.reason')}</legend>
         {RETURN_REASON.map((r) => (
           <label
             key={r}
@@ -149,37 +149,35 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
       >
         {borneBy === 'CUSTOMER' ? (
           <>
-            <b className="font-semibold">반송비는 고객님이 부담</b>합니다. 배송완료 후{' '}
-            {returnWindowDays(reason)}일 이내에 신청할 수 있습니다.
+            {t('ret.byCustomer', { days: returnWindowDays(reason) })}
           </>
         ) : (
           <>
-            <b className="font-semibold">반송비는 저희가 부담</b>합니다. 배송완료 후{' '}
-            {returnWindowDays(reason)}일 이내에 신청할 수 있습니다.
+            {t('ret.bySeller', { days: returnWindowDays(reason) })}
           </>
         )}
       </p>
 
       <div className="flex flex-col gap-2">
         <label htmlFor={`${formId}-detail`} className="text-xs font-medium text-[var(--fg-secondary)]">
-          상세 설명 <span className="text-[var(--fg-muted)]">(선택)</span>
+          {t('ret.detail')} <span className="text-[var(--fg-muted)]">{t('ret.optional')}</span>
         </label>
         <textarea
           id={`${formId}-detail`}
           name="detail"
           rows={3}
           maxLength={500}
-          placeholder="어떤 점이 문제였는지 적어 주시면 처리가 빨라집니다."
+          placeholder={t('ret.detailPlaceholder')}
           className="rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3.5 py-2.5 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
         />
       </div>
 
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? '신청하는 중…' : '신청하기'}
+          {pending ? t('ret.submitting') : t('ret.submit')}
         </Button>
         <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
-          취소
+          {t('common.cancel')}
         </Button>
       </div>
     </form>

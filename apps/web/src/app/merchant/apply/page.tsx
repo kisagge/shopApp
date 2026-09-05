@@ -6,8 +6,12 @@ import { MERCHANT_STATUS_LABEL, type MerchantStatusInput } from '@shop/contract'
 import { getSessionUser } from '@shop/auth/session';
 import { getMyApplication } from '~/lib/merchant/apply';
 import { MerchantApplyForm } from '~/components/merchant-apply-form';
+import { getT } from '~/lib/i18n/server';
+import { NO_INDEX } from '~/lib/no-index';
 
-export const metadata: Metadata = { title: '입점 신청' };
+export async function generateMetadata(): Promise<Metadata> {
+  return { title: (await getT())('merch.heading'), ...NO_INDEX };
+}
 export const dynamic = 'force-dynamic';
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', {
@@ -18,7 +22,7 @@ export default async function MerchantApplyPage() {
   const session = await getSessionUser(await headers());
   if (!session) redirect('/login?next=/merchant/apply');
 
-  const application = await getMyApplication(session.id);
+  const [application, t] = await Promise.all([getMyApplication(session.id), getT()]);
 
   /*
    * 이미 가맹점이면 신청서를 보여 줄 이유가 없다. 어드민으로 보낸다 —
@@ -31,10 +35,11 @@ export default async function MerchantApplyPage() {
 
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 pb-24 md:px-10">
-      <h1 className="pt-8 pb-2 text-xl font-semibold tracking-tight md:text-2xl">입점 신청</h1>
+      <h1 className="pt-8 pb-2 text-xl font-semibold tracking-tight md:text-2xl">
+        {t('merch.heading')}
+      </h1>
       <p className="pb-7 text-[14px] leading-relaxed text-[var(--fg-secondary)]">
-        PLAIN 은 한 매대에 여러 브랜드를 올리는 편집숍입니다. 신청해 주시면 운영진이 확인한
-        뒤 알려 드립니다.
+        {t('merch.lead')}
       </p>
 
       {open && application ? (
@@ -47,9 +52,9 @@ export default async function MerchantApplyPage() {
               ?? application.status}
           </h2>
           <dl className="grid grid-cols-[92px_1fr] gap-y-2 text-[13px]">
-            <dt className="text-[var(--fg-muted)]">브랜드</dt>
+            <dt className="text-[var(--fg-muted)]">{t('merch.brandSection')}</dt>
             <dd>{application.brandName ?? '—'}</dd>
-            <dt className="text-[var(--fg-muted)]">신청일</dt>
+            <dt className="text-[var(--fg-muted)]">{t('merch.appliedAt')}</dt>
             <dd>
               <time dateTime={application.createdAt.toISOString()}>
                 {dateFormat.format(application.createdAt)}
@@ -57,7 +62,7 @@ export default async function MerchantApplyPage() {
             </dd>
             {application.approvedAt && (
               <>
-                <dt className="text-[var(--fg-muted)]">승인일</dt>
+                <dt className="text-[var(--fg-muted)]">{t('merch.approvedAt')}</dt>
                 <dd>
                   <time dateTime={application.approvedAt.toISOString()}>
                     {dateFormat.format(application.approvedAt)}
@@ -69,21 +74,21 @@ export default async function MerchantApplyPage() {
 
           {application.status === 'PENDING' && (
             <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-              심사 중입니다. 결과는 적어 주신 이메일로 알려 드립니다.
+              {t('merch.pending')}
             </p>
           )}
           {application.status === 'APPROVED' && (
             <p className="text-[13px] leading-relaxed">
-              승인되었습니다.{' '}
+              {t('merch.approved')}{' '}
               {/*
                 승인 직후에는 아직 고객 세션이라 어드민에 들어가지 못한다.
                 다시 로그인해야 바뀐 권한이 세션에 실린다.
               */}
-              다시 로그인하시면{' '}
+              {t('merch.approvedRelogin')}{' '}
               <Link href="/admin" className="underline">
-                가맹점 화면
+                {t('merch.merchantConsole')}
               </Link>
-              을 쓰실 수 있습니다.
+              {t('merch.approvedTail')}
             </p>
           )}
         </section>
@@ -94,7 +99,7 @@ export default async function MerchantApplyPage() {
               role="status"
               className="mb-6 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px]"
             >
-              지난 신청은 반려되었습니다. 내용을 고쳐 다시 신청하실 수 있습니다.
+              {t('merch.rejected')}
             </p>
           )}
           <MerchantApplyForm defaultEmail={session.email} />

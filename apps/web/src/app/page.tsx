@@ -6,6 +6,7 @@ import { HomeBanners } from '~/components/home-banners';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { RecentlyViewed } from '~/components/recently-viewed';
+import { getT } from '~/lib/i18n/server';
 
 /**
  * 화면은 매 요청마다 그리되 **읽기는 캐싱한다**(lib/cache).
@@ -17,11 +18,12 @@ import { RecentlyViewed } from '~/components/recently-viewed';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [products, banners] = await Promise.all([
+  const [products, banners, t] = await Promise.all([
     getFeaturedProducts(10),
     // 게시 기간 판정은 서버 시각으로 한다 — 브라우저 시계를 믿으면
     // 시계가 틀어진 사용자에게 끝난 기획전이 계속 보인다.
     getLiveBanners(),
+    getT(),
   ]);
 
   /*
@@ -50,7 +52,7 @@ export default async function HomePage() {
         슬라이드를 넘길 때마다 문서의 제목이 바뀐다. 화면에는 브랜드와
         배너가 이미 보이므로 제목은 읽히기만 하면 된다.
       */}
-      <h1 className="sr-only">PLAIN — 오래 입는 옷</h1>
+      <h1 className="sr-only">{t('home.srTitle')}</h1>
 
       <HomeBanners
         banners={banners.map((b) => ({
@@ -63,10 +65,10 @@ export default async function HomePage() {
       <section aria-labelledby="pick-title" className="px-4 pt-12 md:px-10 md:pt-20">
         <div className="mb-6 flex flex-col gap-2 md:mb-7">
           <p className="text-[10px] font-medium tracking-[0.16em] text-[var(--fg-muted)]">
-            EDITOR&rsquo;S PICK
+            {t('home.pickEyebrow')}
           </p>
           <h2 id="pick-title" className="text-lg font-semibold tracking-tight md:text-[28px]">
-            에디터가 고른 것
+            {t('home.pick')}
           </h2>
         </div>
         <TrackedProductList listId="home_editors_pick" itemCount={products.length}>

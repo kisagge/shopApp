@@ -6,9 +6,8 @@ import { ReviewStars } from './review-stars';
 import { ReviewActions } from './review-actions';
 import { ReviewReport } from './review-report';
 import { ReviewHelpful } from './review-helpful';
+import { formatDate, type Translator } from '@shop/i18n';
 
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
 /** 상품 상세의 리뷰 영역 */
 export function ReviewSection({
@@ -17,6 +16,7 @@ export function ReviewSection({
   sortTabs,
   loggedIn = false,
   sizeFitLabel = (fit) => fit,
+  t,
 }: {
   summary: ReviewSummary;
   reviews: readonly PublicReview[];
@@ -37,16 +37,24 @@ export function ReviewSection({
    * 받아 끼우는 것과 같은 이유로, 이름 붙이는 일도 부르는 쪽이 한다.
    */
   sizeFitLabel?: (fit: SizeFit) => string;
+  /**
+   * 문구 사전.
+   *
+   * 이 조각은 요청의 언어를 몰라야 테스트에서 그릴 수 있다 — 정렬 줄을
+   * 받아 끼우는 것과 같은 이유로 부르는 쪽이 넘긴다.
+   */
+  t: Translator;
 }) {
   return (
     <section aria-labelledby="reviews-title" className="border-t border-[var(--border)] pt-10">
       <h2 id="reviews-title" className="text-lg font-semibold tracking-tight">
-        리뷰 <span className="tnum text-[var(--fg-muted)]">{summary.total.toLocaleString('ko-KR')}</span>
+        {t('review.heading')}{' '}
+        <span className="tnum text-[var(--fg-muted)]">{summary.total}</span>
       </h2>
 
       {summary.total === 0 ? (
         <p className="py-14 text-center text-[13px] text-[var(--fg-muted)]">
-          아직 리뷰가 없습니다. 구매하신 뒤 첫 후기를 남겨 주세요.
+          {t('review.none')}
         </p>
       ) : (
         <>
@@ -59,12 +67,14 @@ export function ReviewSection({
             </div>
 
             <div>
-              <h3 className="mb-3 text-xs font-semibold text-[var(--fg-secondary)]">별점 분포</h3>
+              <h3 className="mb-3 text-xs font-semibold text-[var(--fg-secondary)]">
+                {t('review.breakdown')}
+              </h3>
               <ul className="flex flex-col gap-1.5">
                 {summary.breakdown.map((row) => (
                   <li key={row.rating} className="flex items-center gap-3">
                     <span className="tnum w-8 shrink-0 text-[12px] text-[var(--fg-muted)]">
-                      {row.rating}점
+                      {t('review.starCount', { rating: row.rating })}
                     </span>
                     <span
                       className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--surface-2)]"
@@ -77,7 +87,7 @@ export function ReviewSection({
                       />
                     </span>
                     <span className="tnum w-14 shrink-0 text-right text-[12px] text-[var(--fg-muted)]">
-                      {row.count.toLocaleString('ko-KR')}
+                      {row.count}
                     </span>
                   </li>
                 ))}
@@ -86,7 +96,9 @@ export function ReviewSection({
 
             {summary.sizeFit.some((s) => s.count > 0) && (
               <div>
-                <h3 className="mb-3 text-xs font-semibold text-[var(--fg-secondary)]">사이즈</h3>
+                <h3 className="mb-3 text-xs font-semibold text-[var(--fg-secondary)]">
+                  {t('review.sizeHeading')}
+                </h3>
                 <dl className="flex flex-col gap-2">
                   {summary.sizeFit.map((s) => (
                     <div key={s.fit} className="flex items-center justify-between gap-3">
@@ -114,7 +126,7 @@ export function ReviewSection({
                       dateTime={review.createdAt.toISOString()}
                       className="text-[12px] text-[var(--fg-muted)]"
                     >
-                      {dateFormat.format(review.createdAt)}
+                      {formatDate(t.locale, review.createdAt)}
                     </time>
                     {review.isMine && <ReviewActions reviewId={review.id} />}
                     {review.canReport && (
@@ -158,7 +170,7 @@ export function ReviewSection({
                                 번째 사진인지와 누구의 후기인지를 우리가 말해
                                 준다 — 없는 것보다 낫고, 거짓을 적지도 않는다.
                               */
-                              alt={`${review.authorName} 님의 후기 사진 ${i + 1}`}
+                              alt={t('review.photoAlt', { name: review.authorName, index: i + 1 })}
                               width={96}
                               height={96}
                               /*

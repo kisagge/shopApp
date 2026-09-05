@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 재입고 알림 신청.
@@ -24,6 +25,7 @@ export function RestockButton({
   subscribed: boolean;
   loggedIn: boolean;
 }) {
+  const t = useT();
   const router = useRouter();
   const [on, setOn] = useState(subscribed);
   const [pending, setPending] = useState(false);
@@ -44,17 +46,17 @@ export function RestockButton({
       });
       if (!response.ok) {
         const body = (await response.json()) as { message?: string };
-        setMessage(body.message ?? '신청하지 못했습니다.');
+        setMessage(body.message ?? t('restock.failed'));
         return;
       }
       setOn(next);
       setMessage(
         next
-          ? '재입고되면 알려 드리겠습니다. 마이페이지에서 확인할 수 있습니다.'
-          : '알림을 해제했습니다.',
+          ? t('restock.subscribed')
+          : t('restock.unsubscribed'),
       );
     } catch {
-      setMessage('네트워크 오류로 처리하지 못했습니다.');
+      setMessage(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -70,10 +72,12 @@ export function RestockButton({
         onClick={() => toggle()}
         // 상태를 색으로만 알리지 않는다. 이름 자체가 지금 무엇이 되는지 말한다.
         aria-label={
-          on ? `${optionLabel} 재입고 알림 해제` : `${optionLabel} 재입고 알림 신청`
+          on
+            ? t('restock.offNamed', { option: optionLabel })
+            : t('restock.onNamed', { option: optionLabel })
         }
       >
-        {pending ? '처리하는 중…' : on ? '재입고 알림 해제' : '재입고 알림 신청'}
+        {pending ? t('restock.pending') : on ? t('restock.off') : t('restock.on')}
       </Button>
       {/* 결과를 소리로도 알린다. 버튼 글자만 바뀌면 눌렀는지 알기 어렵다. */}
       <p aria-live="polite" className="text-[12px] leading-relaxed text-[var(--fg-muted)]">

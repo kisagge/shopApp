@@ -2,9 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useT } from '~/lib/i18n/client';
 
 /** 내 리뷰에만 붙는 삭제. 지우지 않고 감춘다(soft delete). */
 export function ReviewActions({ reviewId }: { reviewId: string }) {
+  const t = useT();
   const router = useRouter();
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
@@ -17,12 +19,12 @@ export function ReviewActions({ reviewId }: { reviewId: string }) {
       const response = await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
       if (!response.ok) {
         const data = (await response.json()) as { message?: string };
-        setError(data.message ?? '삭제하지 못했습니다.');
+        setError(data.message ?? t('review.deleteFailed'));
         return;
       }
       router.refresh();
     } catch {
-      setError('네트워크 오류로 삭제하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -32,12 +34,12 @@ export function ReviewActions({ reviewId }: { reviewId: string }) {
 
   return confirming ? (
     <span className="flex items-center gap-2 text-[11px]">
-      <span className="text-[var(--fg-muted)]">삭제할까요?</span>
+      <span className="text-[var(--fg-muted)]">{t('review.deleteAsk')}</span>
       <button type="button" onClick={() => remove()} disabled={pending} className="text-accent underline">
-        {pending ? '삭제 중…' : '삭제'}
+        {pending ? t('review.deleting') : t('review.delete')}
       </button>
       <button type="button" onClick={() => setConfirming(false)} className="text-[var(--fg-muted)] underline">
-        취소
+        {t('common.cancel')}
       </button>
     </span>
   ) : (
@@ -46,7 +48,7 @@ export function ReviewActions({ reviewId }: { reviewId: string }) {
       onClick={() => setConfirming(true)}
       className="text-[11px] text-[var(--fg-muted)] underline underline-offset-2"
     >
-      내 리뷰 삭제
+      {t('review.deleteMine')}
     </button>
   );
 }

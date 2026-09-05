@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   checkClosure, closedAccountEmail, isClosedAccountEmail,
-  CLOSURE_EFFECT, CLOSURE_BLOCK, CLOSURE_BLOCK_MESSAGE, CLOSURE_CONFIRM_PHRASE,
+  CLOSURE_EFFECT, CLOSURE_CONFIRM_PHRASE,
 } from '../src/account-closure';
 
 const order = (over: Record<string, unknown> = {}) =>
@@ -76,11 +76,7 @@ describe('막는 이유', () => {
     expect(result.blocks).toEqual(['IN_FLIGHT_ORDER']);
   });
 
-  it('모든 이유에 사람이 읽는 설명이 있다', () => {
-    for (const block of CLOSURE_BLOCK) {
-      expect(CLOSURE_BLOCK_MESSAGE[block]).toBeTruthy();
-    }
-  });
+  // 막는 이유의 문구는 사전이 가진다 — apps/web 의 closure-copy 검사가 지킨다
 });
 
 describe('탈퇴 계정 값', () => {
@@ -110,8 +106,13 @@ describe('안내 표', () => {
   it('남기는 것에는 반드시 이유가 붙는다', () => {
     // 왜 남는지 말하지 않으면 지우지 않은 것으로 읽힌다
     for (const effect of CLOSURE_EFFECT.filter((e) => e.how === 'keep')) {
-      expect(effect.why, effect.what).toBeTruthy();
+      expect(effect.explains, effect.id).toBe(true);
     }
+  });
+
+  it('항목 이름이 겹치지 않는다 — 사전 열쇠가 된다', () => {
+    const ids = CLOSURE_EFFECT.map((e) => e.id);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it('확인 문구가 비어 있지 않다', () => {

@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { Carousel } from '@shop/ui';
 import { AppLink } from './app-link';
+import { useT } from '~/lib/i18n/client';
 
 export interface HomeBanner {
   readonly id: string;
@@ -28,11 +29,13 @@ const TONE_CLASS: Record<string, string> = {
  * 점을 두면 누를 수 있는 것처럼 보인다.
  */
 export function HomeBanners({ banners }: { banners: readonly HomeBanner[] }) {
+  const t = useT();
+
   if (banners.length === 0) return null;
 
   return (
     <Carousel
-      label="기획전 배너"
+      label={t('home.banners')}
       slides={banners.map((banner, index) => ({
         id: banner.id,
         content: <BannerSlide banner={banner} index={index} />,

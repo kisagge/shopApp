@@ -22,12 +22,10 @@ export const CLOSURE_BLOCK = [
 ] as const;
 export type ClosureBlock = (typeof CLOSURE_BLOCK)[number];
 
-export const CLOSURE_BLOCK_MESSAGE: Readonly<Record<ClosureBlock, string>> = {
-  IN_FLIGHT_ORDER: '배송이 끝나지 않은 주문이 있습니다. 받으신 뒤에 탈퇴해 주세요.',
-  OPEN_RETURN: '처리 중인 반품이 있습니다. 끝난 뒤에 탈퇴할 수 있습니다.',
-  RETURNABLE_ORDER: '아직 반품할 수 있는 주문이 있습니다. 탈퇴하면 반품 신청을 할 수 없게 됩니다.',
-  STAFF_ACCOUNT: '가맹점·운영진 계정은 스스로 탈퇴할 수 없습니다. 관리자에게 문의해 주세요.',
-};
+/*
+ * 막는 이유의 문구는 여기 없다. 무엇이 막는지는 규칙이고 그것을 어떻게
+ * 말할지는 화면이다 — 사전의 `closureBlock.*` 이 세 벌로 가진다.
+ */
 
 /** 배송이 끝나지 않은 상태 */
 const IN_FLIGHT: readonly OrderStatus[] = ['PENDING', 'PAID', 'PREPARING', 'SHIPPED'];
@@ -79,34 +77,34 @@ export function checkClosure(input: {
  */
 export type ClosureHandling = 'erase' | 'keep';
 
+/**
+ * 탈퇴하면 무엇이 어떻게 되는가.
+ *
+ * **글이 아니라 항목만 적는다.** 이 안내는 화면이 세 나라 말로 보여 주므로,
+ * 여기에 한국어 문장을 두면 그 화면만 한국어로 굳는다. 무엇이 지워지고
+ * 무엇이 남는지는 규칙이고, 그것을 어떻게 설명할지는 화면이 정한다.
+ *
+ * `why` 가 있는 항목은 이유까지 말해야 하는 것들이다 — 남는 이유를 적지
+ * 않으면 "왜 안 지우느냐" 는 물음만 남는다.
+ */
 export interface ClosureEffect {
-  readonly what: string;
+  /** 사전 열쇠의 뒷부분. `closure.<id>` 와 `closure.<id>Why` 로 이어진다. */
+  readonly id: string;
   readonly how: ClosureHandling;
-  readonly why?: string;
+  /** 이유까지 보여 줄 항목인가 */
+  readonly explains?: boolean;
 }
 
 export const CLOSURE_EFFECT: readonly ClosureEffect[] = [
-  { what: '이메일 · 이름 · 전화번호', how: 'erase' },
-  { what: '배송지 목록', how: 'erase' },
-  { what: '장바구니 · 찜 · 재입고 알림', how: 'erase' },
-  { what: '보유 쿠폰', how: 'erase' },
-  { what: '로그인 수단(비밀번호 · 구글 연결)', how: 'erase' },
-  { what: '주문서의 받는 사람 · 연락처 · 주소', how: 'erase' },
-  {
-    what: '남은 포인트',
-    how: 'erase',
-    why: '탈퇴와 함께 사라지고 되살릴 수 없습니다',
-  },
-  {
-    what: '주문의 금액 · 상품 · 상태',
-    how: 'keep',
-    why: '가맹점 정산의 근거입니다. 지우면 이미 지급한 돈의 근거가 사라집니다',
-  },
-  {
-    what: '작성한 리뷰',
-    how: 'keep',
-    why: '다른 분들이 보고 사는 정보입니다. 이름은 지워집니다 — 함께 지우실 수도 있습니다',
-  },
+  { id: 'identity', how: 'erase' },
+  { id: 'addresses', how: 'erase' },
+  { id: 'cartWishRestock', how: 'erase' },
+  { id: 'coupons', how: 'erase' },
+  { id: 'credentials', how: 'erase' },
+  { id: 'orderContact', how: 'erase' },
+  { id: 'points', how: 'erase', explains: true },
+  { id: 'orderRecord', how: 'keep', explains: true },
+  { id: 'reviews', how: 'keep', explains: true },
 ];
 
 /**

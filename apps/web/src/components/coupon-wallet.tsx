@@ -3,7 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field } from '@shop/ui';
-import { format, won } from '@shop/core';
+import { formatMoney, formatPercent } from '@shop/i18n';
+import { useLocale, useT } from '~/lib/i18n/client';
 
 interface WalletCoupon {
   id: string;
@@ -31,6 +32,9 @@ interface WalletCoupon {
  * "분명히 있었는데" 가 되고, 그건 그대로 문의가 된다.
  */
 export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) {
+  const t = useT();
+  const locale = useLocale();
+  const money = (amount: number) => formatMoney(locale, amount);
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,14 +57,14 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
       });
       const result = (await response.json()) as { name?: string; message?: string };
       if (!response.ok) {
-        setError(result.message ?? '쿠폰을 받지 못했습니다.');
+        setError(result.message ?? t('coupon.claimFailed'));
         return;
       }
-      setStatus(`${result.name ?? '쿠폰'}을(를) 받았습니다.`);
+      setStatus(t('coupon.claimed', { name: result.name ?? t('coupon.fallbackName') }));
       event.currentTarget.reset();
       router.refresh();
     } catch {
-      setError('네트워크 오류로 받지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -68,8 +72,13 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
 
   const discountText = (c: WalletCoupon) =>
     c.kind === 'AMOUNT'
-      ? `${format(won(c.value))}원 할인`
-      : `${c.percent}% 할인${c.maxDiscount ? ` (최대 ${format(won(c.maxDiscount))}원)` : ''}`;
+      ? t('coupon.amountOff', { amount: money(c.value) })
+      : c.maxDiscount
+        ? t('coupon.percentOffCapped', {
+            percent: formatPercent(locale, c.percent ?? 0),
+            max: money(c.maxDiscount),
+          })
+        : t('coupon.percentOff', { percent: formatPercent(locale, c.percent ?? 0) });
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,7 +87,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
         className="flex items-end gap-2 rounded-sm border border-[var(--border)] p-4"
       >
         <Field
-          label="쿠폰 코드 등록"
+          label={t('coupon.codeLabel')}
           name="code"
           required
           maxLength={30}
@@ -86,7 +95,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
           className="w-[200px] uppercase"
         />
         <Button type="submit" disabled={pending}>
-          {pending ? '받는 중…' : '등록'}
+          {pending ? t('coupon.claiming') : t('coupon.claim')}
         </Button>
       </form>
 
@@ -101,7 +110,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
 
       {initial.length === 0 ? (
         <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
-          아직 받은 쿠폰이 없습니다. 위에 코드를 넣어 등록해 보세요.
+          {t('coupon.empty')}
         </p>
       ) : (
         <ul className="flex flex-col gap-2.5">
@@ -120,16 +129,16 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
                   <p className="flex items-center gap-2 text-sm font-medium">
                     {c.name}
                     {/* 상태를 흐림으로만 알리지 않는다 */}
-                    {used && <Badge tone="neutral">사용함</Badge>}
-                    {expired && <Badge tone="neutral">기간 만료</Badge>}
+                    {used && <Badge tone="neutral">{t('coupon.used')}</Badge>}
+                    {expired && <Badge tone="neutral">{t('coupon.expired')}</Badge>}
                   </p>
                   <p className="text-[13px] text-[var(--fg-secondary)]">{discountText(c)}</p>
                   <p className="text-[12px] text-[var(--fg-muted)]">
-                    {c.minimumOrder > 0 && `${format(won(c.minimumOrder))}원 이상 · `}
+                    {c.minimumOrder > 0 && `${t('coupon.minimum', { amount: money(c.minimumOrder) })} · `}
                     <span className="tnum">
                       {new Date(c.expiresAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
                     </span>
-                    까지
+                    {t('coupon.until')}
                   </p>
                 </div>
                 <span className="tnum shrink-0 text-[11px] text-[var(--fg-muted)]">{c.code}</span>

@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
+import { useT } from '~/lib/i18n/client';
 
 /** 목록에서 알림 하나를 지운다 */
 export function RestockRow({
@@ -12,6 +13,7 @@ export function RestockRow({
   variantId: string;
   productName: string;
 }) {
+  const t = useT();
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
@@ -21,13 +23,13 @@ export function RestockRow({
     try {
       const response = await fetch(`/api/restock/${variantId}`, { method: 'DELETE' });
       if (!response.ok) {
-        setStatus('지우지 못했습니다.');
+        setStatus(t('restock.deleteFailed'));
         return;
       }
-      setStatus(`${productName} 알림을 지웠습니다.`);
+      setStatus(t('restock.deleted', { name: productName }));
       router.refresh();
     } catch {
-      setStatus('네트워크 오류로 지우지 못했습니다.');
+      setStatus(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -43,10 +45,10 @@ export function RestockRow({
         size="sm"
         disabled={pending}
         // "삭제" 만 있으면 스크린리더로는 어느 줄의 삭제인지 알 수 없다
-        aria-label={`${productName} 재입고 알림 삭제`}
+        aria-label={t('restock.deleteNamed', { name: productName })}
         onClick={() => remove()}
       >
-        삭제
+        {t('review.delete')}
       </Button>
     </>
   );

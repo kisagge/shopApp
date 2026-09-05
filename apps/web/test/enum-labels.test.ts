@@ -3,12 +3,14 @@ import {
   ORDER_STATUS, MEMBER_GRADE, RETURN_TYPE, RETURN_REASON, RETURN_STATUS,
   SIZE_FIT, REPORT_REASON,
   ORDER_STATUS_LABEL, RETURN_TYPE_LABEL, RETURN_REASON_LABEL,
+  CLOSURE_EFFECT, CLOSURE_BLOCK,
 } from '@shop/core';
 import { LOCALES, createTranslator, messageKeys } from '@shop/i18n';
 import {
   ORDER_STATUS_KEY, GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY,
   RETURN_STATUS_KEY, SIZE_FIT_KEY, REPORT_REASON_KEY,
 } from '~/lib/i18n/enum-labels';
+import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
 
 /**
  * 도메인 값과 이름표가 어긋나지 않게 지킨다.
@@ -67,5 +69,27 @@ describe('core 에 남겨 둔 한국어 표', () => {
   it('반품 종류·사유 이름이 사전과 같다', () => {
     for (const v of RETURN_TYPE) expect(RETURN_TYPE_LABEL[v]).toBe(ko(RETURN_TYPE_KEY[v]));
     for (const v of RETURN_REASON) expect(RETURN_REASON_LABEL[v]).toBe(ko(RETURN_REASON_KEY[v]));
+  });
+});
+
+describe('탈퇴 안내문', () => {
+  /**
+   * core 는 무엇이 지워지고 무엇이 남는지만 정하고, 그것을 어떻게 설명할지는
+   * 사전이 가진다. 항목을 하나 더하고 사전을 잊으면 화면에 `closure.newThing`
+   * 같은 글자가 그대로 뜬다.
+   */
+  const known = new Set<string>(messageKeys());
+
+  it('모든 항목에 사전 열쇠가 있다', () => {
+    for (const effect of CLOSURE_EFFECT) {
+      expect(known.has(`closure.${effect.id}`), effect.id).toBe(true);
+      if (effect.explains) {
+        expect(known.has(`closure.${effect.id}Why`), `${effect.id}Why`).toBe(true);
+      }
+    }
+  });
+
+  it('막는 이유에도 모두 열쇠가 있다', () => {
+    for (const block of CLOSURE_BLOCK) expect(known.has(CLOSURE_BLOCK_KEY[block])).toBe(true);
   });
 });

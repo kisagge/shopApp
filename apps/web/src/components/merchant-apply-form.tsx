@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
+import { useT } from '~/lib/i18n/client';
 
 type Values = {
   name: string; brandName: string; businessName: string;
@@ -24,6 +25,7 @@ const EMPTY: Values = {
  */
 export function MerchantApplyForm({ defaultEmail }: { defaultEmail: string }) {
   const router = useRouter();
+  const t = useT();
   const [values, setValues] = useState<Values>({ ...EMPTY, contactEmail: defaultEmail });
   const [errors, setErrors] = useState<Readonly<Record<string, string>>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -51,14 +53,14 @@ export function MerchantApplyForm({ defaultEmail }: { defaultEmail: string }) {
           fields?: Record<string, string>;
         };
         setErrors(data.fields ?? {});
-        setFormError(data.message ?? '신청하지 못했습니다.');
+        setFormError(data.message ?? t('merch.failed'));
         return;
       }
 
       // 같은 주소가 신청 현황 화면으로 바뀐다
       router.refresh();
     } catch {
-      setFormError('네트워크 오류로 신청하지 못했습니다.');
+      setFormError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -76,60 +78,60 @@ export function MerchantApplyForm({ defaultEmail }: { defaultEmail: string }) {
       )}
 
       <fieldset className="flex flex-col gap-5 border-0 p-0">
-        <legend className="text-[13px] font-semibold">브랜드</legend>
+        <legend className="text-[13px] font-semibold">{t('merch.brandSection')}</legend>
         <Field
-          label="가맹점 이름" required value={values.name}
+          label={t('merch.name')} required value={values.name}
           onChange={(e) => set('name', e.target.value)}
           error={errors['name']}
-          hint="운영진 화면에 뜨는 이름입니다."
+          hint={t('merch.nameHint')}
         />
         <Field
-          label="브랜드 이름" required value={values.brandName}
+          label={t('merch.brandName')} required value={values.brandName}
           onChange={(e) => set('brandName', e.target.value)}
           error={errors['brandName']}
-          hint="매대에 뜨는 이름입니다. 승인되면 이 이름으로 브랜드가 만들어집니다."
+          hint={t('merch.brandNameHint')}
         />
       </fieldset>
 
       <fieldset className="flex flex-col gap-5 border-0 p-0">
-        <legend className="text-[13px] font-semibold">사업자 정보</legend>
+        <legend className="text-[13px] font-semibold">{t('merch.bizSection')}</legend>
         <Field
-          label="상호" required value={values.businessName}
+          label={t('merch.bizName')} required value={values.businessName}
           onChange={(e) => set('businessName', e.target.value)}
           error={errors['businessName']}
         />
         <Field
-          label="사업자등록번호" required value={values.businessNumber}
+          label={t('merch.bizNumber')} required value={values.businessNumber}
           onChange={(e) => set('businessNumber', e.target.value)}
           error={errors['businessNumber']}
           inputMode="numeric"
           placeholder="000-00-00000"
-          hint="하이픈 없이 적으셔도 됩니다."
+          hint={t('merch.bizNumberHint')}
         />
         <Field
-          label="대표자" required value={values.representative}
+          label={t('merch.representative')} required value={values.representative}
           onChange={(e) => set('representative', e.target.value)}
           error={errors['representative']}
         />
       </fieldset>
 
       <fieldset className="flex flex-col gap-5 border-0 p-0">
-        <legend className="text-[13px] font-semibold">연락처</legend>
+        <legend className="text-[13px] font-semibold">{t('merch.contactSection')}</legend>
         <Field
-          label="이메일" type="email" required value={values.contactEmail}
+          label={t('auth.email')} type="email" required value={values.contactEmail}
           onChange={(e) => set('contactEmail', e.target.value)}
           error={errors['contactEmail']}
-          hint="심사 결과를 이 주소로 알려 드립니다."
+          hint={t('merch.emailHint')}
         />
         <Field
-          label="전화번호" type="tel" required value={values.contactPhone}
+          label={t('merch.phone')} type="tel" required value={values.contactPhone}
           onChange={(e) => set('contactPhone', e.target.value)}
           error={errors['contactPhone']}
         />
       </fieldset>
 
       <Button type="submit" disabled={pending} className="self-start">
-        {pending ? '보내는 중…' : '입점 신청'}
+        {pending ? t('merch.sending') : t('merch.submit')}
       </Button>
     </form>
   );

@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { Badge, Button } from '@shop/ui';
 import { MAX_ADDRESSES } from '@shop/core';
 import { AddressForm, type SavedAddress } from '~/components/address-form';
+import { formatMoney } from '@shop/i18n';
+import { useLocale, useT } from '~/lib/i18n/client';
+import { DEFAULT_SHIPPING } from '@shop/core';
 
 /**
  * 배송지 목록.
@@ -13,6 +16,8 @@ import { AddressForm, type SavedAddress } from '~/components/address-form';
  * 고르려다 지우는 사고가 난다.
  */
 export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
+  const t = useT();
+  const locale = useLocale();
   const [addresses, setAddresses] = useState<readonly SavedAddress[]>(initial);
   const [adding, setAdding] = useState(initial.length === 0);
   const [busy, setBusy] = useState<string | null>(null);
@@ -26,7 +31,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
     try {
       const response = await fetch(`/api/addresses/${target.id}`, { method: 'PATCH' });
       if (!response.ok) {
-        setError('기본 배송지를 바꾸지 못했습니다.');
+        setError(t('addr.defaultFailed'));
         return;
       }
       setAddresses((list) =>
@@ -35,9 +40,9 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
           // 기본이 맨 위로 올라오는 정렬은 서버와 같게 유지한다
           .sort((a, b) => Number(b.isDefault) - Number(a.isDefault)),
       );
-      setStatus(`${target.recipient} 님의 주소를 기본 배송지로 지정했습니다.`);
+      setStatus(t('addr.setDefaultDone', { name: target.recipient }));
     } catch {
-      setError('네트워크 오류로 바꾸지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setBusy(null);
     }
@@ -49,17 +54,17 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
     try {
       const response = await fetch(`/api/addresses/${target.id}`, { method: 'DELETE' });
       if (!response.ok) {
-        setError('배송지를 지우지 못했습니다.');
+        setError(t('addr.deleteFailed'));
         return;
       }
       const rest = addresses.filter((a) => a.id !== target.id);
       // 기본을 지우면 서버가 남은 것 중 하나를 기본으로 올린다. 화면도 맞춘다.
       if (target.isDefault && rest[0]) rest[0] = { ...rest[0], isDefault: true };
       setAddresses(rest);
-      setStatus('배송지를 지웠습니다.');
+      setStatus(t('addr.deleted'));
       if (rest.length === 0) setAdding(true);
     } catch {
-      setError('네트워크 오류로 지우지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setBusy(null);
     }
@@ -93,7 +98,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                 <p className="flex items-center gap-2 text-sm font-medium">
                   {a.recipient}
                   {a.label && <Badge tone="neutral">{a.label}</Badge>}
-                  {a.isDefault && <Badge tone="neutral">기본</Badge>}
+                  {a.isDefault && <Badge tone="neutral">{t('addr.default')}</Badge>}
                 </p>
                 <p className="tnum text-[13px] text-[var(--fg-secondary)]">{a.phone}</p>
                 <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
@@ -102,7 +107,9 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                 </p>
                 {a.isRemoteArea && (
                   <p className="text-[12px] text-[var(--fg-muted)]">
-                    도서산간 추가 배송비 3,000원
+                    {t('addr.remoteFee', {
+                      fee: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+                    })}
                   </p>
                 )}
               </div>
@@ -115,7 +122,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                     disabled={busy !== null}
                     onClick={() => makeDefault(a)}
                   >
-                    기본으로
+                    {t('addr.makeDefault')}
                   </Button>
                 )}
                 {/*
@@ -127,10 +134,10 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                   variant="ghost"
                   size="sm"
                   disabled={busy !== null}
-                  aria-label={`${a.recipient} 님의 배송지 삭제`}
+                  aria-label={t('addr.deleteNamed', { name: a.recipient })}
                   onClick={() => remove(a)}
                 >
-                  삭제
+                  {t('addr.delete')}
                 </Button>
               </div>
             </li>
@@ -139,14 +146,14 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
       )}
 
       {adding ? (
-        <section aria-label="새 배송지" className="rounded-sm border border-[var(--border)] p-4">
+        <section aria-label={t('addr.new')} className="rounded-sm border border-[var(--border)] p-4">
           <AddressForm
-            submitLabel="배송지 저장"
+            submitLabel={t('addr.save')}
             onSaved={(saved) => {
               // 새로 넣은 것은 기본이 된다. 기존 기본은 내려온다.
               setAddresses((list) => [saved, ...list.map((a) => ({ ...a, isDefault: false }))]);
               setAdding(false);
-              setStatus('배송지를 추가했습니다.');
+              setStatus(t('addr.added'));
             }}
             {...(addresses.length > 0 ? { onCancel: () => setAdding(false) } : {})}
           />
@@ -154,11 +161,11 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
       ) : (
         <div>
           <Button type="button" variant="secondary" onClick={() => setAdding(true)} disabled={full}>
-            새 배송지 추가
+            {t('addr.addNew')}
           </Button>
           {full && (
             <p className="mt-2 text-[12px] text-[var(--fg-muted)]">
-              배송지는 {MAX_ADDRESSES}개까지 저장할 수 있습니다. 쓰지 않는 것을 지워 주세요.
+              {t('addr.limit', { max: MAX_ADDRESSES })}
             </p>
           )}
         </div>

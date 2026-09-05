@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { INQUIRY_MAX_LENGTH } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 문의 작성.
@@ -14,6 +15,7 @@ import { INQUIRY_MAX_LENGTH } from '@shop/core';
  */
 export function InquiryForm({ productId }: { productId: string }) {
   const router = useRouter();
+  const t = useT();
   const contentId = useId();
   const privateId = useId();
 
@@ -36,7 +38,7 @@ export function InquiryForm({ productId }: { productId: string }) {
 
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '문의를 남기지 못했습니다.');
+        setError(data.message ?? t('inq.postFailed'));
         return;
       }
 
@@ -44,7 +46,7 @@ export function InquiryForm({ productId }: { productId: string }) {
       setIsPrivate(false);
       router.refresh();
     } catch {
-      setError('네트워크 오류로 문의를 남기지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -53,7 +55,7 @@ export function InquiryForm({ productId }: { productId: string }) {
   return (
     <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3 py-5">
       <label htmlFor={contentId} className="text-[13px] font-medium">
-        궁금한 점을 남겨 주세요
+        {t('inq.ask')}
       </label>
       <textarea
         id={contentId}
@@ -61,7 +63,7 @@ export function InquiryForm({ productId }: { productId: string }) {
         onChange={(event) => setContent(event.target.value)}
         rows={3}
         maxLength={INQUIRY_MAX_LENGTH}
-        placeholder="재고·사이즈·배송 등 무엇이든 물어보세요."
+        placeholder={t('inq.askPlaceholder')}
         className="rounded-sm border border-n-300 bg-[var(--bg)] p-3 text-[14px]"
       />
 
@@ -72,9 +74,9 @@ export function InquiryForm({ productId }: { productId: string }) {
           checked={isPrivate}
           onChange={(event) => setIsPrivate(event.target.checked)}
         />
-        비공개로 문의합니다
+        {t('inq.askPrivate')}
         <span className="text-[12px] text-[var(--fg-muted)]">
-          (나와 판매자만 볼 수 있습니다)
+          {t('inq.askPrivateHint')}
         </span>
       </label>
 
@@ -89,7 +91,7 @@ export function InquiryForm({ productId }: { productId: string }) {
         disabled={pending || content.trim().length < 5}
         className="h-11 self-start rounded-sm bg-[var(--brand)] px-5 text-[13px] font-medium text-[var(--bg)] disabled:opacity-40"
       >
-        {pending ? '남기는 중…' : '문의 남기기'}
+        {pending ? t('inq.posting') : t('inq.post')}
       </button>
     </form>
   );

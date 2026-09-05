@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ANSWER_MAX_LENGTH } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 문의 한 건에 붙는 동작.
@@ -20,6 +21,7 @@ export function InquiryActions({
   canAnswer: boolean;
 }) {
   const router = useRouter();
+  const t = useT();
   const answerId = useId();
 
   const [answering, setAnswering] = useState(false);
@@ -35,12 +37,12 @@ export function InquiryActions({
       const response = await fetch(url, init);
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '처리하지 못했습니다.');
+        setError(data.message ?? t('common.failed'));
         return;
       }
       router.refresh();
     } catch {
-      setError('네트워크 오류로 처리하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -50,7 +52,7 @@ export function InquiryActions({
     return (
       <div className="mt-1 flex flex-col gap-2">
         <label htmlFor={answerId} className="text-[12px] font-medium">
-          답변
+          {t('inq.answer')}
         </label>
         <textarea
           id={answerId}
@@ -73,14 +75,14 @@ export function InquiryActions({
             disabled={answer.trim().length === 0 || pending}
             className="h-9 rounded-sm bg-[var(--brand)] px-3.5 text-[12px] font-medium text-[var(--bg)] disabled:opacity-40"
           >
-            {pending ? '등록 중…' : '답변 등록'}
+            {pending ? t('inq.answerPosting') : t('inq.answerPost')}
           </button>
           <button
             type="button"
             onClick={() => setAnswering(false)}
             className="h-9 px-2 text-[12px] text-[var(--fg-secondary)] underline"
           >
-            취소
+            {t('common.cancel')}
           </button>
         </div>
         {error && (
@@ -100,28 +102,28 @@ export function InquiryActions({
           onClick={() => setAnswering(true)}
           className="text-[var(--fg-secondary)] underline underline-offset-2"
         >
-          답변하기
+          {t('inq.answerDo')}
         </button>
       )}
 
       {canDelete &&
         (confirming ? (
           <>
-            <span className="text-[var(--fg-muted)]">삭제할까요?</span>
+            <span className="text-[var(--fg-muted)]">{t('review.deleteAsk')}</span>
             <button
               type="button"
               onClick={() => void run(`/api/inquiries/${inquiryId}`, { method: 'DELETE' })}
               disabled={pending}
               className="text-accent underline"
             >
-              {pending ? '삭제 중…' : '삭제'}
+              {pending ? t('review.deleting') : t('review.delete')}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
               className="text-[var(--fg-muted)] underline"
             >
-              취소
+              {t('common.cancel')}
             </button>
           </>
         ) : (
@@ -130,7 +132,7 @@ export function InquiryActions({
             onClick={() => setConfirming(true)}
             className="text-[var(--fg-muted)] underline underline-offset-2"
           >
-            내 문의 삭제
+            {t('inq.deleteMine')}
           </button>
         ))}
 

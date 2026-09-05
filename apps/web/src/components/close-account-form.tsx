@@ -3,7 +3,9 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { signOutEverywhere } from '@shop/auth/client';
-import { CLOSURE_CONFIRM_PHRASE, CLOSURE_BLOCK_MESSAGE, type ClosureBlock } from '@shop/core';
+import { CLOSURE_CONFIRM_PHRASE, type ClosureBlock } from '@shop/core';
+import { useT } from '~/lib/i18n/client';
+import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
 
 /**
  * 탈퇴 확인.
@@ -12,6 +14,7 @@ import { CLOSURE_CONFIRM_PHRASE, CLOSURE_BLOCK_MESSAGE, type ClosureBlock } from
  * 읽지 않고도 눌린다. 문구를 옮겨 적는 동안 무엇을 하는지 한 번은 읽는다.
  */
 export function CloseAccountForm() {
+  const t = useT();
   const router = useRouter();
   const phraseId = useId();
   const reviewsId = useId();
@@ -42,7 +45,7 @@ export function CloseAccountForm() {
           message?: string;
           blocks?: ClosureBlock[];
         };
-        setError(data.message ?? '탈퇴하지 못했습니다.');
+        setError(data.message ?? t('close.failed'));
         setBlocks(data.blocks ?? []);
         return;
       }
@@ -57,7 +60,7 @@ export function CloseAccountForm() {
       router.replace('/account/closed');
       router.refresh();
     } catch {
-      setError('네트워크 오류로 탈퇴하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -68,7 +71,7 @@ export function CloseAccountForm() {
       onSubmit={(event) => void submit(event)}
       className="mt-8 flex flex-col gap-4 rounded-sm border border-accent/40 p-5"
     >
-      <h2 className="text-[15px] font-semibold">정말 탈퇴하시겠습니까?</h2>
+      <h2 className="text-[15px] font-semibold">{t('close.confirmHeading')}</h2>
 
       <label className="flex items-start gap-2.5 text-[13px]">
         <input
@@ -79,16 +82,16 @@ export function CloseAccountForm() {
           className="mt-0.5"
         />
         <span>
-          작성한 리뷰도 함께 지웁니다
+          {t('close.alsoReviews')}
           <span className="block text-[12px] text-[var(--fg-muted)]">
-            선택하지 않으면 리뷰는 남고 작성자 이름만 지워집니다.
+            {t('close.alsoReviewsHint')}
           </span>
         </span>
       </label>
 
       <div className="flex flex-col gap-1.5">
         <label htmlFor={phraseId} className="text-[13px]">
-          확인을 위해 <b>{CLOSURE_CONFIRM_PHRASE}</b> 를 입력해 주세요
+          {t('close.typePhrase', { phrase: CLOSURE_CONFIRM_PHRASE })}
         </label>
         <input
           id={phraseId}
@@ -106,7 +109,7 @@ export function CloseAccountForm() {
           {blocks.length > 0 && (
             <ul className="mt-1.5 flex list-none flex-col gap-1 p-0">
               {blocks.map((block) => (
-                <li key={block}>{CLOSURE_BLOCK_MESSAGE[block]}</li>
+                <li key={block}>{t(CLOSURE_BLOCK_KEY[block])}</li>
               ))}
             </ul>
           )}
@@ -122,7 +125,7 @@ export function CloseAccountForm() {
         disabled={!matched || pending}
         className="h-12 rounded-sm bg-accent px-5 text-[14px] font-medium text-n-0 disabled:opacity-40"
       >
-        {pending ? '탈퇴 처리 중…' : '탈퇴하기'}
+        {pending ? t('close.pending') : t('close.submit')}
       </button>
     </form>
   );

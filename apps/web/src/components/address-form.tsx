@@ -4,6 +4,9 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Field } from '@shop/ui';
 import { remoteAreaLabel } from '@shop/core';
 import { openPostcodeSearch } from '~/lib/postcode';
+import { formatMoney } from '@shop/i18n';
+import { useLocale, useT } from '~/lib/i18n/client';
+import { DEFAULT_SHIPPING } from '@shop/core';
 
 export interface SavedAddress {
   id: string;
@@ -31,12 +34,14 @@ export interface SavedAddress {
 export function AddressForm({
   onSaved,
   onCancel,
-  submitLabel = '이 주소로 배송받기',
+  submitLabel,
 }: {
   onSaved: (address: SavedAddress) => void;
   onCancel?: () => void;
   submitLabel?: string;
 }) {
+  const t = useT();
+  const locale = useLocale();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -77,7 +82,7 @@ export function AddressForm({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [searching]);
+  }, [searching, t]);
 
   useEffect(() => {
     if (!searching || !searchBoxRef.current) return;
@@ -101,13 +106,13 @@ export function AddressForm({
       // 광고 차단기나 사내 네트워크에서 막힐 수 있다. 손 입력은 그대로 된다.
       setSearchable(false);
       setSearching(false);
-      setError('주소 검색을 불러오지 못했습니다. 우편번호와 주소를 직접 입력해 주세요.');
+      setError(t('addr.searchFailed'));
     });
 
     return () => {
       alive = false;
     };
-  }, [searching]);
+  }, [searching, t]);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,13 +153,13 @@ export function AddressForm({
       };
 
       if (!response.ok || !result.address) {
-        setError(result.message ?? '배송지를 저장하지 못했습니다.');
+        setError(result.message ?? t('addr.saveFailed'));
         setFieldErrors(result.fields ?? {});
         return;
       }
       onSaved(result.address);
     } catch {
-      setError('네트워크 오류로 저장하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -177,7 +182,7 @@ export function AddressForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field
-          label="받는 분"
+          label={t('addr.recipient')}
           name="recipient"
           required
           maxLength={50}
@@ -185,7 +190,7 @@ export function AddressForm({
           error={fieldErrors['recipient']}
         />
         <Field
-          label="휴대폰 번호"
+          label={t('addr.phone')}
           name="phone"
           required
           inputMode="tel"
@@ -203,7 +208,7 @@ export function AddressForm({
       */}
       <div className="flex items-end gap-2">
         <Field
-          label="우편번호"
+          label={t('addr.zip')}
           name="postalCode"
           required
           inputMode="numeric"
@@ -229,7 +234,7 @@ export function AddressForm({
             aria-expanded={searching}
             aria-controls="postcode-search"
           >
-            {searching ? '검색 닫기' : '주소 검색'}
+            {searching ? t('addr.searchClose') : t('addr.search')}
           </Button>
         )}
       </div>
@@ -237,13 +242,13 @@ export function AddressForm({
       {searching && (
         <section
           id="postcode-search"
-          aria-label="주소 검색"
+          aria-label={t('addr.search')}
           className="rounded-sm border border-[var(--border)]"
         >
           <div ref={searchBoxRef} className="h-[420px] w-full" />
           <div className="border-t border-[var(--border)] p-2 text-right">
             <Button type="button" variant="ghost" size="sm" onClick={closeSearch}>
-              닫기
+              {t('common.close')}
             </Button>
           </div>
         </section>
@@ -256,39 +261,49 @@ export function AddressForm({
         읽히지 않을 때가 있다.
       */}
       <p aria-live="polite" className="min-h-[18px] text-[12px] text-[var(--fg-muted)]">
-        {remote ? `${remote} 지역이라 도서산간 추가 배송비 3,000원이 붙습니다.` : ''}
+        {remote
+          ? t('addr.remoteNotice', {
+              area: remote,
+              fee: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+            })
+          : ''}
       </p>
 
       <Field
-        label="주소"
+        label={t('addr.address')}
         name="address1"
         required
         maxLength={200}
         autoComplete="street-address"
-        placeholder="주소 검색을 쓰거나 직접 입력해 주세요"
+        placeholder={t('addr.addressPlaceholder')}
         value={address1}
         onChange={(e) => setAddress1(e.target.value)}
         error={fieldErrors['address1']}
       />
 
       <Field
-        label="상세 주소"
+        label={t('addr.detail')}
         name="address2"
         ref={detailRef}
         maxLength={200}
-        hint="동·호수 등"
+        hint={t('addr.detailHint')}
         error={fieldErrors['address2']}
       />
 
-      <Field label="배송지 이름" name="label" maxLength={20} hint="선택 · 집, 회사처럼" />
+      <Field
+        label={t('addr.label')}
+        name="label"
+        maxLength={20}
+        hint={t('addr.labelHint')}
+      />
 
       <div className="mt-1 flex items-center gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? '저장하는 중…' : submitLabel}
+          {pending ? t('addr.saving') : (submitLabel ?? t('addr.use'))}
         </Button>
         {onCancel && (
           <Button type="button" variant="secondary" onClick={onCancel} disabled={pending}>
-            취소
+            {t('common.cancel')}
           </Button>
         )}
       </div>

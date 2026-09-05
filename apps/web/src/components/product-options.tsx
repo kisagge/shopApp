@@ -6,6 +6,7 @@ import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
 import { useCartStore } from '~/stores/cart';
 import type { ProductDetail } from '~/lib/queries/products';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 옵션 선택과 장바구니 담기.
@@ -24,6 +25,7 @@ export function ProductOptions({
   /** 이미 재입고 알림을 걸어 둔 옵션 id 들 */
   restockOn: readonly string[];
 }) {
+  const t = useT();
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
@@ -97,7 +99,9 @@ export function ProductOptions({
                     {value.value}
                   </button>
                   {!available && (
-                    <span className="mt-1 block text-center text-[10px] text-[var(--fg-muted)]">품절</span>
+                    <span className="mt-1 block text-center text-[10px] text-[var(--fg-muted)]">
+                      {t('catalog.soldOut')}
+                    </span>
                   )}
                 </li>
               );
@@ -112,22 +116,22 @@ export function ProductOptions({
             <p className="text-xs text-[var(--fg-secondary)]">{selected.label}</p>
             <Price amount={selected.price} size="sm" />
             {selected.stock > 0 && selected.stock <= 5 && (
-              <p className="text-[11px] text-accent">{selected.stock}개 남음</p>
+              <p className="text-[11px] text-accent">{t('opt.stockLeft', { count: selected.stock })}</p>
             )}
           </div>
           <div className="flex items-center rounded-sm border border-n-300 bg-[var(--bg)]">
             <button
-              type="button" aria-label="수량 줄이기"
+              type="button" aria-label={t('cart.decrease')}
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
               className="flex h-9 w-9 items-center justify-center text-[var(--fg-secondary)]"
             >
               −
             </button>
-            <span aria-label={`수량 ${quantity}개`} className="tnum w-8 text-center text-sm font-semibold">
+            <span aria-label={t('cart.quantityOf', { count: quantity })} className="tnum w-8 text-center text-sm font-semibold">
               {quantity}
             </span>
             <button
-              type="button" aria-label="수량 늘리기"
+              type="button" aria-label={t('cart.increase')}
               onClick={() => setQuantity((q) => Math.min(selected.stock, q + 1))}
               className="flex h-9 w-9 items-center justify-center"
             >
@@ -180,16 +184,16 @@ export function ProductOptions({
             setAdded(true);
           }}
         >
-          장바구니
+          {t('nav.cart')}
         </Button>
         <Button aria-disabled={!canAdd} className="flex-[1.3]">
-          {canAdd ? '바로 구매' : '옵션을 선택하세요'}
+          {canAdd ? t('product.buyNow') : t('opt.selectFirst')}
         </Button>
       </div>
 
       {/* 담긴 결과를 시각적으로만 알리면 스크린리더 사용자가 모른다 */}
       <p role="status" aria-live="polite" className="text-center text-xs text-success">
-        {added ? '장바구니에 담았습니다' : ''}
+        {added ? t('opt.added') : ''}
       </p>
       </>
       )}

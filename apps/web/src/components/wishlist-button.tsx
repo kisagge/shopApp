@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { track } from '~/lib/analytics/client';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 찜 버튼.
@@ -29,6 +30,7 @@ export function WishlistButton({
   loggedIn: boolean;
   size?: 'sm' | 'md';
 }) {
+  const t = useT();
   const router = useRouter();
   const [wishlisted, setWishlisted] = useState(initialWishlisted);
   const [pending, setPending] = useState(false);
@@ -55,14 +57,14 @@ export function WishlistButton({
       if (!response.ok) {
         const data = (await response.json()) as { message?: string };
         setWishlisted(!next);
-        setError(data.message ?? '처리하지 못했습니다.');
+        setError(data.message ?? t('common.failed'));
         return;
       }
       if (next) track('add_to_wishlist', { productId });
       router.refresh();
     } catch {
       setWishlisted(!next);
-      setError('네트워크 오류로 처리하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -74,7 +76,11 @@ export function WishlistButton({
         type="button"
         onClick={() => toggle()}
         disabled={pending}
-        aria-label={wishlisted ? `${productName} 찜 해제` : `${productName} 찜하기`}
+        aria-label={
+          wishlisted
+            ? t('wish.remove', { name: productName })
+            : t('wish.add', { name: productName })
+        }
         className={`flex items-center justify-center rounded-full border border-n-900/12 bg-n-0/85 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${box}`}
       >
         <span aria-hidden="true" className={wishlisted ? 'text-accent' : 'text-n-400'}>

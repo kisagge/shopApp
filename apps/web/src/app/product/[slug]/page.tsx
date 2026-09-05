@@ -296,12 +296,13 @@ export default async function ProductPage({ params, searchParams }: Params) {
           sortTabs={<ReviewSortTabs sort={reviewSort} basePath={`/product/${slug}`} />}
           loggedIn={viewer !== null}
           sizeFitLabel={(fit) => t(SIZE_FIT_KEY[fit])}
+          t={t}
         />
         <InquirySection
           productId={product.id}
           inquiries={inquiries.items}
           loggedIn={viewer !== null}
-          privateText={t('support.privateMasked')}
+          t={t}
         />
       </div>
 

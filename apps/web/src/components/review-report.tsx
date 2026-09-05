@@ -30,7 +30,7 @@ export function ReviewReport({
 
   if (done) {
     return (
-      <span className="text-[11px] text-[var(--fg-muted)]">신고함</span>
+      <span className="text-[11px] text-[var(--fg-muted)]">{t('review.reported')}</span>
     );
   }
 
@@ -43,7 +43,7 @@ export function ReviewReport({
         aria-controls={formId}
         className="text-[11px] text-[var(--fg-muted)] underline underline-offset-2"
       >
-        신고
+        {t('review.report')}
       </button>
     );
   }
@@ -70,12 +70,12 @@ export function ReviewReport({
 
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '신고하지 못했습니다.');
+        setError(data.message ?? t('review.reportFailed'));
         return;
       }
       setDone(true);
     } catch {
-      setError('네트워크 오류로 신고하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -88,7 +88,7 @@ export function ReviewReport({
       className="mt-2 flex w-full flex-col gap-2 rounded-sm bg-[var(--surface)] p-3"
     >
       <fieldset className="flex flex-col gap-1.5 border-0 p-0">
-        <legend className="text-[11px] font-medium">신고 사유</legend>
+        <legend className="text-[11px] font-medium">{t('review.reportReason')}</legend>
         {REPORT_REASON.map((reason: ReportReason, index) => (
           <label key={reason} className="flex items-center gap-2 text-[12px]">
             <input type="radio" name="reason" value={reason} defaultChecked={index === 0} required />
@@ -98,7 +98,7 @@ export function ReviewReport({
       </fieldset>
 
       <label className="flex flex-col gap-1 text-[11px] text-[var(--fg-secondary)]">
-        설명 (선택)
+        {t('review.reportDetail')}
         <textarea
           name="detail"
           rows={2}
@@ -108,7 +108,7 @@ export function ReviewReport({
       </label>
 
       <p className="text-[11px] text-[var(--fg-muted)]">
-        신고해도 글은 그대로 남습니다. 운영진이 확인한 뒤 판단합니다.
+        {t('review.reportNote')}
       </p>
 
       {error && (
@@ -123,14 +123,14 @@ export function ReviewReport({
           disabled={pending}
           className="h-9 rounded-sm bg-[var(--brand)] px-3.5 text-[12px] font-medium text-[var(--bg)] disabled:opacity-50"
         >
-          {pending ? '보내는 중…' : '신고'}
+          {pending ? t('review.reportSending') : t('review.report')}
         </button>
         <button
           type="button"
           onClick={() => setOpen(false)}
           className="h-9 px-2 text-[12px] text-[var(--fg-secondary)] underline"
         >
-          취소
+          {t('common.cancel')}
         </button>
       </div>
     </form>

@@ -1,4 +1,5 @@
 import { carrierOf, formatTrackingNumber, trackingUrlFor } from '@shop/core';
+import { getT } from '~/lib/i18n/server';
 
 /**
  * 고객에게 보이는 배송 조회.
@@ -9,7 +10,7 @@ import { carrierOf, formatTrackingNumber, trackingUrlFor } from '@shop/core';
  *
  * 번호는 4자리씩 끊어 보여 준다. 옮겨 적을 때 훨씬 덜 틀린다.
  */
-export function TrackingPanel({
+export async function TrackingPanel({
   carrier,
   trackingNumber,
   shippedAt,
@@ -20,6 +21,8 @@ export function TrackingPanel({
 }) {
   if (!carrier || !trackingNumber) return null;
 
+  const t = await getT();
+
   const name = carrierOf(carrier)?.name ?? carrier;
   const url = trackingUrlFor(carrier, trackingNumber);
 
@@ -29,23 +32,23 @@ export function TrackingPanel({
       className="rounded-sm border border-[var(--border)] p-4"
     >
       <h2 id="tracking-title" className="mb-3 text-sm font-semibold">
-        배송 조회
+        {t('track.heading')}
       </h2>
 
       <dl className="flex flex-col gap-2">
         <div className="flex items-baseline gap-3">
-          <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">택배사</dt>
+          <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">{t('track.carrier')}</dt>
           <dd className="text-[13px]">{name}</dd>
         </div>
         <div className="flex items-baseline gap-3">
-          <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">송장번호</dt>
+          <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">{t('track.number')}</dt>
           <dd className="tnum text-[13px] font-medium select-all">
             {formatTrackingNumber(trackingNumber)}
           </dd>
         </div>
         {shippedAt && (
           <div className="flex items-baseline gap-3">
-            <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">출고</dt>
+            <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">{t('track.shippedAt')}</dt>
             <dd className="tnum text-[13px] text-[var(--fg-secondary)]">
               {shippedAt.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}
             </dd>
@@ -61,15 +64,15 @@ export function TrackingPanel({
           className="mt-3.5 inline-flex h-10 items-center rounded-sm border border-[var(--border)] px-4 text-[13px] font-medium text-[var(--fg)] no-underline hover:bg-[var(--surface)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
         >
           {/* 새 창으로 열린다는 것을 이름에 넣는다. 갑자기 창이 바뀌면 놀란다. */}
-          {name}에서 조회
-          <span className="sr-only"> (새 창)</span>
+          {t('track.openAt', { carrier: name })}
+          <span className="sr-only"> {t('track.newWindow')}</span>
           <span aria-hidden="true" className="ml-1.5 text-[var(--fg-muted)]">
             ↗
           </span>
         </a>
       ) : (
         <p className="mt-3 text-[12px] text-[var(--fg-muted)]">
-          택배사 사이트에서 위 송장번호로 조회해 주세요.
+          {t('track.manual')}
         </p>
       )}
     </section>

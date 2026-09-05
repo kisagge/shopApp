@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { Button } from '@shop/ui';
+import { useT } from '~/lib/i18n/client';
 
 /**
  * 화면 하나가 깨졌을 때.
@@ -19,6 +20,7 @@ export default function ErrorScreen({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const t = useT();
   useEffect(() => {
     // 서버 오류는 instrumentation 이 받는다. 이건 브라우저에서 난 것이다.
     console.error('[client-error]', error.digest ?? '(digest 없음)', error);
@@ -26,16 +28,18 @@ export default function ErrorScreen({
 
   return (
     <div className="mx-auto flex w-full max-w-[420px] flex-col items-center gap-5 px-4 py-24 text-center">
-      <h1 className="font-serif text-2xl font-medium tracking-tight">화면을 불러오지 못했습니다</h1>
+      <h1 className="font-serif text-2xl font-medium tracking-tight">{t('error.heading')}</h1>
       <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
-        일시적인 문제일 수 있습니다. 다시 시도해 보시고, 계속되면 아래 번호와 함께 문의해 주세요.
+        {t('error.note')}
       </p>
       {error.digest && (
         <p className="tnum rounded-sm bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-          오류 번호 {error.digest}
+          {t('error.digest', { digest: error.digest })}
         </p>
       )}
-      <Button type="button" onClick={reset}>다시 시도</Button>
+      <Button type="button" onClick={reset}>
+        {t('common.retry')}
+      </Button>
     </div>
   );
 }

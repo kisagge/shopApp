@@ -97,13 +97,13 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           });
       const data = (await response.json()) as { message?: string };
       if (!response.ok) {
-        setError(data.message ?? '리뷰를 저장하지 못했습니다.');
+        setError(data.message ?? t('review.saveFailed'));
         return;
       }
       setDone(true);
       router.refresh();
     } catch {
-      setError('네트워크 오류로 저장하지 못했습니다.');
+      setError(t('common.networkError'));
     } finally {
       setPending(false);
     }
@@ -112,7 +112,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
   if (done) {
     return (
       <p role="status" className="rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
-        리뷰를 등록했습니다. 감사합니다.
+        {t('review.saved')}
       </p>
     );
   }
@@ -121,9 +121,9 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
     <form onSubmit={(e) => submit(e)} noValidate className="flex flex-col gap-5">
       <fieldset className="flex flex-col gap-2 border-0 p-0">
         <legend id={groupId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          별점
+          {t('review.rating')}
           <span className="ml-1 text-accent" aria-hidden="true">*</span>
-          <span className="sr-only"> (필수)</span>
+          <span className="sr-only"> {t('review.required')}</span>
         </legend>
         <div className="flex gap-1">
           {Array.from({ length: RATING_MAX }, (_, i) => i + 1).map((value) => (
@@ -139,7 +139,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
               <span aria-hidden="true" className={value <= rating ? 'text-warning-graphic' : 'text-n-300'}>
                 ★
               </span>
-              <span className="sr-only">{value}점</span>
+              <span className="sr-only">{t('review.starCount', { rating: value })}</span>
             </label>
           ))}
         </div>
@@ -147,24 +147,24 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
 
       <div className="flex flex-col gap-2">
         <label htmlFor={contentId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          후기
+          {t('review.body')}
           <span className="ml-1 text-accent" aria-hidden="true">*</span>
-          <span className="sr-only"> (필수)</span>
+          <span className="sr-only"> {t('review.required')}</span>
         </label>
         <textarea
           id={contentId} value={content} onChange={(e) => setContent(e.target.value)}
           rows={5} maxLength={2000} required
-          placeholder="소재, 착용감, 사이즈처럼 다음 사람에게 도움이 될 내용을 적어 주세요."
+          placeholder={t('review.bodyPlaceholder')}
           className="rounded-sm border border-n-300 bg-[var(--bg)] px-3.5 py-3 text-sm"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
-          <span className="tnum">{content.trim().length}</span> / 10자 이상
+          <span className="tnum">{content.trim().length}</span> {t('review.minLength')}
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
         <label htmlFor={imagesId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          사진 (선택)
+          {t('review.photos')}
         </label>
         <input
           id={imagesId}
@@ -178,13 +178,13 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           onChange={(e) => {
             const picked = Array.from(e.target.files ?? []);
             if (picked.length > MAX_IMAGES_PER_REVIEW) {
-              setError(`사진은 ${MAX_IMAGES_PER_REVIEW}장까지 올릴 수 있습니다.`);
+              setError(t('review.photoLimit', { max: MAX_IMAGES_PER_REVIEW }));
               return;
             }
             const tooBig = picked.find((f) => f.size > MAX_IMAGE_BYTES);
             if (tooBig) {
               // 여기서 막는 것은 편의다. 진짜 한도는 서버가 다시 본다.
-              setError('사진 한 장은 5MB 를 넘을 수 없습니다.');
+              setError(t('review.photoSize'));
               return;
             }
             setError(null);
@@ -193,7 +193,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           className="text-[13px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-n-300 file:bg-[var(--surface)] file:px-3 file:text-[13px]"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
-          최대 {MAX_IMAGES_PER_REVIEW}장 · 한 장당 5MB · JPEG · PNG · WebP · AVIF
+          {t('review.photoHint', { max: MAX_IMAGES_PER_REVIEW })}
         </p>
 
         {previews.length > 0 && (
@@ -207,13 +207,13 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
                 */}
                 <img
                   src={url}
-                  alt={`고른 사진 ${i + 1}`}
+                  alt={t('review.pickedPhoto', { index: i + 1 })}
                   className="h-20 w-20 rounded-sm border border-[var(--border)] object-cover"
                 />
                 <button
                   type="button"
                   onClick={() => setImages((prev) => prev.filter((_, at) => at !== i))}
-                  aria-label={`고른 사진 ${i + 1} 빼기`}
+                  aria-label={t('review.removePhoto', { index: i + 1 })}
                   className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-n-900 text-[11px] text-n-0"
                 >
                   <span aria-hidden="true">×</span>
@@ -225,7 +225,9 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
       </div>
 
       <fieldset className="flex flex-col gap-2 border-0 p-0">
-        <legend className="text-xs font-medium text-[var(--fg-secondary)]">사이즈는 어땠나요? (선택)</legend>
+        <legend className="text-xs font-medium text-[var(--fg-secondary)]">
+          {t('review.sizeAsk')}
+        </legend>
         <div className="flex gap-2">
           {SIZE_FIT.map((fit) => (
             <label
@@ -247,10 +249,12 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
 
       <fieldset className="flex flex-wrap gap-4 border-0 p-0">
         <legend className="mb-2 text-xs font-medium text-[var(--fg-secondary)]">
-          체형 (선택) — 사이즈 판단에 도움이 됩니다
+          {t('review.bodyInfo')}
         </legend>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={heightId} className="text-[11px] text-[var(--fg-muted)]">키 (cm)</label>
+          <label htmlFor={heightId} className="text-[11px] text-[var(--fg-muted)]">
+            {t('review.height')}
+          </label>
           <input
             id={heightId} type="number" inputMode="numeric" min={100} max={250}
             value={height} onChange={(e) => setHeight(e.target.value)}
@@ -258,7 +262,9 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={weightId} className="text-[11px] text-[var(--fg-muted)]">몸무게 (kg)</label>
+          <label htmlFor={weightId} className="text-[11px] text-[var(--fg-muted)]">
+            {t('review.weight')}
+          </label>
           <input
             id={weightId} type="number" inputMode="numeric" min={20} max={300}
             value={weight} onChange={(e) => setWeight(e.target.value)}
@@ -271,7 +277,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
 
       <div>
         <Button type="submit" size="md" disabled={pending || rating === 0 || content.trim().length < 10}>
-          {pending ? '등록 중…' : '리뷰 등록'}
+          {pending ? t('review.posting') : t('review.post')}
         </Button>
       </div>
     </form>
