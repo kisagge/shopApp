@@ -165,6 +165,8 @@ export const en: Dictionary = {
   'topic.PRODUCT': 'Products',
   'topic.ETC': 'Something else',
 
+  'rec.heading': 'People also viewed',
+  'rec.headingPopular': 'You may also like',
   'recent.heading': 'Recently viewed',
   'recent.clear': 'Clear history',
   'recent.cleared': 'Recently viewed items cleared',

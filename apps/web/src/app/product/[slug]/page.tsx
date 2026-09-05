@@ -22,6 +22,7 @@ import { InquirySection } from '~/components/inquiry-section';
 import { WishlistButton } from '~/components/wishlist-button';
 import { RecordRecentView } from '~/components/record-recent-view';
 import { RecentlyViewed } from '~/components/recently-viewed';
+import { Recommendations } from '~/components/recommendations';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -305,6 +306,12 @@ export default async function ProductPage({ params, searchParams }: Params) {
           t={t}
         />
       </div>
+
+      {/*
+        추천을 최근 본 상품보다 앞에 둔다. 최근 본 것은 이미 아는 상품이고,
+        추천은 모르던 것을 보여 준다 — 뒤에 둘 이유가 없다.
+      */}
+      <Recommendations productId={product.id} categorySlug={product.categorySlug} />
 
       {/* 지금 보고 있는 상품은 빼고 보여 준다 */}
       <RecentlyViewed excludeSlug={product.slug} />

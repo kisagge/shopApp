@@ -172,6 +172,8 @@ export const ko = {
   'topic.PRODUCT': '상품',
   'topic.ETC': '기타',
 
+  'rec.heading': '함께 본 상품',
+  'rec.headingPopular': '이런 상품은 어떠세요',
   'recent.heading': '최근 본 상품',
   'recent.clear': '기록 지우기',
   'recent.cleared': '최근 본 상품을 지웠습니다',

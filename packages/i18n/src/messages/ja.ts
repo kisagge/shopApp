@@ -161,6 +161,8 @@ export const ja: Dictionary = {
   'topic.PRODUCT': '商品',
   'topic.ETC': 'その他',
 
+  'rec.heading': '一緒に見られている商品',
+  'rec.headingPopular': 'こんな商品はいかがですか',
   'recent.heading': '最近見た商品',
   'recent.clear': '履歴を消す',
   'recent.cleared': '最近見た商品を消しました',
