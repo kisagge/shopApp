@@ -29,7 +29,58 @@ const remoteImageHost = ((raw: string | undefined): string => {
   }
 })(process.env['S3_PUBLIC_BASE_URL']);
 
+/**
+ * 요청과 무관하게 늘 같은 보안 헤더.
+ *
+ * 아무것도 없었다 — `curl -I` 로 확인했다. CSP 는 요청마다 nonce 가 달라져야
+ * 해서 여기가 아니라 proxy.ts 가 붙인다.
+ */
+const SECURITY_HEADERS = [
+  /**
+   * 브라우저가 내용을 보고 형식을 짐작하지 않게 한다.
+   *
+   * 사용자가 올린 파일이 text/plain 으로 나가도, 브라우저가 "이건 HTML
+   * 같은데" 하고 실행해 버리는 길이 이것으로 막힌다.
+   */
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  /**
+   * 우리 화면을 남의 페이지에 끼워 넣지 못하게.
+   *
+   * CSP 의 frame-ancestors 와 겹치지만 남겨 둔다 — 옛 브라우저는 CSP 쪽을
+   * 모른다. 클릭재킹은 결제·주문 화면에서 특히 값이 크다.
+   */
+  { key: 'X-Frame-Options', value: 'DENY' },
+  /**
+   * 남의 사이트로 나갈 때 주소를 통째로 넘기지 않는다.
+   *
+   * 주문 상세(/order/20260905-0000001)에서 밖으로 나가면 그 주문번호가
+   * 남의 서버 로그에 남는다. 같은 출처에는 그대로, 밖으로는 도메인만.
+   */
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  /**
+   * 쓰지 않는 장치 권한을 꺼 둔다.
+   *
+   * 결제는 넣지 않는다 — 토스는 Payment Request API 가 아니라 자기 창을
+   * 띄우지만, 확인하지 못한 것을 막아 두면 결제가 안 되는 쪽으로 틀린다.
+   * 못 막아 생기는 손해보다 결제가 막히는 손해가 크다.
+   */
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+  /**
+   * https 로만 오게 한다.
+   *
+   * Vercel 이 이미 붙여 주지만 다른 곳에 올릴 때를 대비해 우리도 적어 둔다.
+   * 브라우저는 http 응답의 이 헤더를 무시하므로 개발 서버에는 영향이 없다.
+   */
+  {
+    key: 'Strict-Transport-Security',
+    value: 'max-age=63072000; includeSubDomains; preload',
+  },
+];
+
 const config: NextConfig = {
+  // Next 는 Promise 를 요구한다. 안에서 기다릴 것은 없다.
+  headers: () => Promise.resolve([{ source: '/:path*', headers: SECURITY_HEADERS }]),
+
   // 워크스페이스 패키지는 TS 소스를 그대로 내보내므로 Next가 직접 컴파일한다.
   transpilePackages: ['@shop/ui', '@shop/core', '@shop/auth', '@shop/db'],
   experimental: {

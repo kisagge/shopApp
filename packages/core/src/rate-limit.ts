@@ -80,6 +80,16 @@ export const RATE_LIMIT = {
    * 조금 더 여유를 두는 것은 사기 전에 여러 상품을 놓고 묻는 일이 있어서다.
    */
   inquiry: { limit: 8, windowMs: MINUTE },
+
+  /**
+   * CSP 위반 신고.
+   *
+   * **브라우저가 보내는 것이라 사람의 속도가 아니다.** 화면 하나가 막히면
+   * 한 번 여는 동안 수십 건이 몰릴 수 있다. 그렇다고 조이면 정작 알아야 할
+   * 첫 신고를 놓치므로, 첫 몇 건만 받고 나머지는 흘린다 — 같은 위반이
+   * 백 번 와도 우리가 아는 것은 첫 번째와 같다.
+   */
+  cspReport: { limit: 20, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

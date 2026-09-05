@@ -196,3 +196,25 @@ test('마이페이지에서 문의 내역으로 갈 수 있다', async ({ page }
 
   await expect(page).toHaveURL('/mypage/inquiries');
 });
+
+test('CSP 아래에서도 우편번호 찾기가 열린다', async ({ page }) => {
+  /*
+   * **CSP 에서 가장 깨지기 쉬운 자리다.** 다음 우편번호 SDK 는 우리 코드가
+   * 부른 뒤 자기 스크립트를 더 심고 iframe 을 띄운다 — 호스트 목록으로
+   * 막으면 그 안쪽까지 우리가 추측해 적어야 하고, 추측은 틀린다.
+   * strict-dynamic 이 그 고리를 대신 이어 준다.
+   */
+  const violations: string[] = [];
+  page.on('console', (message) => {
+    if (/Content Security Policy/i.test(message.text())) violations.push(message.text());
+  });
+
+  await page.goto('/mypage/addresses');
+  await page.getByRole('button', { name: '새 배송지 추가' }).click();
+  await page.getByRole('button', { name: '주소 검색' }).click();
+
+  // SDK 가 심은 iframe 이 실제로 떠야 한다. 스크립트가 막히면 여기가 빈다.
+  await expect(page.locator('#postcode-search iframe')).toBeVisible();
+
+  expect(violations, violations.join('\n')).toEqual([]);
+});
