@@ -14,6 +14,8 @@ export interface HomeBanner {
   readonly href: string | null;
   readonly imageUrl: string | null;
   readonly imageAlt: string | null;
+  /** 남의 사진을 쓸 때의 작가 표기. 상품 사진과 같은 규칙이다. */
+  readonly imageCredit: string | null;
   readonly tone: string;
 }
 
@@ -68,12 +70,26 @@ function BannerSlide({ banner, index }: { banner: HomeBanner; index: number }) {
             priority={index === 0}
             className="object-cover"
           />
-          {/* 사진 위 글자의 대비를 보장한다. 사진이 밝든 어둡든 읽혀야 한다. */}
+          {/*
+            사진 위 글자의 대비를 보장한다.
+            **가림막을 화면 폭이 아니라 글자 폭에 맞춘다.** 화면 폭 기준의
+            그라디언트로 두었더니, 좁은 화면에서 글자 오른쪽 끝이 이미 투명해진
+            자리로 넘어가 붉은 니트 사진 위에서 문장 절반이 사라졌다. 사진이
+            하나도 없을 때는 드러나지 않던 결함이다.
+            글자 칸은 max-w-[460px] + 좌우 여백이라 520px 까지는 확실히 덮고
+            그 뒤에 푼다 — 화면이 그보다 좁으면 전부 덮인다.
+          */}
           <div
             aria-hidden="true"
-            className="absolute inset-0 bg-gradient-to-r from-n-0/85 via-n-0/60 to-transparent"
+            className="absolute inset-0 bg-[linear-gradient(to_right,color-mix(in_oklab,var(--color-n-0)_92%,transparent)_0px,color-mix(in_oklab,var(--color-n-0)_82%,transparent)_520px,transparent_780px)]"
           />
         </>
+      )}
+
+      {banner.imageCredit && (
+        <p className="absolute right-3 bottom-2 z-10 text-[10px] text-n-700/80">
+          {banner.imageCredit}
+        </p>
       )}
 
       <div className="relative z-10 flex max-w-[460px] flex-col gap-4">

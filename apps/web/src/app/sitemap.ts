@@ -1,5 +1,7 @@
 import type { MetadataRoute } from 'next';
-import { getAllProductSlugs, getTopCategories } from '~/lib/queries/products';
+import {
+  getAllProductSlugs, getTopCategories, getLiveCollections,
+} from '~/lib/queries/products';
 import { absoluteUrl } from '~/lib/urls';
 
 /**
@@ -14,7 +16,16 @@ import { absoluteUrl } from '~/lib/urls';
  * 한 장이면 된다. 나눌 때가 오면 그때 나눈다.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [slugs, categories] = await Promise.all([getAllProductSlugs(), getTopCategories()]);
+  const [slugs, categories, collections] = await Promise.all([
+    getAllProductSlugs(),
+    getTopCategories(),
+    /*
+     * **지금 열려 있는 기획전만 넣는다.** 조회가 게시 기간과 담긴 상품까지
+     * 보므로, 끝났거나 빈 기획전의 주소가 새어 나가지 않는다 — 검색 결과에서
+     * 들어왔더니 404 인 주소를 만들지 않는 것이 여기서 지킬 것이다.
+     */
+    getLiveCollections(),
+  ]);
   const now = new Date();
 
   return [
@@ -28,6 +39,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       url: absoluteUrl(`/category/${category.slug}`),
       lastModified: now,
       changeFrequency: 'daily' as const,
+      priority: 0.8,
+    })),
+    ...collections.map((collection) => ({
+      url: absoluteUrl(`/collection/${collection.slug}`),
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
       priority: 0.8,
     })),
     ...slugs.map((slug) => ({

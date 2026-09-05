@@ -10,6 +10,7 @@ export * from './payment';
 export * from './product';
 export * from './admin';
 export * from './banner';
+export * from './collection';
 export * from './catalog';
 export * from './review';
 export * from './cart-sync';

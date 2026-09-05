@@ -41,6 +41,19 @@ const BANNER_WRITERS = [
   'app/api/admin/banners/[id]/image/route.ts',
 ] as const;
 
+/**
+ * 기획전 쓰기 창구.
+ *
+ * 기획전 조회는 `collections` 와 `catalog` 두 태그를 함께 단다 — 담긴 수는
+ * 상품이 내려가도 달라지므로, 상품을 고쳤을 때도 함께 털려야 한다.
+ */
+const COLLECTION_WRITERS = [
+  'app/api/admin/collections/route.ts',
+  'app/api/admin/collections/[id]/route.ts',
+  'app/api/admin/collections/[id]/items/route.ts',
+  'app/api/admin/collections/[id]/image/route.ts',
+] as const;
+
 /** 별점이 목록에 나오므로 리뷰 쓰기도 카탈로그를 턴다 */
 const REVIEW_WRITERS = [
   'app/api/reviews/route.ts',
@@ -100,6 +113,10 @@ describe('무효화한 자리', () => {
     expect(read(rel)).toContain('revalidateBanners()');
   });
 
+  it.each(COLLECTION_WRITERS)('%s 가 기획전을 턴다', (rel) => {
+    expect(read(rel)).toContain('revalidateCollections()');
+  });
+
   it.each(REVIEW_WRITERS)('%s 가 리뷰를 턴다', (rel) => {
     expect(read(rel)).toContain('revalidateReviews()');
   });
@@ -113,6 +130,7 @@ describe('무효화한 자리', () => {
     const listed = new Set<string>([
       ...CATALOG_WRITERS,
       ...BANNER_WRITERS,
+      ...COLLECTION_WRITERS,
       ...REVIEW_WRITERS,
       ...SUPPORT_WRITERS,
     ]);

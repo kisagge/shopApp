@@ -56,7 +56,7 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|shopping|a11y|pwa|i18n|recently-viewed|support|recommendations|search-suggest)\.spec\.ts/,
+        /(auth|shopping|a11y|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections)\.spec\.ts/,
     },
     {
       name: 'customer',

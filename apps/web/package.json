@@ -10,6 +10,7 @@
     "setup:bucket": "node --env-file=../../.env scripts/setup-bucket.mjs",
     "seed:images": "tsx --env-file=../../.env scripts/seed-images.ts",
     "seed:banners": "tsx --env-file=../../.env scripts/seed-banners.ts",
+    "seed:collections": "tsx --env-file=../../.env scripts/seed-collections.ts",
     "seed:photos": "tsx --env-file=../../.env scripts/fetch-product-photos.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "lint": "next typegen && eslint .",

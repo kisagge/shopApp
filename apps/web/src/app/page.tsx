@@ -1,11 +1,12 @@
 import { siteStructuredData } from '@shop/core';
 import { absoluteUrl } from '~/lib/urls';
-import { getFeaturedProducts } from '~/lib/queries/products';
+import { getFeaturedProducts, getLiveCollections } from '~/lib/queries/products';
 import { getLiveBanners } from '~/lib/admin/manage-banner';
 import { HomeBanners } from '~/components/home-banners';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { RecentlyViewed } from '~/components/recently-viewed';
+import { CollectionStrip } from '~/components/collection-strip';
 import { getT } from '~/lib/i18n/server';
 
 /**
@@ -18,11 +19,12 @@ import { getT } from '~/lib/i18n/server';
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [products, banners, t] = await Promise.all([
+  const [products, banners, collections, t] = await Promise.all([
     getFeaturedProducts(10),
     // 게시 기간 판정은 서버 시각으로 한다 — 브라우저 시계를 믿으면
     // 시계가 틀어진 사용자에게 끝난 기획전이 계속 보인다.
     getLiveBanners(),
+    getLiveCollections(),
     getT(),
   ]);
 
@@ -58,9 +60,17 @@ export default async function HomePage() {
         banners={banners.map((b) => ({
           id: b.id, eyebrow: b.eyebrow, headline: b.headline, subcopy: b.subcopy,
           ctaLabel: b.ctaLabel, href: b.href,
-          imageUrl: b.imageUrl, imageAlt: b.imageAlt, tone: b.tone,
+          imageUrl: b.imageUrl, imageAlt: b.imageAlt, imageCredit: b.imageCredit,
+          tone: b.tone,
         }))}
       />
+
+      {/*
+        기획전이 없으면 줄을 통째로 비운다 — 최근 본 상품과 같은 판단이다.
+        "준비 중입니다" 를 띄우는 것은 자리를 채우는 것이지 알려 주는 것이
+        아니다.
+      */}
+      <CollectionStrip collections={collections} />
 
       <section aria-labelledby="pick-title" className="px-4 pt-12 md:px-10 md:pt-20">
         <div className="mb-6 flex flex-col gap-2 md:mb-7">

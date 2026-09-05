@@ -235,6 +235,10 @@ model Banner {
   imageAlt   String?
   storageKey String?
 
+  /// 사진 출처. 남의 사진을 쓸 때 표기가 없으면 나중에 어느 것이 우리
+  /// 것이고 어느 것이 남의 것인지 구분할 방법이 사라진다.
+  imageCredit String?
+
   /// 이미지가 없을 때 쓰는 배경 톤. theme.css 의 --color-ph-* 이름.
   tone String @default("sand")
 
@@ -250,6 +254,61 @@ model Banner {
 
   @@index([isActive, sortOrder])
   @@map("banners")
+}
+
+/// 기획전. 사람이 골라 담은 상품 묶음.
+model Collection {
+  id String @id @default(cuid())
+
+  /// 주소에 그대로 들어간다.
+  slug     String  @unique
+  title    String
+  subtitle String?
+
+  /// 기획전 화면 위쪽에 붙는 긴 설명. 없어도 된다.
+  description String?
+
+  imageUrl   String?
+  imageAlt   String?
+  storageKey String?
+
+  /// 사진 출처. 배너와 같은 이유로 둔다.
+  imageCredit String?
+
+  /// 이미지가 없을 때 쓰는 배경 톤. 배너와 같은 이름을 쓴다.
+  tone String @default("sand")
+
+  sortOrder Int     @default(0)
+  isActive  Boolean @default(true)
+
+  /// 게시 기간. null 이면 제한 없음.
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  items CollectionItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, sortOrder])
+  @@map("collections")
+}
+
+/// 기획전에 담긴 상품. 순서 자체가 편집이라 sortOrder 를 둔다.
+model CollectionItem {
+  collectionId String
+  productId    String
+  sortOrder    Int    @default(0)
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([collectionId, productId])
+  @@index([collectionId, sortOrder])
+  @@index([productId])
+  @@map("collection_items")
 }
 
 // ─────────────────────────────────────────── 상품
@@ -361,6 +420,7 @@ model Product {
   variants     ProductVariant[]
   reviews      Review[]
   wishedBy     WishlistItem[]
+  collections  CollectionItem[]
 
   /// 최초 게시 시각. 이 값이 있으면 검수를 이미 통과한 상품이다 —
   /// 그 뒤로는 가맹점이 직접 내리고 올릴 수 있다.

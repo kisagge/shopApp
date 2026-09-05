@@ -47,6 +47,10 @@ export const PERMISSION = [
   // 홈 배너는 플랫폼 진열이다. 가맹점이 만지면 남의 매대를 바꾸는 셈이 된다.
   'banner:read',
   'banner:write',
+  // 기획전도 같은 이유로 플랫폼의 것이다. 여러 브랜드를 가로질러 고르는
+  // 자리라, 한 가맹점이 고르면 자기 상품만 담거나 경쟁 브랜드를 뺀다.
+  'collection:read',
+  'collection:write',
   'settlement:read',
   'settlement:confirm', // 정산 금액 확정
   'settlement:pay',     // 실제 지급 집행
@@ -101,6 +105,7 @@ const ADMIN: readonly Permission[] = [
   'user:read', 'user:write',
   'coupon:read', 'coupon:write',
   'banner:read', 'banner:write',
+  'collection:read', 'collection:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:moderate',
   'inquiry:answer', 'support:write',

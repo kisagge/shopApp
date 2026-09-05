@@ -15,6 +15,7 @@ import { hashIp } from './analytics/server';
 
 export type AuditTargetType =
   | 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon' | 'banner'
+  | 'collection'
   | 'event_log' | 'review' | 'support_post';
 
 /** 배치처럼 사람이 아닌 행위자 */

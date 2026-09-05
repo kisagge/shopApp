@@ -29,6 +29,7 @@ export interface BannerRow {
   readonly href: string | null;
   readonly imageUrl: string | null;
   readonly imageAlt: string | null;
+  readonly imageCredit: string | null;
   readonly tone: BannerTone;
   readonly sortOrder: number;
   readonly isActive: boolean;
@@ -39,14 +40,14 @@ export interface BannerRow {
 
 const select = {
   id: true, eyebrow: true, headline: true, subcopy: true,
-  ctaLabel: true, href: true, imageUrl: true, imageAlt: true,
+  ctaLabel: true, href: true, imageUrl: true, imageAlt: true, imageCredit: true,
   tone: true, sortOrder: true, isActive: true, startsAt: true, endsAt: true,
 } as const;
 
 type Raw = {
   id: string; eyebrow: string | null; headline: string; subcopy: string | null;
   ctaLabel: string | null; href: string | null; imageUrl: string | null;
-  imageAlt: string | null; tone: string; sortOrder: number; isActive: boolean;
+  imageAlt: string | null; imageCredit: string | null; tone: string; sortOrder: number; isActive: boolean;
   startsAt: Date | null; endsAt: Date | null;
 };
 

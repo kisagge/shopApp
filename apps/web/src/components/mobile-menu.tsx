@@ -105,6 +105,15 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
                 </Link>
               </li>
             ))}
+            {/* 기획전은 갈래가 아니라 편집이라 카테고리 뒤에 따로 둔다 */}
+            <li>
+              <Link
+                href="/collections"
+                className="flex h-12 items-center text-sm font-medium text-[var(--fg)] no-underline"
+              >
+                {t('collection.heading')}
+              </Link>
+            </li>
           </ul>
         </nav>
 
