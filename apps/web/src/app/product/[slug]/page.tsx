@@ -214,7 +214,12 @@ export default async function ProductPage({ params, searchParams }: Params) {
 
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2.5">
-            <Link href={`/category/${product.categorySlug}`} className="text-[11px] font-medium tracking-[0.1em] text-[var(--fg-secondary)]">
+            {/*
+              브랜드 이름이 카테고리로 가고 있었다 — 이름은 브랜드인데 데려가는
+              곳은 갈래라, 누른 사람이 기대한 것과 다른 화면이 나왔다.
+              brandSlug 는 조회가 진작 실어 보내고 있었고 아무도 쓰지 않았다.
+            */}
+            <Link href={`/brand/${product.brandSlug}`} className="text-[11px] font-medium tracking-[0.1em] text-[var(--fg-secondary)]">
               {product.brand}
             </Link>
             <div className="flex items-start justify-between gap-4">

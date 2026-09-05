@@ -12,7 +12,7 @@ export async function CatalogPager({
   params,
   nextCursor,
 }: {
-  basePath: '/search' | `/category/${string}`;
+  basePath: '/search' | `/category/${string}` | `/brand/${string}`;
   params: Record<string, string | string[] | undefined>;
   nextCursor: string | null;
 }) {

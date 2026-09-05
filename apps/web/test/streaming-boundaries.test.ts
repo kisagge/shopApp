@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
@@ -39,13 +39,35 @@ describe('상품 화면의 스트리밍 경계', () => {
     }
   });
 
-  it('넘어가는 동안 보여 줄 화면이 있다', () => {
-    for (const route of [
-      ['product', '[slug]'],
-      ['category', '[slug]'],
-      ['search'],
-    ]) {
-      expect(() => readFileSync(join(SRC, 'app', ...route, 'loading.tsx'), 'utf8')).not.toThrow();
-    }
+  /**
+   * **loading.tsx 가 있는 화면은 404 를 낼 수 없다.**
+   *
+   * 그 파일이 있으면 Next 가 껍데기를 먼저 흘려보내고, 그 순간 상태 코드가
+   * 200 으로 확정된다. 뒤에 notFound() 를 불러도 본문만 404 화면이고 코드는
+   * 200 인 **가짜 404** 가 된다 — 검색엔진은 그 주소를 살아 있는 것으로 보고
+   * 계속 들고 있는다.
+   *
+   * 상품·카테고리·브랜드에 붙였다가 없는 주소가 전부 200 으로 나가는 것을
+   * 보고 뺐다. 눈으로는 404 화면이 그대로 보여서 **화면만 봐서는 모른다.**
+   */
+  it('loading.tsx 와 notFound() 를 같은 화면에 두지 않는다', () => {
+    const offenders: string[] = [];
+
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) walk(full);
+        else if (name === 'loading.tsx') {
+          const page = join(dir, 'page.tsx');
+          if (!existsSync(page)) continue;
+          if (readFileSync(page, 'utf8').includes('notFound()')) {
+            offenders.push(page.replace(SRC, ''));
+          }
+        }
+      }
+    };
+    walk(join(SRC, 'app'));
+
+    expect(offenders, '이 화면들은 죽은 주소에 200 을 돌려준다').toEqual([]);
   });
 });

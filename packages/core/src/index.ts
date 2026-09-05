@@ -25,6 +25,7 @@ export * from './schedule';
 export * from './order-hold';
 export * from './banner';
 export * from './collection';
+export * from './facet';
 export * from './catalog';
 export * from './structured-data';
 export * from './inquiry';

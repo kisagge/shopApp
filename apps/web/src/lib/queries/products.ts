@@ -4,8 +4,8 @@ import { cachedRead, TAG, TTL } from '~/lib/cache';
 import { prisma, Prisma } from '@shop/db';
 import {
   mergeRecommendations, canSuggest, popularTerms, SUGGEST_LIMIT,
-  isLive, hasVisibleItems,
-  type SearchTermStat,
+  isLive, hasVisibleItems, FACET_GROUP, EMPTY_FACETS,
+  type SearchTermStat, type Facets, type FacetValue,
 } from '@shop/core';
 import {
   discountRateOf, won, normalizeSearchTerm, normalizePriceRange, VISIBLE_STATUS,
@@ -466,10 +466,17 @@ export async function getSearchSuggestions(
       label: c.name,
       href: `/category/${c.slug}`,
     })),
+    /*
+     * **브랜드는 브랜드 화면으로 보낸다.**
+     *
+     * 예전에는 `/search?q=<브랜드명>` 으로 보냈는데, 그건 글자가 스치기만
+     * 해도 걸리는 검색이라 남의 상품 설명에 그 이름이 있으면 함께 나왔다.
+     * 브랜드로 좁히는 것은 검색이 아니라 조건이다.
+     */
     ...brands.map((b) => ({
       kind: 'brand' as const,
       label: b.name,
-      href: `/search?q=${encodeURIComponent(b.name)}`,
+      href: `/brand/${b.slug}`,
     })),
     ...products.map((p) => ({
       kind: 'product' as const,
@@ -629,6 +636,9 @@ export async function getCategoryWithChildren(slug: string) {
 export interface CatalogFilter {
   readonly q?: string | undefined;
   readonly categorySlug?: string | undefined;
+  readonly brandSlug?: string | undefined;
+  readonly color?: readonly string[] | undefined;
+  readonly size?: readonly string[] | undefined;
   readonly sort?: ProductSort | undefined;
   readonly minPrice?: number | undefined;
   readonly maxPrice?: number | undefined;
@@ -705,7 +715,11 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
    * 있는 조합이 한정돼 있어 캐싱해도 안전하다.
    */
   const { rows, total } = await (term === null ? cachedCatalogPage : catalogPage)({
-    categoryIds, min: range.min, max: range.max, term,
+    categoryIds,
+    brandSlug: filter.brandSlug ?? null,
+    color: [...(filter.color ?? [])],
+    size: [...(filter.size ?? [])],
+    min: range.min, max: range.max, term,
     sort, take, cursor: filter.cursor ?? null,
   });
 
@@ -723,6 +737,9 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
 
 interface CatalogQuery {
   readonly categoryIds: string[] | null;
+  readonly brandSlug: string | null;
+  readonly color: string[];
+  readonly size: string[];
   readonly min: number | null;
   readonly max: number | null;
   readonly term: string | null;
@@ -747,6 +764,30 @@ async function catalogPage(q: CatalogQuery) {
   };
 
   if (q.categoryIds) where.categoryId = { in: q.categoryIds };
+  if (q.brandSlug) where.brand = { ...sellableBrand(), slug: q.brandSlug };
+
+  /*
+   * **색상과 사이즈는 같은 변형에서 만나야 한다.**
+   *
+   * 따로 걸면 "블랙이 있고 M 도 있는 상품" 이 걸린다 — 블랙은 L 만 있고
+   * M 은 흰색뿐인 상품이 "블랙 M" 검색에 나온다. 고른 사람이 원한 것은
+   * 블랙 M 하나다.
+   *
+   * **재고는 보지 않는다.** 거르지 않은 목록도 품절 상품을 보여 주는데,
+   * 필터만 더 엄격하면 규칙이 두 벌이 된다 — 색으로 좁혔다고 품절이
+   * 사라지면 사용자는 왜 없어졌는지 알 수 없다. 품절 여부는 카드가 이미
+   * 말해 주고, 빼고 보고 싶으면 그건 따로 둘 스위치다.
+   */
+  const optionMatch = [
+    { name: FACET_GROUP.color, values: q.color },
+    { name: FACET_GROUP.size, values: q.size },
+  ]
+    .filter((f) => f.values.length > 0)
+    .map((f) => ({ optionValues: { some: { value: { in: f.values }, group: { name: f.name } } } }));
+
+  if (optionMatch.length > 0) {
+    where.variants = { some: { isActive: true, AND: optionMatch } };
+  }
 
   if (q.min !== null || q.max !== null) {
     const bounds: Prisma.IntFilter = {};
@@ -901,4 +942,102 @@ export async function getCollection(
     description: row.description, imageUrl: row.imageUrl, imageAlt: row.imageAlt,
     imageCredit: row.imageCredit, tone: row.tone, itemCount: items.length, items,
   };
+}
+
+/* ─────────────────────────────────────────── 브랜드 · 필터 축 */
+
+export interface BrandDetail {
+  readonly slug: string;
+  readonly name: string;
+  readonly logoUrl: string | null;
+}
+
+/**
+ * 브랜드 하나.
+ *
+ * **팔 수 있는 브랜드만 준다.** 가맹점을 정지시켰는데 브랜드 화면이 계속
+ * 열리면 처분이 처분이 아니다 — 목록에서만 빼고 주소로는 열리는 상태가
+ * 상품 상세에서 겪은 것과 같은 뒷문이다.
+ */
+export const getBrandBySlug = cachedRead(
+  async (slug: string): Promise<BrandDetail | null> =>
+    prisma.brand.findFirst({
+      where: { slug, ...sellableBrand() },
+      select: { slug: true, name: true, logoUrl: true },
+    }),
+  { key: ['brand'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+/** 사이트맵에 넣을 브랜드. 상품이 하나도 없는 브랜드는 뺀다. */
+export const getSellableBrandSlugs = cachedRead(
+  async (): Promise<string[]> => {
+    const rows = await prisma.brand.findMany({
+      where: { ...sellableBrand(), products: { some: onDisplay() } },
+      select: { slug: true },
+      orderBy: { name: 'asc' },
+    });
+    return rows.map((r) => r.slug);
+  },
+  { key: ['brand-slugs'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+/**
+ * 지금 범위에서 고를 수 있는 색상·사이즈.
+ *
+ * **고른 색상·사이즈는 범위에서 뺀다.** 넣으면 블랙을 고른 순간 다른 색이
+ * 목록에서 사라져 되돌릴 길이 없어진다. 카테고리와 검색어까지만 반영한다.
+ */
+const facetRows = cachedRead(
+  async (categoryIds: string[] | null, brandSlug: string | null, term: string | null) => {
+    const scope: Prisma.ProductWhereInput = { ...onDisplay(), brand: sellableBrand() };
+    if (categoryIds) scope.categoryId = { in: categoryIds };
+    if (brandSlug) scope.brand = { ...sellableBrand(), slug: brandSlug };
+    if (term) scope.searchText = { contains: term.toLowerCase() };
+
+    return prisma.productOptionValue.findMany({
+      where: {
+        group: {
+          name: { in: [FACET_GROUP.color, FACET_GROUP.size] },
+          product: scope,
+        },
+      },
+      select: {
+        value: true,
+        swatchHex: true,
+        sortOrder: true,
+        group: { select: { name: true } },
+      },
+      orderBy: [{ sortOrder: 'asc' }, { value: 'asc' }],
+    });
+  },
+  { key: ['facets'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+export async function getFacets(filter: {
+  categorySlug?: string | undefined;
+  brandSlug?: string | undefined;
+  q?: string | undefined;
+}): Promise<Facets> {
+  const categoryIds = filter.categorySlug ? await categoryIdsFor(filter.categorySlug) : null;
+  if (filter.categorySlug && (categoryIds === null || categoryIds.length === 0)) {
+    return EMPTY_FACETS;
+  }
+
+  const term = filter.q ? normalizeSearchTerm(filter.q) : null;
+  const rows = await facetRows(categoryIds, filter.brandSlug ?? null, term);
+
+  /*
+   * 같은 값이 상품마다 따로 있으므로 여기서 접는다. DB 에 distinct 를
+   * 맡기면 스와치 색과 정렬 순서를 함께 가져올 수 없다.
+   */
+  const fold = (groupName: string): FacetValue[] => {
+    const seen = new Map<string, FacetValue>();
+    for (const row of rows) {
+      if (row.group.name !== groupName || seen.has(row.value)) continue;
+      seen.set(row.value, { value: row.value, swatchHex: row.swatchHex });
+    }
+    return [...seen.values()];
+  };
+
+  return { color: fold(FACET_GROUP.color), size: fold(FACET_GROUP.size) };
 }

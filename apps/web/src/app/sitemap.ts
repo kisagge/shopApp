@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 import {
-  getAllProductSlugs, getTopCategories, getLiveCollections,
+  getAllProductSlugs, getTopCategories, getLiveCollections, getSellableBrandSlugs,
 } from '~/lib/queries/products';
 import { absoluteUrl } from '~/lib/urls';
 
@@ -36,7 +36,7 @@ import { absoluteUrl } from '~/lib/urls';
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [slugs, categories, collections] = await Promise.all([
+  const [slugs, categories, collections, brands] = await Promise.all([
     getAllProductSlugs(),
     getTopCategories(),
     /*
@@ -45,6 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
      * 들어왔더니 404 인 주소를 만들지 않는 것이 여기서 지킬 것이다.
      */
     getLiveCollections(),
+    // 팔 수 있는 브랜드만. 정지된 가맹점의 주소를 색인에 남기지 않는다.
+    getSellableBrandSlugs(),
   ]);
   const now = new Date();
 
@@ -60,6 +62,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.8,
+    })),
+    ...brands.map((brand) => ({
+      url: absoluteUrl(`/brand/${brand}`),
+      lastModified: now,
+      changeFrequency: 'weekly' as const,
+      priority: 0.6,
     })),
     ...collections.map((collection) => ({
       url: absoluteUrl(`/collection/${collection.slug}`),

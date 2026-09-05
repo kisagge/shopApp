@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultReason, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
-import { searchProducts, getPopularSearches } from '~/lib/queries/products';
+import { searchProducts, getPopularSearches, getFacets } from '~/lib/queries/products';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { TrackedSearch } from '~/components/tracked-search';
@@ -45,9 +45,14 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
         sort: parsed.sort,
         minPrice: parsed.minPrice,
         maxPrice: parsed.maxPrice,
+        color: parsed.color,
+        size: parsed.size,
         cursor: parsed.cursor,
       })
     : null;
+
+  // 검색어 안에 실제로 있는 값만 고르게 한다
+  const facets = term ? await getFacets({ q: term }) : undefined;
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
@@ -100,6 +105,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             maxPrice={parsed.maxPrice}
             query={term}
             total={page?.total ?? null}
+            {...(facets ? { facets } : {})}
+            selected={{ color: parsed.color, size: parsed.size }}
           />
 
           {page && page.items.length === 0 ? (

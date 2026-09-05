@@ -1,4 +1,7 @@
-import { PRODUCT_SORT, type ProductSort } from '@shop/core';
+import {
+  PRODUCT_SORT, FACET_KEYS, hasFacets, EMPTY_FACETS,
+  type ProductSort, type Facets, type FacetKey,
+} from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 import { getT } from '~/lib/i18n/server';
 
@@ -9,6 +12,12 @@ import { getT } from '~/lib/i18n/server';
  * 들이면 정책과 화면이 섞인다. core 는 정렬 종류만 정하고, 그것을 뭐라고
  * 부를지는 화면이 정한다.
  */
+/** 축 이름도 core 가 아니라 화면이 정한다 — 정렬 이름과 같은 이유다. */
+const FACET_LABEL: Record<FacetKey, MessageKey> = {
+  color: 'catalog.color',
+  size: 'catalog.size',
+};
+
 const SORT_KEY: Record<ProductSort, MessageKey> = {
   recommended: 'catalog.sortRecommended',
   newest: 'catalog.sortNewest',
@@ -30,6 +39,8 @@ export async function CatalogControls({
   maxPrice,
   query,
   total,
+  facets = EMPTY_FACETS,
+  selected = { color: [], size: [] },
 }: {
   /** 폼이 되돌아갈 경로 */
   action: string;
@@ -39,9 +50,15 @@ export async function CatalogControls({
   /** 검색 페이지에서 검색어를 유지하기 위한 값 */
   query?: string | undefined;
   total: number | null;
+  /** 지금 범위에서 고를 수 있는 값. 없으면 이 자리를 그리지 않는다. */
+  facets?: Facets;
+  selected?: Readonly<Record<FacetKey, readonly string[]>>;
 }) {
   const t = await getT();
-  const filtered = minPrice !== undefined || maxPrice !== undefined;
+  const filtered =
+    minPrice !== undefined ||
+    maxPrice !== undefined ||
+    FACET_KEYS.some((key) => selected[key].length > 0);
 
   return (
     <form
@@ -51,6 +68,47 @@ export async function CatalogControls({
     >
       {/* 검색어는 정렬을 바꿔도 유지돼야 한다 */}
       {query && <input type="hidden" name="q" value={query} />}
+
+      {/*
+        색상·사이즈.
+        **체크박스다.** 같은 이름으로 여러 개가 주소에 붙는 것이 그대로
+        `?size=M&size=L` 이 되고, 자바스크립트 없이도 동작한다. 칩처럼
+        보이지만 실제로는 label 안의 체크박스라 키보드와 낭독기가 그대로
+        읽는다 — 눈에만 보이는 버튼으로 만들면 그것을 다시 만들어야 한다.
+      */}
+      {hasFacets(facets) && (
+        <div className="flex w-full flex-col gap-3">
+          {FACET_KEYS.filter((key) => facets[key].length > 0).map((key) => (
+            <fieldset key={key} className="flex flex-wrap items-center gap-2 border-0 p-0">
+              <legend className="float-left mr-3 text-[11px] text-[var(--fg-muted)]">
+                {t(FACET_LABEL[key])}
+              </legend>
+              {facets[key].map((option) => (
+                <label
+                  key={option.value}
+                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                >
+                  <input
+                    type="checkbox"
+                    name={key}
+                    value={option.value}
+                    defaultChecked={selected[key].includes(option.value)}
+                    className="sr-only"
+                  />
+                  {option.swatchHex && (
+                    <span
+                      aria-hidden="true"
+                      className="size-3 rounded-full border border-n-300"
+                      style={{ backgroundColor: option.swatchHex }}
+                    />
+                  )}
+                  {option.value}
+                </label>
+              ))}
+            </fieldset>
+          ))}
+        </div>
+      )}
 
       <p className="text-[13px] text-[var(--fg-secondary)]">
         {total === null ? (
@@ -116,7 +174,7 @@ export async function CatalogControls({
             href={query ? `${action}?q=${encodeURIComponent(query)}` : action}
             className="flex h-10 items-center px-1 text-[13px] text-[var(--fg-secondary)] no-underline hover:underline"
           >
-            {t('catalog.resetPrice')}
+            {t('catalog.resetFilters')}
           </a>
         )}
       </div>

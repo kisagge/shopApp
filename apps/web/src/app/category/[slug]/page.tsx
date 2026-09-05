@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultReason } from '@shop/core';
 import { categoryName } from '@shop/i18n';
-import { getCategoryWithChildren, searchProducts } from '~/lib/queries/products';
+import { getCategoryWithChildren, searchProducts, getFacets } from '~/lib/queries/products';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CatalogControls } from '~/components/catalog-controls';
@@ -36,15 +36,19 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   const raw = await searchParams;
   const query = catalogQuerySchema.parse(raw);
 
-  const [category, page] = await Promise.all([
+  const [category, page, facets] = await Promise.all([
     getCategoryWithChildren(slug),
     searchProducts({
       categorySlug: slug,
       sort: query.sort,
       minPrice: query.minPrice,
       maxPrice: query.maxPrice,
+      color: query.color,
+      size: query.size,
       cursor: query.cursor,
     }),
+    // 고를 수 있는 값은 이 카테고리 안에 실제로 있는 것만
+    getFacets({ categorySlug: slug }),
   ]);
   if (!category) notFound();
 
@@ -120,6 +124,8 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           minPrice={query.minPrice}
           maxPrice={query.maxPrice}
           total={page.total}
+          facets={facets}
+          selected={{ color: query.color, size: query.size }}
         />
       </div>
 

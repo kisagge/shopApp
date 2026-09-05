@@ -53,7 +53,9 @@ describe('자동완성', () => {
 
     expect(await getSearchSuggestions('코트')).toEqual([
       { kind: 'category', label: '코트', href: '/category/outer-coat' },
-      { kind: 'brand', label: 'STUDIO NOON', href: '/search?q=STUDIO%20NOON' },
+      // 브랜드는 검색이 아니라 브랜드 화면으로 보낸다 — 검색은 글자가
+      // 스치기만 해도 걸려서 남의 상품 설명까지 함께 나온다
+      { kind: 'brand', label: 'STUDIO NOON', href: '/brand/studio-noon' },
       { kind: 'product', label: '울 코트', href: '/product/wool-coat' },
     ]);
   });
