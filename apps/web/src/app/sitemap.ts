@@ -15,6 +15,26 @@ import { absoluteUrl } from '~/lib/urls';
  * 상품이 수만 개가 되면 쪽을 나눠야 하지만(sitemap index), 지금 규모에서는
  * 한 장이면 된다. 나눌 때가 오면 그때 나눈다.
  */
+
+/**
+ * **요청마다 만든다. 빌드 때 만들지 않는다.**
+ *
+ * 이걸 붙이기 전에는 이 파일이 유일하게 빌드 중 DB 를 치는 자리였다. 가짜
+ * 주소로 빌드해 보면 정확히 여기서 죽는다:
+ *
+ *   Error occurred prerendering page "/sitemap.xml"
+ *   Can't reach database server
+ *
+ * 그러면 **DB 가 잠깐 흔들리는 동안 배포가 통째로 실패한다.** 사이트맵 한
+ * 장 때문에 새 코드가 못 나가는 것은 값이 맞지 않는다. 그리고 이 저장소가
+ * ISR 을 쓰지 않기로 한 근거가 "빌드는 DB 를 건드리지 않는다" 였는데,
+ * 그 말이 이미 사실이 아닌 상태였다 — 근거를 다시 사실로 만든다.
+ *
+ * 크롤러가 하루에 몇 번 가져가는 주소라 매번 만들어도 부담이 없고, 조회는
+ * 어차피 캐시를 지난다(lib/cache).
+ */
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [slugs, categories, collections] = await Promise.all([
     getAllProductSlugs(),
