@@ -53,6 +53,11 @@ export function SearchBox({
   const [closed, setClosed] = useState(false);
   const [active, setActive] = useState(-1);
   const rootRef = useRef<HTMLDivElement>(null);
+  /**
+   * 마지막으로 답을 받은 글자. 상태와 같은 값을 들고 있지만 **이펙트 안에서
+   * 지금 값을 봐야** 해서 따로 둔다.
+   */
+  const answeredRef = useRef('');
 
   const eligible = canSuggest(term);
 
@@ -68,8 +73,16 @@ export function SearchBox({
         .then((r) => (r.ok ? r.json() : { suggestions: [] }))
         .then((body: { suggestions: SearchSuggestion[] }) => {
           setItems(body.suggestions);
+          /*
+           * **같은 글자에 대한 답이 다시 오면 고른 자리를 흔들지 않는다.**
+           * 목록이 그대로인데 화살표로 짚어 둔 것만 풀리면, 화살표를 누른
+           * 직후 150ms 안에 답이 도착한 사람에게는 키가 씹힌 것처럼 보인다.
+           * 글자가 바뀌었을 때만 되돌린다 — 그때는 자리 번호가 옛 목록의
+           * 것이라 그대로 두는 쪽이 틀린다.
+           */
+          if (answeredRef.current !== term) setActive(-1);
+          answeredRef.current = term;
           setAnsweredFor(term);
-          setActive(-1);
         })
         .catch(() => {
           // 제안을 못 받아도 검색 자체는 폼으로 된다

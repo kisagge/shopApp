@@ -117,6 +117,45 @@ describe('검색 자동완성 창', () => {
     expect(box()).toHaveAttribute('aria-activedescendant', options[0]!.id);
   });
 
+  it('같은 글자에 답이 다시 와도 고른 자리를 잃지 않는다', async () => {
+    /*
+     * CI 에서만 지던 실패가 이것이었다. 화살표를 누른 **직후에** 앞서 띄워
+     * 둔 요청의 답이 도착하면 짚어 둔 자리가 풀려서, 사용자에게는 키가
+     * 씹힌 것처럼 보인다. 답이 늦게 오는 상황을 그대로 만든다.
+     */
+    const user = await typeAndWait();
+
+    let land = (_: unknown) => {};
+    fetchMock.mockReturnValue(new Promise((resolve) => (land = resolve)));
+
+    // 같은 글자를 다시 친다 — 목록은 그대로 떠 있고 요청만 새로 뜬다
+    await user.clear(box());
+    await user.type(box(), '코트');
+    await new Promise((r) => setTimeout(r, 300));
+
+    await user.keyboard('{ArrowDown}');
+    const first = screen.getAllByRole('option')[0]!;
+    expect(box()).toHaveAttribute('aria-activedescendant', first.id);
+
+    // 이제서야 답이 도착한다
+    land(new Response(JSON.stringify({ suggestions })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    expect(box()).toHaveAttribute('aria-activedescendant', first.id);
+    expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('다른 글자에 답이 오면 고른 자리를 되돌린다 — 번호가 옛 목록의 것이다', async () => {
+    const user = await typeAndWait();
+    await user.keyboard('{ArrowDown}');
+
+    await user.clear(box());
+    await user.type(box(), '니트');
+    await new Promise((r) => setTimeout(r, 300));
+
+    expect(box()).not.toHaveAttribute('aria-activedescendant');
+  });
+
   it('Escape 로 닫는다 — 친 글자는 지우지 않는다', async () => {
     const user = await typeAndWait();
     await user.keyboard('{Escape}');
