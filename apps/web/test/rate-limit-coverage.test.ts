@@ -20,6 +20,7 @@ const GUARDED = [
   'api/inquiries/route.ts',
   'api/products/recent/route.ts',
   'api/reviews/[id]/helpful/route.ts',
+  'api/search/suggest/route.ts',
 ] as const;
 
 const APP = join(process.cwd(), 'src', 'app');

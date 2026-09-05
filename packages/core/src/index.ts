@@ -29,6 +29,7 @@ export * from './support';
 export * from './point';
 export * from './recommend';
 export * from './notification';
+export * from './search-suggest';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';

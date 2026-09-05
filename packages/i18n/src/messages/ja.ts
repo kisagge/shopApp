@@ -32,6 +32,7 @@ export const ja: Dictionary = {
   'nav.logout': 'ログアウト',
   'nav.mypage': 'マイページ',
   'nav.merchantApply': '出店申請',
+  'nav.console': '{role}ページ',
   'nav.language': '言語',
   'nav.languageChange': '言語を選択',
   'footer.disclaimer':
@@ -90,6 +91,13 @@ export const ja: Dictionary = {
   'empty.other_term': '別のキーワードをお試しいただくか、綴りをご確認ください。',
   'empty.no_products': 'まだ登録された商品がありません。',
 
+  'suggest.label': '検索候補',
+  'suggest.count': '候補{count}件',
+  'suggest.none': '候補がありません',
+  'suggest.product': '商品',
+  'suggest.brand': 'ブランド',
+  'suggest.category': 'カテゴリー',
+  'popular.heading': '人気の検索語',
   'search.heading': '検索',
   'search.resultsFor': '「{term}」の検索結果',
   'search.prompt': 'お探しの商品名やブランド名を入力してください。',

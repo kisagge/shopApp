@@ -103,7 +103,7 @@ test.describe('모바일 메뉴', () => {
 
     await expect(category.first()).toBeVisible();
     // 검색도 헤더에서는 sm 아래로 숨으므로 여기 있어야 한다
-    await expect(page.locator('header').getByRole('searchbox')).toBeVisible();
+    await expect(page.locator('header').getByRole('combobox')).toBeVisible();
   });
 
   test('Esc 로 닫히고 포커스가 여는 자리로 돌아온다', async ({ page }) => {

@@ -36,6 +36,7 @@ export const en: Dictionary = {
   'nav.logout': 'Sign out',
   'nav.mypage': 'My page',
   'nav.merchantApply': 'Sell with us',
+  'nav.console': '{role} console',
   'nav.language': 'Language',
   'nav.languageChange': 'Choose a language',
   'footer.disclaimer':
@@ -94,6 +95,13 @@ export const en: Dictionary = {
   'empty.other_term': 'Try a different word, or check the spelling.',
   'empty.no_products': 'No products have been listed yet.',
 
+  'suggest.label': 'Search suggestions',
+  'suggest.count': { one: '{count} suggestion', other: '{count} suggestions' },
+  'suggest.none': 'No suggestions',
+  'suggest.product': 'Product',
+  'suggest.brand': 'Brand',
+  'suggest.category': 'Category',
+  'popular.heading': 'Popular searches',
   'search.heading': 'Search',
   'search.resultsFor': 'Results for “{term}”',
   'search.prompt': 'Enter a product or brand name.',

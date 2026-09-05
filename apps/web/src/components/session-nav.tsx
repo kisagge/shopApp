@@ -52,6 +52,13 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
   }
 
   const role = (data.user as { role?: string }).role;
+  /*
+   * 운영진·가맹점은 **콘솔로 가는 길이 화면에 있어야 한다.** 주소를 외워
+   * 쳐야만 들어갈 수 있으면 없는 것과 같다. 권한 검사는 /admin 이 다시
+   * 하므로 여기서는 길만 낸다.
+   */
+  const staff = role !== undefined && role !== 'CUSTOMER';
+  const consoleLabel = staff ? t('nav.console', { role: roleLabel(t, role) }) : '';
 
   if (menu) {
     return (
@@ -67,6 +74,14 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
         <Link href="/mypage" className="flex h-12 items-center text-sm text-[var(--fg)] no-underline">
           {t('nav.mypage')}
         </Link>
+        {staff && (
+          <Link
+            href="/admin"
+            className="flex h-12 items-center text-sm font-medium text-[var(--fg)] no-underline"
+          >
+            {consoleLabel}
+          </Link>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -90,12 +105,17 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
       </Link>
       <span className="hidden text-xs text-[var(--fg-secondary)] sm:inline">
         {data.user.name}
-        {role && role !== 'CUSTOMER' && (
-          <span className="ml-1.5 rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
-            {roleLabel(t, role)}
-          </span>
-        )}
       </span>
+      {/* 이름은 자리가 모자라면 감추지만 이 문은 남긴다 */}
+      {staff && (
+        <Link
+          href="/admin"
+          aria-label={consoleLabel}
+          className="shrink-0 rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0 no-underline hover:bg-n-700"
+        >
+          {roleLabel(t, role)}
+        </Link>
+      )}
       <button
         type="button"
         onClick={() => {

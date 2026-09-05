@@ -106,7 +106,9 @@ test('비밀번호 찾기는 가입 여부를 알려 주지 않는다', async ({
   await page.getByRole('button', { name: '재설정 링크 받기' }).click();
 
   // 가입된 주소든 아니든 같은 화면이 나와야 한다
-  await expect(page.getByRole('status')).toContainText('메일을 보냈습니다');
+  await expect(page.getByRole('status').filter({ hasText: /./ })).toContainText(
+    '메일을 보냈습니다',
+  );
 });
 
 test('토큰 없이 재설정 화면에 오면 다시 받을 길을 준다', async ({ page }) => {

@@ -55,7 +55,8 @@ test('홈에서 상품을 골라 장바구니에 담는다', async ({ page }) =>
 test('검색은 주소에 남아 새로고침해도 유지된다', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('searchbox', { name: /상품|브랜드/ }).fill('코트');
+  // 자동완성이 붙으면서 searchbox 가 아니라 combobox 가 됐다 — 규격대로다
+  await page.getByRole('combobox', { name: /상품|브랜드/ }).fill('코트');
   await page.keyboard.press('Enter');
 
   await expect(page).toHaveURL(/q=/);

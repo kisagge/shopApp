@@ -161,3 +161,18 @@ test('운영진은 판매 상태를 모두 고를 수 있다', async ({ page }) 
   await expect(status.getByRole('option', { name: '판매중' })).toHaveCount(1);
   await expect(page.getByText(/운영진이 확인한 뒤에 됩니다/)).toHaveCount(0);
 });
+
+test('손님 화면에서 관리자 페이지로 가는 문이 보인다', async ({ page }) => {
+  /*
+   * 주소를 외워 쳐야만 들어갈 수 있으면 없는 것과 같다. 실제로 한동안
+   * 그랬다 — 어느 손님 화면에도 /admin 으로 가는 링크가 없었다.
+   */
+  await page.goto('/');
+
+  // 헤더와 모바일 메뉴에 하나씩 있고, 폭에 따라 한쪽만 보인다
+  const door = page.locator('header a[href="/admin"]:visible');
+  await expect(door).toHaveCount(1);
+
+  await door.click();
+  await expect(page.getByRole('heading', { name: '대시보드', level: 1 })).toBeVisible();
+});

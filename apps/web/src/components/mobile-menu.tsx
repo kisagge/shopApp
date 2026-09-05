@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { categoryName } from '@shop/i18n';
 import { SessionNav } from './session-nav';
+import { SearchBox } from './search-box';
 import { useLocale, useT } from '~/lib/i18n/client';
 
 type Category = { slug: string; name: string };
@@ -89,20 +90,7 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
       >
         {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
         <form method="get" action="/search" role="search" className="flex gap-2">
-          <label htmlFor="menu-search" className="sr-only">
-            {t('nav.searchLabel')}
-          </label>
-          <input
-            id="menu-search"
-            type="search"
-            name="q"
-            placeholder={t('nav.searchPlaceholder')}
-            maxLength={60}
-            className="h-11 min-w-0 flex-1 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500"
-          />
-          <button type="submit" className="h-11 shrink-0 rounded-sm bg-[var(--brand)] px-4 text-sm font-medium text-[var(--bg)]">
-            {t('common.search')}
-          </button>
+          <SearchBox id="menu-search" variant="menu" />
         </form>
 
         <nav aria-label={t('nav.categoriesPlain')} className="mt-4 border-t border-[var(--border)]">

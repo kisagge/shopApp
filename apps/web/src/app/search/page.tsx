@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultReason, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
-import { searchProducts } from '~/lib/queries/products';
+import { searchProducts, getPopularSearches } from '~/lib/queries/products';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { TrackedSearch } from '~/components/tracked-search';
@@ -32,7 +33,9 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   const raw = await searchParams;
   const parsed = catalogQuerySchema.parse(raw);
   const term = parsed.q ? normalizeSearchTerm(parsed.q) : null;
-  const t = await getT();
+
+  // 검색어가 있으면 인기 검색어를 묻지 않는다 — 보여 줄 자리가 없다
+  const [t, popular] = await Promise.all([getT(), term ? [] : getPopularSearches()]);
 
   // 검색어가 없거나 너무 짧으면 조회하지 않는다.
   // 한 글자로 카탈로그 전체를 긁는 것은 검색이 아니다.
@@ -56,11 +59,35 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
       </header>
 
       {!term ? (
-        <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-          {parsed.q
-            ? t('search.tooShort', { min: MIN_SEARCH_LENGTH })
-            : t('search.prompt')}
-        </p>
+        <div className="py-20 text-center">
+          <p className="text-[13px] text-[var(--fg-muted)]">
+            {parsed.q ? t('search.tooShort', { min: MIN_SEARCH_LENGTH }) : t('search.prompt')}
+          </p>
+
+          {/*
+            기준을 못 넘으면 조회가 빈 목록을 준다 — 그때는 이 자리도
+            통째로 비운다. 없는 인기를 지어내 보여 줄 이유가 없다.
+          */}
+          {popular.length > 0 && (
+            <nav aria-label={t('popular.heading')} className="mt-8">
+              <h2 className="text-[11px] font-medium tracking-[0.08em] text-[var(--fg-muted)]">
+                {t('popular.heading')}
+              </h2>
+              <ul className="mt-3 flex flex-wrap justify-center gap-2">
+                {popular.map((word) => (
+                  <li key={word}>
+                    <Link
+                      href={{ pathname: '/search', query: { q: word } }}
+                      className="inline-flex h-9 items-center rounded-full border border-n-300 px-3.5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
+                    >
+                      {word}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          )}
+        </div>
       ) : (
         <>
           {/* 결과 수까지 남긴다 — 0건 검색이 가장 값진 신호다 */}

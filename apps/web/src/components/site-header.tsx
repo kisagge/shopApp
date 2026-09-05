@@ -4,6 +4,7 @@ import { getTopCategories } from '~/lib/queries/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';
+import { SearchBox } from './search-box';
 import { NotificationBell } from './notification-bell';
 import { getLocale, getT } from '~/lib/i18n/server';
 
@@ -48,17 +49,7 @@ export async function SiteHeader() {
         <span className="ml-auto flex shrink-0 items-center gap-4 md:ml-0">
           {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
           <form method="get" action="/search" role="search" className="hidden sm:block">
-            <label htmlFor="site-search" className="sr-only">
-              {t('nav.searchLabel')}
-            </label>
-            <input
-              id="site-search"
-              type="search"
-              name="q"
-              placeholder={t('nav.searchPlaceholder')}
-              maxLength={60}
-              className="h-9 w-36 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] text-[var(--fg)] placeholder:text-[var(--fg-muted)] focus-visible:border-n-500 md:w-48"
-            />
+            <SearchBox id="site-search" />
           </form>
           <span className="hidden md:inline-flex md:items-center">
             <SessionNav />
