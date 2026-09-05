@@ -28,6 +28,7 @@ export * from './inquiry';
 export * from './support';
 export * from './point';
 export * from './recommend';
+export * from './notification';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';

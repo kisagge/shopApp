@@ -3,6 +3,7 @@ import { inquiryAnswerMail } from '@shop/core';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
 import type { AnsweredInquiry } from './write';
+import { recordNotification } from '~/lib/notifications/record';
 
 /**
  * 답변이 달렸다고 알린다.
@@ -34,4 +35,15 @@ export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<v
   } catch (error) {
     console.error('[inquiry] 답변 알림 메일 실패', inquiry.id, error);
   }
+
+  /*
+   * 메일과 **함께** 남긴다. 메일은 놓치기 쉽고 스팸함으로 가기도 한다 —
+   * 다시 들어온 사람이 답이 왔는지 볼 자리가 있어야 한다.
+   */
+  await recordNotification({
+    userId: inquiry.authorId,
+    kind: 'INQUIRY_ANSWERED',
+    ...(inquiry.productName ? { params: { productName: inquiry.productName } } : {}),
+    linkPath: inquiry.productSlug ? `/product/${inquiry.productSlug}` : '/mypage/inquiries',
+  });
 }

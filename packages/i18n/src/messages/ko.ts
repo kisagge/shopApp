@@ -174,6 +174,21 @@ export const ko = {
 
   'rec.heading': '함께 본 상품',
   'rec.headingPopular': '이런 상품은 어떠세요',
+  // ── 알림 ────────────────────────────────────────────────
+  'notif.heading': '알림',
+  'notif.bell': '알림',
+  'notif.bellUnread': '알림, 안 읽은 {count}건',
+  'notif.empty': '아직 알림이 없습니다.',
+  'notif.emptyHint': '주문이 출고되거나 문의에 답이 달리면 여기에 뜹니다.',
+  'notif.unread': '안 읽음',
+  'notif.markAllRead': '모두 읽음',
+  'notif.markedRead': '모두 읽음으로 표시했습니다',
+  'notif.ORDER_SHIPPED': '주문 {orderNo} 이(가) 출고되었습니다.',
+  'notif.ORDER_DELIVERED': '주문 {orderNo} 이(가) 배송 완료되었습니다.',
+  'notif.INQUIRY_ANSWERED': '{productName} 문의에 답변이 달렸습니다.',
+  'notif.INQUIRY_ANSWERED_GENERIC': '문의에 답변이 달렸습니다.',
+  'notif.RESTOCKED': '{productName} ({optionLabel}) 이(가) 다시 들어왔습니다.',
+
   'recent.heading': '최근 본 상품',
   'recent.clear': '기록 지우기',
   'recent.cleared': '최근 본 상품을 지웠습니다',

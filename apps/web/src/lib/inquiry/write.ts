@@ -69,6 +69,8 @@ async function loadForAnswer(inquiryId: string) {
 
 export interface AnsweredInquiry {
   readonly id: string;
+  /** 물어본 사람. 알림을 남길 곳이다. */
+  readonly authorId: string;
   /** 상품 없는 문의면 null */
   readonly productName: string | null;
   readonly productSlug: string | null;
@@ -114,6 +116,7 @@ export async function answerInquiry(
 
   return {
     id: updated.id,
+    authorId: inquiry.authorId,
     productName: inquiry.product?.name ?? null,
     productSlug: inquiry.product?.slug ?? null,
     authorEmail: inquiry.author.email,

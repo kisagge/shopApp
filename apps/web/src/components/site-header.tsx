@@ -4,6 +4,7 @@ import { getTopCategories } from '~/lib/queries/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';
+import { NotificationBell } from './notification-bell';
 import { getLocale, getT } from '~/lib/i18n/server';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
@@ -62,6 +63,8 @@ export async function SiteHeader() {
           <span className="hidden md:inline-flex md:items-center">
             <SessionNav />
           </span>
+          {/* 좁은 화면에서도 남긴다 — 알림은 놓치면 뜻이 없다 */}
+          <NotificationBell />
           <CartBadge />
         </span>
       </div>

@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS, restockMail } from '@shop/core';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
+import { recordNotifications } from '~/lib/notifications/record';
 
 /**
  * 재입고 알림.
@@ -190,6 +191,19 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
   }));
 
   await Promise.allSettled(notifiers.map((n) => n.send(notices)));
+
+  /*
+   * 메일과 **함께** 남긴다. 메일은 놓치기 쉽고 스팸함으로 가기도 한다 —
+   * 다시 들어온 사람이 무슨 일이 있었는지 볼 자리가 있어야 한다.
+   */
+  await recordNotifications(
+    notices.map((n) => ({
+      userId: n.userId,
+      kind: 'RESTOCKED' as const,
+      params: { productName: n.productName, optionLabel: n.optionLabel },
+      linkPath: `/product/${n.productSlug}`,
+    })),
+  );
 
   return {
     notified: pending.length,

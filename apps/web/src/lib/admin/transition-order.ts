@@ -6,6 +6,7 @@ import {
   type Actor, type OrderStatus,
 } from '@shop/core';
 import { grantPurchaseReward } from '~/lib/orders/grant-reward';
+import { recordNotification } from '~/lib/notifications/record';
 
 export class TransitionError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -181,6 +182,20 @@ export async function transitionOrder(
 
     return { moveOrder, count, slowest };
   });
+
+  /*
+   * 알림은 트랜잭션 **밖에서** 남긴다. 안에 넣으면 알림을 못 남겼다고 주문
+   * 상태 변경까지 되돌아가는데, 그건 사람이 한 처리를 알림 하나 때문에
+   * 무르는 셈이다.
+   */
+  if (result.moveOrder && (result.slowest === 'SHIPPED' || result.slowest === 'DELIVERED')) {
+    await recordNotification({
+      userId: order.userId,
+      kind: result.slowest === 'SHIPPED' ? 'ORDER_SHIPPED' : 'ORDER_DELIVERED',
+      params: { orderNo: order.orderNo },
+      linkPath: `/order/${order.orderNo}`,
+    });
+  }
 
   return {
     orderNo: order.orderNo,
