@@ -223,3 +223,24 @@ export async function getCategoryWithChildren(slug: string) {
     },
   });
 }
+
+/**
+ * 옛 주소로 들어왔을 때 갈 곳.
+ *
+ * **찾지 못했을 때만 부른다.** 지금 주소를 먼저 보는 이유는 되돌린 경우
+ * 때문이다 — a → b → a 로 돌아오면 a 는 지금 주소이면서 기록에도 남아
+ * 있을 수 있고, 기록을 먼저 보면 자기 자신으로 넘기는 고리가 생긴다.
+ *
+ * **매대 조건을 건다.** 내려간 상품으로 넘기면 404 를 두 번 거치게 할 뿐이다.
+ */
+export const getProductSlugMovedTo = cachedRead(
+  async (slug: string): Promise<string | null> => {
+    const row = await prisma.productSlug.findFirst({
+      // 매대 조건은 거르는 조건이지 고르는 필드가 아니다
+      where: { slug, product: { ...onDisplay(), brand: sellableBrand() } },
+      select: { product: { select: { slug: true } } },
+    });
+    return row?.product.slug ?? null;
+  },
+  { key: ['product-slug-moved'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);

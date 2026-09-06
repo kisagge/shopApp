@@ -11,6 +11,11 @@ const db = vi.hoisted(() => ({
   category: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   product: { findUnique: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
+  productSlug: {
+    findUnique: vi.fn<(...a: any[]) => any>(),
+    upsert: vi.fn<(...a: any[]) => any>(),
+    deleteMany: vi.fn<(...a: any[]) => any>(),
+  },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -65,7 +70,17 @@ beforeEach(() => {
   db.product.findFirst.mockResolvedValue(existing);
   db.product.create.mockResolvedValue({ id: 'p-new', slug: input.slug, name: input.name, status: 'ACTIVE' });
   db.product.update.mockImplementation(({ data }: { data: unknown }) => Promise.resolve({ id: 'p-1', ...(data as object) }));
-  db.$transaction.mockResolvedValue([]);
+  db.productSlug.findUnique.mockResolvedValue(null);
+  db.productSlug.upsert.mockResolvedValue({});
+  db.productSlug.deleteMany.mockResolvedValue({ count: 0 });
+  /*
+   * 인자로 함수가 오면 트랜잭션 안에서 실제로 돌린다. 배열이면 예전처럼
+   * 목록으로 받는다 — 두 형태를 다 쓰고 있고, 흉내가 한쪽만 알면 검사가
+   * 진짜와 다른 것을 본다.
+   */
+  db.$transaction.mockImplementation(async (arg: unknown) =>
+    typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(db) : [],
+  );
 });
 
 describe('상품 등록 — 브랜드 소유 검증', () => {

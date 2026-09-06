@@ -1,5 +1,5 @@
 import { Suspense } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
@@ -14,7 +14,7 @@ import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
 import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
-import { getProductBySlug } from '~/lib/queries/catalog/products';
+import { getProductBySlug, getProductSlugMovedTo } from '~/lib/queries/catalog/products';
 import { ProductOptions } from '~/components/product-options';
 import { ProductReviews } from '~/components/product-reviews';
 import { ProductInquiries } from '~/components/product-inquiries';
@@ -83,7 +83,18 @@ export default async function ProductPage({ params, searchParams }: Params) {
     getLocale(),
     getT(),
   ]);
-  if (!product) notFound();
+  /*
+   * **없으면 곧바로 404 가 아니다.** slug 는 운영자가 고칠 수 있고, 고치는
+   * 순간 그때까지 나간 링크가 전부 이 자리로 온다. 옛 주소면 새 주소로
+   * 넘긴다 — 308 이라 검색엔진이 색인을 옮기고, 사람도 찾던 상품을 본다.
+   *
+   * 찾은 뒤에 물어보므로 평소에는 조회가 늘지 않는다.
+   */
+  if (!product) {
+    const movedTo = await getProductSlugMovedTo(slug);
+    if (movedTo) permanentRedirect(`/product/${movedTo}`);
+    notFound();
+  }
 
   /**
    * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**

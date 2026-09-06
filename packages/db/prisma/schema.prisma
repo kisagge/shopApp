@@ -267,6 +267,8 @@ model Collection {
 
   /// 주소에 그대로 들어간다.
   slug     String  @unique
+  /// 이 기획전이 쓰던 옛 주소들.
+  oldSlugs CollectionSlug[]
   title    String
   subtitle String?
 
@@ -371,6 +373,8 @@ enum ProductStatus {
 model Product {
   id          String        @id @default(cuid())
   slug        String        @unique
+  /// 이 상품이 쓰던 옛 주소들. 링크가 죽지 않게 넘겨 준다.
+  oldSlugs    ProductSlug[]
   name        String
   description String        @default("")
   status      ProductStatus @default(DRAFT)
@@ -455,6 +459,38 @@ model Product {
   /// 부분 일치(ILIKE '%...%') 는 b-tree 로 못 찾는다. 트라이그램 색인이라야 한다.
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("products")
+}
+
+/**
+ * 상품이 쓰던 옛 주소.
+ *
+ * slug 는 운영자가 고칠 수 있다. 고치는 순간 그때까지 나간 링크가 전부
+ * 죽는데, 화면에는 멀쩡한 404 가 나와서 **아무도 사고인 줄 모른다.**
+ * 옛 주소를 남겨 두고 새 주소로 넘긴다.
+ *
+ * slug 자체가 기본키다 — 한 주소가 두 상품을 가리킬 수는 없다.
+ * 상품이 지워지면 옛 주소도 함께 지운다: 넘길 곳이 없어진 기록은
+ * 404 를 두 번 거치게 만들 뿐이다.
+ */
+model ProductSlug {
+  slug      String   @id
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+  @@map("product_slugs")
+}
+
+/// 기획전이 쓰던 옛 주소. ProductSlug 와 같은 이유로 둔다.
+model CollectionSlug {
+  slug         String     @id
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([collectionId])
+  @@map("collection_slugs")
 }
 
 model ProductImage {

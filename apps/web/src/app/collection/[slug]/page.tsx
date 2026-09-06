@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getCollection } from '~/lib/queries/catalog/collections';
+import { getCollection, getCollectionSlugMovedTo } from '~/lib/queries/catalog/collections';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CollectionHero } from '~/components/collection-hero';
@@ -32,7 +32,12 @@ export default async function CollectionPage({ params }: Params) {
    * 화면을 보여 줄 수도 있지만, 그러면 지난 기획전 주소가 검색 결과에
    * 남아 살아 있는 것처럼 보인다.
    */
-  if (!collection) notFound();
+  // 상품과 같은 규칙이다 — 옛 주소면 새 주소로 넘기고, 그다음이 404 다
+  if (!collection) {
+    const movedTo = await getCollectionSlugMovedTo(slug);
+    if (movedTo) permanentRedirect(`/collection/${movedTo}`);
+    notFound();
+  }
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">

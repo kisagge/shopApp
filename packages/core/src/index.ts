@@ -25,6 +25,7 @@ export * from './schedule';
 export * from './order-hold';
 export * from './banner';
 export * from './blur';
+export * from './slug-history';
 export * from './collection';
 export * from './facet';
 export * from './web-vitals';

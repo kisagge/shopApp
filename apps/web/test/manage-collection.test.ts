@@ -14,6 +14,11 @@ const db = vi.hoisted(() => ({
     createMany: vi.fn<(...a: any[]) => any>(),
   },
   product: { count: vi.fn<(...a: any[]) => any>() },
+  collectionSlug: {
+    findUnique: vi.fn<(...a: any[]) => any>(),
+    upsert: vi.fn<(...a: any[]) => any>(),
+    deleteMany: vi.fn<(...a: any[]) => any>(),
+  },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -43,7 +48,13 @@ beforeEach(() => {
   db.collection.count.mockResolvedValue(0);
   db.collectionItem.findMany.mockResolvedValue([]);
   db.product.count.mockResolvedValue(0);
-  db.$transaction.mockResolvedValue([]);
+  db.collectionSlug.findUnique.mockResolvedValue(null);
+  db.collectionSlug.upsert.mockResolvedValue({});
+  db.collectionSlug.deleteMany.mockResolvedValue({ count: 0 });
+  // 함수로 오면 실제로 돌리고, 배열이면 예전처럼 목록으로 받는다
+  db.$transaction.mockImplementation(async (arg: unknown) =>
+    typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(db) : [],
+  );
 });
 
 describe('누가 만질 수 있는가', () => {

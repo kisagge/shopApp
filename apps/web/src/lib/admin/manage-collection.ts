@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
   assertPermission, resequence, verifyImageBytes, imageObjectKey,
-  isLive, publishStatus, isVisibleStatus, MAX_COLLECTION_ITEMS,
+  isLive, publishStatus, isVisibleStatus, MAX_COLLECTION_ITEMS, isSlugTaken,
   type Actor, type PublishStatus, type BannerTone,
 } from '@shop/core';
 import {
@@ -147,17 +147,27 @@ export async function getCollectionItemsFor(
   return byCollection;
 }
 
+
+/** 상품과 같은 규칙이다 — 기록에 남은 주소도 남의 것이면 못 쓴다. */
+async function slugTaken(slug: string, selfId?: string): Promise<boolean> {
+  const [live, history] = await Promise.all([
+    prisma.collection.findUnique({ where: { slug }, select: { id: true } }),
+    prisma.collectionSlug.findUnique({ where: { slug }, select: { collectionId: true } }),
+  ]);
+  return isSlugTaken({
+    liveOwnerId: live?.id ?? null,
+    historyOwnerId: history?.collectionId ?? null,
+    selfId,
+  });
+}
+
 export async function createCollection(
   actor: Actor,
   input: CreateCollectionInput,
 ): Promise<CollectionRow> {
   assertPermission(actor, 'collection:write');
 
-  const taken = await prisma.collection.findUnique({
-    where: { slug: input.slug },
-    select: { id: true },
-  });
-  if (taken) throw new CollectionError('SLUG_TAKEN', 409);
+  if (await slugTaken(input.slug)) throw new CollectionError('SLUG_TAKEN', 409);
 
   const count = await prisma.collection.count();
   const created = await prisma.collection.create({
@@ -178,12 +188,9 @@ export async function updateCollection(
   const before = await prisma.collection.findUnique({ where: { id: collectionId }, select });
   if (!before) throw new CollectionError('COLLECTION_NOT_FOUND', 404);
 
-  if (input.slug !== undefined && input.slug !== before.slug) {
-    const taken = await prisma.collection.findUnique({
-      where: { slug: input.slug },
-      select: { id: true },
-    });
-    if (taken) throw new CollectionError('SLUG_TAKEN', 409);
+  const renaming = input.slug !== undefined && input.slug !== before.slug;
+  if (renaming && (await slugTaken(input.slug!, collectionId))) {
+    throw new CollectionError('SLUG_TAKEN', 409);
   }
 
   // 보내지 않은 필드는 키 자체를 빼서 넘긴다 — "지우려는 null" 과
@@ -192,7 +199,22 @@ export async function updateCollection(
     Object.entries(input).filter(([, value]) => value !== undefined),
   );
 
-  const after = await prisma.collection.update({ where: { id: collectionId }, data, select });
+  // 상품에서와 같은 이유로 옛 주소 기록과 수정을 함께 묶는다
+  const after = await prisma.$transaction(async (tx) => {
+    const updated = await tx.collection.update({ where: { id: collectionId }, data, select });
+
+    if (renaming) {
+      await tx.collectionSlug.upsert({
+        where: { slug: before.slug },
+        create: { slug: before.slug, collectionId },
+        update: { collectionId },
+      });
+      await tx.collectionSlug.deleteMany({ where: { slug: input.slug! } });
+    }
+
+    return updated;
+  });
+
   return { before: toRow(before, now), after: toRow(after, now) };
 }
 

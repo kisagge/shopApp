@@ -4,7 +4,7 @@ import {
   canManageProduct, merchantScope, becameAvailable, hasPermission,
   needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
   type Actor, type ProductStatus,
-  searchTextFor,
+  searchTextFor, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
 import {
@@ -20,6 +20,25 @@ import {
  * 때문에 컬럼으로 저장한다. **가격을 바꾸는 모든 경로가 이 함수를 거쳐야**
  * 값이 어긋나지 않는다. 따로 계산해 쓰지 말 것.
  */
+/**
+ * 이 주소를 쓸 수 있는가.
+ *
+ * **지금 쓰는 주소만 보면 모자란다.** 남이 버리고 간 주소를 새로 집어 가면
+ * 그 주소가 한쪽에서는 새 주인을 가리키고 다른 쪽에서는 옛 주인으로 넘긴다.
+ * 만들 때와 고칠 때가 같은 규칙을 쓰도록 한 곳에 둔다.
+ */
+async function slugTaken(slug: string, selfId?: string): Promise<boolean> {
+  const [live, history] = await Promise.all([
+    prisma.product.findUnique({ where: { slug }, select: { id: true } }),
+    prisma.productSlug.findUnique({ where: { slug }, select: { productId: true } }),
+  ]);
+  return isSlugTaken({
+    liveOwnerId: live?.id ?? null,
+    historyOwnerId: history?.productId ?? null,
+    selfId,
+  });
+}
+
 function priceFields(input: { listPrice: number; salePrice: number | null }) {
   return {
     listPrice: input.listPrice,
@@ -86,10 +105,7 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
   });
   if (!category) throw new ProductError('CATEGORY_NOT_FOUND', 400);
 
-  const taken = await prisma.product.findUnique({
-    where: { slug: input.slug }, select: { id: true },
-  });
-  if (taken) throw new ProductError('SLUG_TAKEN', 409);
+  if (await slugTaken(input.slug)) throw new ProductError('SLUG_TAKEN', 409);
 
   // 새 상품은 게시된 적이 없다. 곧바로 매대 상태로 만들려면 권한이 필요하다.
   assertCanPublish(actor, input.status, null);
@@ -172,11 +188,9 @@ export async function updateProduct(
     ).name;
   }
 
-  if (input.slug && input.slug !== before.slug) {
-    const taken = await prisma.product.findUnique({
-      where: { slug: input.slug }, select: { id: true },
-    });
-    if (taken) throw new ProductError('SLUG_TAKEN', 409);
+  const renaming = Boolean(input.slug) && input.slug !== before.slug;
+  if (renaming && (await slugTaken(input.slug!, productId))) {
+    throw new ProductError('SLUG_TAKEN', 409);
   }
 
   assertCanPublish(actor, input.status, before.publishedAt);
@@ -184,7 +198,17 @@ export async function updateProduct(
   // 같은 이유로 여기서도 "DRAFT 가 아니면" 이 아니라 "매대에 보이면" 이다
   const goingPublic = input.status !== undefined && isVisibleStatus(input.status);
 
-  const after = await prisma.product.update({
+  /*
+   * **옛 주소를 기록하는 것과 이름을 바꾸는 것은 함께 일어나야 한다.**
+   *
+   * 따로 두면 하나만 성공했을 때 링크가 죽거나(기록 실패), 살아 있는 주소가
+   * 옛 주소로 기록된다(수정 실패). 둘 다 조용한 고장이라 트랜잭션으로 묶는다.
+   *
+   * 되돌아온 주소는 기록에서 지운다 — a → b → a 로 돌아왔으면 a 는 이제 지금
+   * 주소이고, 기록에 남겨 두면 자기 자신으로 넘기는 고리가 된다.
+   */
+  const after = await prisma.$transaction(async (tx) => {
+    const updated = await tx.product.update({
     where: { id: productId },
     data: {
       ...(input.slug !== undefined ? { slug: input.slug } : {}),
@@ -220,6 +244,18 @@ export async function updateProduct(
       id: true, slug: true, name: true, description: true,
       listPrice: true, salePrice: true, status: true, brandId: true, categoryId: true,
     },
+    });
+
+    if (renaming) {
+      await tx.productSlug.upsert({
+        where: { slug: before.slug },
+        create: { slug: before.slug, productId },
+        update: { productId },
+      });
+      await tx.productSlug.deleteMany({ where: { slug: input.slug! } });
+    }
+
+    return updated;
   });
 
   return { before, after };

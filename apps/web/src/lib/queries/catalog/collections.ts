@@ -113,3 +113,24 @@ export async function getCollection(
     blurDataUrl: row.blurDataUrl, imageCredit: row.imageCredit, tone: row.tone, itemCount: items.length, items,
   };
 }
+
+/**
+ * 옛 주소로 들어왔을 때 갈 곳. 상품과 같은 규칙이다.
+ *
+ * **게시 기간은 여기서 보지 않는다.** 넘긴 자리에서 다시 보고, 끝난
+ * 기획전이면 그쪽이 404 를 낸다 — 판정을 두 곳에 적으면 한쪽만 낡는다.
+ */
+export const getCollectionSlugMovedTo = cachedRead(
+  async (slug: string): Promise<string | null> => {
+    const row = await prisma.collectionSlug.findUnique({
+      where: { slug },
+      select: { collection: { select: { slug: true } } },
+    });
+    return row?.collection.slug ?? null;
+  },
+  {
+    key: ['collection-slug-moved'],
+    tags: [TAG.catalog, TAG.collections],
+    revalidate: TTL.collections,
+  },
+);
