@@ -2,8 +2,9 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { Badge, Button, Field, Price } from '@shop/ui';
-import { won, MIN_POINTS_USE } from '@shop/core';
+import { won, MIN_POINTS_USE, isBlurDataUrl } from '@shop/core';
 import {
   PAYMENT_METHOD,
   type CreateOrderResponse, type OrderError, type PaymentMethodInput,
@@ -303,7 +304,26 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
             const line = q?.lines.find((l) => l.variantId === i.variantId);
             return (
               <li key={i.variantId} className="flex items-center justify-between gap-3">
-                <span className="flex flex-col gap-0.5">
+                {/*
+                  결제 직전에 무엇을 사는지 다시 보여 준다. 장바구니에서
+                  담을 때 본 것과 같은 사진이라야 대조가 된다.
+                */}
+                {line?.imageUrl && (
+                  <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+                    <Image
+                      src={line.imageUrl}
+                      alt=""
+                      aria-hidden="true"
+                      fill
+                      sizes="44px"
+                      {...(isBlurDataUrl(line.blurDataUrl)
+                        ? { placeholder: 'blur' as const, blurDataURL: line.blurDataUrl }
+                        : {})}
+                      className="object-cover"
+                    />
+                  </span>
+                )}
+                <span className="flex flex-1 flex-col gap-0.5">
                   <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brand}</span>
                   <span className="text-[13px]">{i.productName}</span>
                   <span className="text-[11px] text-[var(--fg-muted)]">

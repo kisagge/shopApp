@@ -43,6 +43,12 @@ export async function quoteCart(
           // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면
           // 정지 처분이 판매를 멈추지 못한다.
           brand: { select: { name: true, merchant: { select: { status: true } } } },
+          // 담은 것이 무엇인지 눈으로 확인할 수 있게. 첫 장이면 된다.
+          images: {
+            select: { url: true, alt: true, blurDataUrl: true },
+            orderBy: { sortOrder: 'asc' },
+            take: 1,
+          },
         },
       },
     },
@@ -80,6 +86,9 @@ export async function quoteCart(
       productName: v.product.name,
       brandName: v.product.brand.name,
       optionLabel: v.label,
+      imageUrl: v.product.images[0]?.url ?? null,
+      imageAlt: v.product.images[0]?.alt ?? null,
+      blurDataUrl: v.product.images[0]?.blurDataUrl ?? null,
       listPrice,
       unitPrice,
       discountPercent: discountRateOf(listPrice, unitPrice),
@@ -172,6 +181,8 @@ function emptyLine(
 ): CartQuoteLine {
   return {
     variantId, productSlug: '', productName, brandName: '-', optionLabel,
+    // 사라졌거나 내려간 상품이다. 사진을 보여 줄 것이 없다.
+    imageUrl: null, imageAlt: null, blurDataUrl: null,
     listPrice: ZERO, unitPrice: ZERO, discountPercent: 0,
     quantity: 0, requestedQuantity, subtotal: ZERO, stock: 0, issue,
   };

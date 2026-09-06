@@ -43,6 +43,19 @@ export const cartQuoteLineSchema = z.object({
   productName: z.string(),
   brandName: z.string(),
   optionLabel: z.string(),
+  /**
+   * 담은 것이 무엇인지 눈으로 확인할 수 있게.
+   *
+   * 예전에는 이 칸이 없어서 장바구니·주문서에 "IMG" 라고 적힌 회색 칸만
+   * 있었다. **사는 과정 내내 사진이 사라지는 셈**이라, 옵션이 비슷한 상품을
+   * 여럿 담으면 무엇이 무엇인지 구별할 방법이 없었다.
+   *
+   * 없을 수 있다 — 사진을 아직 안 올린 상품이 있다.
+   */
+  imageUrl: z.string().nullable(),
+  imageAlt: z.string().nullable(),
+  /** 사진이 도착하기 전 깔 자리표시. 살아 있는 상품에서 읽으므로 그냥 따라온다. */
+  blurDataUrl: z.string().nullable(),
   listPrice: wonSchema,
   /** 할인 적용 후 단가 */
   unitPrice: wonSchema,

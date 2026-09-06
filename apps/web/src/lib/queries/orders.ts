@@ -44,6 +44,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
       items: {
         select: {
           productName: true, brandName: true, optionLabel: true,
+          // 주문한 그때의 사진. 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
+          imageUrl: true,
           listPrice: true, unitPrice: true, quantity: true, subtotal: true,
         },
       },

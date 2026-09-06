@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { Metadata } from 'next';
 import { getSessionUser } from '@shop/auth/session';
 import {
@@ -122,7 +123,26 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         <ul className="flex flex-col gap-3">
           {order.items.map((i, idx) => (
             <li key={idx} className="flex items-center justify-between gap-3">
-              <span className="flex flex-col gap-0.5">
+              {/*
+                **주문에 박아 둔 사진이다.** 살아 있는 상품에서 다시 읽지
+                않는다 — 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
+                그래서 자리표시 그림은 없다: 그건 살아 있는 상품에서만
+                따라오는 값이고, 여기 두려면 주문에도 칸을 하나 더 박아야 한다.
+                작은 썸네일이라 그만한 값이 없다.
+              */}
+              {i.imageUrl && (
+                <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+                  <Image
+                    src={i.imageUrl}
+                    alt=""
+                    aria-hidden="true"
+                    fill
+                    sizes="44px"
+                    className="object-cover"
+                  />
+                </span>
+              )}
+              <span className="flex flex-1 flex-col gap-0.5">
                 <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brandName}</span>
                 <span className="text-[13px]">{i.productName}</span>
                 <span className="text-[11px] text-[var(--fg-muted)]">

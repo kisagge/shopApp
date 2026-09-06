@@ -25,6 +25,7 @@ const quote = (over: Partial<CartQuoteResponse> = {}): CartQuoteResponse => ({
   lines: [{
     variantId: 'v-coat-s', productSlug: 'oversized-wool-coat',
     productName: '오버사이즈 울 블렌드 코트', brandName: 'STUDIO NOON', optionLabel: '오트밀 / S',
+    imageUrl: null, imageAlt: null, blurDataUrl: null,
     listPrice: 413_000, unitPrice: 289_000, discountPercent: 30,
     quantity: 4, requestedQuantity: 9, subtotal: 1_156_000, stock: 4, issue: 'STOCK_REDUCED',
   }],
@@ -124,5 +125,34 @@ describe('견적 실패', () => {
     useCartStore.setState({ items: [item()] });
     render(<CartView />);
     expect(screen.getByRole('alert')).toHaveTextContent('금액을 불러오지 못했습니다');
+  });
+});
+
+/**
+ * 담은 것이 무엇인지 눈으로 확인할 수 있어야 한다.
+ *
+ * 예전에는 "IMG" 라고 적힌 회색 칸이었다. 옵션이 비슷한 상품을 여럿 담으면
+ * 무엇이 무엇인지 구별할 방법이 없었다.
+ */
+describe('장바구니 사진', () => {
+  it('견적이 준 사진을 그린다', () => {
+    useCartQuote.mockReturnValue(
+      ok(quote({
+        lines: [{ ...quote().lines[0]!, imageUrl: 'https://cdn.test/coat.jpg', imageAlt: '오트밀 코트' }],
+      })),
+    );
+    useCartStore.setState({ items: [item()] });
+    render(<CartView />);
+
+    expect(screen.getByRole('img', { name: '오트밀 코트' })).toBeInTheDocument();
+  });
+
+  it('사진이 없으면 자리표시가 남는다 — 자리가 비지 않는다', () => {
+    useCartQuote.mockReturnValue(ok(quote()));
+    useCartStore.setState({ items: [item()] });
+    render(<CartView />);
+
+    // 사진이 없다고 이름까지 없어지지 않는다
+    expect(screen.getByRole('img', { name: /오버사이즈 울 블렌드 코트/ })).toBeInTheDocument();
   });
 });

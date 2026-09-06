@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Badge, Button, Price } from '@shop/ui';
-import { won } from '@shop/core';
+import { won, isBlurDataUrl } from '@shop/core';
 import type { CartQuoteLine } from '@shop/contract';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { track } from '~/lib/analytics/client';
@@ -164,13 +165,37 @@ function CartRow({
         <Check on={item.selected} />
       </button>
 
-      <div
-        role="img"
-        aria-label={t('cart.itemImage', { name: item.productName })}
-        className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-700"
-      >
-        IMG
-      </div>
+      {/*
+        담은 것이 무엇인지 눈으로 확인할 수 있어야 한다. 예전에는 "IMG" 라고
+        적힌 회색 칸이었는데, 옵션이 비슷한 상품을 여럿 담으면 무엇이 무엇인지
+        구별할 방법이 없었다.
+
+        **사진이 없을 수도 있다.** 아직 사진을 안 올린 상품이 있고, 그때는
+        지금까지처럼 톤 블록이 남는다.
+      */}
+      {line?.imageUrl ? (
+        <div className="relative h-[95px] w-[76px] shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+          <Image
+            src={line.imageUrl}
+            alt={line.imageAlt ?? t('cart.itemImage', { name: item.productName })}
+            fill
+            // 크기가 고정이라 기기 크기 목록 전체로 후보를 만들 이유가 없다
+            sizes="76px"
+            {...(isBlurDataUrl(line.blurDataUrl)
+              ? { placeholder: 'blur' as const, blurDataURL: line.blurDataUrl }
+              : {})}
+            className="object-cover"
+          />
+        </div>
+      ) : (
+        <div
+          role="img"
+          aria-label={t('cart.itemImage', { name: item.productName })}
+          className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-700"
+        >
+          IMG
+        </div>
+      )}
 
       <div className="flex flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">

@@ -41,6 +41,7 @@ const quote = (over: Partial<CartQuoteResponse> = {}): CartQuoteResponse => ({
   lines: [{
     variantId: 'v-coat-m', productSlug: 'oversized-wool-coat',
     productName: '오버사이즈 울 블렌드 코트', brandName: 'STUDIO NOON', optionLabel: '오트밀 / M',
+  imageUrl: null, imageAlt: null, blurDataUrl: null,
     listPrice: 413_000, unitPrice: 289_000, discountPercent: 30,
     quantity: 1, requestedQuantity: 1, subtotal: 289_000, stock: 12, issue: null,
   }],

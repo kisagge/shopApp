@@ -17,6 +17,8 @@ const variant = (over: Record<string, unknown> = {}) => ({
     slug: 'oversized-wool-coat', name: '오버사이즈 울 블렌드 코트',
     listPrice: 413_000, salePrice: 289_000, status: 'ACTIVE', deletedAt: null,
     brand: { name: 'STUDIO NOON' },
+    // 실제 select 와 같은 모양이어야 한다 — 사진이 없는 상품도 있다
+    images: [{ url: 'https://cdn.test/coat.jpg', alt: '오트밀 코트', blurDataUrl: null }],
   },
   ...over,
 });
@@ -248,5 +250,44 @@ describe('등급별 적립률', () => {
     // 부르는 쪽이 빠뜨려도 계산이 깨지지는 않는다
     const q = await quoteCart(line, { id: 'u-1', pointBalance: 0 });
     expect(q.rewardPoints).toBe(2_890);
+  });
+});
+
+/**
+ * 담은 것이 무엇인지 눈으로 확인할 수 있어야 한다.
+ *
+ * 예전에는 견적에 사진 칸이 아예 없어서, 장바구니와 주문서에 "IMG" 라고 적힌
+ * 회색 칸만 있었다 — **사는 과정 내내 사진이 사라지는 셈**이라, 옵션이 비슷한
+ * 상품을 여럿 담으면 무엇이 무엇인지 구별할 방법이 없었다.
+ */
+describe('줄마다 사진을 함께 준다', () => {
+  it('첫 사진의 주소·대체 텍스트·자리표시를 싣는다', async () => {
+    findManyVariants.mockResolvedValue([variant()]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.lines[0]).toMatchObject({
+      imageUrl: 'https://cdn.test/coat.jpg',
+      imageAlt: '오트밀 코트',
+    });
+  });
+
+  it('사진이 없는 상품은 빈 값이다 — 지어내지 않는다', async () => {
+    findManyVariants.mockResolvedValue([
+      variant({ product: { ...variant().product, images: [] } }),
+    ]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.lines[0]).toMatchObject({ imageUrl: null, imageAlt: null, blurDataUrl: null });
+  });
+
+  /** 사라진 상품 줄에도 같은 칸이 있어야 화면이 갈라지지 않는다 */
+  it('사라진 상품 줄에도 칸은 있다', async () => {
+    findManyVariants.mockResolvedValue([]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-gone', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.lines[0]).toMatchObject({ issue: 'NOT_FOUND', imageUrl: null });
   });
 });
