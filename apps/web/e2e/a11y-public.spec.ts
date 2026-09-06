@@ -23,6 +23,17 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['공지', '/support/notice'],
   ['입점 신청', '/merchant/apply'],
   ['없는 주소', '/product/no-such-thing'],
+  /*
+   * 아래 넷은 처음 훑기를 만들 때 빠져 있었다. 로그인 앞뒤로 흩어져 있어
+   * 목록을 손으로 적다 놓친 자리들이다 — **폼이 있는 화면일수록 이름표와
+   * 오류 연결이 어긋날 자리가 많은데** 정작 그쪽이 빠졌다.
+   */
+  ['비밀번호 찾기', '/forgot-password'],
+  // 열쇠 없이 열면 "다시 요청하세요" 상태가 뜬다. 그 상태도 화면이다.
+  ['비밀번호 재설정', '/reset-password'],
+  ['결제 실패', '/checkout/fail'],
+  ['탈퇴 완료', '/account/closed'],
+  ['오프라인', '/offline'],
 ];
 
 for (const [name, path] of PAGES) {

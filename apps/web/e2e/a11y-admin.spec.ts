@@ -25,12 +25,37 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['회원', '/admin/users'],
   ['포인트 대사', '/admin/points'],
   ['감사 로그', '/admin/audit'],
+  ['상품 등록', '/admin/products/new'],
 ];
 
 for (const [name, path] of PAGES) {
   test(`${name} 화면에 접근성 위반이 없다`, async ({ page }) => {
     await page.goto(path);
     await page.waitForLoadState('networkidle');
+    await expectNoA11yViolations(page);
+  });
+}
+
+/**
+ * 동적 경로.
+ *
+ * 목록만 훑으면 **상세는 한 번도 안 지나간다.** 실제로 운영자가 오래 머무는
+ * 자리는 목록이 아니라 상세다 — 주문 하나를 붙들고 상태를 바꾸고 메모를 쓴다.
+ */
+for (const [name, list, link] of [
+  ['주문 상세', '/admin/orders', 'a[href^="/admin/orders/"]'],
+  ['상품 수정', '/admin/products', 'a[href^="/admin/products/"]'],
+] as const) {
+  test(`${name} 화면에 접근성 위반이 없다`, async ({ page }) => {
+    await page.goto(list);
+    await page.waitForLoadState('networkidle');
+
+    // 주소를 박아 두면 시드가 바뀔 때 조용히 다른 것을 보게 된다
+    const first = page.locator(`#main ${link}`).first();
+    test.skip((await first.count()) === 0, '목록이 비어 있다');
+    await first.click();
+    await page.waitForLoadState('networkidle');
+
     await expectNoA11yViolations(page);
   });
 }

@@ -355,9 +355,15 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
       <section aria-labelledby="method-title">
         <h2 id="method-title" className="mb-3.5 text-sm font-semibold">{t('checkout.method')}</h2>
-        <ul role="radiogroup" aria-labelledby="method-title" className="grid grid-cols-2 gap-2">
+        {/*
+          목록이 아니라 라디오 그룹이다. role 을 얹는 순간 ul 의 목록 의미가
+          사라져서 그 안의 li 가 갈 곳을 잃는다 — 상품 옵션에서 같은 것을
+          고쳤는데 여기 하나가 더 있었다. 훑기가 결제 화면을 지나가지 않아
+          그동안 아무도 몰랐다.
+        */}
+        <div role="radiogroup" aria-labelledby="method-title" className="grid grid-cols-2 gap-2">
           {methods.map((m) => (
-            <li key={m}>
+            <div key={m}>
               <button
                 type="button"
                 role="radio"
@@ -372,9 +378,9 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
               >
                 {t(METHOD_KEY[m])}
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
         {/*
           무엇으로 도는지 사실대로 말한다. 결제창이 뜨지 않는데 주문이 완료되는
           것은 놀랄 일이므로 미리 알려야 하고, 반대로 실제 결제창이 뜰 때
