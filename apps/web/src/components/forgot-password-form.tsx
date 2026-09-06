@@ -2,12 +2,13 @@
 
 import { useState, type FormEvent } from 'react';
 import { Button, Field } from '@shop/ui';
-import { forgotPasswordSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
 import { useT } from '~/lib/i18n/client';
+import { useLazySchema } from '~/lib/form-schema';
 
 export function ForgotPasswordForm() {
   const t = useT();
+  const getSchema = useLazySchema(async () => (await import('@shop/contract')).forgotPasswordSchema);
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [sent, setSent] = useState(false);
@@ -16,7 +17,7 @@ export function ForgotPasswordForm() {
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    const parsed = forgotPasswordSchema.safeParse({ email });
+    const parsed = (await getSchema()).safeParse({ email });
     if (!parsed.success) {
       setFieldError(parsed.error.issues[0]?.message);
       return;

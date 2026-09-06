@@ -4,10 +4,10 @@ import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
-import { signUpSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
 import { track } from '~/lib/analytics/client';
 import { useIssueText, useT } from '~/lib/i18n/client';
+import { useLazySchema } from '~/lib/form-schema';
 import type { IssueBounds } from '~/lib/i18n/issue';
 
 type FieldName = 'email' | 'name' | 'password' | 'passwordConfirm';
@@ -15,6 +15,7 @@ type FieldName = 'email' | 'name' | 'password' | 'passwordConfirm';
 export function SignUpForm() {
   const router = useRouter();
   const t = useT();
+  const getSchema = useLazySchema(async () => (await import('@shop/contract')).signUpSchema);
   const issueText = useIssueText();
   const [values, setValues] = useState({ email: '', name: '', password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
@@ -31,7 +32,7 @@ export function SignUpForm() {
     e.preventDefault();
     setError(null);
 
-    const parsed = signUpSchema.safeParse(values);
+    const parsed = (await getSchema()).safeParse(values);
     if (!parsed.success) {
       const next: Partial<Record<FieldName, string>> = {};
       for (const issue of parsed.error.issues) {

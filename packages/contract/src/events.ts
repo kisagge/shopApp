@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_EVENTS_PER_BATCH } from '@shop/core';
 import { cuidSchema, orderNoSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -57,9 +58,6 @@ export const eventInputSchema = z.discriminatedUnion('name', [
 export type EventInput = z.infer<typeof eventInputSchema>;
 export type EventName = EventInput['name'];
 
-/** 한 번에 보낼 수 있는 이벤트 수. 브라우저 트래커의 배치 크기와 맞춘다. */
-export const MAX_EVENTS_PER_BATCH = 20;
-
 export const eventBatchSchema = z.object({
   events: z
     .array(eventInputSchema)
@@ -67,6 +65,9 @@ export const eventBatchSchema = z.object({
     .max(MAX_EVENTS_PER_BATCH, 'valid.eventsTooMany'),
 });
 export type EventBatch = z.infer<typeof eventBatchSchema>;
+
+// 계약을 통해 쓰던 곳이 깨지지 않게 그대로 다시 내보낸다
+export { MAX_EVENTS_PER_BATCH };
 
 export const eventBatchResponseSchema = z.object({
   accepted: z.int().min(0),

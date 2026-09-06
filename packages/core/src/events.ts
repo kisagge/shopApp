@@ -37,6 +37,16 @@ export const isCommerceEvent = (name: string): name is CommerceEvent =>
  * 매출이 걸린 이벤트를 클라이언트에서 받으면 누구나 curl 로 매출을 지어낼 수 있다.
  * 이 둘은 주문 확정·환불 처리 서버 코드에서만 기록한다.
  */
+/**
+ * 한 번에 보낼 수 있는 이벤트 수. 브라우저 트래커의 배치 크기와 맞춘다.
+ *
+ * **계약이 아니라 여기 둔다.** 계약 패키지는 Zod 를 끌고 오는데, 이 상수
+ * 하나 때문에 브라우저 트래커가 계약을 import 하면서 **모든 화면이 Zod 를
+ * 통째로 받고 있었다** — 폼이 하나도 없는 화면까지 384KB 씩. 상수는 정책이고
+ * 스키마가 그것을 쓰는 것이지, 그 반대가 아니다.
+ */
+export const MAX_EVENTS_PER_BATCH = 20;
+
 export const SERVER_ONLY_EVENT = ['purchase', 'refund'] as const;
 export type ServerOnlyEvent = (typeof SERVER_ONLY_EVENT)[number];
 

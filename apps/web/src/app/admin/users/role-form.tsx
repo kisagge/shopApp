@@ -3,8 +3,9 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-import { USER_ROLE_INPUT, type UserRoleInput } from '@shop/contract';
-import { USER_ROLE_LABEL } from '@shop/core';
+import type { UserRoleInput } from '@shop/contract';
+// 계약을 거치면 Zod 가 딸려 온다 — 값 목록은 core 의 것이다
+import { USER_ROLE, USER_ROLE_LABEL } from '@shop/core';
 
 /**
  * 권한 부여.
@@ -82,7 +83,7 @@ export function RoleForm({
           onChange={(e) => setNext(e.target.value as UserRoleInput)}
           className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
         >
-          {USER_ROLE_INPUT.map((r) => (
+          {USER_ROLE.map((r) => (
             <option key={r} value={r}>{USER_ROLE_LABEL[r]}</option>
           ))}
         </select>

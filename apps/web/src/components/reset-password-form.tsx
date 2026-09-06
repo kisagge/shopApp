@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
-import { resetPasswordSchema } from '@shop/contract';
 import { authClient } from '@shop/auth/client';
 import { useIssueText, useT } from '~/lib/i18n/client';
+import { useLazySchema } from '~/lib/form-schema';
 import type { IssueBounds } from '~/lib/i18n/issue';
 
 type FieldName = 'password' | 'passwordConfirm';
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const t = useT();
+  const getSchema = useLazySchema(async () => (await import('@shop/contract')).resetPasswordSchema);
   const issueText = useIssueText();
   const router = useRouter();
   const [values, setValues] = useState({ password: '', passwordConfirm: '' });
@@ -30,7 +31,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     e.preventDefault();
     setError(null);
 
-    const parsed = resetPasswordSchema.safeParse(values);
+    const parsed = (await getSchema()).safeParse(values);
     if (!parsed.success) {
       const next: Partial<Record<FieldName, string>> = {};
       for (const issue of parsed.error.issues) {

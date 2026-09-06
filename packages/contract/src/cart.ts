@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LINE_ISSUE } from '@shop/core';
 import { cuidSchema, discountPercentSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -25,8 +26,8 @@ export const cartQuoteRequestSchema = z.object({
 export type CartQuoteRequest = z.infer<typeof cartQuoteRequestSchema>;
 
 /** 담아 둔 사이에 생긴 문제. 화면이 사용자에게 알려 줘야 한다. */
-export const LINE_ISSUE = ['NOT_FOUND', 'INACTIVE', 'SOLD_OUT', 'STOCK_REDUCED'] as const;
-export type LineIssue = (typeof LINE_ISSUE)[number];
+// 값 목록은 core 가 갖고, 계약은 그것으로 스키마를 만든다.
+export { LINE_ISSUE, type LineIssue } from '@shop/core';
 
 /*
  * 문구는 여기 없다.

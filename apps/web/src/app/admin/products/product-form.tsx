@@ -3,7 +3,9 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
-import { PRODUCT_STATUS, PRODUCT_STATUS_LABEL, type ProductStatusInput } from '@shop/contract';
+// 계약을 거치면 Zod 가 딸려 온다. 이 값들은 core 의 것을 계약이 다시 내보낼 뿐이다.
+import { PRODUCT_STATUS, PRODUCT_STATUS_LABEL } from '@shop/core'
+import type { ProductStatusInput } from '@shop/contract';
 import { MERCHANT_SELECTABLE_STATUS } from '@shop/core';
 import { discountRateOf, won } from '@shop/core';
 

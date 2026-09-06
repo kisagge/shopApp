@@ -214,3 +214,16 @@ function resolvePoints(
   const owned = available ?? ZERO;
   return min(min(requested, owned), base);
 }
+
+/**
+ * 장바구니 줄에 생길 수 있는 문제.
+ *
+ * **계약이 아니라 여기 둔다.** 이건 값 목록이지 주고받는 모양이 아니고,
+ * 화면이 이 목록으로 문구를 고른다. 계약에 두었더니 장바구니 화면이 그
+ * 배열 하나 때문에 Zod 를 통째로 받고 있었다.
+ *
+ * 문구는 여기 없다 — 화면이 세 나라 말로 나가므로 뭐라고 부를지는 화면이
+ * 정한다.
+ */
+export const LINE_ISSUE = ['NOT_FOUND', 'INACTIVE', 'SOLD_OUT', 'STOCK_REDUCED'] as const;
+export type LineIssue = (typeof LINE_ISSUE)[number];

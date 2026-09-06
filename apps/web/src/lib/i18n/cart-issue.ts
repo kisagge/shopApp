@@ -1,4 +1,5 @@
-import { LINE_ISSUE, type LineIssue } from '@shop/contract';
+// 계약을 거치면 Zod 가 딸려 온다 — 값 목록은 core 의 것이다
+import { LINE_ISSUE, type LineIssue } from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 
 /**

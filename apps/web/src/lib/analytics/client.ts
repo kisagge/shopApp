@@ -1,5 +1,10 @@
-import { isServerOnlyEvent, requiresConsent, type CommerceEvent } from '@shop/core';
-import { MAX_EVENTS_PER_BATCH } from '@shop/contract';
+/*
+ * **계약을 거치지 않는다.** 상수 하나 때문에 계약을 import 하면 Zod 가 통째로
+ * 딸려 오고, 이 파일은 루트 레이아웃에 있어서 **모든 화면이 그것을 받는다.**
+ */
+import {
+  isServerOnlyEvent, requiresConsent, MAX_EVENTS_PER_BATCH, type CommerceEvent,
+} from '@shop/core';
 import { getAnonymousId, getSessionId } from './session';
 
 /**
