@@ -14,16 +14,30 @@ import { absoluteUrl } from '~/lib/urls';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { LocaleProvider } from '~/lib/i18n/client';
 
+/**
+ * 굵기는 **실제로 쓰는 것만** 부른다.
+ *
+ * 한글 글꼴은 글자가 많아 수백 개 조각으로 쪼개져 오고, 굵기마다 그 조각
+ * 전부에 @font-face 선언이 하나씩 붙는다. 그래서 굵기 하나가 곧 CSS 수십
+ * KB 다 — 다섯 굵기를 부르던 본문 글꼴의 선언만 232KB 였고, 그 CSS 는 글자가
+ * 그려지기 전에 받아야 한다.
+ *
+ * 세어 보니 300(light)은 **한 곳도 쓰지 않았고**, 700(bold)은 배지 두 곳뿐이라
+ * 600 으로 맞췄다. 세리프는 워드마크와 큰 제목에만 쓰는데 전부 500 이었다.
+ *
+ * 굵기를 새로 쓰려면 여기 한 줄을 더해야 한다. 그 한 줄이 수십 KB 라는 것을
+ * 알고 더하는 편이 낫다.
+ */
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
+  weight: ['400', '500', '600'],
   variable: '--font-plex-kr',
   display: 'swap',
 });
 
 const serif = Hahmlet({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+  weight: ['500'],
   variable: '--font-hahmlet',
   display: 'swap',
 });

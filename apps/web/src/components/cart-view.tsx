@@ -127,7 +127,7 @@ function Check({ on }: { on: boolean }) {
     <span
       aria-hidden="true"
       className={[
-        'flex h-5 w-5 shrink-0 items-center justify-center rounded-xs text-[11px] font-bold',
+        'flex h-5 w-5 shrink-0 items-center justify-center rounded-xs text-[11px] font-semibold',
         on ? 'bg-n-900 text-n-0' : 'border border-n-300',
       ].join(' ')}
     >

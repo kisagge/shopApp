@@ -20,14 +20,25 @@ import { ready } from './state';
  */
 const BUDGET_KB = 800;
 
-async function scriptKB(page: import('@playwright/test').Page, path: string): Promise<number> {
+/**
+ * 스타일 상한.
+ *
+ * 처음 쟀을 때 화면마다 451KB 였는데 **그중 412KB 가 스타일이 아니라
+ * `@font-face` 선언**이었다. 한글 글꼴은 수백 개 조각으로 쪼개져 오고 굵기마다
+ * 그 조각 전부에 선언이 하나씩 붙는다 — 쓰지도 않는 굵기 하나가 수십 KB 다.
+ * 실제 앱 스타일은 48KB 뿐이었다.
+ */
+const CSS_BUDGET_KB = 300;
+
+async function staticKB(
+  page: import('@playwright/test').Page,
+  path: string,
+  ext: '.js' | '.css',
+): Promise<number> {
   const bytes = new Map<string, number>();
   const onResponse = async (response: import('@playwright/test').Response) => {
-    /*
-     * **스크립트만 센다.** CSS 도 같은 폴더에 있어서, 처음에는 그것까지
-     * 합산돼 화면마다 450KB 가 얹혀 나왔다.
-     */
-    if (!response.url().includes('/_next/static/') || !response.url().endsWith('.js')) return;
+    // 스크립트와 스타일은 같은 폴더에 있다 — 섞어 세면 어느 쪽이 는지 알 수 없다
+    if (!response.url().includes('/_next/static/') || !response.url().endsWith(ext)) return;
     try {
       bytes.set(response.url(), (await response.body()).byteLength);
     } catch {
@@ -49,8 +60,13 @@ async function scriptKB(page: import('@playwright/test').Page, path: string): Pr
 
 for (const path of ['/', '/signup', '/cart', '/support']) {
   test(`${path} 가 받는 스크립트가 상한 안에 있다`, async ({ page }) => {
-    const kb = await scriptKB(page, path);
-    expect(kb, `${path} 가 ${Math.round(kb)}KB 를 받는다`).toBeLessThan(BUDGET_KB);
+    const kb = await staticKB(page, path, '.js');
+    expect(kb, `${path} 가 스크립트 ${Math.round(kb)}KB 를 받는다`).toBeLessThan(BUDGET_KB);
+  });
+
+  test(`${path} 가 받는 스타일이 상한 안에 있다`, async ({ page }) => {
+    const kb = await staticKB(page, path, '.css');
+    expect(kb, `${path} 가 스타일 ${Math.round(kb)}KB 를 받는다`).toBeLessThan(CSS_BUDGET_KB);
   });
 }
 
