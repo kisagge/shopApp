@@ -26,17 +26,18 @@
     "@shop/contract": "workspace:*",
     "@shop/core": "workspace:*",
     "@shop/db": "workspace:*",
+    "@shop/i18n": "workspace:*",
+    "@shop/mail": "workspace:*",
+    "@shop/native": "workspace:*",
     "@shop/ui": "workspace:*",
     "@tanstack/react-query": "5.102.8",
     "next": "16.3.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
+    "web-vitals": "^6.2.1",
     "zod": "4.5.4",
-    "zustand": "5.0.15",
-    "@shop/native": "workspace:*",
-    "@shop/mail": "workspace:*",
-    "@shop/i18n": "workspace:*"
+    "zustand": "5.0.15"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",

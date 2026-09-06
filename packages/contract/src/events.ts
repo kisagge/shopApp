@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_EVENTS_PER_BATCH } from '@shop/core';
+import { MAX_EVENTS_PER_BATCH, WEB_VITAL } from '@shop/core';
 import { cuidSchema, orderNoSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -53,6 +53,20 @@ export const eventInputSchema = z.discriminatedUnion('name', [
   // 여기 정의는 서버 측 기록 함수의 타입을 위한 것이다.
   ev('purchase', { orderId: orderNoSchema, value: wonSchema, itemCount: z.int().min(1) }),
   ev('refund', { orderId: orderNoSchema, value: wonSchema }),
+  /*
+   * 실사용자 성능.
+   *
+   * **값의 상한을 둔다.** 브라우저가 보내는 값이라 아무 숫자나 올 수 있고,
+   * 하나가 터무니없이 크면 백분위가 통째로 끌려간다 — 탭을 열어 두고 며칠
+   * 뒤 돌아온 사람의 LCP 같은 것이 그렇다. 10분을 넘는 값은 성능이 아니라
+   * 잡음이다.
+   */
+  ev('web_vitals', {
+    metric: z.enum(WEB_VITAL),
+    value: z.number().min(0).max(600_000),
+    rating: z.enum(['good', 'needs-improvement', 'poor']),
+    navigationType: z.string().max(24).optional(),
+  }),
 ]);
 
 export type EventInput = z.infer<typeof eventInputSchema>;

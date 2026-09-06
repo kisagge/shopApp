@@ -3,7 +3,7 @@
  * 딸려 오고, 이 파일은 루트 레이아웃에 있어서 **모든 화면이 그것을 받는다.**
  */
 import {
-  isServerOnlyEvent, requiresConsent, MAX_EVENTS_PER_BATCH, type CommerceEvent,
+  isServerOnlyEvent, requiresConsent, MAX_EVENTS_PER_BATCH, type EventName,
 } from '@shop/core';
 import { getAnonymousId, getSessionId } from './session';
 
@@ -58,7 +58,7 @@ const defaultTransport: Transport = {
 };
 
 interface QueuedEvent {
-  name: CommerceEvent;
+  name: EventName;
   occurredAt: string;
   sessionId: string;
   anonymousId: string;
@@ -94,7 +94,7 @@ export class AnalyticsTracker {
     return this.#queue.length;
   }
 
-  track(name: CommerceEvent, props: Readonly<Record<string, unknown>> = {}): void {
+  track(name: EventName, props: Readonly<Record<string, unknown>> = {}): void {
     if (this.#disposed) return;
 
     // purchase·refund 는 서버가 기록한다. 여기서 보내도 API 가 거부하므로
@@ -174,5 +174,5 @@ export function getTracker(): AnalyticsTracker {
 }
 
 /** 앱 어디서나 쓰는 진입점 */
-export const track = (name: CommerceEvent, props?: Record<string, unknown>): void =>
+export const track = (name: EventName, props?: Record<string, unknown>): void =>
   getTracker().track(name, props);

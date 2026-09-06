@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { COMMERCE_EVENT } from '@shop/core';
+import { COMMERCE_EVENT, DIAGNOSTIC_EVENT } from '@shop/core';
 import { eventInputSchema, eventBatchSchema, MAX_EVENTS_PER_BATCH } from '../src/events';
 
 const envelope = {
@@ -15,11 +15,22 @@ describe('이벤트 이름 정합성', () => {
     (o) => (o as { shape: Record<string, { value: string }> }).shape['name']!.value,
   );
 
-  it('계약의 이름 집합이 core 의 COMMERCE_EVENT 와 정확히 같다', () => {
+  it('계약의 이름 집합이 core 의 목록과 정확히 같다', () => {
     // 한쪽에만 이벤트를 추가하면 여기서 걸린다.
     // 계약에만 있으면 core 의 퍼널·동의 판정이 그 이벤트를 모르고,
     // core 에만 있으면 브라우저가 보낼 수 없다.
-    expect(contractNames.toSorted()).toEqual([...COMMERCE_EVENT].toSorted());
+    expect(contractNames.toSorted()).toEqual(
+      [...COMMERCE_EVENT, ...DIAGNOSTIC_EVENT].toSorted(),
+    );
+  });
+
+  it('장사 이벤트와 진단 이벤트가 겹치지 않는다', () => {
+    /*
+     * COMMERCE_EVENT 는 GA4 권장 이름을 그대로 따르기로 한 목록이다.
+     * 거기에 우리가 지은 이름이 섞이면 나중에 내보낼 때 매핑 표가 다시 생긴다.
+     */
+    const commerce = new Set<string>(COMMERCE_EVENT);
+    expect(DIAGNOSTIC_EVENT.filter((n) => commerce.has(n))).toEqual([]);
   });
 });
 

@@ -176,3 +176,15 @@ test('손님 화면에서 관리자 페이지로 가는 문이 보인다', async
   await door.click();
   await expect(page.getByRole('heading', { name: '대시보드', level: 1 })).toBeVisible();
 });
+
+test('트래픽 화면이 실사용자 성능을 기준선과 함께 보여 준다', async ({ page }) => {
+  // 숫자만 보여 주면 그게 좋은 값인지 알 수 없다
+  await page.goto('/admin/traffic');
+  await expect(page.getByRole('heading', { name: '실사용자 성능' })).toBeVisible();
+
+  for (const metric of ['LCP', 'INP', 'CLS']) {
+    await expect(page.locator('#main')).toContainText(metric);
+  }
+  // 색만으로 좋고 나쁨을 말하지 않는다
+  await expect(page.locator('#main')).toContainText(/좋음|개선 필요|나쁨|표본 없음/);
+});

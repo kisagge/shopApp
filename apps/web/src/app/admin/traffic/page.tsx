@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getTrafficHistory } from '~/lib/queries/admin';
+import { getTrafficHistory, getWebVitals } from '~/lib/queries/admin';
+import { VITAL_THRESHOLD, formatVital } from '@shop/core';
 
 export const metadata: Metadata = { title: '트래픽 추이' };
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function TrafficPage() {
   const actor = await requireAdmin();
-  const { months, rawSince } = await getTrafficHistory(actor);
+  const [{ months, rawSince }, { vitals, since }] = await Promise.all([
+    getTrafficHistory(actor),
+    getWebVitals(actor),
+  ]);
 
   const peak = Math.max(1, ...months.map((m) => m.viewItems));
   const empty = months.every((m) => m.viewItems === 0 && m.purchases === 0);
@@ -30,6 +34,71 @@ export default async function TrafficPage() {
       </header>
 
       <div className="flex flex-col gap-5 p-8">
+        <section
+          aria-labelledby="vitals-title"
+          className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+        >
+          <div className="mb-5 flex flex-col gap-1">
+            <h2 id="vitals-title" className="text-base font-semibold">실사용자 성능</h2>
+            <p className="max-w-[70ch] text-xs leading-relaxed text-[var(--fg-muted)]">
+              실제 방문에서 브라우저가 잰 값입니다. <b>평균이 아니라 75 백분위</b>로
+              봅니다 — 평균은 아주 느린 소수를 빠른 다수에 묻어 버립니다. 75 백분위는 &ldquo;넷 중 셋이
+              이보다 빨랐다&rdquo; 는 뜻이라, 느린 쪽이 넷 중 하나를 넘으면 대표값이 그쪽을
+              가리킵니다 — 구글이 Core Web Vitals 를 이 값으로 판정하는 것도 같은
+              이유입니다. 기준선은 구글이 정한 값을 그대로 씁니다. {since.toISOString().slice(0, 10)} 이후.
+            </p>
+          </div>
+
+          <ul className="grid grid-cols-2 gap-3 md:grid-cols-5">
+            {vitals.map((v) => (
+              <li
+                key={v.metric}
+                className="flex flex-col gap-1.5 rounded-sm border border-[var(--border)] p-4"
+              >
+                <span className="text-[11px] font-medium tracking-[0.08em] text-[var(--fg-muted)]">
+                  {v.metric}
+                </span>
+                <span
+                  className={`tnum text-[22px] font-semibold ${
+                    v.rating === 'good'
+                      ? 'text-success'
+                      : v.rating === 'poor'
+                        ? 'text-accent'
+                        : v.rating === 'needs-improvement'
+                          ? 'text-warning'
+                          : 'text-[var(--fg-muted)]'
+                  }`}
+                >
+                  {v.p75 === null ? '—' : formatVital(v.metric, v.p75)}
+                  {v.p75 !== null && v.metric !== 'CLS' && (
+                    <span className="ml-0.5 text-[13px] font-normal">ms</span>
+                  )}
+                </span>
+                {/* 색만으로 좋고 나쁨을 말하지 않는다 */}
+                <span className="text-[11px] text-[var(--fg-secondary)]">
+                  {v.rating === null
+                    ? '표본 없음'
+                    : v.rating === 'good'
+                      ? '좋음'
+                      : v.rating === 'poor'
+                        ? '나쁨'
+                        : '개선 필요'}
+                </span>
+                <span className="tnum text-[10px] text-[var(--fg-muted)]">
+                  기준 {formatVital(v.metric, VITAL_THRESHOLD[v.metric].good)} 이하 · 표본{' '}
+                  {v.samples.toLocaleString('ko-KR')}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {vitals.every((v) => v.samples === 0) && (
+            <p className="mt-4 text-[12px] text-[var(--fg-muted)]">
+              아직 모인 값이 없습니다. 방문이 있어야 쌓입니다 — 지어내지 않습니다.
+            </p>
+          )}
+        </section>
+
         <section
           aria-labelledby="traffic-title"
           className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"

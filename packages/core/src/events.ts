@@ -28,6 +28,19 @@ export const COMMERCE_EVENT = [
 
 export type CommerceEvent = (typeof COMMERCE_EVENT)[number];
 
+/**
+ * 장사가 아니라 **우리 화면이 얼마나 빠른가**를 재는 이벤트.
+ *
+ * COMMERCE_EVENT 에 섞지 않는다. 그 목록은 GA4 권장 이름을 그대로 따르기로
+ * 한 것이고, 거기에 우리가 지은 이름을 끼우면 나중에 내보낼 때 매핑 표가
+ * 다시 생긴다.
+ */
+export const DIAGNOSTIC_EVENT = ['web_vitals'] as const;
+export type DiagnosticEvent = (typeof DIAGNOSTIC_EVENT)[number];
+
+/** 브라우저가 보낼 수 있는 이벤트 이름 전부 */
+export type EventName = CommerceEvent | DiagnosticEvent;
+
 export const isCommerceEvent = (name: string): name is CommerceEvent =>
   (COMMERCE_EVENT as readonly string[]).includes(name);
 
@@ -59,7 +72,7 @@ export const isServerOnlyEvent = (name: string): name is ServerOnlyEvent =>
  */
 export const ESSENTIAL_EVENT = ['purchase', 'refund', 'login', 'sign_up'] as const;
 
-export const requiresConsent = (name: CommerceEvent): boolean =>
+export const requiresConsent = (name: EventName): boolean =>
   !(ESSENTIAL_EVENT as readonly string[]).includes(name);
 
 // ── 퍼널 ──────────────────────────────────────────────────────
@@ -155,7 +168,7 @@ export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelSte
 // ── 싱크 ──────────────────────────────────────────────────────
 
 export interface TrackedEvent {
-  readonly name: CommerceEvent;
+  readonly name: EventName;
   /** 브라우저가 찍은 시각. 기기 시계는 틀릴 수 있어 순서 복원에만 쓴다. */
   readonly occurredAt: Date;
   readonly sessionId: string;

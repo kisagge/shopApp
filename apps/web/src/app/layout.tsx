@@ -3,6 +3,7 @@ import { LOCALE_TAG, OG_LOCALE } from '@shop/i18n';
 import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
+import { WebVitalsReporter } from '~/components/web-vitals-reporter';
 import { CartSync } from '~/components/cart-sync';
 import { NativeSession } from '~/components/native-session';
 import { ServiceWorker } from '~/components/service-worker';
@@ -86,6 +87,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <SiteFooter />
             </div>
             <AnalyticsProvider />
+            {/* 실사용자 성능. 같은 파이프라인으로 나간다. */}
+            <WebVitalsReporter />
             {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
             <CartSync />
             {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}

@@ -6,6 +6,8 @@ import {
   type Actor, type Permission, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
   readOrderSearch, readDateRange,
   type ProductStatus,
+  WEB_VITAL, rateVital,
+  type WebVital, type VitalRating,
 } from '@shop/core';
 
 /**
@@ -380,6 +382,62 @@ export async function getTrafficHistory(
       };
     }),
     rawSince: dayKeyOf(new Date(now.getTime() - RAW_RETENTION_DAYS * 24 * 60 * 60 * 1000)),
+  };
+}
+
+export interface VitalSummary {
+  readonly metric: WebVital;
+  /** 75 백분위. 표본이 없으면 null */
+  readonly p75: number | null;
+  readonly rating: VitalRating | null;
+  readonly samples: number;
+}
+
+/**
+ * 실사용자 성능.
+ *
+ * **평균이 아니라 75 백분위로 본다.** 평균은 아주 느린 소수를 빠른 다수에
+ * 묻어 버린다. 75 백분위는 "넷 중 셋이 이보다 빨랐다" 는 뜻이라, 느린 쪽이
+ * 넷 중 하나를 넘으면 대표값이 그쪽을 가리킨다.
+ *
+ * 백분위는 DB 에 맡긴다. 값을 전부 읽어 와 코드에서 정렬하면 이벤트가 쌓일수록
+ * 그대로 무거워지는데, 이건 매일 열어 보는 화면이다.
+ */
+export async function getWebVitals(
+  actor: Actor,
+  days = 28,
+  now: Date = new Date(),
+): Promise<{ vitals: VitalSummary[]; since: Date }> {
+  assertPermission(actor, 'analytics:all');
+
+  const since = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+  const rows = await prisma.$queryRaw<{ metric: string; p75: number; samples: bigint }[]>`
+    select
+      props->>'metric'                                                as metric,
+      percentile_cont(0.75) within group (order by (props->>'value')::float) as p75,
+      count(*)                                                        as samples
+    from event_logs
+    where name = 'web_vitals'
+      and "receivedAt" >= ${since}
+      and props->>'metric' is not null
+    group by 1
+  `;
+
+  const byMetric = new Map(rows.map((r) => [r.metric, r]));
+
+  return {
+    since,
+    vitals: WEB_VITAL.map((metric) => {
+      const row = byMetric.get(metric);
+      // 값이 없으면 null 이다. 0 을 돌려주면 "아주 빠름" 으로 읽힌다.
+      const value = row ? Number(row.p75) : null;
+      return {
+        metric,
+        p75: value,
+        rating: value === null ? null : rateVital(metric, value),
+        samples: row ? Number(row.samples) : 0,
+      };
+    }),
   };
 }
 
