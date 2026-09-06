@@ -5,7 +5,7 @@ import {
   MAX_IMAGES_PER_REVIEW,
 } from '@shop/core';
 import { getStorage } from '~/lib/storage';
-import { makeBlur } from '~/lib/images/blur';
+import { prepareImage } from '~/lib/images/prepare';
 
 /**
  * 리뷰 사진 업로드.
@@ -61,11 +61,16 @@ export async function uploadReviewImages(
         // 파일 이름을 쓰지 않는다 — 경로 탈출과 덮어쓰기가 전부 거기서 나온다
         token: randomBytes(12).toString('base64url'),
       });
-      const [{ url }, blurDataUrl] = await Promise.all([
-        storage.put({ key, body: file.bytes, contentType: file.contentType }),
-        makeBlur(file.bytes),
-      ]);
-      done.push({ url, key, blurDataUrl });
+      /*
+       * **여기가 가장 중요한 자리다.** 리뷰 사진은 사용자가 휴대폰에서 바로
+       * 올리고, 그 파일에는 찍은 자리의 좌표가 들어 있다. 게다가 화면이
+       * 원본 주소를 새 탭으로 열어 주므로 그 파일이 그대로 공개된다.
+       */
+      const prepared = await prepareImage(file.bytes, file.contentType);
+      const { url } = await storage.put({
+        key, body: prepared.bytes, contentType: file.contentType,
+      });
+      done.push({ url, key, blurDataUrl: prepared.blurDataUrl });
     }
   } catch (error) {
     // 중간에 실패하면 이미 올린 것을 도로 지운다. 리뷰가 만들어지지 않을

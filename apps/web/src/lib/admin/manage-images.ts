@@ -7,7 +7,7 @@ import {
   type Actor,
 } from '@shop/core';
 import { getStorage } from '~/lib/storage';
-import { makeBlur } from '~/lib/images/blur';
+import { prepareImage } from '~/lib/images/prepare';
 import { ProductError } from './manage-product';
 
 /**
@@ -71,10 +71,11 @@ export async function addProductImage(
     token: randomBytes(12).toString('base64url'),
   });
 
-  const [{ url }, blurDataUrl] = await Promise.all([
-    getStorage().put({ key, body: file.bytes, contentType }),
-    makeBlur(file.bytes),
-  ]);
+  // 받은 그대로가 아니라 **다듬어서** 저장한다 — 크기를 줄이고 곁들여 온
+  // 정보(촬영 위치 등)를 떼어 낸다. 자리표시도 같은 한 번에 만든다.
+  const prepared = await prepareImage(file.bytes, contentType);
+  const { url } = await getStorage().put({ key, body: prepared.bytes, contentType });
+  const blurDataUrl = prepared.blurDataUrl;
 
   const sortOrder = product._count.images;
   const image = await prisma.productImage.create({

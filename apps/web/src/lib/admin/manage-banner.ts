@@ -12,7 +12,7 @@ import {
   type BannerErrorCode, type CreateBannerInput, type UpdateBannerInput,
 } from '@shop/contract';
 import { getStorage } from '~/lib/storage';
-import { makeBlur } from '~/lib/images/blur';
+import { prepareImage } from '~/lib/images/prepare';
 
 export class BannerError extends Error {
   constructor(readonly code: BannerErrorCode, readonly status = 404) {
@@ -213,11 +213,9 @@ export async function setBannerImage(
     token: randomBytes(12).toString('base64url'),
   });
 
-  const [{ url }, blurDataUrl] = await Promise.all([
-    getStorage().put({ key, body: file.bytes, contentType }),
-    // 저장과 나란히 만든다. 실패해도 null 이라 업로드를 막지 않는다.
-    makeBlur(file.bytes),
-  ]);
+  const prepared = await prepareImage(file.bytes, contentType);
+  const { url } = await getStorage().put({ key, body: prepared.bytes, contentType });
+  const blurDataUrl = prepared.blurDataUrl;
 
   const after = await prisma.banner.update({
     where: { id: bannerId },

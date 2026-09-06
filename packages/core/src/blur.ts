@@ -58,3 +58,24 @@ export function isBlurDataUrl(value: string | null | undefined): value is string
   if (value.length > MAX_BLUR_DATA_URL) return false;
   return /^[A-Za-z0-9+/]+=*$/.test(value.slice(PREFIX.length));
 }
+
+
+/**
+ * 저장할 사진의 긴 변 상한(px).
+ *
+ * **올린 것을 그대로 저장하지 않는다.** 상한이 5MB 라 4000×6000 짜리
+ * 휴대폰 사진이 그대로 들어온다. 재 보면 1.9MB 짜리가 긴 변 2400 에서
+ * 206KB 가 된다 — 89% 가 줄고, 눈으로는 차이가 없다.
+ *
+ * 이 값은 저장소만의 문제가 아니다. 화면 크기별 사진은 요청이 올 때 만드는데,
+ * **그때마다 원본을 가져온다.** 원본이 크면 그 왕복이 매번 무겁다.
+ *
+ * 2400 인 이유는 지금 저장된 것들(1200~1920px)보다 위여서다. 있는 사진은
+ * 건드리지 않고 과하게 큰 업로드에서만 걸린다. 화면에서 가장 크게 쓰는
+ * 자리가 상품 상세의 대표 사진인데, 고해상도 노트북에서 필요한 픽셀이
+ * 2200 안팎이라 그 위에 있다.
+ */
+export const MAX_IMAGE_EDGE = 2400;
+
+/** 다시 인코딩할 때의 품질. 사진에 쓰는 값이고, 무손실 형식에는 뜻이 없다. */
+export const IMAGE_QUALITY = 82;
