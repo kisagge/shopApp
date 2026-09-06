@@ -5,7 +5,7 @@ import { notFound } from 'next/navigation';
 import { hasPermission } from '@shop/core';
 import { PRODUCT_STATUS_LABEL, type ProductStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminProductDetail } from '~/lib/queries/admin';
+import { getAdminProductDetail } from '~/lib/queries/admin/products';
 import { getProductFormOptions } from '~/lib/admin/manage-product';
 import { listProductImages } from '~/lib/admin/manage-images';
 import { isStorageConfigured } from '~/lib/storage';

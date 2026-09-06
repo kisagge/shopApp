@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ForbiddenError, type Actor } from '@shop/core';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 const db = vi.hoisted(() => {
@@ -16,10 +16,11 @@ const db = vi.hoisted(() => {
 });
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: () => '' } }));
 
-const {
-  getDashboard, getAdminOrders, getAdminOrder, getAdminProducts,
-  getAdminProductDetail, getSettlements, getMerchants,
-} = await import('~/lib/queries/admin');
+const { getDashboard } = await import('~/lib/queries/admin/dashboard');
+const { getAdminOrders, getAdminOrder } = await import('~/lib/queries/admin/orders');
+const { getAdminProducts, getAdminProductDetail } = await import('~/lib/queries/admin/products');
+const { getSettlements } = await import('~/lib/queries/admin/settlements');
+const { getMerchants } = await import('~/lib/queries/admin/merchants');
 
 const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
 const merchantNoScope: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: null };
@@ -69,7 +70,16 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
      * 새 조회를 만들 때 조용히 빠뜨리는 실수다 — 화면 가드가 앞에 있으니
      * 아무 일도 일어나지 않고, 그 가드가 없는 자리에서 부르는 순간 샌다.
      */
-    const src = readFileSync(join(process.cwd(), 'src/lib/queries/admin.ts'), 'utf8');
+    /*
+     * 한 파일이 아니라 **어드민 조회 폴더 전체**를 훑는다. 파일 이름을 적어
+     * 두면 새로 만든 모듈이 목록 밖에 있어 조용히 빠진다 — 이 검사가 막으려는
+     * 실수와 정확히 같은 모양의 실수다.
+     */
+    const dir = join(process.cwd(), 'src/lib/queries/admin');
+    const src = readdirSync(dir)
+      .filter((f) => f.endsWith('.ts'))
+      .map((f) => readFileSync(join(dir, f), 'utf8'))
+      .join('\n');
     const missing: string[] = [];
 
     for (const m of src.matchAll(/export async function (\w+)\s*\(([\s\S]*?)\)[^{]*\{/g)) {

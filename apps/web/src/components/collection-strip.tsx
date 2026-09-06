@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { CollectionCard } from '~/lib/queries/products';
+import type { CollectionCard } from '~/lib/queries/catalog/collections';
 import { CollectionHero } from './collection-hero';
 import { getT } from '~/lib/i18n/server';
 

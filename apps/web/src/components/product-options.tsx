@@ -5,7 +5,7 @@ import { Button, Price } from '@shop/ui';
 import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
 import { useCartStore } from '~/stores/cart';
-import type { ProductDetail } from '~/lib/queries/products';
+import type { ProductDetail } from '~/lib/queries/catalog/products';
 import { useT } from '~/lib/i18n/client';
 
 /**

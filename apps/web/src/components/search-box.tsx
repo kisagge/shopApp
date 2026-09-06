@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { canSuggest, SUGGEST_MIN_LENGTH } from '@shop/core';
-import type { SearchSuggestion } from '~/lib/queries/products';
+import type { SearchSuggestion } from '~/lib/queries/catalog/suggest';
 import { useT } from '~/lib/i18n/client';
 
 /**

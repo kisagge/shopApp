@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ProductCard } from '@shop/ui';
-import type { ProductListItem } from '~/lib/queries/products';
+import type { ProductListItem } from '~/lib/queries/catalog/shelf';
 import { useRecentlyViewed } from '~/stores/recently-viewed';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { AppLink } from './app-link';

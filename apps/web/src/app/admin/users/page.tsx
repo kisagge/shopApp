@@ -3,7 +3,7 @@ import { Badge } from '@shop/ui';
 import { hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
 import type { UserRoleInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin';
+import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin/merchants';
 import { RoleForm } from './role-form';
 import { Pager } from '../pager';
 

@@ -5,7 +5,7 @@ import {
   SETTLEMENT_STATUS_LABEL, SettlementError, type SettlementStatus,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getSettlements } from '~/lib/queries/admin';
+import { getSettlements } from '~/lib/queries/admin/settlements';
 import { previewSettlements } from '~/lib/admin/close-settlement';
 import { CloseButton, PayButton } from './settlement-actions';
 

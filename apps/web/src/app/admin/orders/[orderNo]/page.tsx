@@ -10,7 +10,7 @@ import {
 import { ShipmentForm } from './shipment-form';
 import { ReturnActions } from './return-actions';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminOrder } from '~/lib/queries/admin';
+import { getAdminOrder } from '~/lib/queries/admin/orders';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
 import { getT } from '~/lib/i18n/server';
 import { GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';

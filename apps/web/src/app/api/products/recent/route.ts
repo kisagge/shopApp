@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { getProductsBySlugs } from '~/lib/queries/products';
+import { getProductsBySlugs } from '~/lib/queries/catalog/products';
 import { MAX_RECENT } from '~/stores/recently-viewed';
 
 /**

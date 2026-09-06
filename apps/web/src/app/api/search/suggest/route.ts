@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { getSearchSuggestions } from '~/lib/queries/products';
+import { getSearchSuggestions } from '~/lib/queries/catalog/suggest';
 
 /**
  * 검색 자동완성.

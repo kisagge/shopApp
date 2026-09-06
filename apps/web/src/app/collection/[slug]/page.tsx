@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getCollection } from '~/lib/queries/products';
+import { getCollection } from '~/lib/queries/catalog/collections';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CollectionHero } from '~/components/collection-hero';

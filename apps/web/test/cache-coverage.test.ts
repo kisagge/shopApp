@@ -18,7 +18,12 @@ const read = (rel: string) => readFileSync(join(SRC, rel), 'utf8');
 
 /** 캐싱해야 하는 공개 조회 */
 const CACHED_READS = [
-  'lib/queries/products.ts',
+  'lib/queries/catalog/products.ts',
+  'lib/queries/catalog/search.ts',
+  'lib/queries/catalog/suggest.ts',
+  'lib/queries/catalog/recommend.ts',
+  'lib/queries/catalog/collections.ts',
+  'lib/queries/catalog/brands.ts',
   'lib/queries/reviews.ts',
   'lib/admin/manage-banner.ts',
   'lib/queries/support.ts',
@@ -96,7 +101,9 @@ describe('캐싱한 자리', () => {
   });
 
   it('어드민 조회는 캐싱하지 않는다 — 운영자는 방금 바꾼 값을 봐야 한다', () => {
-    expect(read('lib/queries/admin.ts')).not.toContain('cachedRead');
+    for (const f of readdirSync(join(SRC, 'lib/queries/admin'))) {
+      expect(read(join('lib/queries/admin', f))).not.toContain('cachedRead');
+    }
     expect(read('lib/queries/admin-reviews.ts')).not.toContain('cachedRead');
   });
 

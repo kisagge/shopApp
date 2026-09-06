@@ -26,7 +26,7 @@ vi.mock('~/lib/cache', () => ({
   TTL: { catalog: 60, collections: 60 },
 }));
 
-const { getLiveCollections, getCollection } = await import('~/lib/queries/products');
+const { getLiveCollections, getCollection } = await import('~/lib/queries/catalog/collections');
 
 const NOW = new Date('2026-09-01T12:00:00Z');
 

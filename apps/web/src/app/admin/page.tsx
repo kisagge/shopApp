@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import { format, won, isDashboardRange, ORDER_STATUS_LABEL, USER_ROLE_LABEL } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getDashboard } from '~/lib/queries/admin';
+import { getDashboard } from '~/lib/queries/admin/dashboard';
 import { RevenueChart } from '~/components/admin/revenue-chart';
 import { RangeTabs } from '~/components/admin/range-tabs';
 

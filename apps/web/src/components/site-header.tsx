@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { categoryName } from '@shop/i18n';
-import { getTopCategories } from '~/lib/queries/products';
+import { getTopCategories } from '~/lib/queries/catalog/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';

@@ -6,7 +6,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: {} }));
 
-const { searchProducts } = await import('~/lib/queries/products');
+const { searchProducts } = await import('~/lib/queries/catalog/search');
 
 const row = (id: string, over: Record<string, unknown> = {}) => ({
   id, slug: `p-${id}`, name: '코트', listPrice: 100_000, salePrice: null,

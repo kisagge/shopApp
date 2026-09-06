@@ -1,6 +1,6 @@
 import { worthShowing } from '@shop/core';
 import { ProductCard } from '@shop/ui';
-import { getRecommendations } from '~/lib/queries/products';
+import { getRecommendations } from '~/lib/queries/catalog/recommend';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { AppLink } from './app-link';
 import { AppImage } from './app-image';

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getTrafficHistory, getWebVitals } from '~/lib/queries/admin';
+import { getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
 import { VITAL_THRESHOLD, formatVital } from '@shop/core';
 
 export const metadata: Metadata = { title: '트래픽 추이' };

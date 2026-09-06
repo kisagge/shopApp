@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { getLiveCollections } from '~/lib/queries/products';
+import { getLiveCollections } from '~/lib/queries/catalog/collections';
 import { CollectionHero } from '~/components/collection-hero';
 import { getT } from '~/lib/i18n/server';
 

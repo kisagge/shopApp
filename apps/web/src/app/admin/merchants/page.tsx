@@ -3,7 +3,7 @@ import { Badge } from '@shop/ui';
 import { hasPermission } from '@shop/core';
 import { MERCHANT_STATUS_LABEL, type MerchantStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getMerchants } from '~/lib/queries/admin';
+import { getMerchants } from '~/lib/queries/admin/merchants';
 import { MerchantStatusForm } from './status-form';
 
 export const metadata: Metadata = { title: '가맹점' };

@@ -1,7 +1,7 @@
 import type { MetadataRoute } from 'next';
-import {
-  getAllProductSlugs, getTopCategories, getLiveCollections, getSellableBrandSlugs,
-} from '~/lib/queries/products';
+import { getAllProductSlugs, getTopCategories } from '~/lib/queries/catalog/products';
+import { getLiveCollections } from '~/lib/queries/catalog/collections';
+import { getSellableBrandSlugs } from '~/lib/queries/catalog/brands';
 import { absoluteUrl } from '~/lib/urls';
 
 /**

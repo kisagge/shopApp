@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { categoryName } from '@shop/i18n';
-import { getTopCategories } from '~/lib/queries/products';
+import { getTopCategories } from '~/lib/queries/catalog/products';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { LocaleSwitcher } from './locale-switcher';
 

@@ -1,6 +1,7 @@
 import { siteStructuredData } from '@shop/core';
 import { absoluteUrl } from '~/lib/urls';
-import { getFeaturedProducts, getLiveCollections } from '~/lib/queries/products';
+import { getFeaturedProducts } from '~/lib/queries/catalog/products';
+import { getLiveCollections } from '~/lib/queries/catalog/collections';
 import { getLiveBanners } from '~/lib/admin/manage-banner';
 import { HomeBanners } from '~/components/home-banners';
 import { ProductGrid } from '~/components/product-grid';

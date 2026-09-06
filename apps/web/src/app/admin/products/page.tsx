@@ -7,7 +7,7 @@ import {
 } from '@shop/core';
 import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminProducts } from '~/lib/queries/admin';
+import { getAdminProducts } from '~/lib/queries/admin/products';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '상품 관리' };

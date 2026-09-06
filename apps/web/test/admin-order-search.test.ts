@@ -7,7 +7,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: {} }));
 
-const { getAdminOrders } = await import('~/lib/queries/admin');
+const { getAdminOrders } = await import('~/lib/queries/admin/orders');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };

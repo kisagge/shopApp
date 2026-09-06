@@ -12,7 +12,7 @@ vi.mock('@shop/db', () => ({
 }));
 
 const { getFeaturedProducts, getProductBySlug, getAllProductSlugs } =
-  await import('~/lib/queries/products');
+  await import('~/lib/queries/catalog/products');
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -1,5 +1,5 @@
 import { format, won } from '@shop/core';
-import type { DailyRevenue } from '~/lib/queries/admin';
+import type { DailyRevenue } from '~/lib/queries/admin/dashboard';
 
 /**
  * 7일 매출 추이.

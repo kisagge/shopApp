@@ -15,7 +15,7 @@ vi.mock('~/lib/cache', () => ({
   TTL: { catalog: 60 },
 }));
 
-const { getRecommendations } = await import('~/lib/queries/products');
+const { getRecommendations } = await import('~/lib/queries/catalog/recommend');
 
 const row = (id: string, over: Record<string, unknown> = {}) => ({
   id,

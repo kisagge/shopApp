@@ -4,7 +4,7 @@ import { Badge } from '@shop/ui';
 import { format, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminOrders } from '~/lib/queries/admin';
+import { getAdminOrders } from '~/lib/queries/admin/orders';
 import { isOrderStatus } from '~/lib/queries/mypage';
 import { Pager } from '../pager';
 

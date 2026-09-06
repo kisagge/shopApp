@@ -2,7 +2,7 @@ import { headers } from 'next/headers';
 import { ProductCard } from '@shop/ui';
 import { getSessionUser } from '@shop/auth/session';
 import { getLocale } from '~/lib/i18n/server';
-import type { ProductListItem } from '~/lib/queries/products';
+import type { ProductListItem } from '~/lib/queries/catalog/shelf';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { WishlistButton } from './wishlist-button';
 import { AppLink } from './app-link';

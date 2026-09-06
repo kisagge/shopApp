@@ -23,7 +23,7 @@ vi.mock('~/lib/cache', () => ({
   TTL: { catalog: 60 },
 }));
 
-const { getSearchSuggestions, getPopularSearches } = await import('~/lib/queries/products');
+const { getSearchSuggestions, getPopularSearches } = await import('~/lib/queries/catalog/suggest');
 
 beforeEach(() => {
   vi.clearAllMocks();

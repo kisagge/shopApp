@@ -13,7 +13,7 @@ import { headers } from 'next/headers';
 import { getSessionUser } from '@shop/auth/session';
 import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
-import { getProductBySlug } from '~/lib/queries/products';
+import { getProductBySlug } from '~/lib/queries/catalog/products';
 import { ProductOptions } from '~/components/product-options';
 import { ProductReviews } from '~/components/product-reviews';
 import { ProductInquiries } from '~/components/product-inquiries';
