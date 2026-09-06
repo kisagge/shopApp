@@ -21,7 +21,10 @@ export interface PublicReview {
   readonly authorName: string;
   readonly optionLabel: string | null;
   readonly createdAt: Date;
-  readonly imageUrls: readonly string[];
+  readonly images: readonly {
+    readonly url: string;
+    readonly blurDataUrl: string | null;
+  }[];
   /** 지금 보고 있는 사람이 쓴 리뷰인가 — 수정·삭제 버튼을 그릴지 결정한다 */
   readonly isMine: boolean;
   /** 신고할 수 있는가 — 로그인했고 내 글이 아니어야 한다 */
@@ -88,7 +91,8 @@ export async function getProductReviews(
     select: {
       id: true, rating: true, content: true, sizeFit: true,
       height: true, weight: true, createdAt: true, userId: true,
-      imageUrls: true, helpfulCount: true,
+      images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
+      helpfulCount: true,
       user: { select: { name: true } },
       // 어떤 옵션을 산 사람의 후기인지가 사이즈 판단에 도움이 된다
       orderItem: { select: { optionLabel: true } },
@@ -139,7 +143,7 @@ export async function getProductReviews(
       authorName: maskAuthor(r.user.name),
       optionLabel: r.orderItem?.optionLabel ?? null,
       createdAt: r.createdAt,
-      imageUrls: r.imageUrls,
+      images: r.images,
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
       canReport: options.viewerId !== undefined && r.userId !== options.viewerId,
       reportedByMe: mineReported.has(r.id),

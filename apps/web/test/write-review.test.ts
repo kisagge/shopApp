@@ -109,7 +109,7 @@ describe('평점 집계', () => {
 
   it('리뷰가 하나도 없으면 전부 0 이 된다', async () => {
     tx.review.aggregate.mockResolvedValue({ _sum: { rating: null }, _count: { _all: 0 } });
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', images: [] });
     await deleteReview({ userId: USER, canModerate: false }, 'r-1');
     expect(tx.product.update.mock.calls[0]?.[0].data).toEqual({
       ratingSum: 0, reviewCount: 0, ratingScore: 0,
@@ -117,7 +117,7 @@ describe('평점 집계', () => {
   });
 
   it('삭제된 리뷰는 집계에서 뺀다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', images: [] });
     await deleteReview({ userId: USER, canModerate: false }, 'r-1');
     expect(tx.review.aggregate.mock.calls[0]?.[0].where.deletedAt).toBeNull();
   });
@@ -130,11 +130,11 @@ describe('평점 집계', () => {
 
 describe('수정', () => {
   beforeEach(() => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', images: [] });
   });
 
   it('내 리뷰만 고칠 수 있다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', images: [] });
     await expect(updateReview(USER, 'r-1', { rating: 1 })).rejects.toMatchObject({
       code: 'NOT_OWN_REVIEW', status: 403,
     });
@@ -158,7 +158,7 @@ describe('수정', () => {
 
 describe('삭제', () => {
   beforeEach(() => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', images: [] });
   });
 
   it('본인이 지우면 행을 없앤다 — 다시 쓸 수 있어야 한다', async () => {
@@ -170,26 +170,26 @@ describe('삭제', () => {
   });
 
   it('운영진이 지우면 표시만 한다 — 같은 구매로 다시 올릴 수 없어야 한다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', images: [] });
     await deleteReview({ userId: 'u-admin', canModerate: true }, 'r-1');
     expect(tx.review.update.mock.calls[0]?.[0].data.deletedAt).toBeInstanceOf(Date);
     expect(tx.review.delete).not.toHaveBeenCalled();
   });
 
   it('운영진이 자기 리뷰를 지우면 본인 규칙을 따른다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-admin', productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-admin', productId: 'p-1', images: [] });
     await deleteReview({ userId: 'u-admin', canModerate: true }, 'r-1');
     expect(tx.review.delete).toHaveBeenCalled();
   });
 
   it('남의 리뷰는 못 지운다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', images: [] });
     await expect(deleteReview({ userId: USER, canModerate: false }, 'r-1'))
       .rejects.toMatchObject({ code: 'NOT_OWN_REVIEW' });
   });
 
   it('운영진은 남의 리뷰도 지울 수 있다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', imageKeys: [] });
+    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', images: [] });
     await expect(deleteReview({ userId: 'u-admin', canModerate: true }, 'r-1')).resolves.toBeUndefined();
   });
 
@@ -203,15 +203,33 @@ describe('삭제', () => {
 describe('리뷰 사진', () => {
   it('올린 주소와 키를 함께 저장한다', async () => {
     await createReview(USER, input, [
-      { url: 'https://cdn.test/reviews/oi-1/a.png', key: 'reviews/oi-1/a.png' },
-      { url: 'https://cdn.test/reviews/oi-1/b.png', key: 'reviews/oi-1/b.png' },
+      { url: 'https://cdn.test/reviews/oi-1/a.png', key: 'reviews/oi-1/a.png', blurDataUrl: 'data:image/webp;base64,AAAA' },
+      { url: 'https://cdn.test/reviews/oi-1/b.png', key: 'reviews/oi-1/b.png', blurDataUrl: null },
     ]);
 
-    // 키를 따로 두지 않으면 나중에 지울 대상을 찾을 방법이 없다
+    /*
+     * 키를 따로 두지 않으면 나중에 지울 대상을 찾을 방법이 없다. 그리고
+     * **순서를 함께 박는다** — 예전에는 주소 배열과 키 배열의 자리 번호가
+     * 곧 순서였는데, 표로 옮기면서 그 약속이 사라졌다.
+     */
     expect(tx.review.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({
-        imageUrls: ['https://cdn.test/reviews/oi-1/a.png', 'https://cdn.test/reviews/oi-1/b.png'],
-        imageKeys: ['reviews/oi-1/a.png', 'reviews/oi-1/b.png'],
+        images: {
+          create: [
+            {
+              url: 'https://cdn.test/reviews/oi-1/a.png',
+              storageKey: 'reviews/oi-1/a.png',
+              blurDataUrl: 'data:image/webp;base64,AAAA',
+              sortOrder: 0,
+            },
+            {
+              url: 'https://cdn.test/reviews/oi-1/b.png',
+              storageKey: 'reviews/oi-1/b.png',
+              blurDataUrl: null,
+              sortOrder: 1,
+            },
+          ],
+        },
       }),
     }));
   });
@@ -220,13 +238,14 @@ describe('리뷰 사진', () => {
     await createReview(USER, input);
 
     expect(tx.review.create).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ imageUrls: [], imageKeys: [] }),
+      data: expect.objectContaining({ images: { create: [] } }),
     }));
   });
 
   it('본인이 지우면 사진도 지운다', async () => {
     db.review.findFirst.mockResolvedValue({
-      id: 'r-1', userId: USER, productId: 'p-1', imageKeys: ['k1', 'k2'],
+      id: 'r-1', userId: USER, productId: 'p-1',
+      images: [{ storageKey: 'k1' }, { storageKey: 'k2' }],
     });
 
     await deleteReview({ userId: USER, canModerate: false }, 'r-1');
@@ -236,7 +255,7 @@ describe('리뷰 사진', () => {
 
   it('운영진이 내린 글의 사진은 남긴다 — 반쪽짜리 기록이 되면 안 된다', async () => {
     db.review.findFirst.mockResolvedValue({
-      id: 'r-1', userId: 'u-other', productId: 'p-1', imageKeys: ['k1'],
+      id: 'r-1', userId: 'u-other', productId: 'p-1', images: [{ storageKey: 'k1' }],
     });
 
     await deleteReview({ userId: 'u-admin', canModerate: true }, 'r-1');

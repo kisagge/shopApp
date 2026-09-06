@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
+import { isBlurDataUrl } from '@shop/core';
 import type { SizeFit } from '@shop/core';
 import type { PublicReview, ReviewSummary } from '~/lib/queries/reviews';
 import { ReviewStars } from './review-stars';
@@ -152,18 +153,18 @@ export function ReviewSection({
                     {review.content}
                   </p>
 
-                  {review.imageUrls.length > 0 && (
+                  {review.images.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-2">
-                      {review.imageUrls.map((url, i) => (
-                        <li key={url}>
+                      {review.images.map((image, i) => (
+                        <li key={image.url}>
                           {/*
                             원본을 새 탭으로 연다. 확대 보기를 직접 만들면
                             포커스 가두기와 Esc 를 함께 다뤄야 하는데, 사진
                             한 장을 크게 보는 일에 그만한 장치가 필요하지 않다.
                           */}
-                          <a href={url} target="_blank" rel="noreferrer">
+                          <a href={image.url} target="_blank" rel="noreferrer">
                             <Image
-                              src={url}
+                              src={image.url}
                               /*
                                 작성자가 대체 텍스트를 적지 않는다. 억지로
                                 받으면 대부분 "사진" 이라고 적힌다. 대신 몇
@@ -178,6 +179,9 @@ export function ReviewSection({
                                 next/image 가 기기 크기 목록 전체로 후보를
                                 만들고, 빼면 96·192 두 벌만 만든다.
                               */
+                              {...(isBlurDataUrl(image.blurDataUrl)
+                                ? { placeholder: 'blur' as const, blurDataURL: image.blurDataUrl }
+                                : {})}
                               className="h-24 w-24 rounded-sm border border-[var(--border)] object-cover"
                             />
                           </a>

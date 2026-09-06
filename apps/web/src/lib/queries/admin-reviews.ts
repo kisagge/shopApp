@@ -76,7 +76,9 @@ const PAGE_SIZE = 25;
 const QUEUE_CAP = 200;
 
 const reviewSelect = {
-  id: true, rating: true, content: true, imageUrls: true,
+  id: true, rating: true, content: true,
+  // 몇 장인지만 쓴다. 주소까지 읽어 올 이유가 없다.
+  _count: { select: { images: true } },
   createdAt: true, deletedAt: true, productId: true,
   user: { select: { name: true } },
   product: { select: { name: true } },
@@ -91,7 +93,7 @@ const reviewSelect = {
 } as const;
 
 type RawReview = {
-  id: string; rating: number; content: string; imageUrls: string[];
+  id: string; rating: number; content: string; _count: { images: number };
   createdAt: Date; deletedAt: Date | null; productId: string;
   user: { name: string };
   product: { name: string };
@@ -109,7 +111,7 @@ function toRow(raw: RawReview): AdminReviewRow {
     id: raw.id,
     rating: raw.rating,
     content: raw.content,
-    imageCount: raw.imageUrls.length,
+    imageCount: raw._count.images,
     createdAt: raw.createdAt,
     authorName: maskName(raw.user.name),
     productId: raw.productId,

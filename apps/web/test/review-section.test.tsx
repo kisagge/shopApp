@@ -16,7 +16,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   id: 'r-1', rating: 4, content: '두껍고 따뜻합니다',
   sizeFit: 'TRUE', height: 175, weight: 70,
   authorName: '데****자', optionLabel: '오트밀 / M',
-  createdAt: new Date('2026-09-01T00:00:00Z'), imageUrls: [], isMine: false,
+  createdAt: new Date('2026-09-01T00:00:00Z'), images: [], isMine: false,
   canReport: false, reportedByMe: false,
   helpfulCount: 0, helpfulByMe: false,
   ...over,
@@ -133,7 +133,7 @@ describe('리뷰 사진', () => {
   });
 
   it('올린 순서대로 보여 준다', () => {
-    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ images: photos.map((url) => ({ url, blurDataUrl: null })) })]} />);
 
     const imgs = screen.getAllByRole('img', { name: /후기 사진/ });
     expect(imgs).toHaveLength(2);
@@ -151,14 +151,14 @@ describe('리뷰 사진', () => {
 
   it('대체 텍스트가 누구의 몇 번째 사진인지 말한다', () => {
     // 작성자에게 대체 텍스트를 받지 않는다. 억지로 받으면 "사진" 이라고 적힌다.
-    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ images: photos.map((url) => ({ url, blurDataUrl: null })) })]} />);
 
     expect(screen.getByAltText('데****자 님의 후기 사진 1')).toBeDefined();
     expect(screen.getByAltText('데****자 님의 후기 사진 2')).toBeDefined();
   });
 
   it('원본은 새 탭으로 연다', () => {
-    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ imageUrls: [photos[0]!] })]} />);
+    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ images: [{ url: photos[0]!, blurDataUrl: null }] })]} />);
 
     const link = screen.getByRole('link', { name: /후기 사진 1/ });
     expect(link.getAttribute('href')).toBe(photos[0]);
@@ -167,9 +167,46 @@ describe('리뷰 사진', () => {
   });
 
   it('아래쪽 사진은 늦게 받는다', () => {
-    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ imageUrls: photos })]} />);
+    render(<ReviewSection t={ko} summary={summary()} reviews={[review({ images: photos.map((url) => ({ url, blurDataUrl: null })) })]} />);
     for (const img of screen.getAllByRole('img', { name: /후기 사진/ })) {
       expect(img.getAttribute('loading')).toBe('lazy');
     }
+  });
+
+  /**
+   * 자리표시 그림.
+   *
+   * 사용자가 올린 사진이라 크고, 목록에는 여러 장이 한 화면에 깔린다.
+   * 없으면 사진이 도착할 때까지 자리가 비어 있다.
+   */
+  it('자리표시가 있으면 깐다', () => {
+    render(
+      <ReviewSection
+        t={ko}
+        summary={summary()}
+        reviews={[
+          review({
+            images: [{ url: photos[0]!, blurDataUrl: 'data:image/webp;base64,UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==' }],
+          }),
+        ]}
+      />,
+    );
+
+    const img = screen.getByRole('img', { name: /후기 사진 1/ });
+    // next/image 는 자리표시를 배경 그림으로 깐다
+    expect(img.getAttribute('style') ?? '').toContain('background-image');
+  });
+
+  it('자리표시가 없으면 아무것도 깔지 않는다 — 빈 값을 그리면 깨진 그림이 된다', () => {
+    render(
+      <ReviewSection
+        t={ko}
+        summary={summary()}
+        reviews={[review({ images: [{ url: photos[0]!, blurDataUrl: null }] })]}
+      />,
+    );
+
+    const img = screen.getByRole('img', { name: /후기 사진 1/ });
+    expect(img.getAttribute('style') ?? '').not.toContain('background-image');
   });
 });

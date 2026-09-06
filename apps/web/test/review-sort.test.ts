@@ -19,7 +19,7 @@ const { getProductReviews } = await import('~/lib/queries/reviews');
 
 const row = (over: Record<string, unknown> = {}) => ({
   id: 'r-1', rating: 4, content: '좋아요', sizeFit: null, height: null, weight: null,
-  createdAt: new Date('2026-01-01'), userId: 'u-author', imageUrls: [], helpfulCount: 0,
+  createdAt: new Date('2026-01-01'), userId: 'u-author', images: [], helpfulCount: 0,
   user: { name: '홍길동' }, orderItem: { optionLabel: 'M' },
   ...over,
 });

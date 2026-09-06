@@ -28,7 +28,7 @@ export interface ReviewRow {
 const select = {
   id: true, rating: true, content: true, sizeFit: true,
   height: true, weight: true, createdAt: true, productId: true,
-  imageUrls: true,
+  images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
 } as const;
 
 /**
@@ -109,7 +109,7 @@ export async function createReview(
    * 이 함수가 직접 올리지 않는다 — 트랜잭션 안에서 외부 저장소를 두드리면
    * 롤백해도 파일은 남는다. 올리는 것은 바깥에서, 여기서는 기록만 한다.
    */
-  images: readonly { url: string; key: string }[] = [],
+  images: readonly { url: string; key: string; blurDataUrl: string | null }[] = [],
 ): Promise<ReviewRow> {
   const { productId } = await assertCanReview(userId, input.orderItemId);
 
@@ -124,8 +124,15 @@ export async function createReview(
         sizeFit: input.sizeFit,
         height: input.height,
         weight: input.weight,
-        imageUrls: images.map((i) => i.url),
-        imageKeys: images.map((i) => i.key),
+        images: {
+          // 순서가 곧 화면에 보이는 차례다. 넘겨받은 순서를 그대로 박는다.
+          create: images.map((i, sortOrder) => ({
+            url: i.url,
+            storageKey: i.key,
+            blurDataUrl: i.blurDataUrl,
+            sortOrder,
+          })),
+        },
       },
       select,
     });
@@ -177,7 +184,10 @@ export async function deleteReview(
 ): Promise<void> {
   const review = await prisma.review.findFirst({
     where: { id: reviewId, deletedAt: null },
-    select: { id: true, userId: true, productId: true, imageKeys: true },
+    select: {
+      id: true, userId: true, productId: true,
+      images: { select: { storageKey: true } },
+    },
   });
   if (!review) throw new ReviewError('REVIEW_NOT_FOUND', 404);
 
@@ -202,8 +212,8 @@ export async function deleteReview(
    * 저장소 삭제는 실패해도 넘어간다. 화면에서 사라지는 것이 우선이고,
    * 남은 객체는 눈에 보이는 피해가 없다.
    */
-  if (isOwner && review.imageKeys.length > 0) {
-    await discardReviewImages(review.imageKeys);
+  if (isOwner && review.images.length > 0) {
+    await discardReviewImages(review.images.map((i) => i.storageKey));
   }
 }
 

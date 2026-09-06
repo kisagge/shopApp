@@ -961,11 +961,12 @@ model Review {
   height  Int?
   weight  Int?
 
-  imageUrls String[]
-  /// 저장소 객체 키. url 과 따로 둔다 — 공개 주소가 바뀌어도 지울 대상은
-  /// 그대로여야 하고, 주소에서 키를 되짚는 방식은 그때 무너진다.
-  /// ProductImage 가 storageKey 를 따로 두는 것과 같은 이유다.
-  imageKeys String[]
+  /// 첨부 사진. 예전에는 주소 배열과 키 배열 **둘**로 들고 있었다.
+  ///
+  /// 두 배열이 같은 순서라는 약속에 기대는 구조라, 한쪽만 손대면 사진과
+  /// 지울 대상이 뒤섞인다. 사진마다 딸린 값(자리표시 그림)을 붙이려니
+  /// 세 번째 배열이 필요해져서 그때 표로 옮겼다.
+  images ReviewImage[]
 
   /// 도움이 됐다고 누른 사람 수.
   ///
@@ -1020,6 +1021,29 @@ enum ReportReason {
 /// 신고는 **운영진이 먼저 볼 것을 고르는 신호**일 뿐이다. 쌓인다고 글이
 /// 자동으로 내려가지는 않는다 — 그렇게 두면 계정 몇 개로 정당한 혹평을
 /// 지울 수 있다(core 의 AUTO_HIDE_ON_REPORTS).
+/**
+ * 리뷰에 붙은 사진 한 장.
+ *
+ * ProductImage 와 같은 모양이다 — 주소, 지울 때 쓸 저장소 키, 사진이
+ * 도착하기 전 깔 자리표시, 순서. 리뷰가 지워지면 함께 지운다.
+ */
+model ReviewImage {
+  id       String @id @default(cuid())
+  reviewId String
+  review   Review @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+
+  url String
+  /// 공개 주소가 바뀌어도 지울 대상은 그대로여야 한다. 주소에서 키를
+  /// 되짚는 방식은 그때 무너진다.
+  storageKey String
+  /// 사진이 도착하기 전 그 자리에 깔 아주 작은 같은 사진(webp 데이터 URI).
+  blurDataUrl String?
+  sortOrder   Int     @default(0)
+
+  @@index([reviewId])
+  @@map("review_images")
+}
+
 model ReviewReport {
   id       String @id @default(cuid())
   reviewId String

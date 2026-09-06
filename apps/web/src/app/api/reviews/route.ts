@@ -4,7 +4,9 @@ import { createReviewSchema } from '@shop/contract';
 import { ImageError, MAX_IMAGE_BYTES, MAX_IMAGES_PER_REVIEW } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
 import { createReview, assertCanReview, ReviewError } from '~/lib/reviews/write-review';
-import { uploadReviewImages, discardReviewImages } from '~/lib/reviews/images';
+import {
+  uploadReviewImages, discardReviewImages, type UploadedImage,
+} from '~/lib/reviews/images';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
@@ -85,7 +87,7 @@ export async function POST(request: Request): Promise<NextResponse> {
    * createReview 가 같은 검사를 다시 하지만, 업로드 전에 한 번 걸러야
    * 남의 주문 id 를 넣어 파일만 올리는 길이 막힌다.
    */
-  let uploaded: { url: string; key: string }[] = [];
+  let uploaded: UploadedImage[] = [];
   try {
     if (files.length > 0) {
       await assertCanReview(user.id, parsed.data.orderItemId);

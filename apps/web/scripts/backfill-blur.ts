@@ -81,6 +81,14 @@ async function main(): Promise<void> {
     (id, blurDataUrl) => prisma.banner.update({ where: { id }, data: { blurDataUrl } }),
   );
 
+  const reviewImages = await prisma.reviewImage.findMany({
+    where: { blurDataUrl: null },
+    select: { id: true, url: true },
+  });
+  await fill('리뷰 사진', reviewImages, (id, blurDataUrl) =>
+    prisma.reviewImage.update({ where: { id }, data: { blurDataUrl } }),
+  );
+
   const collections = await prisma.collection.findMany({
     where: { blurDataUrl: null, imageUrl: { not: null } },
     select: { id: true, imageUrl: true },

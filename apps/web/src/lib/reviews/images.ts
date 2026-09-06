@@ -5,6 +5,7 @@ import {
   MAX_IMAGES_PER_REVIEW,
 } from '@shop/core';
 import { getStorage } from '~/lib/storage';
+import { makeBlur } from '~/lib/images/blur';
 
 /**
  * 리뷰 사진 업로드.
@@ -19,6 +20,14 @@ import { getStorage } from '~/lib/storage';
 export interface UploadedImage {
   readonly url: string;
   readonly key: string;
+  /**
+   * 사진이 도착하기 전 깔 자리표시.
+   *
+   * **바이트가 여기 있을 때 만든다.** 나중에 주소로 다시 받아 만들 수도
+   * 있지만, 그건 올린 것을 도로 내려받는 일이다. 못 만들면 null 이고
+   * 그때는 지금처럼 톤 블록이 깔린다.
+   */
+  readonly blurDataUrl: string | null;
 }
 
 /**
@@ -52,8 +61,11 @@ export async function uploadReviewImages(
         // 파일 이름을 쓰지 않는다 — 경로 탈출과 덮어쓰기가 전부 거기서 나온다
         token: randomBytes(12).toString('base64url'),
       });
-      const { url } = await storage.put({ key, body: file.bytes, contentType: file.contentType });
-      done.push({ url, key });
+      const [{ url }, blurDataUrl] = await Promise.all([
+        storage.put({ key, body: file.bytes, contentType: file.contentType }),
+        makeBlur(file.bytes),
+      ]);
+      done.push({ url, key, blurDataUrl });
     }
   } catch (error) {
     // 중간에 실패하면 이미 올린 것을 도로 지운다. 리뷰가 만들어지지 않을

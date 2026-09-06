@@ -17,7 +17,7 @@ const CUSTOMER: Actor = { id: 'u-cust', role: 'CUSTOMER', merchantId: null };
 
 let seq = 0;
 const raw = (over: Record<string, unknown> = {}) => ({
-  id: `r-${++seq}`, rating: 3, content: '내용', imageUrls: [],
+  id: `r-${++seq}`, rating: 3, content: '내용', _count: { images: 0 },
   createdAt: new Date('2026-09-01T00:00:00Z'), deletedAt: null, productId: 'p-1',
   user: { name: '홍길동' },
   product: { name: '울 코트' },
