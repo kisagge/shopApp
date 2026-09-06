@@ -11,6 +11,8 @@ export const NOTIFICATION_KIND = [
   'ORDER_DELIVERED',
   'INQUIRY_ANSWERED',
   'RESTOCKED',
+  /** 운영진이 지급한 쿠폰. 받은 줄 모르면 쿠폰은 없는 것과 같다. */
+  'COUPON_ISSUED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 

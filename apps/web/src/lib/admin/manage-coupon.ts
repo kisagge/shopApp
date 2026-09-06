@@ -6,6 +6,7 @@ import {
   type Actor, type CouponStatus,
 } from '@shop/core';
 import type { CreateCouponInput, UpdateCouponInput } from '@shop/contract';
+import { recordNotifications } from '~/lib/notifications/record';
 
 /**
  * 쿠폰 발행과 발급.
@@ -288,29 +289,120 @@ export async function claimCouponByCode(
   return issueCouponToUser(coupon.id, userId, now);
 }
 
-/** 어드민이 여러 사용자에게 한 번에 지급한다 */
+/**
+ * 운영진이 고른 회원들에게 한 번에 지급한다.
+ *
+ * **한 사람씩 돌지 않는다.** 사람마다 조회 두 번과 트랜잭션 하나면, 계약이
+ * 허용하는 500명에서 질의가 2천 번이다 — 서버리스에서 시간 안에 끝나지
+ * 않는다. 이미 받은 사람을 한 번에 걸러 내고, 한도는 조건부 UPDATE 로 한 번에
+ * 잡고, 나머지를 한 번에 넣는다.
+ *
+ * **모자라면 아무에게도 주지 않는다.** 고른 서른 명 중 열 명만 받는 것은
+ * 운영자에게 "누가 받았나" 라는 질문을 남긴다. 몇 장이 남았는지 알려 주고
+ * 다시 고르게 하는 편이 낫다 — 스스로 받아 가는 경로(코드 입력)와 판단이
+ * 다른 이유는, 그쪽은 고르는 사람이 자기 하나뿐이기 때문이다.
+ *
+ * 이미 받은 사람은 **건너뛴다.** 한 명 때문에 전체를 멈출 이유가 없고,
+ * 운영자가 목록에서 그 사람을 골라낼 방법도 없다.
+ */
+export interface IssueSummary {
+  /** 이번에 새로 받은 사람 수 */
+  readonly issued: number;
+  /** 이미 갖고 있어 건너뛴 사람 수 */
+  readonly skipped: number;
+}
+
 export async function issueCouponToUsers(
   actor: Actor,
   couponId: string,
   userIds: readonly string[],
   now = new Date(),
-): Promise<{ issued: number; skipped: number }> {
+): Promise<IssueSummary> {
   assertPermission(actor, 'coupon:write');
 
-  let issued = 0;
-  let skipped = 0;
-  for (const userId of userIds) {
-    try {
-      await issueCouponToUser(couponId, userId, now);
-      issued += 1;
-    } catch (error) {
-      // 이미 받은 사람은 건너뛴다. 한 명 때문에 전체를 멈출 이유가 없다.
-      if (error instanceof CouponError && error.code === 'ALREADY_ISSUED') {
-        skipped += 1;
-        continue;
-      }
-      throw error;
-    }
+  const coupon = await prisma.coupon.findUnique({
+    where: { id: couponId },
+    select: {
+      id: true, code: true, name: true, isActive: true,
+      startsAt: true, endsAt: true, issueLimit: true, issuedCount: true,
+    },
+  });
+  if (!coupon) throw new CouponError('NOT_FOUND', '쿠폰을 찾을 수 없습니다.', 404);
+
+  /*
+   * 쿠폰 자체가 줄 수 없는 상태면 아무것도 하기 전에 멈춘다. 한 사람씩 돌 때는
+   * 첫 사람에서 걸렸지만, 한 번에 처리하면 여기서 봐야 한다.
+   */
+  if (!isIssuable(coupon, now)) {
+    const status = couponStatus(coupon, now);
+    throw new CouponError(status, '지금은 지급할 수 없는 쿠폰입니다.', 409);
   }
-  return { issued, skipped };
+
+  // 같은 사람을 두 번 고를 수 있다. 세기 전에 접는다.
+  const unique = [...new Set(userIds)];
+
+  const summary = await prisma.$transaction(async (tx) => {
+    const already = await tx.userCoupon.findMany({
+      where: { couponId, userId: { in: unique } },
+      select: { userId: true },
+    });
+    const has = new Set(already.map((u) => u.userId));
+    const targets = unique.filter((id) => !has.has(id));
+    if (targets.length === 0) return { issued: 0, skipped: has.size, granted: [] as string[] };
+
+    /*
+     * 한도를 원자적으로 잡는다. **한 번에 다 들어가지 않으면 0건**이라,
+     * 그 사이 다른 요청이 마지막 장을 가져갔어도 초과 발급이 없다.
+     */
+    const claimed = await tx.$executeRaw`
+      UPDATE coupons
+         SET "issuedCount" = "issuedCount" + ${targets.length}
+       WHERE id = ${couponId}
+         AND ("issueLimit" IS NULL OR "issuedCount" + ${targets.length} <= "issueLimit")
+    `;
+    if (claimed === 0) {
+      const left = coupon.issueLimit === null ? 0 : coupon.issueLimit - coupon.issuedCount;
+      throw new CouponError(
+        'EXHAUSTED',
+        `남은 수량이 ${left}장이라 ${targets.length}명에게 지급할 수 없습니다.`,
+        409,
+      );
+    }
+
+    const { count } = await tx.userCoupon.createMany({
+      data: targets.map((userId) => ({ userId, couponId, expiresAt: coupon.endsAt })),
+      // 여기까지 오는 사이에 스스로 받아 간 사람이 있을 수 있다
+      skipDuplicates: true,
+    });
+
+    /*
+     * 잡아 둔 수와 실제로 들어간 수가 다르면 그만큼 되돌린다. 안 그러면
+     * 발급 수가 실제보다 많아져서, 남은 장수가 있는데 소진으로 보인다.
+     */
+    if (count < targets.length) {
+      await tx.coupon.update({
+        where: { id: couponId },
+        data: { issuedCount: { decrement: targets.length - count } },
+      });
+    }
+
+    return { issued: count, skipped: has.size, granted: targets };
+  });
+
+  /*
+   * **받은 줄 모르면 쿠폰은 없는 것과 같다.** 트랜잭션 밖에서 남기고 실패해도
+   * 삼킨다 — 알림이 안 갔다고 지급을 되돌릴 일이 아니다.
+   */
+  if (summary.issued > 0) {
+    await recordNotifications(
+      summary.granted.map((userId) => ({
+        userId,
+        kind: 'COUPON_ISSUED' as const,
+        params: { couponName: coupon.name },
+        href: '/mypage/coupons',
+      })),
+    );
+  }
+
+  return { issued: summary.issued, skipped: summary.skipped };
 }

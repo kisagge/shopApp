@@ -14,11 +14,12 @@ const discountText = (c: CouponRow) =>
 
 /** 발행한 쿠폰. 할인 내용은 못 고치므로 여기서 할 수 있는 것은 중지·재개뿐이다. */
 export function CouponTable({
-  coupons, pending, onToggle,
+  coupons, pending, onToggle, onGrant,
 }: {
   coupons: readonly CouponRow[];
   pending: boolean;
   onToggle: (coupon: CouponRow) => void;
+  onGrant: (coupon: CouponRow) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
@@ -77,16 +78,33 @@ export function CouponTable({
                 </Badge>
               </td>
               <td className="px-4 py-3 text-right">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => onToggle(c)}
-                  aria-label={`${c.name} 쿠폰 ${c.isActive ? '중지' : '재개'}`}
-                >
-                  {c.isActive ? '중지' : '재개'}
-                </Button>
+                <span className="flex justify-end gap-1.5">
+                  {/*
+                    중지된 쿠폰은 지급할 수 없다. 창구가 어차피 거절하지만,
+                    누를 수 있게 두면 눌러 보고 나서야 알게 된다.
+                  */}
+                  {c.isActive && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => onGrant(c)}
+                      aria-label={`${c.name} 쿠폰 지급`}
+                    >
+                      지급
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => onToggle(c)}
+                    aria-label={`${c.name} 쿠폰 ${c.isActive ? '중지' : '재개'}`}
+                  >
+                    {c.isActive ? '중지' : '재개'}
+                  </Button>
+                </span>
               </td>
             </tr>
           ))}

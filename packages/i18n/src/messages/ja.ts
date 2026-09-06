@@ -790,4 +790,5 @@ export const ja: Dictionary = {
   'mail.order.due': 'お振込期限',
   'mail.order.view': '注文詳細を見る',
   'mail.order.quantity': '{count}点',
+  'notif.COUPON_ISSUED': '{couponName} クーポンが届きました',
 };

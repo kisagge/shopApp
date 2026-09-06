@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { CouponTable } from './coupon-table';
 import { CouponForm } from './coupon-form';
+import { CouponGrant } from './coupon-grant';
 import type { CouponRow, NamedOption } from './types';
 
 /**
@@ -32,6 +33,8 @@ export function CouponBoard({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('');
+  /** 지금 지급 창구를 연 쿠폰. 한 번에 하나만 연다. */
+  const [granting, setGranting] = useState<CouponRow | null>(null);
 
   async function toggleActive(target: CouponRow) {
     setPending(true);
@@ -70,7 +73,32 @@ export function CouponBoard({
       )}
 
       {coupons.length > 0 && (
-        <CouponTable coupons={coupons} pending={pending} onToggle={toggleActive} />
+        <CouponTable
+          coupons={coupons}
+          pending={pending}
+          onToggle={toggleActive}
+          onGrant={(coupon) => {
+            setError(null);
+            setGranting(coupon);
+          }}
+        />
+      )}
+
+      {granting && (
+        <CouponGrant
+          coupon={granting}
+          onClose={() => setGranting(null)}
+          onDone={({ issued, skipped }) => {
+            setGranting(null);
+            setStatus(
+              skipped > 0
+                ? `${issued}명에게 지급했습니다. ${skipped}명은 이미 갖고 있어 건너뛰었습니다.`
+                : `${issued}명에게 지급했습니다.`,
+            );
+            // 발급 수가 늘었으므로 목록이 들고 있는 값이 낡는다
+            router.refresh();
+          }}
+        />
       )}
 
       {creating ? (

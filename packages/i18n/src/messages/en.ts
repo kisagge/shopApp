@@ -794,4 +794,5 @@ export const en: Dictionary = {
   'mail.order.due': 'Due by',
   'mail.order.view': 'View order',
   'mail.order.quantity': '{count}',
+  'notif.COUPON_ISSUED': 'You received a coupon: {couponName}',
 };

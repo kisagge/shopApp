@@ -824,6 +824,7 @@ export const ko = {
   'mail.order.due': '입금 기한',
   'mail.order.view': '주문 상세 보기',
   'mail.order.quantity': '{count}개',
+  'notif.COUPON_ISSUED': '{couponName} 쿠폰이 도착했습니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;
