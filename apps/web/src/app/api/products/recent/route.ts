@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { getProductsBySlugs } from '~/lib/queries/catalog/products';
+import { markRequest, serverTiming } from '~/lib/diagnostics/boot';
 import { MAX_RECENT } from '~/stores/recently-viewed';
 
 /**
@@ -17,6 +18,14 @@ import { MAX_RECENT } from '~/stores/recently-viewed';
 const SLUG = /^[a-z0-9-]{1,80}$/;
 
 export async function GET(request: Request): Promise<NextResponse> {
+  /*
+   * **콜드 스타트를 가르는 자다.** 이 창구는 캐싱하지 않아 늘 DB 를 친다.
+   * DB 를 치지 않는 /api/health 와 견주면, 쉬었다 오는 첫 요청의 2초가
+   * 어디로 갔는지가 나뉜다 — 인스턴스 나이는 노드가 깬 뒤 흐른 시간이고,
+   * 전체에서 그것과 질의 시간을 빼면 컨테이너를 띄운 몫이 남는다.
+   */
+  const timing = markRequest();
+
   /*
    * 제한을 **본문을 읽기 전에** 건다. 뒤에 두면 막으려던 요청이 이미 일을
    * 다 하고 나서 429 를 받는다 — 앞서 다른 창구에서 그렇게 만들어 두었다가
@@ -34,7 +43,16 @@ export async function GET(request: Request): Promise<NextResponse> {
     // 들고 있는 개수만큼만 본다. 주소로 얼마든지 길게 보낼 수 있는 값이다.
     .slice(0, MAX_RECENT);
 
-  if (slugs.length === 0) return NextResponse.json({ products: [] });
+  if (slugs.length === 0) {
+    return NextResponse.json({ products: [] }, { headers: { 'server-timing': serverTiming(timing) } });
+  }
 
-  return NextResponse.json({ products: await getProductsBySlugs(slugs) });
+  const startedAt = performance.now();
+  const products = await getProductsBySlugs(slugs);
+  const dbMs = Math.round(performance.now() - startedAt);
+
+  return NextResponse.json(
+    { products },
+    { headers: { 'server-timing': `${serverTiming(timing)}, db;dur=${dbMs}` } },
+  );
 }
