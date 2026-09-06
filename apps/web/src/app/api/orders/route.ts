@@ -2,6 +2,7 @@ import { getQuoteViewer } from '~/lib/grade/effective';
 import { createOrderRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
+import { revalidateCatalog } from '~/lib/cache';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
 import { validationFailed } from '~/lib/i18n/validation';
 import { getLocale } from '~/lib/i18n/server';
@@ -51,6 +52,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     // purchase 이벤트는 여기서 찍지 않는다. 주문이 만들어졌을 뿐 결제는
     // 아직 안 났다. 결제 승인(confirm-payment)이 성립한 순간에만 기록한다 —
     // 그러지 않으면 결제되지 않은 주문까지 매출로 잡힌다.
+
+    /*
+     * **재고가 줄었으므로 목록을 턴다.**
+     *
+     * 예전에는 털지 않아서, 마지막 한 장이 팔린 뒤에도 캐시 수명만큼 재고
+     * 있는 것으로 보였다. 초과 판매로는 이어지지 않는다 — 주문을 만들 때
+     * 서버가 재고를 다시 본다 — 대신 고른 사람이 결제 직전에 막힌다.
+     */
+    revalidateCatalog();
 
     return NextResponse.json(order, { status: 201 });
   } catch (error) {

@@ -2,6 +2,7 @@ import { cancelOrderRequestSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
+import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
@@ -43,6 +44,9 @@ export async function POST(
       after: { status: result.status, refunded: result.refunded, reason: parsed.data.reason },
       request,
     });
+
+    // 취소하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
+    revalidateCatalog();
 
     return NextResponse.json(result);
   } catch (error) {

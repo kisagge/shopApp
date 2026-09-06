@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { refundOrder, RefundError } from '~/lib/admin/refund-order';
+import { revalidateCatalog } from '~/lib/cache';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
@@ -63,6 +64,9 @@ export async function POST(
         },
         request,
       });
+
+      // 환불하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
+      if (refund.stockRestored) revalidateCatalog();
 
       return NextResponse.json(refund);
     }

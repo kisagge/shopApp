@@ -38,6 +38,15 @@ const CATALOG_WRITERS = [
   'app/api/admin/products/[id]/review/route.ts',
   'app/api/admin/products/[id]/images/route.ts',
   'app/api/admin/products/[id]/images/[imageId]/route.ts',
+  /*
+   * **주문도 카탈로그를 바꾼다.** 예전에는 이 셋이 빠져 있어서, 마지막 한
+   * 장이 팔린 뒤에도 캐시 수명만큼 재고 있는 것으로 보였다. 초과 판매로는
+   * 이어지지 않지만(주문을 만들 때 서버가 다시 본다) 고른 사람이 결제
+   * 직전에 막힌다 — 그리고 캐시 수명을 늘리는 순간 그 창이 그만큼 길어진다.
+   */
+  'app/api/orders/route.ts',
+  'app/api/orders/[orderNo]/cancel/route.ts',
+  'app/api/admin/orders/[orderNo]/status/route.ts',
 ] as const;
 
 const BANNER_WRITERS = [
@@ -170,4 +179,31 @@ describe('무효화한 자리', () => {
 
     expect(found.filter((f) => !listed.has(f))).toEqual([]);
   });
+});
+
+/**
+ * 캐시 수명.
+ *
+ * **신선도는 이 값이 아니라 무효화가 지킨다.** 그래서 짧게 잡을 이유가 없고,
+ * 짧게 잡으면 트래픽이 뜸한 곳에서 거의 모든 방문자가 만료된 캐시를 만나
+ * **자는 DB 를 깨운다** — 운영에서 재 보니 그 값이 1.5초였다.
+ *
+ * 되돌아오기 쉬운 종류다. "캐시는 짧게" 가 손에 익은 규칙이라, 다음 사람이
+ * 60초로 되돌려 놓고 왜 느려졌는지 모를 수 있다.
+ */
+describe('캐시 수명', () => {
+  const source = readFileSync(join(SRC, 'lib/cache.ts'), 'utf8');
+  const ttls = [...source.matchAll(/^\s*(catalog|banners|collections|support): (\d+),/gm)];
+
+  it('네 값을 모두 찾았다 — 검사가 헛돌지 않게', () => {
+    expect(ttls).toHaveLength(4);
+  });
+
+  it.each(ttls.map((m) => [m[1]!, Number(m[2])]))(
+    '%s 는 짧게 잡지 않는다',
+    (_name, seconds) => {
+      // 5분이면 앞사람이 다녀갔을 가능성이 거의 없다. 그보다는 길어야 한다.
+      expect(seconds).toBeGreaterThanOrEqual(600);
+    },
+  );
 });
