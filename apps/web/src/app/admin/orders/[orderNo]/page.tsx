@@ -75,11 +75,11 @@ export default async function AdminOrderDetail({
                 <span className="text-xs text-[var(--fg-muted)]">— 내 가맹점 상품만</span>
               )}
             </div>
-            <table>
+            <table className="data-table">
               <caption className="sr-only">주문에 포함된 상품</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="pb-2.5 text-xs text-[var(--fg-secondary)]">상품</th>
+                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">상품</th>
                   <th scope="col" className="w-24 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">단가</th>
                   <th scope="col" className="w-14 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수량</th>
                   <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">합계</th>
@@ -195,13 +195,13 @@ export default async function AdminOrderDetail({
             className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
           >
             <h2 id="log-title" className="mb-4 text-base font-semibold">처리 이력</h2>
-            <table>
+            <table className="data-table">
               <caption className="sr-only">주문 상태 변경 이력</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="w-40 pb-2.5 text-xs text-[var(--fg-secondary)]">일시</th>
-                  <th scope="col" className="w-32 pb-2.5 text-xs text-[var(--fg-secondary)]">처리자</th>
-                  <th scope="col" className="pb-2.5 text-xs text-[var(--fg-secondary)]">내용</th>
+                  <th scope="col" className="w-40 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">일시</th>
+                  <th scope="col" className="w-32 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">처리자</th>
+                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">내용</th>
                 </tr>
               </thead>
               <tbody>

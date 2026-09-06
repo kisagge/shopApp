@@ -107,7 +107,7 @@ export default async function SettlementsPage({
               이 기간에 정산할 가맹점이 없습니다.
             </p>
           ) : (
-            <table>
+            <table className="data-table">
               <caption className="sr-only">{yearMonth} 가맹점별 정산 초안</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
@@ -175,7 +175,7 @@ export default async function SettlementsPage({
               확정된 정산 내역이 없습니다.
             </p>
           ) : (
-            <table>
+            <table className="data-table">
               <caption className="sr-only">확정된 정산 내역</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">

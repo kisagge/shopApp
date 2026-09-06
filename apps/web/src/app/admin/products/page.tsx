@@ -100,13 +100,13 @@ export default async function AdminProductsPage({
               <caption className="sr-only">등록된 상품 목록</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="px-4 py-3 text-xs text-[var(--fg-secondary)]">상품</th>
-                  <th scope="col" className="w-36 px-4 py-3 text-xs text-[var(--fg-secondary)]">카테고리</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">상품</th>
+                  <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">카테고리</th>
                   <th scope="col" className="w-32 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">판매가</th>
                   <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">재고</th>
                   <th scope="col" className="w-24 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                   {canPublish && (
-                    <th scope="col" className="w-56 px-4 py-3 text-xs text-[var(--fg-secondary)]">검수</th>
+                    <th scope="col" className="w-56 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">검수</th>
                   )}
                 </tr>
               </thead>

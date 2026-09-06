@@ -142,12 +142,12 @@ export default async function AdminDashboard({
                 {d.rangeLabel} 판매 기록이 없습니다.
               </p>
             ) : (
-              <table>
+              <table className="data-table">
                 <caption className="sr-only">{d.rangeLabel} 판매 상위 상품</caption>
                 <thead>
                   <tr className="border-b border-[var(--border)]">
-                    <th scope="col" className="w-7 pb-2.5 text-[11px] text-[var(--fg-secondary)]">#</th>
-                    <th scope="col" className="pb-2.5 text-[11px] text-[var(--fg-secondary)]">상품</th>
+                    <th scope="col" className="w-7 pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">#</th>
+                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">상품</th>
                     <th scope="col" className="w-16 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">판매</th>
                     <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">매출</th>
                   </tr>
@@ -182,12 +182,12 @@ export default async function AdminDashboard({
             {d.recentOrders.length === 0 ? (
               <p className="py-10 text-center text-[13px] text-[var(--fg-muted)]">주문이 없습니다.</p>
             ) : (
-              <table>
+              <table className="data-table">
                 <caption className="sr-only">최근 접수된 주문</caption>
                 <thead>
                   <tr className="border-b border-[var(--border)]">
-                    <th scope="col" className="pb-2.5 text-[11px] text-[var(--fg-secondary)]">주문번호</th>
-                    <th scope="col" className="pb-2.5 text-[11px] text-[var(--fg-secondary)]">주문자</th>
+                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문번호</th>
+                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문자</th>
                     <th scope="col" className="pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">금액</th>
                     <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">상태</th>
                   </tr>

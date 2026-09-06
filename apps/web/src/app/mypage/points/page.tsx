@@ -63,11 +63,11 @@ export default async function PointsPage() {
             {t('my.pointsEmpty')}
           </p>
         ) : (
-          <table>
+          <table className="data-table">
             <caption className="sr-only">{t('my.pointsHistoryCaption')}</caption>
             <thead>
               <tr className="border-b border-[var(--border)]">
-                <th scope="col" className="pb-2.5 text-[11px] text-[var(--fg-muted)]">
+                <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-muted)]">
                   {t('my.pointsWhat')}
                 </th>
                 <th scope="col" className="pb-2.5 text-right text-[11px] text-[var(--fg-muted)]">

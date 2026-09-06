@@ -118,7 +118,7 @@ export default async function TrafficPage() {
               아직 접힌 이벤트가 없습니다. 롤업 배치는 매일 새벽에 어제치를 접습니다.
             </p>
           ) : (
-            <table className="w-full border-collapse text-[13px]">
+            <table className="data-table border-collapse text-[13px]">
               <caption className="sr-only">
                 월별 상품 조회·장바구니 담기·결제 완료 이벤트 수와 전환율
               </caption>

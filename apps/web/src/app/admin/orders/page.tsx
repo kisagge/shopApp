@@ -182,11 +182,11 @@ export default async function AdminOrdersPage({
               <caption className="sr-only">주문 목록</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="px-4 py-3 text-xs text-[var(--fg-secondary)]">주문번호</th>
-                  <th scope="col" className="px-4 py-3 text-xs text-[var(--fg-secondary)]">상품</th>
-                  <th scope="col" className="w-24 px-4 py-3 text-xs text-[var(--fg-secondary)]">주문자</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">주문번호</th>
+                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">상품</th>
+                  <th scope="col" className="w-24 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">주문자</th>
                   <th scope="col" className="w-28 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">금액</th>
-                  <th scope="col" className="w-28 px-4 py-3 text-xs text-[var(--fg-secondary)]">주문일</th>
+                  <th scope="col" className="w-28 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">주문일</th>
                   <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                 </tr>
               </thead>
@@ -204,7 +204,7 @@ export default async function AdminOrdersPage({
                         <span className="text-[var(--fg-muted)]"> 외 <span className="tnum">{o.itemCount - 1}</span>건</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-[13px]">{o.buyerName}</td>
+                    <td className="px-4 py-3 text-[13px] whitespace-nowrap">{o.buyerName}</td>
                     <td className="tnum px-4 py-3 text-right text-[13px] font-semibold">{format(o.amount)}</td>
                     <td className="tnum px-4 py-3 text-xs text-[var(--fg-muted)]">
                       {o.placedAt.toLocaleDateString('ko-KR')}

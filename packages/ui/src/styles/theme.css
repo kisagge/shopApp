@@ -192,6 +192,26 @@
   /* 금액은 자릿수가 흔들리면 읽기 어렵다 */
   .tnum { font-variant-numeric: tabular-nums; letter-spacing: 0.01em; }
 
+  /*
+   * 카드 안에 사는 표.
+   *
+   * 칸 사이 여백을 칸마다 손으로 적었더니 **여섯 표는 붙어 있고 여섯 표는
+   * 아니었다.** 붙은 쪽에서는 "−29,700168,300" 처럼 숫자 둘이 한 덩어리로
+   * 읽힌다 — 정산 금액에서 그러면 읽는 사람이 값을 잘못 안다.
+   *
+   * 폭도 함께 준다. table 은 기본이 내용 크기라, 넓은 카드 안에서 왼쪽에
+   * 몰리고 오른쪽이 텅 빈다. 붙어 보이던 표들이 정확히 그 상태였다.
+   *
+   * **바깥쪽 여백은 비운다.** 이 표들은 이미 패딩이 있는 카드 안에 살아서,
+   * 양 끝에 패딩을 더 주면 첫 칸만 안쪽으로 밀려 카드의 다른 줄과 어긋난다.
+   * 카드 밖에 사는 표(가로 스크롤 상자 안의 것들)는 이걸 쓰지 않는다 —
+   * 그쪽은 끝 여백이 있어야 한다.
+   */
+  .data-table { width: 100%; }
+  .data-table :is(th, td) { padding-inline: 0.75rem; }
+  .data-table :is(th, td):first-child { padding-inline-start: 0; }
+  .data-table :is(th, td):last-child { padding-inline-end: 0; }
+
   /* Capacitor 웹뷰: OS 상태바·홈 인디케이터가 레이아웃 위에 그려진다 */
   .safe-t { padding-top: env(safe-area-inset-top, 0px); }
   .safe-b { padding-bottom: env(safe-area-inset-bottom, 0px); }
