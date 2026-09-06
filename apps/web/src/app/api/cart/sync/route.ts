@@ -3,6 +3,7 @@ import { cartSyncSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { mergeServerCart } from '~/lib/cart/server-cart';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 로그인 직후 장바구니 병합.
@@ -13,14 +14,14 @@ import { validationFailed } from '~/lib/i18n/validation';
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = cartSyncSchema.safeParse(body);

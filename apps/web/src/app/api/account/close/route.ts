@@ -4,6 +4,7 @@ import { auth } from '@shop/auth';
 import { getSessionUser } from '@shop/auth/session';
 import { closeAccount, ClosureError } from '~/lib/account/close-account';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 회원 탈퇴.
@@ -15,7 +16,7 @@ import { validationFailed } from '~/lib/i18n/validation';
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = closeAccountSchema.safeParse(await request.json().catch(() => null));

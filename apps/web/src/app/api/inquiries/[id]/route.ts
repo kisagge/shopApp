@@ -3,6 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { hasPermission } from '@shop/core';
 import { deleteInquiry, InquiryError } from '~/lib/inquiry/write';
 import { recordAudit } from '~/lib/audit';
+import { unauthorized } from '~/lib/api/respond';
 
 /** 문의 삭제. 본인은 지우고, 운영진이 내리면 표시만 남긴다. */
 export async function DELETE(
@@ -11,7 +12,7 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const { id } = await params;

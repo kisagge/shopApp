@@ -4,6 +4,7 @@ import { assertPermission, ForbiddenError } from '@shop/core';
 import { restoreReview, ReviewError } from '~/lib/reviews/write-review';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
+import { unauthorized } from '~/lib/api/respond';
 
 /** 내린 글을 되돌린다. 잘못 내린 것을 고칠 수 있어야 한다. */
 export async function POST(
@@ -12,7 +13,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const { id } = await params;

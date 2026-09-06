@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { prisma } from '@shop/db';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 안 읽은 알림을 모두 읽음으로.
@@ -12,7 +13,7 @@ import { prisma } from '@shop/db';
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   // 이미 읽은 것은 건드리지 않는다 — 읽은 시각이 뒤로 밀리면 안 된다

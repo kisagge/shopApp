@@ -569,6 +569,13 @@ export const en: Dictionary = {
   'error.note': 'It may be temporary. Try again, and if it keeps happening, get in touch with the number below.',
   'error.digest': 'Error {digest}',
 
+  'api.unauthorized': 'Please sign in.',
+  'api.forbidden': 'You do not have permission.',
+  'api.invalidJson': 'The request body could not be read.',
+  'api.invalidForm': 'The upload could not be read.',
+  'api.tooLarge': 'The request is too large.',
+  'api.fileRequired': 'Please choose an image file.',
+  'api.imageTooLarge': 'Images may not exceed 5MB.',
   'valid.generic': 'Please check what you entered.',
   'valid.tooShortChars': 'Must be at least {min} characters',
   'valid.tooLongChars': 'Cannot be longer than {max} characters',

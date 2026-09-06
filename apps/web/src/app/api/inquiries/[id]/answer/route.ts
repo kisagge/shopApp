@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { answerInquiry, InquiryError } from '~/lib/inquiry/write';
 import { notifyInquiryAnswered } from '~/lib/inquiry/notify';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 문의 답변.
@@ -17,7 +18,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = answerInquirySchema.safeParse(await request.json().catch(() => null));

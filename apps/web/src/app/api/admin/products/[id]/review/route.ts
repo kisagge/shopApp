@@ -5,6 +5,7 @@ import { reviewProduct, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 게시 검수 결정.
@@ -18,7 +19,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = reviewProductSchema.safeParse(await request.json().catch(() => null));

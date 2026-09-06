@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { subscribeRestock, unsubscribeRestock, RestockError } from '~/lib/restock/notify';
+import { unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ variantId: string }> };
 
@@ -13,7 +14,7 @@ type Params = { params: Promise<{ variantId: string }> };
 export async function PUT(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   const { variantId } = await params;
   try {
@@ -30,7 +31,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
 export async function DELETE(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   const { variantId } = await params;
   await unsubscribeRestock(user.id, variantId);

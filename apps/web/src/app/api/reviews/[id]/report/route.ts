@@ -4,6 +4,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { reportReview, ReviewReportError } from '~/lib/reviews/report';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 리뷰 신고.
@@ -17,7 +18,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   // 본문을 읽기 전에 센다 — 뒤에 두면 형식이 틀린 요청이 세어지지 않는다

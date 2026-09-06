@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { markHelpful, unmarkHelpful, HelpfulError } from '~/lib/reviews/helpful';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 도움이 됐다.
@@ -18,8 +19,7 @@ import { markHelpful, unmarkHelpful, HelpfulError } from '~/lib/reviews/helpful'
 
 type Params = { params: Promise<{ id: string }> };
 
-const UNAUTHORIZED = () =>
-  NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+
 
 async function respond(
   params: Params['params'],
@@ -42,7 +42,7 @@ async function respond(
 
 export async function PUT(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
-  if (!user) return UNAUTHORIZED();
+  if (!user) return unauthorized();
 
   const limited = await enforceRateLimit('vote', request, user.id);
   if (limited) return limited;
@@ -52,7 +52,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
 
 export async function DELETE(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
-  if (!user) return UNAUTHORIZED();
+  if (!user) return unauthorized();
 
   const limited = await enforceRateLimit('vote', request, user.id);
   if (limited) return limited;

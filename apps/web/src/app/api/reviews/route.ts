@@ -7,6 +7,7 @@ import { createReview, assertCanReview, ReviewError } from '~/lib/reviews/write-
 import { uploadReviewImages, discardReviewImages } from '~/lib/reviews/images';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 사진이 있으면 multipart, 없으면 JSON 으로 온다.
@@ -52,7 +53,7 @@ async function readBody(request: Request): Promise<{
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   // 로그인 필수 창구라 사용자 id 로 센다
@@ -69,7 +70,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (error instanceof ImageError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
     }
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = createReviewSchema.safeParse(body);

@@ -3,6 +3,7 @@ import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { paySettlement, SettlementCloseError } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
+import { forbidden, unauthorized } from '~/lib/api/respond';
 
 /** 지급 집행. 슈퍼관리자만. */
 export async function POST(
@@ -11,7 +12,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const { id } = await params;
@@ -32,7 +33,7 @@ export async function POST(
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+      return await forbidden();
     }
     throw error;
   }

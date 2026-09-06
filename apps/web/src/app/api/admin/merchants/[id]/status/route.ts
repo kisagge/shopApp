@@ -5,6 +5,7 @@ import { getActor } from '@shop/auth/session';
 import { updateMerchantStatus, AccessError } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
+import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 입점 승인·정지. 슈퍼관리자만. */
 export async function PATCH(
@@ -13,14 +14,14 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = updateMerchantStatusSchema.safeParse(body);
@@ -47,7 +48,7 @@ export async function PATCH(
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+      return await forbidden();
     }
     throw error;
   }

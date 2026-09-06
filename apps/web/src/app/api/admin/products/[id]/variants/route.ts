@@ -5,6 +5,7 @@ import { createVariant, ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 옵션 추가 */
 export async function POST(
@@ -13,14 +14,14 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = createVariantSchema.safeParse(body);

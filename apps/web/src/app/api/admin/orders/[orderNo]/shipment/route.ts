@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { registerShipment, ShipmentError } from '~/lib/admin/manage-shipment';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 export async function POST(
   request: Request,
@@ -11,7 +12,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = registerShipmentSchema.safeParse(await request.json().catch(() => null));

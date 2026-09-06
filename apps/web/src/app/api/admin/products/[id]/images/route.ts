@@ -10,6 +10,7 @@ import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { fileRequired, imageTooLarge, invalidForm, invalidJson, unauthorized } from '~/lib/api/respond';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
@@ -37,33 +38,24 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json(
-      { code: 'INVALID_FORM', message: '업로드 형식을 읽을 수 없습니다.' },
-      { status: 400 },
-    );
+    return await invalidForm();
   }
 
   const file = form.get('file');
   if (!(file instanceof File)) {
-    return NextResponse.json(
-      { code: 'FILE_REQUIRED', message: '이미지 파일을 선택해 주세요.' },
-      { status: 400 },
-    );
+    return await fileRequired();
   }
   // 바이트를 메모리에 올리기 전에 크기를 먼저 본다. 5MB 제한을 통과할 수 없는
   // 파일을 굳이 다 읽을 이유가 없다.
   if (file.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json(
-      { code: 'TOO_LARGE', message: '이미지는 5MB 를 넘을 수 없습니다' },
-      { status: 400 },
-    );
+    return await imageTooLarge();
   }
 
   const { id } = await params;
@@ -106,14 +98,14 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = reorderSchema.safeParse(body);

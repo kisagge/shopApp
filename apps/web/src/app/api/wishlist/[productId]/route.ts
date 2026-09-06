@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { addToWishlist, removeFromWishlist, WishlistError } from '~/lib/wishlist/wishlist';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 찜 넣기·빼기.
@@ -9,12 +10,9 @@ import { addToWishlist, removeFromWishlist, WishlistError } from '~/lib/wishlist
  * 돌아간다 — 연타나 재시도에서 실제로 일어나는 일이다. 이렇게 두면
  * 몇 번을 보내도 결과가 같다.
  */
-function requireUser(user: { id: string } | null): NextResponse | null {
+async function requireUser(user: { id: string } | null): Promise<NextResponse | null> {
   if (user) return null;
-  return NextResponse.json(
-    { code: 'UNAUTHORIZED', message: '찜하려면 로그인이 필요합니다.' },
-    { status: 401 },
-  );
+  return unauthorized();
 }
 
 export async function PUT(
@@ -22,7 +20,7 @@ export async function PUT(
   { params }: { params: Promise<{ productId: string }> },
 ): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
-  const denied = requireUser(user);
+  const denied = await requireUser(user);
   if (denied || !user) return denied!;
 
   const { productId } = await params;
@@ -43,7 +41,7 @@ export async function DELETE(
   { params }: { params: Promise<{ productId: string }> },
 ): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
-  const denied = requireUser(user);
+  const denied = await requireUser(user);
   if (denied || !user) return denied!;
 
   const { productId } = await params;

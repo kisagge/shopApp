@@ -8,6 +8,7 @@ import {
   deviceTypeOf, hashIp, recordEvents, toTrackedEvent, type CollectionContext,
 } from '~/lib/analytics/server';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson, tooLarge } from '~/lib/api/respond';
 
 /** 본문 크기 상한. 배치 20건이면 넉넉하다. */
 const MAX_BODY_BYTES = 64 * 1024;
@@ -25,10 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const raw = await request.text();
 
   if (raw.length > MAX_BODY_BYTES) {
-    return NextResponse.json(
-      { code: 'PAYLOAD_TOO_LARGE', message: '요청이 너무 큽니다.' },
-      { status: 413 },
-    );
+    return await tooLarge();
   }
 
   // 요청 본문의 userId 는 절대 쓰지 않는다. 세션이 말하는 사람만 믿는다.
@@ -51,10 +49,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = JSON.parse(raw);
   } catch {
-    return NextResponse.json(
-      { code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' },
-      { status: 400 },
-    );
+    return await invalidJson();
   }
 
   const parsed = eventBatchSchema.safeParse(body);

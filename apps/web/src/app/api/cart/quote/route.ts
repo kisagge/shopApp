@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { getQuoteViewer } from '~/lib/grade/effective';
 import { quoteCart } from '~/lib/queries/cart';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson } from '~/lib/api/respond';
 
 /**
  * 장바구니 견적.
@@ -32,10 +33,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json(
-      { code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' },
-      { status: 400 },
-    );
+    return await invalidJson();
   }
 
   const parsed = cartQuoteRequestSchema.safeParse(body);

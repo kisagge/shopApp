@@ -5,16 +5,17 @@ import { getActor } from '@shop/auth/session';
 import { updateSupportPost, deleteSupportPost } from '~/lib/admin/manage-support';
 import { revalidateSupport } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ id: string }> };
 
 async function guard(request: Request): Promise<NextResponse | null> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   if (!hasPermission(actor, 'support:write')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
   return null;
 }
@@ -33,7 +34,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = supportPostSchema.safeParse(body);

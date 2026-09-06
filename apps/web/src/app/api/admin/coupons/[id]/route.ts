@@ -4,6 +4,8 @@ import { updateCouponSchema } from '@shop/contract';
 import { ForbiddenError } from '@shop/core';
 import { updateCoupon, CouponError } from '~/lib/admin/manage-coupon';
 import { recordAudit } from '~/lib/audit';
+import { unauthorized } from '~/lib/api/respond';
+import { validationFailed } from '~/lib/i18n/validation';
 
 export async function PATCH(
   request: Request,
@@ -11,12 +13,13 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = updateCouponSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return NextResponse.json({ code: 'INVALID_INPUT', message: '입력을 확인해 주세요.' }, { status: 400 });
+    // 문구는 계약의 열쇠에서 나오고, 번역은 이 응답을 만들 때 한다
+    return validationFailed(parsed.error);
   }
 
   const { id } = await params;

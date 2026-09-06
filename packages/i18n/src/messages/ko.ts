@@ -597,6 +597,13 @@ export const ko = {
   //
   // 계약(@shop/contract)의 Zod 문구가 이 열쇠를 그대로 담는다. 번역은
   // 응답을 만드는 서버가 한다 — 화면은 받은 문장을 그대로 보여 준다.
+  'api.unauthorized': '로그인이 필요합니다.',
+  'api.forbidden': '권한이 없습니다.',
+  'api.invalidJson': '요청 본문을 읽을 수 없습니다.',
+  'api.invalidForm': '업로드 형식을 읽을 수 없습니다.',
+  'api.tooLarge': '요청이 너무 큽니다.',
+  'api.fileRequired': '이미지 파일을 선택해 주세요.',
+  'api.imageTooLarge': '이미지는 5MB 를 넘을 수 없습니다.',
   'valid.generic': '입력값을 확인해 주세요.',
   'valid.tooShortChars': '{min}자 이상이어야 합니다',
   'valid.tooLongChars': '{max}자를 넘을 수 없습니다',

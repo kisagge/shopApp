@@ -4,6 +4,7 @@ import { resolveReturnSchema } from '@shop/contract';
 import { resolveReturn, ReturnError } from '~/lib/orders/return-request';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /** 운영진의 반품 승인·반려 */
 export async function POST(
@@ -12,7 +13,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = resolveReturnSchema.safeParse(await request.json().catch(() => null));

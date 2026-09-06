@@ -5,11 +5,12 @@ import { ForbiddenError } from '@shop/core';
 import { listCoupons, createCoupon, CouponError } from '~/lib/admin/manage-coupon';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   try {
     return NextResponse.json({ coupons: await listCoupons(actor) });
@@ -24,7 +25,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = createCouponSchema.safeParse(await request.json().catch(() => null));

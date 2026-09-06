@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { setDefaultAddress, deleteAddress, AddressError } from '~/lib/addresses/manage-address';
+import { unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -8,7 +9,7 @@ type Params = { params: Promise<{ id: string }> };
 export async function PATCH(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   const { id } = await params;
   try {
@@ -25,7 +26,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<NextR
 export async function DELETE(request: Request, { params }: Params): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   const { id } = await params;
   try {

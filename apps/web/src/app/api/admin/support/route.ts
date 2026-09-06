@@ -5,23 +5,24 @@ import { getActor } from '@shop/auth/session';
 import { createSupportPost } from '~/lib/admin/manage-support';
 import { revalidateSupport } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   // 권한을 본문 검증보다 먼저 본다. 순서가 반대면 권한 없는 사용자가
   // 입력값 오류를 돌려받아, 무엇을 보내야 통과하는지 알게 된다.
   if (!hasPermission(actor, 'support:write')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = supportPostSchema.safeParse(body);

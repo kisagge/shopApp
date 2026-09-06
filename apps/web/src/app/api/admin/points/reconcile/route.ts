@@ -3,12 +3,13 @@ import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { reconcilePoints } from '~/lib/admin/reconcile-points';
 import { recordAudit } from '~/lib/audit';
+import { forbidden, unauthorized } from '~/lib/api/respond';
 
 /** 포인트 잔액 대사 실행. 원장 → 잔액 방향으로만 고친다. */
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   try {
@@ -38,7 +39,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+      return await forbidden();
     }
     throw error;
   }

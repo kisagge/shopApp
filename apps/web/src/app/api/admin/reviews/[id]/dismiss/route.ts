@@ -3,6 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { assertPermission, ForbiddenError } from '@shop/core';
 import { dismissReports, ReviewReportError } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 신고를 "문제없음" 으로 닫는다. 글은 그대로 둔다.
@@ -16,7 +17,7 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const { id } = await params;

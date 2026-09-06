@@ -565,6 +565,13 @@ export const ja: Dictionary = {
   'error.note': '一時的な問題かもしれません。もう一度お試しいただき、続く場合は下の番号を添えてお問い合わせください。',
   'error.digest': 'エラー番号 {digest}',
 
+  'api.unauthorized': 'ログインが必要です。',
+  'api.forbidden': '権限がありません。',
+  'api.invalidJson': 'リクエスト本文を読み取れませんでした。',
+  'api.invalidForm': 'アップロード形式を読み取れませんでした。',
+  'api.tooLarge': 'リクエストが大きすぎます。',
+  'api.fileRequired': '画像ファイルを選んでください。',
+  'api.imageTooLarge': '画像は5MBを超えられません。',
   'valid.generic': '入力内容をご確認ください。',
   'valid.tooShortChars': '{min}文字以上で入力してください',
   'valid.tooLongChars': '{max}文字を超えられません',

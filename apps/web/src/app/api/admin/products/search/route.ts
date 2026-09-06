@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@shop/db';
 import { getActor } from '@shop/auth/session';
 import { hasPermission, isVisibleStatus, merchantScope } from '@shop/core';
+import { forbidden } from '~/lib/api/respond';
 
 /**
  * 운영 화면에서 상품을 골라 담을 때 쓰는 검색.
@@ -23,12 +24,12 @@ import { hasPermission, isVisibleStatus, merchantScope } from '@shop/core';
 export async function GET(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor || !hasPermission(actor, 'product:read')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   const scope = merchantScope(actor);
   if (scope === undefined) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   const q = new URL(request.url).searchParams.get('q')?.trim().toLowerCase() ?? '';

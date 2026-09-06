@@ -3,6 +3,7 @@ import { cartSyncSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { getServerCart, replaceServerCart } from '~/lib/cart/server-cart';
 import { validationFailed } from '~/lib/i18n/validation';
+import { invalidJson } from '~/lib/api/respond';
 
 /** 서버에 저장된 장바구니를 읽는다. 비로그인이면 빈 목록이다. */
 export async function GET(request: Request): Promise<NextResponse> {
@@ -25,7 +26,7 @@ export async function PUT(request: Request): Promise<NextResponse> {
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = cartSyncSchema.safeParse(body);

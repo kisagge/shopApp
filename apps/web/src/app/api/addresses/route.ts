@@ -3,11 +3,12 @@ import { getSessionUser } from '@shop/auth/session';
 import { addressInputSchema } from '@shop/contract';
 import { listAddresses, createAddress, AddressError } from '~/lib/addresses/manage-address';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   return NextResponse.json({ addresses: await listAddresses(user.id) });
 }
@@ -15,7 +16,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = addressInputSchema.safeParse(await request.json().catch(() => null));

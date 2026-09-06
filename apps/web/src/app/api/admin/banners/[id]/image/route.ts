@@ -5,6 +5,7 @@ import { setBannerImage, BannerError } from '~/lib/admin/manage-banner';
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
+import { fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
 
 /** 배너 배경 이미지 교체 */
 export async function POST(
@@ -13,27 +14,27 @@ export async function POST(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   // 권한을 본문 검증보다 먼저 본다. 순서가 반대면 권한 없는 사용자가
   // 입력값 오류를 돌려받아, 무엇을 보내야 통과하는지 알게 된다.
   if (!hasPermission(actor, 'banner:write')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return NextResponse.json({ code: 'INVALID_FORM', message: '업로드 형식을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidForm();
   }
 
   const file = form.get('file');
   if (!(file instanceof File)) {
-    return NextResponse.json({ code: 'FILE_REQUIRED', message: '이미지 파일을 선택해 주세요.' }, { status: 400 });
+    return await fileRequired();
   }
   if (file.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json({ code: 'TOO_LARGE', message: '이미지는 5MB 를 넘을 수 없습니다' }, { status: 400 });
+    return await imageTooLarge();
   }
 
   const alt = form.get('alt');
@@ -66,7 +67,7 @@ export async function POST(
       );
     }
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+      return await forbidden();
     }
     throw error;
   }

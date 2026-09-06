@@ -6,13 +6,14 @@ import { updateBanner, deleteBanner, BannerError } from '~/lib/admin/manage-bann
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
+import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
-function fail(error: unknown): NextResponse | null {
+async function fail(error: unknown): Promise<NextResponse | null> {
   if (error instanceof BannerError) {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
   }
   if (error instanceof ForbiddenError) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
   return null;
 }
@@ -23,19 +24,19 @@ export async function PATCH(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   // 권한을 본문 검증보다 먼저 본다. 순서가 반대면 권한 없는 사용자가
   // 입력값 오류를 돌려받아, 무엇을 보내야 통과하는지 알게 된다.
   if (!hasPermission(actor, 'banner:write')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   let body: unknown;
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ code: 'INVALID_JSON', message: '요청 본문을 읽을 수 없습니다.' }, { status: 400 });
+    return await invalidJson();
   }
 
   const parsed = updateBannerSchema.safeParse(body);
@@ -56,7 +57,7 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }
@@ -68,12 +69,12 @@ export async function DELETE(
 ): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
   // 권한을 본문 검증보다 먼저 본다. 순서가 반대면 권한 없는 사용자가
   // 입력값 오류를 돌려받아, 무엇을 보내야 통과하는지 알게 된다.
   if (!hasPermission(actor, 'banner:write')) {
-    return NextResponse.json({ code: 'FORBIDDEN', message: '권한이 없습니다.' }, { status: 403 });
+    return await forbidden();
   }
 
   const { id } = await params;
@@ -86,7 +87,7 @@ export async function DELETE(
     });
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }

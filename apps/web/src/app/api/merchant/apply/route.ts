@@ -3,6 +3,7 @@ import { applyMerchantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { applyForMerchant, MerchantApplicationError } from '~/lib/merchant/apply';
 import { validationFailed } from '~/lib/i18n/validation';
+import { unauthorized } from '~/lib/api/respond';
 
 /**
  * 입점 신청.
@@ -13,7 +14,7 @@ import { validationFailed } from '~/lib/i18n/validation';
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
   if (!actor) {
-    return NextResponse.json({ code: 'UNAUTHORIZED', message: '로그인이 필요합니다.' }, { status: 401 });
+    return await unauthorized();
   }
 
   const parsed = applyMerchantSchema.safeParse(await request.json().catch(() => null));
