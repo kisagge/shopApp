@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 화면이 받는 자바스크립트의 상한.
@@ -59,6 +60,7 @@ test('가입 폼은 보내기 전에 스스로 거른다', async ({ page }) => {
    * **화면이 먼저 거르는지는 여기서만 확인된다.**
    */
   await page.goto('/signup');
+  await ready(page);
   await page.getByLabel(/^이메일/).fill('e2e-mismatch@plain.test');
   await page.getByLabel(/^이름/).fill('불일치 테스트');
   await page.getByLabel(/^비밀번호\*/).fill('quiet-harbor-42');

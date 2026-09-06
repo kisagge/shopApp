@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 언어.
@@ -49,6 +50,7 @@ test('고른 언어가 브라우저 설정을 이긴다', async ({ page }) => {
 
 test('언어를 바꿔도 보던 검색 결과를 잃지 않는다', async ({ page }) => {
   await page.goto('/search?q=코트');
+  await ready(page);
 
   await page.getByRole('form', { name: '언어 선택' }).getByRole('button', { name: 'English' }).click();
 

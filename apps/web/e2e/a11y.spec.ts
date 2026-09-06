@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * **읽기만 하는 검사**는 그림을 기다리지 않는다.
@@ -109,6 +110,8 @@ test.describe('모바일 메뉴', () => {
   test('Esc 로 닫히고 포커스가 여는 자리로 돌아온다', async ({ page }) => {
     await page.goto('/');
 
+    await ready(page);
+
     const toggle = page.getByRole('button', { name: '메뉴' });
     await toggle.click();
     await expect(page.locator('header a[href^="/category/"]').first()).toBeVisible();
@@ -147,6 +150,7 @@ test.describe('모바일 메뉴', () => {
 
   test('카테고리를 고르면 메뉴가 따라 닫힌다', async ({ page }) => {
     await page.goto('/');
+    await ready(page);
 
     await page.getByRole('button', { name: '메뉴' }).click();
     const first = page.locator('header a[href^="/category/"]').first();

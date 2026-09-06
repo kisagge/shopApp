@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SEED_ACCOUNT, SEED_PASSWORD } from '@shop/auth/seed-fixtures';
+import { ready } from './state';
 
 /**
  * 로그인 화면 자체.
@@ -14,6 +15,7 @@ test.describe.configure({ mode: 'serial' });
 
 test('로그인하면 헤더가 바뀐다', async ({ page }) => {
   await page.goto('/login');
+  await ready(page);
   await page.getByLabel('이메일').fill(SEED_ACCOUNT.customer);
   await page.getByLabel('비밀번호').fill(SEED_PASSWORD);
   await page.getByRole('button', { name: '로그인' }).click();
@@ -24,6 +26,7 @@ test('로그인하면 헤더가 바뀐다', async ({ page }) => {
 
 test('틀린 비밀번호는 어느 쪽이 틀렸는지 알려 주지 않는다', async ({ page }) => {
   await page.goto('/login');
+  await ready(page);
   await page.getByLabel('이메일').fill(SEED_ACCOUNT.customer);
   await page.getByLabel('비밀번호').fill('틀린비밀번호');
   await page.getByRole('button', { name: '로그인' }).click();
@@ -57,6 +60,7 @@ test('처음 온 사람이 가입하고 바로 로그인된 상태가 된다', a
   const email = `e2e-${Date.now()}@plain.test`;
 
   await page.goto('/signup');
+  await ready(page);
   await page.getByLabel(/^이메일/).fill(email);
   await page.getByLabel(/^이름/).fill('가입 테스트');
   await page.getByLabel(/^비밀번호\*/).fill('quiet-harbor-42');
@@ -72,6 +76,7 @@ test('처음 온 사람이 가입하고 바로 로그인된 상태가 된다', a
 
 test('이미 가입된 주소는 그 칸에서 알려 준다', async ({ page }) => {
   await page.goto('/signup');
+  await ready(page);
   await page.getByLabel(/^이메일/).fill(SEED_ACCOUNT.customer);
   await page.getByLabel(/^이름/).fill('중복 테스트');
   await page.getByLabel(/^비밀번호\*/).fill('quiet-harbor-42');
@@ -86,6 +91,7 @@ test('로그인과 회원가입은 서로 오갈 수 있다', async ({ page }) =
   const main = page.locator('#main');
 
   await page.goto('/login');
+  await ready(page);
   await main.getByRole('link', { name: '회원가입' }).click();
   await expect(page).toHaveURL(/\/signup$/);
 
@@ -102,6 +108,7 @@ test('로그인과 회원가입은 서로 오갈 수 있다', async ({ page }) =
  */
 test('비밀번호 찾기는 가입 여부를 알려 주지 않는다', async ({ page }) => {
   await page.goto('/forgot-password');
+  await ready(page);
   await page.getByLabel(/^이메일/).fill('nobody-here@plain.test');
   await page.getByRole('button', { name: '재설정 링크 받기' }).click();
 
@@ -129,6 +136,7 @@ test('죽은 토큰은 재설정 화면까지 가지 못한다', async ({ page }
 
 test('로그인 화면에서 비밀번호 찾기로 갈 수 있다', async ({ page }) => {
   await page.goto('/login');
+  await ready(page);
   await page.locator('#main').getByRole('link', { name: '비밀번호를 잊으셨나요?' }).click();
 
   await expect(page).toHaveURL(/\/forgot-password$/);

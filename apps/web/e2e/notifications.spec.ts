@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 알림센터.
@@ -10,6 +11,7 @@ import { test, expect } from '@playwright/test';
 
 test('머리의 알림 종이 목록으로 이어진다', async ({ page }) => {
   await page.goto('/');
+  await ready(page);
 
   await page.getByRole('link', { name: /^알림/ }).click();
 

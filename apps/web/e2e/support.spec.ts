@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 고객센터.
@@ -9,6 +10,7 @@ import { test, expect } from '@playwright/test';
 
 test('푸터에서 고객센터로 갈 수 있다', async ({ page }) => {
   await page.goto('/');
+  await ready(page);
 
   await page.getByRole('contentinfo').getByRole('link', { name: '고객센터' }).click();
 

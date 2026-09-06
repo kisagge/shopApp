@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 로그인한 고객이 보는 화면.
@@ -102,6 +103,7 @@ test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 �
 
 test('탈퇴 화면은 무엇이 지워지고 무엇이 남는지 먼저 말한다', async ({ page }) => {
   await page.goto('/mypage');
+  await ready(page);
   await page.getByRole('link', { name: '회원 탈퇴' }).click();
 
   await expect(page.getByRole('heading', { name: '회원 탈퇴', level: 1 })).toBeVisible();
@@ -154,6 +156,7 @@ test('입점 신청 입구가 푸터에 있고 양식이 열린다', async ({ pa
    * 전부 무너진다. 입구가 있고 양식이 그려지는지만 본다.
    */
   await page.goto('/');
+  await ready(page);
   await page.getByRole('link', { name: '입점 신청' }).click();
 
   await expect(page.getByRole('heading', { name: '입점 신청', level: 1 })).toBeVisible();
@@ -191,6 +194,7 @@ test('고객센터에 물으면 내 문의 내역에 남는다', async ({ page }
 
 test('마이페이지에서 문의 내역으로 갈 수 있다', async ({ page }) => {
   await page.goto('/mypage');
+  await ready(page);
 
   await page.getByRole('link', { name: '문의 내역' }).click();
 
@@ -210,6 +214,7 @@ test('CSP 아래에서도 우편번호 찾기가 열린다', async ({ page }) =>
   });
 
   await page.goto('/mypage/addresses');
+  await ready(page);
   await page.getByRole('button', { name: '새 배송지 추가' }).click();
   await page.getByRole('button', { name: '주소 검색' }).click();
 

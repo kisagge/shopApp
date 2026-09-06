@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /**
  * 기획전.
@@ -44,6 +45,7 @@ test('없는 기획전은 404 다 — 끝난 주소가 살아 있는 것처럼 �
 test('헤더에서 기획전으로 갈 수 있다', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto('/');
+  await ready(page);
 
   await page.locator('header a[href="/collections"]:visible').click();
   await expect(page).toHaveURL(/\/collections$/);

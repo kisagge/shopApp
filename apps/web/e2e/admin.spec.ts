@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /** 운영자가 보는 화면 */
 
@@ -68,6 +69,7 @@ test.describe('주문 검색', () => {
 
   test('조건이 주소에 남는다 — 새로고침해도 같은 결과다', async ({ page }) => {
     await page.goto('/admin/orders');
+    await ready(page);
     await page.getByLabel('주문번호 · 주문자').fill('데모');
     await page.getByRole('button', { name: '검색' }).click();
 
@@ -87,6 +89,7 @@ test.describe('주문 검색', () => {
 
   test('상태 탭을 눌러도 검색이 유지된다', async ({ page }) => {
     await page.goto('/admin/orders?q=데모');
+    await ready(page);
 
     await page.getByRole('link', { name: '결제완료' }).click();
 
@@ -97,6 +100,7 @@ test.describe('주문 검색', () => {
 
   test('조건 지우기로 되돌린다', async ({ page }) => {
     await page.goto('/admin/orders?q=데모&from=2026-01-01');
+    await ready(page);
 
     await page.getByRole('link', { name: '조건 지우기' }).click();
 
@@ -205,6 +209,7 @@ test('기획전에 담을 상품을 같은 창구로 찾는다', async ({ page }
 
 test('쿠폰 대상도 같은 창구를 쓴다', async ({ page }) => {
   await page.goto('/admin/coupons');
+  await ready(page);
   // 대상 지정 칸은 새 쿠폰을 만들 때만 나온다
   await page.getByRole('button', { name: '새 쿠폰 만들기' }).click();
 
