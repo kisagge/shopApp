@@ -52,7 +52,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
       <div className="flex w-[232px] shrink-0 flex-col gap-7 bg-dark-bg px-4 py-6">
         <p className="flex items-baseline gap-2 px-1.5">
           <span className="font-serif text-[19px] font-medium tracking-[0.16em] text-n-0">PLAIN</span>
-          <span className="text-[10px] font-medium tracking-[0.14em] text-n-600">ADMIN</span>
+          <span className="text-[10px] font-medium tracking-[0.14em] text-dark-muted">ADMIN</span>
         </p>
 
         <nav aria-label="관리자 메뉴" className="flex-1">

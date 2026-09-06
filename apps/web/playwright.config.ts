@@ -56,18 +56,18 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|shopping|a11y|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|image-priority|bundle-budget|web-vitals)\.spec\.ts/,
+        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|image-priority|bundle-budget|web-vitals)\.spec\.ts/,
     },
     {
       name: 'customer',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.customer },
-      testMatch: /(customer|review-helpful|notifications|order-idempotency)\.spec\.ts/,
+      testMatch: /(customer|review-helpful|notifications|order-idempotency|a11y-account)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
       name: 'admin',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.admin },
-      testMatch: /(admin|slug-history)\.spec\.ts/,
+      testMatch: /(admin|slug-history|a11y-admin)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {

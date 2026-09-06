@@ -141,7 +141,6 @@ export const ko = {
   'product.noReviews': '아직 리뷰가 없습니다.',
   'product.inquiries': '상품 문의',
   'product.notFound': '상품을 찾을 수 없습니다',
-  'product.mainImage': '{name} 대표 이미지',
   'product.photoCredit': '사진',
   'product.allSoldOut': '전 옵션 품절',
   'product.rewardLabel': '적립',

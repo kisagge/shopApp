@@ -135,7 +135,6 @@ export const en: Dictionary = {
   'product.noReviews': 'No reviews yet.',
   'product.inquiries': 'Questions',
   'product.notFound': 'Product not found',
-  'product.mainImage': 'Main photo of {name}',
   'product.photoCredit': 'Photo',
   'product.allSoldOut': 'All options sold out',
   'product.rewardLabel': 'Points',

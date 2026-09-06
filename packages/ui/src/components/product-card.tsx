@@ -151,7 +151,7 @@ export function ProductCard({
             />
           ) : (
             // 장식용 플레이스홀더. 상품명은 아래 제목이 이미 전달한다.
-            <span aria-hidden="true" className="text-[11px] tracking-widest text-n-500">
+            <span aria-hidden="true" className="text-[11px] tracking-widest text-n-700">
               IMAGE
             </span>
           )}

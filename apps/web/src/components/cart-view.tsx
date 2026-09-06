@@ -167,7 +167,7 @@ function CartRow({
       <div
         role="img"
         aria-label={t('cart.itemImage', { name: item.productName })}
-        className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-500"
+        className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-700"
       >
         IMG
       </div>

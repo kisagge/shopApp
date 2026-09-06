@@ -71,12 +71,19 @@ export function ProductOptions({
           <h2 id={`opt-${group.id}`} className="mb-2.5 text-[13px] font-semibold">
             {group.name}
           </h2>
-          <ul role="radiogroup" aria-labelledby={`opt-${group.id}`} className="grid grid-cols-4 gap-2">
+          {/*
+            목록이 아니라 라디오 그룹이다.
+            전에는 <ul role="radiogroup"> 이었는데, role 을 얹는 순간 ul 의 목록
+            의미가 사라져서 그 안의 li 가 **목록 없는 항목**이 된다. 낭독기에는
+            "라디오 그룹" 과 "목록" 이 겹쳐 들리고, 검사는 li 가 갈 곳이 없다고
+            말한다. 라디오 그룹은 애초에 목록이 아니므로 껍데기를 걷어냈다.
+          */}
+          <div role="radiogroup" aria-labelledby={`opt-${group.id}`} className="grid grid-cols-4 gap-2">
             {group.values.map((value) => {
               const on = picked[group.id] === value.id;
               const available = availability.get(value.id) ?? false;
               return (
-                <li key={value.id}>
+                <div key={value.id}>
                   <button
                     type="button"
                     role="radio"
@@ -103,10 +110,10 @@ export function ProductOptions({
                       {t('catalog.soldOut')}
                     </span>
                   )}
-                </li>
+                </div>
               );
             })}
-          </ul>
+          </div>
         </section>
       ))}
 

@@ -131,7 +131,6 @@ export const ja: Dictionary = {
   'product.noReviews': 'まだレビューがありません。',
   'product.inquiries': '商品への問い合わせ',
   'product.notFound': '商品が見つかりません',
-  'product.mainImage': '{name} のメイン画像',
   'product.photoCredit': '写真',
   'product.allSoldOut': '全オプション売り切れ',
   'product.rewardLabel': 'ポイント',

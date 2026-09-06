@@ -91,3 +91,30 @@ describe('뉴트럴 램프', () => {
     }
   });
 });
+
+/**
+ * 톤 블록 위의 글자.
+ *
+ * **여기가 비어 있었다.** 위의 검사는 글자색을 n-0·n-50 같은 밝은 표면에
+ * 대고만 쟀는데, 사진 자리에 깔리는 톤 블록은 그보다 어둡다(0.86~0.91).
+ * 그래서 n-500 으로 적어 둔 "IMAGE" 자리표시가 다섯 톤 전부에서 AA 에
+ * 못 미치는 채로 지나갔다 — 실제 화면을 axe 로 훑고 나서야 드러났다.
+ *
+ * 토큰끼리 재는 검사가 짝을 빠뜨리면 그 짝은 아무도 안 본다.
+ */
+describe('톤 블록 위의 글자', () => {
+  const TONES = ['ph-sand', 'ph-stone', 'ph-clay', 'ph-olive', 'ph-mist'] as const;
+
+  it.each(TONES)('%s 위의 보조 글자(n-700)가 본문 기준을 넘는다', (tone) => {
+    expect(contrastRatio(T['n-700']!, T[tone]!)).toBeGreaterThanOrEqual(AA_TEXT);
+  });
+
+  /*
+   * 한 단계 밝은 것으로 되돌리면 걸리게 해 둔다. n-500 은 3.29~3.87 이고
+   * n-600 도 가장 어두운 톤(clay)에서 4.25 로 모자란다.
+   */
+  it('n-600 이하로는 못 내려간다 — 가장 어두운 톤에서 모자란다', () => {
+    const worst = Math.min(...TONES.map((t) => contrastRatio(T['n-600']!, T[t]!)));
+    expect(worst).toBeLessThan(AA_TEXT);
+  });
+});

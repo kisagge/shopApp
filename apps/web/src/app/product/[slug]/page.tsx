@@ -179,11 +179,15 @@ export default async function ProductPage({ params, searchParams }: Params) {
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_452px] lg:gap-10">
-        <div
-          role="img"
-          aria-label={t('product.mainImage', { name: product.name })}
-          className="relative flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]"
-        >
+        {/*
+          **role="img" 를 걷어냈다.** 이 칸에 붙여 두었더니 안쪽이 통째로 그림
+          하나가 되어, 아래 사진 출처 링크가 낭독기에는 없는 것이 되고 키보드로는
+          잡히는 상태가 됐다 — 초점은 가는데 무엇에 왔는지 들리지 않는다.
+
+          사진이 있으면 그 img 의 대체 텍스트가 이미 이름을 말하고, 없으면 옆의
+          h1 이 말한다. 자리표시 글자는 장식이라 감춘 채로 둔다.
+        */}
+        <div className="relative flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]">
           {product.images[0] ? (
             <Image
               src={product.images[0].url}
@@ -199,7 +203,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
               className="rounded-md object-cover"
             />
           ) : (
-            <span aria-hidden="true" className="text-[11px] tracking-widest text-n-500">IMAGE</span>
+            <span aria-hidden="true" className="text-[11px] tracking-widest text-n-700">IMAGE</span>
           )}
 
           {/*
