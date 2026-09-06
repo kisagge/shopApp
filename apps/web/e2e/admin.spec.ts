@@ -207,6 +207,41 @@ test('기획전에 담을 상품을 같은 창구로 찾는다', async ({ page }
   await expect(picker.getByRole('button', { name: /담기|담김/ }).first()).toBeVisible();
 });
 
+/**
+ * 쿠폰을 실제로 만들어 본다.
+ *
+ * 폼이 열리는지만 보던 자리였다. 만드는 폼과 목록을 따로 두면서 성공을
+ * 알리는 길이 콜백이 되었는데, **성공한 뒤에 무슨 일이 일어나는지가 여기
+ * 말고는 어디에도 검사되지 않는다** — 목록에 붙는가, 폼이 닫히는가,
+ * 화면이 그 사실을 읽어 주는가.
+ */
+test('만든 쿠폰이 목록에 붙고 폼이 닫힌다', async ({ page }) => {
+  await page.goto('/admin/coupons');
+  await ready(page);
+
+  const create = page.getByRole('button', { name: '새 쿠폰 만들기' });
+  if ((await create.count()) > 0) await create.click();
+
+  // 코드는 병렬 실행에서도 겹치지 않아야 한다
+  const code = `E2E${Date.now().toString(36).toUpperCase().slice(-7)}`;
+  const name = `E2E 검사 쿠폰 ${code}`;
+  await page.getByLabel('코드').fill(code);
+  await page.getByLabel('쿠폰 이름').fill(name);
+  await page.getByLabel('할인 금액 (원)').fill('1000');
+  await page.getByLabel('최소 주문 금액 (원)').fill('10000');
+  await page.getByLabel('시작').fill('2026-01-01T00:00');
+  await page.getByLabel('종료').fill('2030-12-31T23:59');
+
+  await page.getByRole('button', { name: '쿠폰 만들기' }).click();
+
+  // 목록에 붙는다
+  await expect(page.getByRole('cell', { name: code })).toBeVisible();
+  // 폼은 닫힌다 — 만들자마자 같은 코드를 또 넣는 일이 없어야 한다
+  await expect(page.getByRole('button', { name: '새 쿠폰 만들기' })).toBeVisible();
+  // 눈으로 볼 수 없는 사람에게도 알린다
+  await expect(page.locator('#main')).toContainText(`${name} 쿠폰을 만들었습니다.`);
+});
+
 test('쿠폰 대상도 같은 창구를 쓴다', async ({ page }) => {
   await page.goto('/admin/coupons');
   await ready(page);

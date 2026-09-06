@@ -1,7 +1,8 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminCollections, getCollectionItemsFor } from '~/lib/admin/manage-collection';
-import { CollectionEditor, type CollectionItem } from './collection-editor';
+import { CollectionEditor } from './collection-editor';
+import type { CollectionItem } from './types';
 
 export const metadata: Metadata = { title: '기획전' };
 export const dynamic = 'force-dynamic';

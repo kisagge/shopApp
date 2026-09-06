@@ -1,0 +1,97 @@
+'use client';
+
+import { Badge, Button } from '@shop/ui';
+import { format, won, COUPON_KIND_LABEL, COUPON_STATUS_LABEL } from '@shop/core';
+import type { CouponRow } from './types';
+
+const dateText = (v: string | Date) =>
+  new Date(v).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' });
+
+const discountText = (c: CouponRow) =>
+  c.kind === 'AMOUNT'
+    ? `${format(won(c.value))}원`
+    : `${c.percent}%${c.maxDiscount ? ` (최대 ${format(won(c.maxDiscount))}원)` : ''}`;
+
+/** 발행한 쿠폰. 할인 내용은 못 고치므로 여기서 할 수 있는 것은 중지·재개뿐이다. */
+export function CouponTable({
+  coupons, pending, onToggle,
+}: {
+  coupons: readonly CouponRow[];
+  pending: boolean;
+  onToggle: (coupon: CouponRow) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
+      <table className="w-full min-w-[860px] border-collapse text-[13px]">
+        <caption className="sr-only">발행한 쿠폰 목록</caption>
+        <thead>
+          <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--fg-muted)]">
+            <th scope="col" className="px-4 py-3 font-medium">쿠폰</th>
+            <th scope="col" className="px-4 py-3 font-medium">할인</th>
+            <th scope="col" className="px-4 py-3 font-medium">최소 주문</th>
+            <th scope="col" className="px-4 py-3 font-medium">대상</th>
+            <th scope="col" className="px-4 py-3 text-right font-medium">발급 / 사용</th>
+            <th scope="col" className="px-4 py-3 font-medium">기간</th>
+            <th scope="col" className="px-4 py-3 font-medium">상태</th>
+            <th scope="col" className="px-4 py-3 font-medium"><span className="sr-only">동작</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          {coupons.map((c) => (
+            <tr key={c.id} className="border-b border-[var(--border)] last:border-0">
+              <th scope="row" className="px-4 py-3 text-left font-normal">
+                <span className="flex flex-col gap-0.5">
+                  <span className="font-medium">{c.name}</span>
+                  <span className="tnum text-[11px] text-[var(--fg-muted)]">{c.code}</span>
+                </span>
+              </th>
+              <td className="px-4 py-3">
+                <span className="flex flex-col gap-0.5">
+                  <span>{discountText(c)}</span>
+                  <span className="text-[11px] text-[var(--fg-muted)]">
+                    {COUPON_KIND_LABEL[c.kind as 'AMOUNT' | 'PERCENT']}
+                  </span>
+                </span>
+              </td>
+              <td className="tnum px-4 py-3">
+                {c.minimumOrder === 0 ? '없음' : `${format(won(c.minimumOrder))}원`}
+              </td>
+              <td className="px-4 py-3 text-[12px]">
+                {c.targetCount === 0 ? (
+                  '전체'
+                ) : (
+                  <span className="tnum">지정 {c.targetCount}개</span>
+                )}
+              </td>
+              <td className="tnum px-4 py-3 text-right">
+                {c.issuedCount}
+                {c.issueLimit === null ? '' : ` / ${c.issueLimit}`}
+                <span className="text-[var(--fg-muted)]"> · 사용 {c.usedCount}</span>
+              </td>
+              <td className="tnum px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
+                {dateText(c.startsAt)} ~ {dateText(c.endsAt)}
+              </td>
+              <td className="px-4 py-3">
+                <Badge tone={c.status === 'ACTIVE' ? 'success' : 'neutral'}>
+                  {COUPON_STATUS_LABEL[c.status]}
+                </Badge>
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => onToggle(c)}
+                  aria-label={`${c.name} 쿠폰 ${c.isActive ? '중지' : '재개'}`}
+                >
+                  {c.isActive ? '중지' : '재개'}
+                </Button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
