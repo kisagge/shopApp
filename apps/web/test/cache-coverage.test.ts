@@ -207,3 +207,28 @@ describe('캐시 수명', () => {
     },
   );
 });
+
+/**
+ * 레이아웃이 던지는 질의.
+ *
+ * **어느 화면을 열든 지나간다.** 그래서 여기 하나가 캐시를 안 거치면 화면별
+ * 캐시를 아무리 잘 잡아도 소용이 없다 — 첫 요청이 그 질의로 자는 DB 를
+ * 깨우고, 방문자는 1.5초를 기다린다.
+ *
+ * 실제로 그랬다. 카탈로그 캐시를 한 시간으로 늘렸더니 상품 상세는 3.25초에서
+ * 0.30초가 됐는데 **홈만 3.7초 그대로**였고, 원인이 헤더의 카테고리 목록이었다.
+ * React 의 `cache` 로만 감싸 두어서 한 요청 안의 중복만 막고 요청 사이에는
+ * 남지 않았다.
+ */
+describe('레이아웃 질의', () => {
+  const source = readFileSync(join(SRC, 'lib/queries/catalog/products.ts'), 'utf8');
+
+  it('최상위 카테고리는 요청 사이에도 남는다', () => {
+    // cache() 만으로는 모자란다. cachedRead 를 함께 거쳐야 한다.
+    expect(source).toMatch(/cachedRead\([\s\S]{0,600}?parentId: null/);
+  });
+
+  it('한 요청 안의 중복도 계속 막는다 — 헤더와 푸터가 같은 목록을 쓴다', () => {
+    expect(source).toMatch(/getTopCategories = cache\(/);
+  });
+});

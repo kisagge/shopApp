@@ -32,17 +32,34 @@ export async function getFeaturedProducts(limit = 8): Promise<ProductListItem[]>
 }
 
 /**
- * 헤더 내비게이션용 최상위 카테고리. 헤더와 푸터가 같은 목록을 쓴다 — cache 로
- * 감싸 한 요청에 한 번만 읽는다. 감싸지 않으면 모든 페이지가 같은 질의를 두 번 던진다.
+ * 헤더 내비게이션용 최상위 카테고리.
+ *
+ * **감싸개가 둘이고 하는 일이 다르다.**
+ *
+ * `cache` 는 한 요청 안의 중복만 막는다 — 헤더와 푸터가 같은 목록을 쓰므로,
+ * 없으면 모든 화면이 같은 질의를 두 번 던진다. 그런데 **요청 사이에는 남지
+ * 않는다.** 처음에는 이것만 감싸 두었고, 그래서 **모든 첫 요청이 이 질의로
+ * DB 를 깨웠다.**
+ *
+ * 레이아웃에 있는 질의라 어느 화면을 열든 지나간다. 운영에서 재 보니 자는
+ * DB 를 깨우는 데 1.5초가 들었고, 카탈로그 캐시를 한 시간으로 늘린 뒤에도
+ * 홈이 3.7초였던 것이 이 자리 때문이었다 — 상품 상세는 0.3초로 떨어졌는데
+ * 홈만 그대로였고, 그 뒤에 연 화면들이 빨라진 것이 단서였다.
+ *
+ * 그래서 `cachedRead` 로 한 겹 더 감싼다. 카테고리는 시드로 들어가고 고치는
+ * 창구가 없어서 거의 바뀌지 않는다 — 캐시에 올리지 못할 이유가 없다.
  */
-export const getTopCategories = cache(
+const topCategoryRows = cachedRead(
   async (): Promise<{ slug: string; name: string }[]> =>
     prisma.category.findMany({
       where: { parentId: null },
       orderBy: { sortOrder: 'asc' },
       select: { slug: true, name: true },
     }),
+  { key: ['top-categories'], tags: [TAG.catalog], revalidate: TTL.catalog },
 );
+
+export const getTopCategories = cache(topCategoryRows);
 
 /**
  * slug 목록으로 상품을 가져온다. 최근 본 상품이 쓴다.
