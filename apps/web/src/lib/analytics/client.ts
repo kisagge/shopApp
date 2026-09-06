@@ -5,6 +5,7 @@
 import {
   isServerOnlyEvent, requiresConsent, MAX_EVENTS_PER_BATCH, type EventName,
 } from '@shop/core';
+import { getLocalConsent } from './consent';
 import { getAnonymousId, getSessionId } from './session';
 
 /**
@@ -146,6 +147,17 @@ export class AnalyticsTracker {
     }
   }
 
+  /**
+   * 큐에 남은 것을 **보내지 않고 버린다.**
+   *
+   * 수집을 끄는 순간에 쓴다. flush 로 비우면 방금 거부한 사람의 기록이
+   * 마지막으로 한 번 더 나간다 — 거부를 존중한다고 할 수 없다.
+   */
+  discard(): void {
+    this.#clearTimer();
+    this.#queue = [];
+  }
+
   dispose(): void {
     this.flush(true);
     this.#disposed = true;
@@ -169,7 +181,17 @@ export class AnalyticsTracker {
 let singleton: AnalyticsTracker | null = null;
 
 export function getTracker(): AnalyticsTracker {
-  singleton ??= new AnalyticsTracker();
+  /*
+   * **거부를 실제로 존중한다.**
+   *
+   * 동의를 읽는 모듈은 진작 있었는데 아무도 부르지 않아서, 트래커가 기본값
+   * `() => true` 로 돌고 있었다 — 브라우저에서 거부해도 그대로 보냈다는
+   * 뜻이다. 문서에는 "거부는 즉시 존중한다" 고 적혀 있었다.
+   *
+   * 매번 읽는다. 한 번 읽어 두면 설정을 끈 뒤에도 그 탭이 살아 있는 동안은
+   * 계속 보낸다.
+   */
+  singleton ??= new AnalyticsTracker({ hasConsent: getLocalConsent });
   return singleton;
 }
 

@@ -12,6 +12,7 @@ import { formatDate, formatMoney, formatPercent } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
 import { ORDER_STATUS_KEY, GRADE_KEY } from '~/lib/i18n/enum-labels';
+import { AnalyticsConsentToggle } from '~/components/analytics-consent-toggle';
 
 export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT())('my.heading'), ...NO_INDEX };
@@ -224,6 +225,9 @@ export default async function MyPage() {
           </li>
         </ul>
       </nav>
+
+      {/* 거부할 길이 없으면 동의가 아니다 */}
+      <AnalyticsConsentToggle />
 
       {/*
         탈퇴는 목록 안에 섞지 않는다. 되돌릴 수 없는 동작이 "쿠폰함" 옆에

@@ -264,6 +264,12 @@ export const ja: Dictionary = {
   'my.menu': 'マイページメニュー',
   'my.writeReview': 'レビューを書く',
   'my.reviewable': '作成可能 {count}',
+  'my.analytics': '利用データの収集',
+  'my.analyticsNote': 'どの画面が遅いか、どこでやめるかを見ます。匿名IDとハッシュ化したIPだけが残り、外には出ません。',
+  'my.analyticsOn': '収集中',
+  'my.analyticsOff': '収集しない',
+  'my.analyticsStop': '収集をやめる',
+  'my.analyticsStart': '収集を許可する',
   'my.close': '退会',
 
   'my.pointsHeading': 'ポイント',

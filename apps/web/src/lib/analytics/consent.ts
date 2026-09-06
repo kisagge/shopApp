@@ -22,10 +22,25 @@ export function getLocalConsent(): boolean {
   }
 }
 
+/**
+ * 값이 바뀌었을 때 알려 줄 곳.
+ *
+ * 화면이 이 값을 그려야 하는데 서버는 모른다. 구독을 두면 화면이
+ * useSyncExternalStore 로 읽을 수 있고, 그러면 이펙트에서 setState 를 하는
+ * 것보다 렌더를 한 번 덜 부른다.
+ */
+const listeners = new Set<() => void>();
+
+export function subscribeConsent(onChange: () => void): () => void {
+  listeners.add(onChange);
+  return () => listeners.delete(onChange);
+}
+
 export function setLocalConsent(granted: boolean): void {
   try {
     window.localStorage.setItem(KEY, String(granted));
   } catch {
     /* 저장 못 하면 이번 세션에만 적용된다 */
   }
+  for (const listener of listeners) listener();
 }

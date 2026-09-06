@@ -268,6 +268,12 @@ export const en: Dictionary = {
   'my.menu': 'My page menu',
   'my.writeReview': 'Write a review',
   'my.reviewable': '{count} to write',
+  'my.analytics': 'Usage data',
+  'my.analyticsNote': 'We look at which pages are slow and where people give up. Only an anonymous id and a hashed IP are kept, and nothing leaves us.',
+  'my.analyticsOn': 'Collecting',
+  'my.analyticsOff': 'Not collecting',
+  'my.analyticsStop': 'Stop collecting',
+  'my.analyticsStart': 'Allow collecting',
   'my.close': 'Close account',
 
   'my.pointsHeading': 'Points',

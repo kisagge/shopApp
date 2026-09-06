@@ -281,6 +281,12 @@ export const ko = {
   'my.menu': '마이페이지 메뉴',
   'my.writeReview': '리뷰 쓰기',
   'my.reviewable': '작성 가능 {count}',
+  'my.analytics': '이용 기록 수집',
+  'my.analyticsNote': '어떤 화면이 느린지, 어디서 그만두는지를 봅니다. 익명 식별자와 해시한 IP 만 남고 밖으로 나가지 않습니다.',
+  'my.analyticsOn': '수집 중',
+  'my.analyticsOff': '수집하지 않음',
+  'my.analyticsStop': '수집 그만두기',
+  'my.analyticsStart': '수집 허용하기',
   'my.close': '회원 탈퇴',
 
   'my.pointsHeading': '포인트',

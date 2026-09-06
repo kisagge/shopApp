@@ -5,6 +5,17 @@
  * 편의가 아니라 방어다.
  */
 
+/**
+ * 받을 수 있는 형식. **허용 목록이고, 그것이 규칙 전부다.**
+ *
+ * SVG 는 일부러 뺐다 — 안에 <script> 가 들어갈 수 있고, 같은 오리진에서
+ * 그대로 내려주면 그 스크립트가 우리 쿠키를 읽는다. 상품 사진에 벡터가
+ * 필요한 경우는 없다.
+ *
+ * 거절 목록을 따로 두었었는데 **아무도 보지 않는 목록이었다.** 막는 것처럼
+ * 보이지만 실제로 막는 것은 이 허용 목록이고, 그런 상수는 읽는 사람을
+ * 속인다.
+ */
 export const IMAGE_CONTENT_TYPE = [
   'image/jpeg',
   'image/png',
@@ -12,15 +23,6 @@ export const IMAGE_CONTENT_TYPE = [
   'image/avif',
 ] as const;
 export type ImageContentType = (typeof IMAGE_CONTENT_TYPE)[number];
-
-/**
- * SVG 는 일부러 뺐다.
- *
- * SVG 안에는 <script> 가 들어갈 수 있고, 같은 오리진에서 그대로 내려주면
- * 그 스크립트가 우리 쿠키를 읽는다. 상품 사진에 벡터가 필요한 경우는 없으므로
- * 허용 목록에 넣지 않는다.
- */
-export const REJECTED_CONTENT_TYPE = ['image/svg+xml', 'text/html'] as const;
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 export const MAX_IMAGES_PER_PRODUCT = 8;

@@ -19,7 +19,7 @@ export type AuditTargetType =
   | 'event_log' | 'review' | 'support_post';
 
 /** 배치처럼 사람이 아닌 행위자 */
-export function isSystemActor(actor: Actor): boolean {
+function isSystemActor(actor: Actor): boolean {
   return actor.id.startsWith('system:');
 }
 

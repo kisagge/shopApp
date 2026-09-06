@@ -23,8 +23,6 @@ export const ZERO: Won = won(0);
 export const add = (...amounts: readonly Won[]): Won =>
   won(amounts.reduce<number>((sum, a) => sum + a, 0));
 
-export const subtract = (a: Won, b: Won): Won => won(a - b);
-
 /** 0 아래로는 내려가지 않는 뺄셈. 할인이 금액을 초과할 때 쓴다. */
 export const subtractToZero = (a: Won, b: Won): Won => won(Math.max(0, a - b));
 
@@ -36,7 +34,6 @@ export const multiply = (a: Won, quantity: number): Won => {
 };
 
 export const min = (a: Won, b: Won): Won => (a <= b ? a : b);
-export const isZero = (a: Won): boolean => a === 0;
 export const gte = (a: Won, b: Won): boolean => a >= b;
 
 /**

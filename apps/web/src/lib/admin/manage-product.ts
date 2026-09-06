@@ -20,7 +20,7 @@ import {
  * 때문에 컬럼으로 저장한다. **가격을 바꾸는 모든 경로가 이 함수를 거쳐야**
  * 값이 어긋나지 않는다. 따로 계산해 쓰지 말 것.
  */
-export function priceFields(input: { listPrice: number; salePrice: number | null }) {
+function priceFields(input: { listPrice: number; salePrice: number | null }) {
   return {
     listPrice: input.listPrice,
     salePrice: input.salePrice,
@@ -121,7 +121,7 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
 }
 
 /** 감사 로그에 남길 변경 전 상태 */
-export async function loadProductForAudit(actor: Actor, productId: string) {
+async function loadProductForAudit(actor: Actor, productId: string) {
   const scope = merchantScope(actor);
   if (scope === undefined) throw new ProductError('PRODUCT_NOT_FOUND', 404);
 

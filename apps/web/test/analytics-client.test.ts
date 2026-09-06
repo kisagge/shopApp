@@ -183,3 +183,26 @@ describe('봉투', () => {
     expect(event!['sessionId']).toMatch(/^[A-Za-z0-9_-]{8,64}$/);
   });
 });
+
+describe('앱이 쓰는 트래커', () => {
+  it('브라우저에서 거부하면 실제로 보내지 않는다', async () => {
+    /*
+     * 동의를 읽는 모듈은 진작 있었는데 **아무도 부르지 않았다** — 트래커가
+     * 기본값 `() => true` 로 돌아서, 거부해도 그대로 보냈다. 문서에는
+     * "거부는 즉시 존중한다" 고 적혀 있었다.
+     */
+    window.localStorage.setItem('shop.consent.analytics', 'false');
+    const sent: unknown[] = [];
+    vi.stubGlobal('fetch', vi.fn((_u: string, init: RequestInit) => {
+      sent.push(init.body);
+      return Promise.resolve(new Response(null, { status: 204 }));
+    }));
+
+    const { getTracker } = await import('~/lib/analytics/client');
+    const tracker = getTracker();
+    tracker.track('view_item', { productId: 'p-1' });
+    tracker.flush();
+
+    expect(sent).toEqual([]);
+  });
+});
