@@ -18,6 +18,7 @@ import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 // 이 앱에서 해석하지 못해 실패한다.
 import { prisma } from '@shop/db';
 import { imageObjectKey, defaultAlt } from '@shop/core';
+import { makeBlur } from '../src/lib/images/blur';
 import { placeholder, TONES } from './make-png.mjs';
 
 const TONE_NAMES = Object.keys(TONES);
@@ -80,6 +81,7 @@ async function main(): Promise<void> {
           productId: product.id,
           url: `${publicBase}/${key}`,
           storageKey: key,
+          blurDataUrl: await makeBlur(png),
           sortOrder: i,
           alt: defaultAlt({
             brandName: product.brand.name,

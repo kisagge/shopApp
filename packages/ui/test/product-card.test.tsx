@@ -93,4 +93,45 @@ describe('ProductCard', () => {
     const { container } = render(<ProductCard {...base} soldOut />);
     await expectNoA11yViolations(container);
   });
+
+  /**
+   * 자리표시 그림은 카드가 만들지 않고 **받아서 넘긴다.**
+   *
+   * 이 패키지는 next 를 모르므로 blur 를 직접 쓸 수 없다 — sizes·priority 와
+   * 같은 결이다. 넘기는 것을 빠뜨리면 아무 오류 없이 그냥 안 깔리므로,
+   * 넘어가는지를 여기서 본다.
+   */
+  it('자리표시 그림을 이미지 컴포넌트에 그대로 넘긴다', () => {
+    const seen: Record<string, unknown>[] = [];
+    const Spy = (props: Record<string, unknown>) => {
+      seen.push(props);
+      return null;
+    };
+
+    render(
+      <ProductCard
+        {...base}
+        image={{ src: '/a.jpg', alt: '코트', blurDataUrl: 'data:image/webp;base64,AAAA' }}
+        imageComponent={Spy as never}
+      />,
+    );
+
+    expect(seen[0]?.['blurDataUrl']).toBe('data:image/webp;base64,AAAA');
+  });
+
+  it('자리표시가 없으면 속성 자체를 넘기지 않는다', () => {
+    const seen: Record<string, unknown>[] = [];
+    const Spy = (props: Record<string, unknown>) => {
+      seen.push(props);
+      return null;
+    };
+
+    render(
+      <ProductCard {...base} image={{ src: '/a.jpg', alt: '코트' }} imageComponent={Spy as never} />,
+    );
+
+    // undefined 를 넘기면 exactOptionalPropertyTypes 아래에서 값이 있는 것과
+    // 구분되지 않는다. 아예 빼는 편이 정확하다.
+    expect(seen[0]).not.toHaveProperty('blurDataUrl');
+  });
 });

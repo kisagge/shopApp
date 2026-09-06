@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { isBlurDataUrl } from '@shop/core';
 
 const TONE_CLASS: Record<string, string> = {
   sand: 'bg-ph-sand', stone: 'bg-ph-stone', clay: 'bg-ph-clay',
@@ -18,6 +19,7 @@ export function CollectionHero({
   subtitle,
   description,
   imageUrl,
+  blurDataUrl,
   imageCredit,
   tone,
   sizes,
@@ -36,6 +38,8 @@ export function CollectionHero({
   subtitle: string | null;
   description?: string | null;
   imageUrl: string | null;
+  /** 사진이 도착하기 전 깔 자리표시. 없으면 톤 블록이 그대로 남는다. */
+  blurDataUrl?: string | null;
   /** 남의 사진을 쓸 때의 작가 표기. 상품 사진과 같은 규칙이다. */
   imageCredit?: string | null;
   tone: string;
@@ -74,6 +78,9 @@ export function CollectionHero({
             fill
             sizes={sizes ?? '100vw'}
             priority={priority}
+            {...(isBlurDataUrl(blurDataUrl)
+              ? { placeholder: 'blur' as const, blurDataURL: blurDataUrl }
+              : {})}
             className="object-cover"
           />
           {/*

@@ -42,6 +42,15 @@ export interface ImageLikeProps {
   readonly sizes?: string;
   /** 첫 화면에 보이는 이미지에만. 레이지 로딩을 끄고 먼저 받는다. */
   readonly priority?: boolean;
+  /**
+   * 사진이 도착하기 전 그 자리에 깔 아주 작은 같은 사진(데이터 URI).
+   *
+   * 없으면 지금처럼 톤 블록이 깔린다 — **자리는 어느 쪽이든 비지 않는다.**
+   *
+   * null 도 받는다. DB 의 칸이 비어 있을 수 있는 값이라, 넘기는 쪽마다
+   * undefined 로 바꾸게 하면 그 변환이 열 곳에 흩어진다.
+   */
+  readonly blurDataUrl?: string | null;
 }
 export type ImageLike = ComponentType<ImageLikeProps>;
 
@@ -64,7 +73,11 @@ export interface ProductCardProps {
   readonly soldOut?: boolean;
   readonly isNew?: boolean;
   /** 상품 이미지. 없으면 톤 블록 플레이스홀더가 들어간다 */
-  readonly image?: { readonly src: string; readonly alt: string } | undefined;
+  readonly image?: {
+    readonly src: string;
+    readonly alt: string;
+    readonly blurDataUrl?: string | null | undefined;
+  } | undefined;
   readonly placeholderTone?: 'sand' | 'stone' | 'clay' | 'olive' | 'mist';
   /**
    * 라우팅을 담당할 컴포넌트. 기본은 평범한 <a> 라 전체 페이지 이동이 난다.
@@ -133,6 +146,7 @@ export function ProductCard({
               alt={image.alt}
               className="h-full w-full object-cover"
               {...(imageSizes ? { sizes: imageSizes } : {})}
+              {...(image.blurDataUrl ? { blurDataUrl: image.blurDataUrl } : {})}
               priority={imagePriority}
             />
           ) : (

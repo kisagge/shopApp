@@ -37,6 +37,7 @@ export async function CollectionStrip({
                 title={c.title}
                 subtitle={c.subtitle}
                 imageUrl={c.imageUrl}
+                blurDataUrl={c.blurDataUrl}
                 imageCredit={c.imageCredit}
                 tone={c.tone}
                 // md 부터 두 칸이다. 그 아래로는 한 칸.

@@ -7,6 +7,7 @@ import {
   type Actor,
 } from '@shop/core';
 import { getStorage } from '~/lib/storage';
+import { makeBlur } from '~/lib/images/blur';
 import { ProductError } from './manage-product';
 
 /**
@@ -70,7 +71,10 @@ export async function addProductImage(
     token: randomBytes(12).toString('base64url'),
   });
 
-  const { url } = await getStorage().put({ key, body: file.bytes, contentType });
+  const [{ url }, blurDataUrl] = await Promise.all([
+    getStorage().put({ key, body: file.bytes, contentType }),
+    makeBlur(file.bytes),
+  ]);
 
   const sortOrder = product._count.images;
   const image = await prisma.productImage.create({
@@ -78,6 +82,7 @@ export async function addProductImage(
       productId,
       url,
       storageKey: key,
+      blurDataUrl,
       sortOrder,
       alt:
         alt?.trim() ||

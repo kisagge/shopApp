@@ -235,6 +235,11 @@ model Banner {
   imageAlt   String?
   storageKey String?
 
+  /// 사진이 도착하기 전 그 자리에 깔 아주 작은 같은 사진(webp 데이터 URI).
+  /// 이미지마다 HTML 에 실려 나가므로 크기가 곧 비용이다 — 상한은 core 가 정하고,
+  /// 넘으면 만들지 않는다(그때는 지금처럼 톤 블록이 깔린다).
+  blurDataUrl String?
+
   /// 사진 출처. 남의 사진을 쓸 때 표기가 없으면 나중에 어느 것이 우리
   /// 것이고 어느 것이 남의 것인지 구분할 방법이 사라진다.
   imageCredit String?
@@ -271,6 +276,11 @@ model Collection {
   imageUrl   String?
   imageAlt   String?
   storageKey String?
+
+  /// 사진이 도착하기 전 그 자리에 깔 아주 작은 같은 사진(webp 데이터 URI).
+  /// 이미지마다 HTML 에 실려 나가므로 크기가 곧 비용이다 — 상한은 core 가 정하고,
+  /// 넘으면 만들지 않는다(그때는 지금처럼 톤 블록이 깔린다).
+  blurDataUrl String?
 
   /// 사진 출처. 배너와 같은 이유로 둔다.
   imageCredit String?
@@ -455,6 +465,11 @@ model ProductImage {
   /// 비워 두지 말 것. 스크린리더가 읽는 유일한 설명이다.
   alt       String
   sortOrder Int     @default(0)
+
+  /// 사진이 도착하기 전 그 자리에 깔 아주 작은 같은 사진(webp 데이터 URI).
+  /// 이미지마다 HTML 에 실려 나가므로 크기가 곧 비용이다 — 상한은 core 가 정하고,
+  /// 넘으면 만들지 않는다(그때는 지금처럼 톤 블록이 깔린다).
+  blurDataUrl String?
 
   /// 오브젝트 스토리지의 키. 우리가 올린 이미지에만 있다.
   /// url 에서 잘라 쓰지 않는 이유는 공개 도메인(CDN)이 바뀌면

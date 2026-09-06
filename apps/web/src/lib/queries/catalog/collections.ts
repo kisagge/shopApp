@@ -12,6 +12,7 @@ export interface CollectionCard {
   readonly subtitle: string | null;
   readonly imageUrl: string | null;
   readonly imageAlt: string | null;
+  readonly blurDataUrl: string | null;
   readonly imageCredit: string | null;
   readonly tone: string;
   readonly itemCount: number;
@@ -47,6 +48,7 @@ const collectionRows = cachedRead(
       orderBy: { sortOrder: 'asc' },
       select: {
         slug: true, title: true, subtitle: true, imageUrl: true, imageAlt: true,
+        blurDataUrl: true,
         imageCredit: true, tone: true, isActive: true, startsAt: true, endsAt: true,
         _count: { select: { items: { where: { product: { ...onDisplay(), brand: sellableBrand() } } } } },
       },
@@ -61,7 +63,8 @@ export async function getLiveCollections(now = new Date()): Promise<CollectionCa
     isLive(reviveWindow(c), now) && hasVisibleItems(c._count.items)
       ? [{
           slug: c.slug, title: c.title, subtitle: c.subtitle,
-          imageUrl: c.imageUrl, imageAlt: c.imageAlt, imageCredit: c.imageCredit,
+          imageUrl: c.imageUrl, imageAlt: c.imageAlt, blurDataUrl: c.blurDataUrl,
+          imageCredit: c.imageCredit,
           tone: c.tone, itemCount: c._count.items,
         }]
       : [],
@@ -82,7 +85,7 @@ const collectionRow = cachedRead(
       where: { slug },
       select: {
         slug: true, title: true, subtitle: true, description: true,
-        imageUrl: true, imageAlt: true, imageCredit: true, tone: true,
+        imageUrl: true, imageAlt: true, blurDataUrl: true, imageCredit: true, tone: true,
         isActive: true, startsAt: true, endsAt: true,
         items: {
           where: { product: { ...onDisplay(), brand: sellableBrand() } },
@@ -107,6 +110,6 @@ export async function getCollection(
   return {
     slug: row.slug, title: row.title, subtitle: row.subtitle,
     description: row.description, imageUrl: row.imageUrl, imageAlt: row.imageAlt,
-    imageCredit: row.imageCredit, tone: row.tone, itemCount: items.length, items,
+    blurDataUrl: row.blurDataUrl, imageCredit: row.imageCredit, tone: row.tone, itemCount: items.length, items,
   };
 }

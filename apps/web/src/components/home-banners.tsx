@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import { isBlurDataUrl } from '@shop/core';
 import { Carousel } from '@shop/ui';
 import { AppLink } from './app-link';
 import { useT } from '~/lib/i18n/client';
@@ -13,6 +14,7 @@ export interface HomeBanner {
   readonly ctaLabel: string | null;
   readonly href: string | null;
   readonly imageUrl: string | null;
+  readonly blurDataUrl: string | null;
   readonly imageAlt: string | null;
   /** 남의 사진을 쓸 때의 작가 표기. 상품 사진과 같은 규칙이다. */
   readonly imageCredit: string | null;
@@ -68,6 +70,9 @@ function BannerSlide({ banner, index }: { banner: HomeBanner; index: number }) {
             sizes="100vw"
             // 홈의 첫 화면이다. 여기가 늦으면 사이트가 늦은 것으로 보인다.
             priority={index === 0}
+            {...(isBlurDataUrl(banner.blurDataUrl)
+              ? { placeholder: 'blur' as const, blurDataURL: banner.blurDataUrl }
+              : {})}
             className="object-cover"
           />
           {/*

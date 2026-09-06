@@ -61,7 +61,8 @@ export default async function HomePage() {
         banners={banners.map((b) => ({
           id: b.id, eyebrow: b.eyebrow, headline: b.headline, subcopy: b.subcopy,
           ctaLabel: b.ctaLabel, href: b.href,
-          imageUrl: b.imageUrl, imageAlt: b.imageAlt, imageCredit: b.imageCredit,
+          imageUrl: b.imageUrl, imageAlt: b.imageAlt, blurDataUrl: b.blurDataUrl,
+          imageCredit: b.imageCredit,
           tone: b.tone,
         }))}
       />

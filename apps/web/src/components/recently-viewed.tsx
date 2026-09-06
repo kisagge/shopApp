@@ -123,7 +123,9 @@ export function RecentlyViewed({ excludeSlug }: { excludeSlug?: string } = {}) {
                   soldOut={p.soldOut}
                   isNew={p.isNew}
                   image={
-                    p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined
+                    p.imageUrl && p.imageAlt
+                      ? { src: p.imageUrl, alt: p.imageAlt, blurDataUrl: p.blurDataUrl }
+                      : undefined
                   }
                 />
               </li>

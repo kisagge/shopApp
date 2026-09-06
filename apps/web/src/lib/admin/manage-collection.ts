@@ -13,6 +13,7 @@ import {
   type UpdateCollectionInput,
 } from '@shop/contract';
 import { getStorage } from '~/lib/storage';
+import { makeBlur } from '~/lib/images/blur';
 
 export class CollectionError extends Error {
   constructor(readonly code: CollectionErrorCode, readonly status = 404) {
@@ -316,11 +317,14 @@ export async function setCollectionImage(
     token: randomBytes(12).toString('base64url'),
   });
 
-  const { url } = await getStorage().put({ key, body: file.bytes, contentType });
+  const [{ url }, blurDataUrl] = await Promise.all([
+    getStorage().put({ key, body: file.bytes, contentType }),
+    makeBlur(file.bytes),
+  ]);
 
   const after = await prisma.collection.update({
     where: { id: collectionId },
-    data: { imageUrl: url, storageKey: key, imageAlt: alt.trim() || null },
+    data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
     select,
   });
 

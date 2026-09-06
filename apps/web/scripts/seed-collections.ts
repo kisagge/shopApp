@@ -19,6 +19,7 @@ import { randomBytes } from 'node:crypto';
 import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@shop/db';
 import { imageObjectKey, verifyImageBytes } from '@shop/core';
+import { makeBlur } from '../src/lib/images/blur';
 
 const ACCESS_KEY = process.env['UNSPLASH_ACCESS_KEY'];
 
@@ -110,7 +111,7 @@ async function fetchHero(
   query: string,
   keyOwner: string,
   used: Set<string>,
-): Promise<{ url: string; key: string; credit: string } | null> {
+): Promise<{ url: string; key: string; credit: string; blurDataUrl: string | null } | null> {
   const candidates = (await search(query)).filter((p) => !used.has(p.id));
   const photo = candidates[0];
   if (!photo) {
@@ -142,6 +143,8 @@ async function fetchHero(
     url: `${publicBase}/${key}`,
     key,
     credit: `Photo: ${photo.user.name} / Unsplash`,
+    // 받아 온 바이트가 여기 있다. 나중에 주소로 다시 받는 것보다 싸다.
+    blurDataUrl: await makeBlur(bytes),
   };
 }
 
@@ -176,7 +179,8 @@ async function main(): Promise<void> {
     await prisma.collection.update({
       where: { id: collection.id },
       data: {
-        imageUrl: hero.url, storageKey: hero.key, imageCredit: hero.credit, imageAlt: '',
+        imageUrl: hero.url, storageKey: hero.key, blurDataUrl: hero.blurDataUrl,
+        imageCredit: hero.credit, imageAlt: '',
       },
     });
     console.log(`${collection.title} — 사진 1장`);
@@ -204,7 +208,10 @@ async function main(): Promise<void> {
         data: {
           href: `/collection/${link.slug}`,
           ...(hero
-            ? { imageUrl: hero.url, storageKey: hero.key, imageCredit: hero.credit, imageAlt: '' }
+            ? {
+                imageUrl: hero.url, storageKey: hero.key, blurDataUrl: hero.blurDataUrl,
+                imageCredit: hero.credit, imageAlt: '',
+              }
             : {}),
         },
       });

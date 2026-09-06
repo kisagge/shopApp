@@ -46,6 +46,7 @@ export interface ProductListItem {
   readonly isNew: boolean;
   readonly imageUrl: string | undefined;
   readonly imageAlt: string | undefined;
+  readonly blurDataUrl: string | undefined;
 }
 
 /** 등록 30일 이내면 NEW */
@@ -61,7 +62,11 @@ export const listSelect = {
   reviewCount: true,
   publishedAt: true,
   brand: { select: { name: true } },
-  images: { select: { url: true, alt: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
+  images: {
+    select: { url: true, alt: true, blurDataUrl: true },
+    orderBy: { sortOrder: 'asc' },
+    take: 1,
+  },
   variants: { select: { stock: true }, where: { isActive: true } },
 } as const;
 
@@ -85,7 +90,7 @@ type ListRow = {
    */
   publishedAt: Date | string | null;
   brand: { name: string };
-  images: { url: string; alt: string }[];
+  images: { url: string; alt: string; blurDataUrl: string | null }[];
   variants: { stock: number }[];
 };
 
@@ -115,5 +120,6 @@ export function toListItem(p: ListRow, now: number): ProductListItem {
     isNew: p.publishedAt !== null && now - epochOf(p.publishedAt) < NEW_WINDOW_MS,
     imageUrl: image?.url,
     imageAlt: image?.alt,
+    blurDataUrl: image?.blurDataUrl ?? undefined,
   };
 }

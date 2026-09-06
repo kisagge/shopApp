@@ -7,6 +7,7 @@ import { Badge, Price } from '@shop/ui';
 import {
   DEFAULT_SHIPPING, GRADE_REWARD_PERCENT, percentOf,
   productStructuredData, breadcrumbStructuredData,
+  isBlurDataUrl,
 } from '@shop/core';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { headers } from 'next/headers';
@@ -181,6 +182,9 @@ export default async function ProductPage({ params, searchParams }: Params) {
               sizes="(min-width: 1024px) calc(100vw - 452px), 100vw"
               // 이 화면의 가장 큰 그림이자 첫 화면에 있다. 늦게 받으면 그대로 체감된다.
               priority
+              {...(isBlurDataUrl(product.images[0].blurDataUrl)
+                ? { placeholder: 'blur' as const, blurDataURL: product.images[0].blurDataUrl }
+                : {})}
               className="rounded-md object-cover"
             />
           ) : (

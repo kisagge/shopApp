@@ -43,6 +43,7 @@ export default async function CollectionPage({ params }: Params) {
           subtitle={collection.subtitle}
           description={collection.description}
           imageUrl={collection.imageUrl}
+          blurDataUrl={collection.blurDataUrl}
           imageCredit={collection.imageCredit}
           tone={collection.tone}
           sizes="100vw"

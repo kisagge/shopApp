@@ -44,6 +44,7 @@ export default async function CollectionsPage() {
                   title={c.title}
                   subtitle={c.subtitle}
                   imageUrl={c.imageUrl}
+                  blurDataUrl={c.blurDataUrl}
                   imageCredit={c.imageCredit}
                   tone={c.tone}
                   sizes="(min-width: 768px) 50vw, 100vw" 

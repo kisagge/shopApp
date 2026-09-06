@@ -12,6 +12,7 @@ import {
   type BannerErrorCode, type CreateBannerInput, type UpdateBannerInput,
 } from '@shop/contract';
 import { getStorage } from '~/lib/storage';
+import { makeBlur } from '~/lib/images/blur';
 
 export class BannerError extends Error {
   constructor(readonly code: BannerErrorCode, readonly status = 404) {
@@ -28,6 +29,7 @@ export interface BannerRow {
   readonly ctaLabel: string | null;
   readonly href: string | null;
   readonly imageUrl: string | null;
+  readonly blurDataUrl: string | null;
   readonly imageAlt: string | null;
   readonly imageCredit: string | null;
   readonly tone: BannerTone;
@@ -40,13 +42,15 @@ export interface BannerRow {
 
 const select = {
   id: true, eyebrow: true, headline: true, subcopy: true,
-  ctaLabel: true, href: true, imageUrl: true, imageAlt: true, imageCredit: true,
+  ctaLabel: true, href: true, imageUrl: true, imageAlt: true, blurDataUrl: true,
+  imageCredit: true,
   tone: true, sortOrder: true, isActive: true, startsAt: true, endsAt: true,
 } as const;
 
 type Raw = {
   id: string; eyebrow: string | null; headline: string; subcopy: string | null;
   ctaLabel: string | null; href: string | null; imageUrl: string | null;
+  blurDataUrl: string | null;
   imageAlt: string | null; imageCredit: string | null; tone: string; sortOrder: number; isActive: boolean;
   startsAt: Date | null; endsAt: Date | null;
 };
@@ -209,11 +213,15 @@ export async function setBannerImage(
     token: randomBytes(12).toString('base64url'),
   });
 
-  const { url } = await getStorage().put({ key, body: file.bytes, contentType });
+  const [{ url }, blurDataUrl] = await Promise.all([
+    getStorage().put({ key, body: file.bytes, contentType }),
+    // 저장과 나란히 만든다. 실패해도 null 이라 업로드를 막지 않는다.
+    makeBlur(file.bytes),
+  ]);
 
   const after = await prisma.banner.update({
     where: { id: bannerId },
-    data: { imageUrl: url, storageKey: key, imageAlt: alt.trim() || null },
+    data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
     select,
   });
 

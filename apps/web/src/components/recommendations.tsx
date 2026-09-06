@@ -65,7 +65,11 @@ export async function Recommendations({
               reviewCount={p.reviewCount}
               soldOut={p.soldOut}
               isNew={p.isNew}
-              image={p.imageUrl && p.imageAlt ? { src: p.imageUrl, alt: p.imageAlt } : undefined}
+              image={
+                p.imageUrl && p.imageAlt
+                  ? { src: p.imageUrl, alt: p.imageAlt, blurDataUrl: p.blurDataUrl }
+                  : undefined
+              }
             />
           </li>
         ))}

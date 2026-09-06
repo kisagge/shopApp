@@ -23,6 +23,7 @@ import { randomBytes } from 'node:crypto';
 import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { prisma } from '@shop/db';
 import { imageObjectKey, defaultAlt, verifyImageBytes } from '@shop/core';
+import { makeBlur } from '../src/lib/images/blur';
 
 const ACCESS_KEY = process.env['UNSPLASH_ACCESS_KEY'];
 if (!ACCESS_KEY) {
@@ -231,6 +232,7 @@ async function main(): Promise<void> {
           productId: product.id,
           url: `${publicBase}/${key}`,
           storageKey: key,
+          blurDataUrl: await makeBlur(bytes),
           sortOrder: i,
           alt: defaultAlt({
             brandName: product.brand.name,
