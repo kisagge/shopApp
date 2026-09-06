@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { sendOrderMail, orderLocale, shipToLine } from '~/lib/orders/notify';
 import {
   assertPaymentAmount, isPaidStatus, transition, won,
   PaymentError, type PaymentGateway, type Won,
@@ -45,8 +46,11 @@ export async function confirmPayment(
     where: { orderNo: input.orderNo, userId: user.id },
     select: {
       id: true, orderNo: true, status: true, payable: true, browserSessionId: true,
-      items: { select: { quantity: true } },
+      // 안내 메일이 쓴다. 주문에 박아 둔 값을 쓰므로 상품이 바뀌어도 그때 그대로다.
+      locale: true, recipient: true, postalCode: true, address1: true, address2: true,
+      items: { select: { quantity: true, productName: true, optionLabel: true, unitPrice: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true } },
+      user: { select: { email: true, name: true } },
     },
   });
   if (!order) throw new ConfirmError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
@@ -146,6 +150,37 @@ export async function confirmPayment(
       props: { provider: gateway.provider, method: result.method },
     });
   }
+
+  /*
+   * 안내 메일.
+   *
+   * **결제가 성립한 뒤에 보낸다.** 주문을 만들 때 보내면 결제 화면에서
+   * 떠난 사람에게도 "주문이 완료되었습니다" 가 간다 — 실제로 그런 주문이
+   * 재고를 물고 있었던 것을 앞서 봤다.
+   *
+   * 가상계좌는 아직 입금 전이라 다른 말을 보낸다. 이때 계좌번호를 메일로
+   * 주지 않으면 **화면을 닫는 순간 어디로 넣을지 알 길이 없어진다.**
+   *
+   * 던지지 않는다. 여기서 실패한다고 승인된 결제를 되돌릴 수는 없다.
+   */
+  await sendOrderMail(paid ? 'paid' : 'pending', {
+    to: order.user.email,
+    buyerName: order.user.name,
+    orderNo: order.orderNo,
+    locale: orderLocale(order.locale),
+    items: order.items,
+    payable: order.payable,
+    shipTo: shipToLine(order),
+    ...(result.virtualAccount
+      ? {
+          virtualAccount: {
+            bank: result.virtualAccount.bank,
+            accountNumber: result.virtualAccount.accountNumber,
+            dueDate: result.virtualAccount.dueDate ?? null,
+          },
+        }
+      : {}),
+  });
 
   return {
     orderNo: order.orderNo,

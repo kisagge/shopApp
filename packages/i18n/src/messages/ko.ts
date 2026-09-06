@@ -801,6 +801,29 @@ export const ko = {
   'cart.freeShippingLeft': '더 담으면 무료배송입니다',
   'cart.rewardPreview': '구매 시 {amount}P 적립 예정',
   'cart.goShopping': '쇼핑하러 가기',
+
+  /* ── 주문 안내 메일 ─────────────────────────────────
+     화면이 아니라 메일함에서 읽는 글이다. 받는 사람은 우리 화면을 보고
+     있지 않으므로, 문장 하나만 봐도 무슨 주문인지 알 수 있어야 한다. */
+  'mail.footer': '포트폴리오 목적으로 제작된 화면입니다. 이 메일은 발신 전용입니다.',
+  'mail.order.paidSubject': '[PLAIN] 주문이 완료되었습니다 · {orderNo}',
+  'mail.order.paidHeading': '주문이 완료되었습니다',
+  'mail.order.paidLead': '{name}님, 주문해 주셔서 감사합니다. 결제가 확인되어 상품을 준비하고 있습니다.',
+  'mail.order.pendingSubject': '[PLAIN] 입금을 기다리고 있습니다 · {orderNo}',
+  'mail.order.pendingHeading': '입금을 기다리고 있습니다',
+  'mail.order.pendingLead': '{name}님, 아래 계좌로 입금해 주시면 주문이 확정됩니다. 기한이 지나면 주문은 자동으로 취소됩니다.',
+  'mail.order.depositedSubject': '[PLAIN] 입금이 확인되었습니다 · {orderNo}',
+  'mail.order.depositedHeading': '입금이 확인되었습니다',
+  'mail.order.depositedLead': '입금이 확인되어 주문이 확정되었습니다. 상품을 준비하고 있습니다.',
+  'mail.order.orderNo': '주문번호',
+  'mail.order.items': '주문 상품',
+  'mail.order.total': '결제 금액',
+  'mail.order.shipTo': '받는 곳',
+  'mail.order.bank': '입금 은행',
+  'mail.order.account': '계좌번호',
+  'mail.order.due': '입금 기한',
+  'mail.order.view': '주문 상세 보기',
+  'mail.order.quantity': '{count}개',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

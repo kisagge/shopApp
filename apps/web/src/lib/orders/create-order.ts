@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { DEFAULT_LOCALE, type Locale } from '@shop/i18n';
 import {
   generateOrderNumber, INITIAL_ORDER_STATUS, won,
   type OrderItemDraft, type ShippingSnapshot, type Won,
@@ -38,6 +39,14 @@ export async function createOrder(
   input: CreateOrderRequest,
   // 적립률까지 함께 받는다 — 견적과 같은 값이어야 한다(getQuoteViewer)
   user: { id: string; pointBalance: number; rewardPercent?: number },
+  /**
+   * 주문한 그때의 언어. 안내 메일이 이 값을 쓴다.
+   *
+   * **요청 본문이 아니라 서버가 읽은 값을 받는다.** 화면이 보내는 값을
+   * 그대로 믿으면 남의 주문 메일 언어를 바꿔 넣을 수 있고, 무엇보다
+   * 사용자가 실제로 본 화면의 말과 어긋날 수 있다.
+   */
+  locale: Locale = DEFAULT_LOCALE,
 ): Promise<CreateOrderResponse> {
   /*
    * **이미 만든 주문이면 그것을 그대로 돌려준다.**
@@ -170,6 +179,7 @@ export async function createOrder(
             isRemoteArea: shipping.isRemoteArea,
             deliveryMemo: shipping.deliveryMemo,
             browserSessionId: input.browserSessionId ?? null,
+            locale,
             idempotencyKey: input.idempotencyKey ?? null,
             usedCouponId,
             items: {

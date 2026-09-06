@@ -22,8 +22,12 @@ const user = { id: 'u-1' };
 
 const order = (over: Record<string, unknown> = {}) => ({
   id: 'o-1', orderNo: '20260831-1234567', status: 'PENDING', payable: 289_000,
-  items: [{ quantity: 2 }],
+  // 안내 메일이 읽는 값들. 실제 select 와 같은 모양이어야 한다.
+  locale: 'ko', recipient: '데모', postalCode: '04524',
+  address1: '서울 중구 세종대로 110', address2: '3층',
+  items: [{ quantity: 2, productName: '울 코트', optionLabel: 'M / 블랙', unitPrice: 144_500 }],
   payment: { id: 'p-1', status: 'READY', pgPaymentKey: null },
+  user: { email: 'demo@plain.test', name: '데모 고객' },
   ...over,
 });
 

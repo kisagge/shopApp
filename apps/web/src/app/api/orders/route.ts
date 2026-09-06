@@ -4,6 +4,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
 import { validationFailed } from '~/lib/i18n/validation';
+import { getLocale } from '~/lib/i18n/server';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
@@ -45,7 +46,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    const order = await createOrder(parsed.data, user);
+    const order = await createOrder(parsed.data, user, await getLocale());
 
     // purchase 이벤트는 여기서 찍지 않는다. 주문이 만들어졌을 뿐 결제는
     // 아직 안 났다. 결제 승인(confirm-payment)이 성립한 순간에만 기록한다 —

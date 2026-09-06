@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { isPaidStatus, transition, type PaymentGateway } from '@shop/core';
+import { sendOrderMail, orderLocale, shipToLine } from '~/lib/orders/notify';
 import { getPaymentGateway } from './index';
 import { recordServerEvent } from '~/lib/analytics/server';
 
@@ -36,7 +37,16 @@ export async function applyDeposit(
       id: true,
       status: true,
       amount: true,
-      order: { select: { id: true, orderNo: true, status: true, userId: true, browserSessionId: true } },
+      order: {
+        select: {
+          id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
+          // 안내 메일이 쓴다
+          locale: true, payable: true, recipient: true, postalCode: true,
+          address1: true, address2: true,
+          items: { select: { productName: true, optionLabel: true, quantity: true, unitPrice: true } },
+          user: { select: { email: true, name: true } },
+        },
+      },
     },
   });
   if (!payment) return { applied: false, reason: '우리 결제가 아닙니다' };
@@ -70,13 +80,13 @@ export async function applyDeposit(
 
   const nextStatus = transition(payment.order.status, 'PAID');
 
-  await prisma.$transaction(async (tx) => {
+  const applied = await prisma.$transaction(async (tx) => {
     // 조건부 UPDATE. 그 사이 다른 웹훅이 먼저 처리했으면 0건이 나온다.
     const { count } = await tx.order.updateMany({
       where: { id: payment.order.id, status: 'PENDING' },
       data: { status: nextStatus, paidAt: result.approvedAt ?? new Date() },
     });
-    if (count === 0) return;
+    if (count === 0) return false;
 
     await tx.orderItem.updateMany({
       where: { orderId: payment.order.id },
@@ -99,7 +109,21 @@ export async function applyDeposit(
         rawResponse: result.raw as object,
       },
     });
+
+    return true;
   });
+
+  /*
+   * **반영하지 못했으면 여기서 멈춘다.**
+   *
+   * 조건부 UPDATE 가 0건이면 그 사이 다른 웹훅이 먼저 처리했거나 주문이 이미
+   * 다른 상태로 갔다는 뜻이다. 그런데 예전에는 트랜잭션 안에서만 빠져나가고
+   * **바깥은 그대로 돌았다** — 웹훅은 여러 번 오므로 같은 매출이 두 번 찍힐
+   * 수 있었다. 앞의 DONE 검사가 대부분 막아 주지만 경합에서는 지나간다.
+   */
+  if (!applied) {
+    return { applied: false, reason: '다른 처리가 먼저 반영했습니다' };
+  }
 
   // 매출 이벤트는 서버에서만 기록한다. 브라우저가 보낸 것은 수집 API 가 버린다.
   const session = payment.order.browserSessionId ?? `order-${payment.order.orderNo}`;
@@ -117,6 +141,18 @@ export async function applyDeposit(
     value: payment.amount,
     quantity: null,
     props: { provider: gateway.provider, method: 'VIRTUAL_ACCOUNT', via: 'deposit_webhook' },
+  });
+
+  // 입금이 확인된 순간이 이 주문의 결제가 성립한 순간이다.
+  // 그때의 말을 알 길이 여기에는 없으므로 주문이 들고 있던 값을 쓴다.
+  await sendOrderMail('deposited', {
+    to: payment.order.user.email,
+    buyerName: payment.order.user.name,
+    orderNo: payment.order.orderNo,
+    locale: orderLocale(payment.order.locale),
+    items: payment.order.items,
+    payable: payment.order.payable,
+    shipTo: shipToLine(payment.order),
   });
 
   return { applied: true, orderNo: payment.order.orderNo, status: nextStatus };

@@ -32,6 +32,11 @@ const payment = (over: Record<string, unknown> = {}) => ({
   order: {
     id: 'o-1', orderNo: '20260903-0000001', status: 'PENDING',
     userId: 'u-1', browserSessionId: 'sess-1',
+    // 안내 메일이 읽는 값들
+    locale: 'ko', payable: 289_000, recipient: '데모', postalCode: '04524',
+    address1: '서울 중구 세종대로 110', address2: null,
+    items: [{ productName: '울 코트', optionLabel: 'M / 블랙', quantity: 1, unitPrice: 289_000 }],
+    user: { email: 'demo@plain.test', name: '데모 고객' },
   },
   ...over,
 });

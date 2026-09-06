@@ -35,18 +35,36 @@ export function escapeHtml(value: string): string {
  *
  * 바깥에서 아무것도 불러오지 않는다 — 메일 클라이언트는 대부분 외부 CSS 와
  * 웹폰트를 막고, 이미지도 기본으로 차단한다. 인라인 스타일과 시스템 글꼴만 쓴다.
+ *
+ * **바닥글 문구를 받는다.** 예전에는 한국어가 박혀 있었는데, 주문 안내처럼
+ * 받는 사람의 말로 나가야 하는 메일이 생기면서 그 자리만 한국어로 남았다.
+ * 여기가 정하는 것은 모양이고, 무슨 말인지는 부르는 쪽이 안다.
  */
-function shell(heading: string, bodyHtml: string): string {
+export function mailShell(input: {
+  readonly heading: string;
+  readonly bodyHtml: string;
+  readonly footer: string;
+}): string {
   return [
     '<div style="font-family:-apple-system,BlinkMacSystemFont,\'Apple SD Gothic Neo\',sans-serif;',
     'font-size:15px;line-height:1.7;color:#2b2926;max-width:520px;margin:0 auto;padding:32px 24px">',
     '<p style="font-size:18px;letter-spacing:0.16em;font-weight:600;margin:0 0 28px">PLAIN</p>',
-    `<h1 style="font-size:19px;font-weight:600;margin:0 0 16px">${escapeHtml(heading)}</h1>`,
-    bodyHtml,
+    `<h1 style="font-size:19px;font-weight:600;margin:0 0 16px">${escapeHtml(input.heading)}</h1>`,
+    input.bodyHtml,
     '<p style="color:#6f6a63;font-size:12px;margin:32px 0 0;border-top:1px solid #e6e3de;padding-top:16px">',
-    '포트폴리오 목적으로 제작된 화면입니다. 이 메일은 발신 전용입니다.',
+    escapeHtml(input.footer),
     '</p></div>',
   ].join('');
+}
+
+/** 지금까지의 메일은 전부 한국어다. 받는 사람의 말을 알 길이 없어서다. */
+const KO_FOOTER = '포트폴리오 목적으로 제작된 화면입니다. 이 메일은 발신 전용입니다.';
+
+const shell = (heading: string, bodyHtml: string): string =>
+  mailShell({ heading, bodyHtml, footer: KO_FOOTER });
+
+export function mailButton(url: string, label: string): string {
+  return button(url, label);
 }
 
 function button(url: string, label: string): string {
