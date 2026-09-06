@@ -17,6 +17,10 @@ const tx = vi.hoisted(() => ({
 const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/** 게이트웨이를 언제 만드는지 보려고 가로챈다 */
+const payments = vi.hoisted(() => ({ getPaymentGateway: vi.fn<(...a: any[]) => any>() }));
+vi.mock('~/lib/payments', () => payments);
+
 const { cancelOrder, CancelError } = await import('~/lib/orders/cancel-order');
 
 const customer: Actor = { id: 'u-1', role: 'CUSTOMER', merchantId: null };
@@ -196,5 +200,31 @@ describe('취소할 수 없는 이유를 구분해서 알린다', () => {
     await expect(
       cancelOrder('20260831-1234567', admin, '배송 사고', gateway()),
     ).rejects.toThrow(/배송중/); // 상태머신이 SHIPPED → CANCELLED 를 막는다
+  });
+});
+
+describe('결제가 잡히지 않은 주문', () => {
+  it('게이트웨이를 아예 만들지 않는다', async () => {
+    /*
+     * **기본 인자로 미리 만들면 부를 때마다 만들어진다.** 결제 키가 없는
+     * 배포에서는 그 자리에서 던져서, 돈이 오간 적 없는 주문의 취소가 통째로
+     * 500 이었다 — 결제 대기 재고를 푸는 배치도 같은 이유로 한 건도 못
+     * 풀었을 것이다.
+     *
+     * 여기서 게이트웨이를 넘기지 않는다. 만들려 들면 그 자리에서 터진다.
+     */
+    db.order.findFirst.mockResolvedValue(
+      order({ status: 'PENDING', payment: { id: 'pay-1', status: 'READY', pgPaymentKey: null, refundedAmount: 0 } }),
+    );
+
+    // 만들려 들면 그 자리에서 터진다 — 키가 없는 배포가 그랬다
+    payments.getPaymentGateway.mockImplementation(() => {
+      throw new Error('결제 설정이 없습니다');
+    });
+
+    const result = await cancelOrder('20260101-0000001', customer, '단순 변심');
+
+    expect(result.refunded).toBe(0);
+    expect(result.status).toBe('CANCELLED');
   });
 });

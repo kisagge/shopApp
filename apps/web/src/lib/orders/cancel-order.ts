@@ -34,7 +34,18 @@ export async function cancelOrder(
   orderNo: string,
   actor: Actor,
   reason: string,
-  gateway: PaymentGateway = getPaymentGateway(),
+  /**
+   * 결제 취소를 부를 곳.
+   *
+   * **기본값으로 미리 만들지 않는다.** 기본 인자는 부를 때마다 평가되므로,
+   * 결제가 잡히지 않은 주문을 취소할 때도 게이트웨이가 만들어졌다 — 그리고
+   * 결제 키가 없는 배포에서는 그 자리에서 던졌다. 돈이 오간 적 없는 주문을
+   * 되돌리는 데 결제 설정이 필요할 이유가 없다.
+   *
+   * 실제로 미결제 주문 취소가 통째로 500 이었고, **결제 대기 재고를 푸는
+   * 배치도 같은 이유로 한 건도 못 풀었을 것**이다.
+   */
+  gateway?: PaymentGateway,
 ): Promise<CancelResult> {
   const isStaff = canRefundOrder(actor);
 
@@ -76,7 +87,8 @@ export async function cancelOrder(
   let refunded = 0;
   const captured = order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED';
   if (captured && order.payment?.pgPaymentKey) {
-    const result = await gateway.cancel({
+    // 여기서야 필요하다. 여기까지 오지 않으면 만들지 않는다.
+    const result = await (gateway ?? getPaymentGateway()).cancel({
       paymentKey: order.payment.pgPaymentKey,
       amount: null, // 전액 취소
       reason,

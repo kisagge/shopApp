@@ -12,6 +12,28 @@ import { test, expect } from '@playwright/test';
  */
 
 /**
+ * 만든 주문을 되돌린다.
+ *
+ * **이 명세는 진짜 주문을 만든다** — 그러면 진짜 재고가 깎인다. 되돌리지
+ * 않으면 같은 DB 에서 반복해 돌릴수록 재고가 말라 나중 실행이 "주문할 수
+ * 있는 상품이 없습니다" 로 진다. 실제로 그렇게 됐다: 마흔 건이 쌓이고
+ * 변형 일곱이 0 이 됐다.
+ *
+ * 되돌리는 길은 사용자가 쓰는 그 길이다 — 결제 전 주문은 스스로 취소할 수
+ * 있고, 그러면 재고·포인트·쿠폰이 함께 돌아온다.
+ */
+async function undo(
+  page: import('@playwright/test').Page,
+  orderNos: readonly string[],
+): Promise<void> {
+  for (const orderNo of orderNos) {
+    await page.request.post(`/api/orders/${orderNo}/cancel`, {
+      data: { reason: '검사가 만든 주문을 되돌립니다' },
+    });
+  }
+}
+
+/**
  * 살 수 있는 variantId 하나를 얻는다.
  *
  * 화면을 거쳐야 알 수 있는 값이라 실제로 담아 보고 서버 장바구니에서 읽는다.
@@ -81,6 +103,8 @@ test('같은 열쇠로 두 번 보내도 주문은 하나다', async ({ page }) 
   // 주문 목록에도 하나만 있어야 한다
   await page.goto('/mypage/orders');
   await expect(page.getByText(created.orderNo)).toHaveCount(1);
+
+  await undo(page, [created.orderNo]);
 });
 
 test('열쇠가 다르면 다른 주문이다 — 정말 두 번 사는 사람을 막지 않는다', async ({ page }) => {
@@ -105,5 +129,10 @@ test('열쇠가 다르면 다른 주문이다 — 정말 두 번 사는 사람�
 
   expect(a.status()).toBe(201);
   expect(b.status()).toBe(201);
-  expect((await a.json()).orderNo).not.toBe((await b.json()).orderNo);
+
+  const first = (await a.json()) as { orderNo: string };
+  const second = (await b.json()) as { orderNo: string };
+  expect(first.orderNo).not.toBe(second.orderNo);
+
+  await undo(page, [first.orderNo, second.orderNo]);
 });
