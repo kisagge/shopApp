@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminCollections, getCollectionItems } from '~/lib/admin/manage-collection';
+import { getAdminCollections, getCollectionItemsFor } from '~/lib/admin/manage-collection';
 import { CollectionEditor, type CollectionItem } from './collection-editor';
 
 export const metadata: Metadata = { title: '기획전' };
@@ -14,15 +14,18 @@ export default async function AdminCollectionsPage() {
    * 담긴 상품까지 한 번에 실어 보낸다. 화면을 연 뒤 기획전마다 다시 물으면
    * 편집을 시작하기도 전에 요청이 여러 번 나가고, 그중 하나만 실패해도
    * 어떤 기획전이 비어 보이는지 알 수 없다.
+   *
+   * **읽는 것도 한 번이다.** 처음에는 기획전마다 따로 물었는데, 둘일 때는
+   * 티가 안 나지만 늘면 그대로 늘어난다.
    */
-  const items: CollectionItem[] = await Promise.all(
-    collections.map(async (c) => ({
-      ...c,
-      startsAt: c.startsAt?.toISOString() ?? null,
-      endsAt: c.endsAt?.toISOString() ?? null,
-      products: await getCollectionItems(actor, c.id),
-    })),
-  );
+  const productsBy = await getCollectionItemsFor(actor, collections.map((c) => c.id));
+
+  const items: CollectionItem[] = collections.map((c) => ({
+    ...c,
+    startsAt: c.startsAt?.toISOString() ?? null,
+    endsAt: c.endsAt?.toISOString() ?? null,
+    products: productsBy.get(c.id) ?? [],
+  }));
 
   return (
     <>

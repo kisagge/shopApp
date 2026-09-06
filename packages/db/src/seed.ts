@@ -4,6 +4,7 @@ import { config } from 'dotenv';
 // 모노레포 루트의 .env 를 읽는다 (cwd 는 packages/db)
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
+import { searchTextFor } from '@shop/core';
 import { prisma } from './client';
 import { seedReviews } from './seed-reviews';
 import { seedSupport } from './seed-support';
@@ -228,6 +229,9 @@ async function main(): Promise<void> {
       where: { slug: p.slug },
       update: {
         name: p.name, description: p.description, listPrice: p.listPrice,
+        // 검색이 보는 칸. 어드민 쓰기 경로와 같은 규칙을 쓴다 — 여기서
+        // 빠뜨렸더니 갓 시드한 DB 에서 검색이 아무것도 못 찾았다.
+        searchText: searchTextFor({ name: p.name, brandName: brand.name }),
         salePrice: p.salePrice, brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
         // 평점 집계는 여기서 건드리지 않는다. reviews 테이블이 진실이고
@@ -238,6 +242,7 @@ async function main(): Promise<void> {
       },
       create: {
         slug: p.slug, name: p.name, description: p.description,
+        searchText: searchTextFor({ name: p.name, brandName: brand.name }),
         listPrice: p.listPrice, salePrice: p.salePrice,
         brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',

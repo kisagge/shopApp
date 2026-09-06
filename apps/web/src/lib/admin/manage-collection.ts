@@ -91,12 +91,33 @@ export async function getCollectionItems(
   actor: Actor,
   collectionId: string,
 ): Promise<CollectionItemRow[]> {
+  const byCollection = await getCollectionItemsFor(actor, [collectionId]);
+  return byCollection.get(collectionId) ?? [];
+}
+
+/**
+ * 여러 기획전의 담긴 상품을 **한 번에** 읽는다.
+ *
+ * 어드민 목록은 기획전마다 이것을 따로 불렀다 — 둘일 때는 티가 안 나지만
+ * 늘면 그대로 늘고, 화면이 열릴 때마다 그만큼 왕복한다. 하나로 읽고 코드에서
+ * 나눈다.
+ */
+export async function getCollectionItemsFor(
+  actor: Actor,
+  collectionIds: readonly string[],
+): Promise<Map<string, CollectionItemRow[]>> {
   assertPermission(actor, 'collection:read');
 
+  const byCollection = new Map<string, CollectionItemRow[]>();
+  for (const id of collectionIds) byCollection.set(id, []);
+  if (collectionIds.length === 0) return byCollection;
+
   const rows = await prisma.collectionItem.findMany({
-    where: { collectionId },
-    orderBy: { sortOrder: 'asc' },
+    where: { collectionId: { in: [...collectionIds] } },
+    // 기획전끼리도 순서를 지켜 담아야 아래에서 그대로 밀어 넣을 수 있다
+    orderBy: [{ collectionId: 'asc' }, { sortOrder: 'asc' }],
     select: {
+      collectionId: true,
       product: {
         select: {
           id: true, slug: true, name: true, deletedAt: true, publishedAt: true, status: true,
@@ -107,18 +128,22 @@ export async function getCollectionItems(
     },
   });
 
-  return rows.map(({ product: p }) => ({
-    id: p.id,
-    slug: p.slug,
-    name: p.name,
-    brandName: p.brand.name,
-    imageUrl: p.images[0]?.url ?? null,
-    onDisplay:
-      p.deletedAt === null &&
-      p.publishedAt !== null &&
-      isVisibleStatus(p.status) &&
-      (p.brand.merchant === null || p.brand.merchant.status === 'APPROVED'),
-  }));
+  for (const { collectionId, product: p } of rows) {
+    byCollection.get(collectionId)?.push({
+      id: p.id,
+      slug: p.slug,
+      name: p.name,
+      brandName: p.brand.name,
+      imageUrl: p.images[0]?.url ?? null,
+      onDisplay:
+        p.deletedAt === null &&
+        p.publishedAt !== null &&
+        isVisibleStatus(p.status) &&
+        (p.brand.merchant === null || p.brand.merchant.status === 'APPROVED'),
+    });
+  }
+
+  return byCollection;
 }
 
 export async function createCollection(

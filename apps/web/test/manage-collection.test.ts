@@ -19,8 +19,8 @@ const db = vi.hoisted(() => ({
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const {
-  getAdminCollections, getCollectionItems, createCollection, updateCollection,
-  setCollectionItems, deleteCollection, CollectionError,
+  getAdminCollections, getCollectionItems, getCollectionItemsFor, createCollection,
+  updateCollection, setCollectionItems, deleteCollection, CollectionError,
 } = await import('~/lib/admin/manage-collection');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
@@ -172,6 +172,7 @@ describe('담긴 상품', () => {
 
 describe('어드민에서 보는 담긴 상품', () => {
   const item = (over: Record<string, unknown> = {}) => ({
+    collectionId: 'c-1',
     product: {
       id: 'p-1', slug: 'coat', name: '코트',
       deletedAt: null, publishedAt: new Date('2026-01-01'), status: 'ACTIVE',
@@ -198,6 +199,45 @@ describe('어드민에서 보는 담긴 상품', () => {
       item({ brand: { name: 'PLAIN', merchant: null } }),
     ]);
     expect((await getCollectionItems(admin, 'c-1'))[0]!.onDisplay).toBe(true);
+  });
+});
+
+describe('여러 기획전을 한 번에 읽는다', () => {
+  const item = (collectionId: string, id: string) => ({
+    collectionId,
+    product: {
+      id, slug: id, name: id,
+      deletedAt: null, publishedAt: new Date('2026-01-01'), status: 'ACTIVE',
+      brand: { name: 'B', merchant: null },
+      images: [],
+    },
+  });
+
+  it('기획전이 몇 개든 조회는 한 번이다', async () => {
+    db.collectionItem.findMany.mockResolvedValue([
+      item('c-1', 'p-1'), item('c-1', 'p-2'), item('c-2', 'p-3'),
+    ]);
+
+    const byCollection = await getCollectionItemsFor(admin, ['c-1', 'c-2']);
+
+    expect(db.collectionItem.findMany).toHaveBeenCalledTimes(1);
+    expect(byCollection.get('c-1')!.map((p) => p.id)).toEqual(['p-1', 'p-2']);
+    expect(byCollection.get('c-2')!.map((p) => p.id)).toEqual(['p-3']);
+  });
+
+  it('담긴 것이 없는 기획전도 빈 목록으로 답한다 — 없는 것과 빈 것은 다르다', async () => {
+    db.collectionItem.findMany.mockResolvedValue([]);
+    const byCollection = await getCollectionItemsFor(admin, ['c-1']);
+    expect(byCollection.get('c-1')).toEqual([]);
+  });
+
+  it('아무것도 안 물으면 DB 를 부르지 않는다', async () => {
+    expect((await getCollectionItemsFor(admin, [])).size).toBe(0);
+    expect(db.collectionItem.findMany).not.toHaveBeenCalled();
+  });
+
+  it('가맹점은 여기도 못 본다', async () => {
+    await expect(getCollectionItemsFor(merchant, ['c-1'])).rejects.toThrow();
   });
 });
 

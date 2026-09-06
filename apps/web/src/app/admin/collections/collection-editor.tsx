@@ -420,9 +420,8 @@ function ProductPicker({
   async function search() {
     setSearching(true);
     try {
-      const response = await fetch(
-        `/api/admin/collections/candidates?q=${encodeURIComponent(term)}`,
-      );
+      // 쿠폰 대상 지정과 같은 창구를 쓴다 — 같은 일이라 두 벌로 두지 않는다
+      const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(term)}`);
       if (!response.ok) return;
       const data: { products: PickedProduct[] } = await response.json();
       setFound(data.products);

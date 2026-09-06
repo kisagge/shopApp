@@ -107,3 +107,18 @@ export function emptyResultReason(applied: {
   if (applied.hasQuery) return 'other_term';
   return 'no_products';
 }
+
+/**
+ * 검색 대상 문자열.
+ *
+ * 브랜드명을 상품 행에 복사해 둔다 — 검색 OR 가 두 테이블에 걸치면 인덱스를
+ * 못 쓴다. 소문자로 저장해 비교 때 대소문자를 신경 쓰지 않는다.
+ *
+ * **여기 둔 이유가 있다.** 예전에는 어드민 쓰기 경로에만 있어서 **시드가
+ * 이 칸을 비워 두었고, 갓 시드한 DB 에서는 검색이 아무것도 못 찾았다** —
+ * 검색 명세가 결과를 확인하지 않아 아무도 몰랐다. 쓰는 곳이 둘이면 규칙도
+ * 한 곳에 있어야 한다.
+ */
+export function searchTextFor(input: { name: string; brandName: string }): string {
+  return `${input.name} ${input.brandName}`.toLowerCase();
+}

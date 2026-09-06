@@ -188,3 +188,30 @@ test('트래픽 화면이 실사용자 성능을 기준선과 함께 보여 준�
   // 색만으로 좋고 나쁨을 말하지 않는다
   await expect(page.locator('#main')).toContainText(/좋음|개선 필요|나쁨|표본 없음/);
 });
+
+test('기획전에 담을 상품을 같은 창구로 찾는다', async ({ page }) => {
+  /*
+   * 쿠폰 대상 지정과 기획전 담기가 하던 일이 같아서 창구를 하나로 합쳤다.
+   * 합치면서 한쪽이 조용히 죽을 수 있는 자리라 양쪽을 다 밟아 둔다.
+   */
+  await page.goto('/admin/collections');
+  const picker = page.locator('section[aria-label="담긴 상품"]').first();
+
+  await picker.getByLabel('상품 찾기').fill('코트');
+  await picker.getByRole('button', { name: '찾기' }).click();
+
+  await expect(picker.getByRole('button', { name: /담기|담김/ }).first()).toBeVisible();
+});
+
+test('쿠폰 대상도 같은 창구를 쓴다', async ({ page }) => {
+  await page.goto('/admin/coupons');
+  // 대상 지정 칸은 새 쿠폰을 만들 때만 나온다
+  await page.getByRole('button', { name: '새 쿠폰 만들기' }).click();
+
+  // 헤더에도 "상품 검색" 이 있다 — id 로 정확히 집는다
+  await page.locator('#product-q').fill('코트');
+  await page.locator('#product-q').press('Enter');
+
+  // 찾은 것이 하나라도 떠야 대상 지정을 할 수 있다. 결과는 체크박스로 나온다.
+  await expect(page.getByRole('checkbox', { name: /코트/ }).first()).toBeVisible();
+});

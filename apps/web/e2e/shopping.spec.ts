@@ -66,6 +66,24 @@ test('검색은 주소에 남아 새로고침해도 유지된다', async ({ page
   expect(page.url()).toBe(url);
 });
 
+test('검색이 실제로 찾아 준다', async ({ page }) => {
+  /*
+   * **결과를 확인한다.** 예전에는 주소만 보고 넘어갔는데, 그 사이 시드가
+   * 검색용 칸을 비워 두어 **갓 시드한 DB 에서는 검색이 아무것도 못 찾고
+   * 있었다.** 화면은 "결과가 없습니다" 를 멀쩡히 보여 주므로 눈으로는
+   * 고장인지 알 수 없다.
+   */
+  await page.goto('/search?q=코트');
+
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+  await expect(page.locator('#main')).toContainText('코트');
+});
+
+test('브랜드 이름으로도 찾는다 — 브랜드명을 상품 행에 복사해 두는 이유다', async ({ page }) => {
+  await page.goto('/search?q=STUDIO');
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+});
+
 test('결과가 없으면 무엇을 풀어야 하는지 알려 준다', async ({ page }) => {
   await page.goto('/search?q=존재하지않는상품명입니다');
 

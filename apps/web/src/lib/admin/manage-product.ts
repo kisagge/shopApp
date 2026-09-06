@@ -4,6 +4,7 @@ import {
   canManageProduct, merchantScope, becameAvailable, hasPermission,
   needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
   type Actor, type ProductStatus,
+  searchTextFor,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
 import {
@@ -27,15 +28,8 @@ export function priceFields(input: { listPrice: number; salePrice: number | null
   };
 }
 
-/**
- * 검색 대상 문자열.
- *
- * 브랜드명을 상품 행에 복사해 둔다 — 검색 OR 가 두 테이블에 걸치면
- * 인덱스를 못 쓴다. 소문자로 저장해 비교 때 대소문자를 신경 쓰지 않는다.
- */
-export function searchTextFor(input: { name: string; brandName: string }): string {
-  return `${input.name} ${input.brandName}`.toLowerCase();
-}
+// 검색 대상 문자열을 만드는 규칙은 core 에 있다 — 시드도 같은 것을 쓴다
+export { searchTextFor };
 
 export class ProductError extends Error {
   constructor(readonly code: ProductErrorCode, readonly status = 409) {
