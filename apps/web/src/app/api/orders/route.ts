@@ -1,6 +1,7 @@
 import { getQuoteViewer } from '~/lib/grade/effective';
 import { createOrderRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
+import { enforceRateLimit } from '~/lib/rate-limit';
 import { NextResponse } from 'next/server';
 import { revalidateCatalog } from '~/lib/cache';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
@@ -19,6 +20,20 @@ export async function POST(request: Request): Promise<NextResponse> {
   if (!sessionUser) {
     return await unauthorized();
   }
+
+  /*
+   * **주문을 만드는 것은 곧 재고를 깎는 것이다.**
+   *
+   * 초과 판매는 조건부 갱신이 막지만, 그건 "없는 것을 팔지 않는다" 일 뿐
+   * "있는 것을 묶어 두지 않는다" 가 아니다. 결제 없이 버려진 주문의 재고는
+   * 회수 배치가 돌 때까지 잠긴 채로 있고, 그 배치는 하루에 한 번 돈다.
+   * 한 계정이 반복해서 부르면 매대가 빈다 — 시드 재고는 상품당 한 자릿수다.
+   *
+   * 로그인 필수 창구라 IP 가 아니라 사용자 id 로 센다. 같은 사무실에서
+   * 여러 사람이 주문하는 것을 한 사람으로 묶지 않기 위해서다.
+   */
+  const limited = await enforceRateLimit('order', request, sessionUser.id);
+  if (limited) return limited;
 
   let body: unknown;
   try {
