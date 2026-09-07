@@ -108,15 +108,6 @@ function bodiesFor(categorySlug: string): readonly string[] {
 }
 
 export async function seedReviews(): Promise<void> {
-  const existing = await prisma.review.count();
-  if (existing > 0) {
-    console.log(`  리뷰 ${existing}건이 이미 있어 새로 만들지 않습니다`);
-    // 만들지 않더라도 **집계는 항상 다시 센다.** 상품 upsert 가 돌면서
-    // 값이 어긋나 있을 수 있고, 다시 세는 비용은 상품 수만큼뿐이다.
-    await recountAll();
-    return;
-  }
-
   const random = makeRandom(20260901);
 
   // 리뷰어 계정. **로그인용 Account 를 만들지 않는다** — 시드가 비밀번호
@@ -137,8 +128,18 @@ export async function seedReviews(): Promise<void> {
     ),
   );
 
+  /*
+   * **리뷰가 없는 상품만 채운다.**
+   *
+   * 예전에는 리뷰가 하나라도 있으면 통째로 건너뛰었다. 그러면 나중에 상품을
+   * 더했을 때 **새 상품만 영영 리뷰 없이 남는다** — 매대를 채우려고 스물여섯
+   * 개를 더하다 실제로 그렇게 됐다.
+   *
+   * 상품 단위로 보면 두 번 돌려도 늘어나지 않으면서(이미 있는 것은 건너뛴다)
+   * 새로 들어온 것만 채워진다. 시드는 덧붙일 수 있어야 한다.
+   */
   const products = await prisma.product.findMany({
-    where: { deletedAt: null },
+    where: { deletedAt: null, reviews: { none: {} } },
     select: {
       id: true, name: true,
       brand: { select: { name: true, merchantId: true } },
@@ -151,6 +152,14 @@ export async function seedReviews(): Promise<void> {
       },
     },
   });
+
+  if (products.length === 0) {
+    console.log('  모든 상품에 리뷰가 있어 새로 만들지 않습니다');
+    // 만들지 않더라도 **집계는 항상 다시 센다.** 상품 upsert 가 돌면서
+    // 값이 어긋나 있을 수 있고, 다시 세는 비용은 상품 수만큼뿐이다.
+    await recountAll();
+    return;
+  }
 
   let orderSeq = 0;
   let reviewCount = 0;

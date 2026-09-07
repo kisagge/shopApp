@@ -50,6 +50,33 @@ const QUERY: Readonly<Record<string, string>> = {
   'cable-knit-muffler': 'knit scarf fashion',
   'heavy-cotton-hoodie': 'hoodie fashion',
   'washed-denim-straight': 'denim jeans fashion',
+
+  'cashmere-blend-balmacaan': 'camel overcoat fashion',
+  'single-chesterfield-coat': 'black overcoat fashion',
+  'hooded-duffle-coat': 'duffle coat fashion',
+  'long-goose-down': 'long down parka fashion',
+  'light-down-vest': 'down vest fashion',
+  'linen-blend-blazer': 'linen blazer fashion',
+  'corduroy-work-jacket': 'corduroy jacket fashion',
+  'suede-trucker-blouson': 'suede jacket fashion',
+  'nylon-coach-jacket': 'coach jacket fashion',
+  'wool-varsity-blouson': 'varsity jacket fashion',
+  'merino-turtleneck': 'turtleneck sweater fashion',
+  'cotton-cable-crewneck': 'cable knit sweater fashion',
+  'wool-knit-cardigan': 'wool cardigan fashion',
+  'alpaca-shawl-cardigan': 'shawl collar cardigan fashion',
+  'fine-gauge-cardigan': 'thin cardigan fashion',
+  'wool-wide-slacks': 'wool trousers fashion',
+  'linen-wide-pants': 'linen trousers fashion',
+  'cotton-straight-chino': 'chino pants fashion',
+  'raw-denim-straight': 'raw denim fashion',
+  'leather-derby-shoes': 'leather derby shoes',
+  'suede-chelsea-boots': 'suede chelsea boots',
+  'canvas-low-sneakers': 'canvas sneakers',
+  'wool-felt-loafers': 'felt loafers shoes',
+  'leather-belt-35mm': 'leather belt accessory',
+  'wool-beanie': 'wool beanie hat',
+  'leather-card-wallet': 'leather card wallet',
 };
 
 const PER_PRODUCT = 2;
@@ -73,6 +100,19 @@ async function search(query: string): Promise<UnsplashPhoto[]> {
 
   const response = await fetch(url, { headers: auth });
   if (!response.ok) {
+    /*
+     * **한도에 걸린 것과 잘못 부른 것은 다르다.**
+     *
+     * 데모 키는 시간당 50회다. 상품이 서른넷이라 한 번은 되지만 이어서 다시
+     * 돌리면 걸린다. 그때 "검색 실패 (403)" 만 보면 키가 잘못된 줄 알고
+     * 엉뚱한 곳을 뒤지게 된다.
+     */
+    if (response.status === 403 || response.status === 429) {
+      throw new Error(
+        `Unsplash 요청 한도에 걸렸습니다 (${response.status}). 데모 키는 시간당 50회입니다 — ` +
+          '한 시간 뒤에 다시 돌리면 이미 채운 상품은 건너뜁니다.',
+      );
+    }
     throw new Error(`Unsplash 검색 실패 (${response.status}) — ${query}`);
   }
   const body = (await response.json()) as { results: UnsplashPhoto[] };
