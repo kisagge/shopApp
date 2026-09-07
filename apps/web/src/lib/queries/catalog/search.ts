@@ -2,6 +2,7 @@ import 'server-only';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
 import { prisma, Prisma } from '@shop/db';
 import {
+  DEFAULT_SORT,
   normalizeSearchTerm, normalizePriceRange, FACET_GROUP, EMPTY_FACETS,
   type ProductSort, type Facets, type FacetValue,
 } from '@shop/core';
@@ -72,7 +73,8 @@ function orderFor(sort: ProductSort) {
  */
 export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage> {
   const take = Math.min(filter.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
-  const sort = filter.sort ?? 'recommended';
+  // 기본값은 core 가 정한다. 여기 글자로 적어 두면 core 를 고쳐도 검색만 옛 값으로 남는다.
+  const sort = filter.sort ?? DEFAULT_SORT;
   const term = filter.q ? normalizeSearchTerm(filter.q) : null;
   const range = normalizePriceRange({ min: filter.minPrice, max: filter.maxPrice });
 

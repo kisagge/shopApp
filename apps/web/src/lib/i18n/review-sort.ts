@@ -1,4 +1,4 @@
-import { REVIEW_SORT, type ReviewSort } from '@shop/contract';
+import type { ReviewSort } from '@shop/contract';
 import type { MessageKey } from '@shop/i18n';
 
 /**
@@ -13,5 +13,3 @@ export const REVIEW_SORT_KEY: Record<ReviewSort, MessageKey> = {
   rating_desc: 'review.sortRatingDesc',
   rating_asc: 'review.sortRatingAsc',
 };
-
-export const REVIEW_SORTS = REVIEW_SORT;

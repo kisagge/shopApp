@@ -8,7 +8,6 @@ import {
   nextDay,
   computeFunnel,
   FUNNEL_STEP,
-  RAW_RETENTION_DAYS,
   type DayKey,
 } from '@shop/core';
 
@@ -202,5 +201,3 @@ async function contiguousFrontier(): Promise<DayKey | null> {
   }
   return frontier;
 }
-
-export const RETENTION_DAYS = RAW_RETENTION_DAYS;

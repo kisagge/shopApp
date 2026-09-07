@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
   assertPermission, resequence, verifyImageBytes, imageObjectKey,
-  isLive, publishStatus, isVisibleStatus, MAX_COLLECTION_ITEMS, isSlugTaken,
+  publishStatus, isVisibleStatus, MAX_COLLECTION_ITEMS, isSlugTaken,
   type Actor, type PublishStatus, type BannerTone,
 } from '@shop/core';
 import {
@@ -360,9 +360,6 @@ export async function setCollectionImage(
 
   return toRow(after, new Date());
 }
-
-/** 지금 노출 중인지 — 어드민 화면에서 "왜 안 보이나" 를 설명하는 데 쓴다. */
-export const isCollectionLive = isLive;
 
 async function resequenceCollections(): Promise<void> {
   const rows = await prisma.collection.findMany({

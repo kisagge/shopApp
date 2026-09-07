@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RATING_MIN, RATING_MAX, SIZE_FIT, MAX_IMAGES_PER_REVIEW, REPORT_REASON } from '@shop/core';
+import { RATING_MIN, RATING_MAX, SIZE_FIT, REPORT_REASON } from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -63,9 +63,6 @@ export const reviewListQuerySchema = z.object({
   sort: z.enum(REVIEW_SORT).catch('recent'),
   cursor: z.string().optional(),
 });
-
-/** 리뷰 사진 개수 한도. 화면이 안내 문구에 쓴다. */
-export const REVIEW_IMAGE_LIMIT = MAX_IMAGES_PER_REVIEW;
 
 /**
  * 리뷰 신고.
