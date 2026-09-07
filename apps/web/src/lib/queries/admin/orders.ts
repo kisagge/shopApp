@@ -153,10 +153,17 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
 
   return {
     ...order,
-    // 주문자 개인정보는 가맹점에게 최소한만 준다. 배송에 필요한 건
-    // 이름과 연락처지 이메일이 아니다.
+    /*
+     * 주문자 개인정보는 가맹점에게 최소한만 준다.
+     *
+     * 배송에 필요한 것은 **받는 사람**의 이름·연락처·주소지, 주문한 계정의
+     * 이름이나 이메일이 아니다. 둘은 다를 수 있다(선물).
+     *
+     * 등급도 뺀다. 우리 적립·할인 제도의 값이라 가맹점이 알 이유가 없고,
+     * 알면 손님을 등급으로 다르게 대할 여지만 생긴다.
+     */
     user: scope
-      ? { name: maskName(order.user.name), email: null, grade: order.user.grade }
+      ? { name: maskName(order.user.name), email: null, grade: null }
       : { name: order.user.name, email: order.user.email, grade: order.user.grade },
     /** 가맹점이 보는 금액은 자기 줄의 합계다 */
     scopedTotal: won(scope ? order.items.reduce((s, i) => s + i.subtotal, 0) : order.payable),

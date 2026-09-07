@@ -119,7 +119,8 @@ export default async function AdminOrderDetail({
                 <Row label="이름" value={order.user.name} />
                 {/* 가맹점에게는 이메일을 주지 않는다. 배송에 필요한 정보가 아니다. */}
                 {order.user.email && <Row label="이메일" value={order.user.email} />}
-                <Row label="등급" value={t(GRADE_KEY[order.user.grade])} />
+                {/* 가맹점에게는 등급을 주지 않는다 — 없으면 줄 자체를 두지 않는다 */}
+                {order.user.grade && <Row label="등급" value={t(GRADE_KEY[order.user.grade])} />}
               </dl>
             </section>
 
