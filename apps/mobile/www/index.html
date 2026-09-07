@@ -13,6 +13,10 @@
 
   바깥에서 아무것도 불러오지 않는다 — 연결이 없을 때 보여 줄 화면이
   연결을 필요로 하면 뜻이 없다. 글꼴도 시스템 것을 쓴다.
+
+  **문구도 같은 이유로 여기 박혀 있다.** 사전은 서버 쪽에 있고, 이 화면이
+  뜨는 상황은 바로 그 서버에 닿지 못하는 상황이다. 그래서 세 말을 아래
+  스크립트에 그대로 적고 기기 언어로 고른다.
 -->
 <style>
   :root { color-scheme: light dark; }
@@ -53,9 +57,61 @@
 <body>
   <main>
     <h1>PLAIN</h1>
-    <p>연결할 수 없습니다.</p>
-    <p class="hint">네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
-    <button type="button" onclick="location.reload()">다시 시도</button>
+    <p id="title">연결할 수 없습니다.</p>
+    <p class="hint" id="hint">네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
+    <button type="button" id="retry" onclick="location.reload()">다시 시도</button>
   </main>
+
+<script>
+  /*
+   * 기기 언어로 문구를 고른다.
+   *
+   * 웹뷰는 기기 언어를 그대로 navigator.languages 에 넣어 준다 — 평소 화면이
+   * Accept-Language 로 받는 것과 같은 값이다. 여기서는 헤더가 없으니 그 배열을
+   * 직접 본다.
+   *
+   * **쿠키는 보지 않는다.** 이 파일은 앱 안에 들어 있어 원격 주소와 출처가
+   * 달라서, 사용자가 웹에서 고른 말이 여기에는 오지 않는다.
+   *
+   * 기본은 한국어다. 이 가게는 한국 가게이고, 못 고른 상태로 빈 화면을 두는
+   * 것보다 한 말로라도 보여 주는 편이 낫다.
+   */
+  (function () {
+    var TEXT = {
+      ko: {
+        title: '연결할 수 없습니다.',
+        hint: '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+        retry: '다시 시도',
+        lang: 'ko-KR'
+      },
+      en: {
+        title: "Can't connect.",
+        hint: 'Check your network connection and try again.',
+        retry: 'Try again',
+        lang: 'en-US'
+      },
+      ja: {
+        title: '接続できません。',
+        hint: 'ネットワーク接続を確認してからもう一度お試しください。',
+        retry: '再試行',
+        lang: 'ja-JP'
+      }
+    };
+
+    var wanted = navigator.languages || [navigator.language || ''];
+    var pick = 'ko';
+    for (var i = 0; i < wanted.length; i += 1) {
+      // ja-JP 는 ja 로 맞춘다. 지역까지 같은 태그만 받으면 대부분이 걸러진다.
+      var base = String(wanted[i] || '').toLowerCase().split('-')[0];
+      if (TEXT[base]) { pick = base; break; }
+    }
+
+    var t = TEXT[pick];
+    document.documentElement.lang = t.lang;
+    document.getElementById('title').textContent = t.title;
+    document.getElementById('hint').textContent = t.hint;
+    document.getElementById('retry').textContent = t.retry;
+  })();
+</script>
 </body>
 </html>
