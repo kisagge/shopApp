@@ -253,3 +253,43 @@ describe('수정', () => {
     expect(db.coupon.update.mock.calls[0]?.[0].data).toEqual({ isActive: false });
   });
 });
+
+/**
+ * 기간을 줄이는 동안 누가 쿠폰을 받아 가면.
+ *
+ * "이미 발급된 쿠폰의 기간은 줄일 수 없다" 는 **읽은 시점의 발급 수**로
+ * 판단한다. 0 이던 쿠폰을 누가 받아 가는 사이에 기간이 줄면, 방금 받은
+ * 사람의 쿠폰이 뒤에서 짧아진다 — 받은 사람은 알 방법이 없다.
+ */
+describe('쿠폰 수정 — 그 사이에 발급되면', () => {
+  it('줄일 때는 아직 아무도 안 받았다는 조건을 함께 건다', async () => {
+    db.coupon.findUnique.mockResolvedValue(coupon({ issuedCount: 0 }));
+
+    await updateCoupon(admin, 'c-1', { endsAt: '2026-09-10T00:00:00+09:00' });
+
+    expect(db.coupon.update.mock.calls[0]?.[0].where).toMatchObject({
+      id: 'c-1',
+      issuedCount: 0,
+    });
+  });
+
+  it('줄이는 것이 아니면 조건을 걸지 않는다', async () => {
+    /*
+     * 이름만 고칠 때까지 조건을 걸면, 그 순간 누가 쿠폰을 받았다는 이유로
+     * 멀쩡한 수정이 실패한다. 막아야 하는 것은 줄이는 것뿐이다.
+     */
+    db.coupon.findUnique.mockResolvedValue(coupon({ issuedCount: 0 }));
+
+    await updateCoupon(admin, 'c-1', { name: '이름만 바꾼다' });
+
+    expect(db.coupon.update.mock.calls[0]?.[0].where).toEqual({ id: 'c-1' });
+  });
+
+  it('늘리는 것은 이미 발급됐어도 막지 않는다', async () => {
+    db.coupon.findUnique.mockResolvedValue(coupon({ issuedCount: 5 }));
+
+    await updateCoupon(admin, 'c-1', { endsAt: '2026-10-31T23:59:59+09:00' });
+
+    expect(db.coupon.update.mock.calls[0]?.[0].where).toEqual({ id: 'c-1' });
+  });
+});

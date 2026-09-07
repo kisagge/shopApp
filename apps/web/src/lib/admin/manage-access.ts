@@ -55,15 +55,27 @@ export async function updateMerchantStatus(
   });
   if (!before) throw new AccessError('MERCHANT_NOT_FOUND', 404);
 
-  const after = await prisma.merchant.update({
-    where: { id: merchantId },
-    data: {
-      status: input.status,
-      ...(input.status === 'APPROVED' && before.approvedAt === null
-        ? { approvedAt: new Date() }
-        : {}),
-    },
-    select: { id: true, name: true, status: true, approvedAt: true },
+  /*
+   * **최초 승인일은 비어 있을 때만 찍는다 — 쓰는 순간에 확인한다.**
+   *
+   * 읽어 온 approvedAt 으로 판단하면, 두 사람이 동시에 승인할 때 둘 다
+   * "아직 비어 있다" 로 보고 각자 지금 시각을 찍는다. 뒤엣것이 이기면
+   * 최초 입점일이 뒤로 밀리고, 그 날짜는 **정산 기간 계산의 기준**이다.
+   *
+   * where 에 조건을 실으면 이미 찍힌 뒤에는 0건이 되고, 그게 맞다.
+   */
+  const after = await prisma.$transaction(async (tx) => {
+    if (input.status === 'APPROVED') {
+      await tx.merchant.updateMany({
+        where: { id: merchantId, approvedAt: null },
+        data: { approvedAt: new Date() },
+      });
+    }
+    return tx.merchant.update({
+      where: { id: merchantId },
+      data: { status: input.status },
+      select: { id: true, name: true, status: true, approvedAt: true },
+    });
   });
 
   /*
@@ -129,9 +141,25 @@ export async function assignRole(
     if (merchant.status !== 'APPROVED') throw new AccessError('MERCHANT_NOT_APPROVED', 409);
   }
 
-  const after = await prisma.user.update({
-    where: { id: userId },
+  /*
+   * **읽은 상태를 그대로 조건에 싣는다.**
+   *
+   * 위 검사들은 전부 `target` 을 읽은 시점의 값으로 판단한다. 읽기와 쓰기
+   * 사이에 대상이 바뀌면 그 판단이 무의미해진다 — 가장 나쁜 경우는 그 사이에
+   * 대상이 슈퍼관리자가 되는 것이다. canEditUser 가 막으려던 바로 그 일이
+   * 검사를 지나쳐 벌어진다.
+   *
+   * 재고를 깎을 때 `stock: { gte: quantity }` 를 거는 것과 같은 방식이다.
+   * 안 맞으면 0건이고, 0건은 실패다.
+   */
+  const changed = await prisma.user.updateMany({
+    where: { id: userId, role: target.role, merchantId: target.merchantId, deletedAt: null },
     data: { role: input.role, merchantId: input.merchantId },
+  });
+  if (changed.count === 0) throw new AccessError('CHANGED_MEANWHILE', 409);
+
+  const after = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
     select: { id: true, name: true, email: true, role: true, merchantId: true },
   });
 

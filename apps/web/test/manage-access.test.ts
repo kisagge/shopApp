@@ -2,10 +2,22 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 import { assignRoleSchema, updateMerchantStatusSchema } from '@shop/contract';
 
-const db = vi.hoisted(() => ({
-  merchant: { findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
-  user: { findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
-}));
+const db = vi.hoisted(() => {
+  const inner = {
+    merchant: {
+      findUnique: vi.fn<(...a: any[]) => any>(),
+      update: vi.fn<(...a: any[]) => any>(),
+      updateMany: vi.fn<(...a: any[]) => any>(),
+    },
+    user: {
+      findUnique: vi.fn<(...a: any[]) => any>(),
+      findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
+      updateMany: vi.fn<(...a: any[]) => any>(),
+    },
+  };
+  // $transaction(콜백) 은 같은 클라이언트를 넘겨준다 — 흉내도 그렇게 한다
+  return { ...inner, $transaction: vi.fn((fn: any) => fn(inner)) };
+});
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
@@ -29,12 +41,15 @@ beforeEach(() => {
   });
   db.merchant.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
     Promise.resolve({ id: MERCHANT_ID, name: '무어', approvedAt: null, ...data }));
+  db.merchant.updateMany.mockResolvedValue({ count: 1 });
   db.user.findUnique.mockResolvedValue({
     id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'CUSTOMER',
     merchantId: null, deletedAt: null,
   });
-  db.user.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
-    Promise.resolve({ id: 'u-target', name: '홍길동', email: 'a@b.test', ...data }));
+  db.user.updateMany.mockResolvedValue({ count: 1 });
+  db.user.findUniqueOrThrow.mockResolvedValue({
+    id: 'u-target', name: '홍길동', email: 'a@b.test', role: 'ADMIN', merchantId: null,
+  });
 });
 
 describe('입점 승인 — 권한', () => {
@@ -60,7 +75,7 @@ describe('입점 승인 — 권한', () => {
 describe('입점 승인 — 승인 시각', () => {
   it('처음 승인할 때 찍는다', async () => {
     await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
-    expect(db.merchant.update.mock.calls[0]?.[0].data.approvedAt).toBeInstanceOf(Date);
+    expect(db.merchant.updateMany.mock.calls[0]?.[0].data.approvedAt).toBeInstanceOf(Date);
   });
 
   it('정지했다 다시 승인해도 최초 입점일을 밀지 않는다', async () => {
@@ -68,8 +83,13 @@ describe('입점 승인 — 승인 시각', () => {
       id: MERCHANT_ID, name: '무어', status: 'SUSPENDED', approvedAt: new Date('2026-01-01'),
     });
     await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
-    // 정산 기간이 이 날짜를 기준으로 계산된다
-    expect(db.merchant.update.mock.calls[0]?.[0].data.approvedAt).toBeUndefined();
+    /*
+     * 정산 기간이 이 날짜를 기준으로 계산된다.
+     *
+     * 이제 **읽어 온 값으로 판단하지 않는다.** 조건을 where 에 실어 쓰는
+     * 순간에 확인하므로, 이미 찍혀 있으면 0건이 되고 덮이지 않는다.
+     */
+    expect(db.merchant.updateMany.mock.calls[0]?.[0].where.approvedAt).toBeNull();
   });
 
   it('없는 가맹점은 404', async () => {
@@ -102,7 +122,7 @@ describe('권한 부여', () => {
 
   it('관리자는 권한을 줄 수 없다 — 스스로 올리는 경로를 막는다', async () => {
     await expect(assignRole(admin, 'u-target', role(grant))).rejects.toThrow();
-    expect(db.user.update).not.toHaveBeenCalled();
+    expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
   it('슈퍼관리자는 줄 수 있다', async () => {
@@ -140,7 +160,7 @@ describe('권한 부여', () => {
     await expect(assignRole(superAdmin, 'u-target', role(grant))).rejects.toMatchObject({
       code: 'USER_CLOSED', status: 409,
     });
-    expect(db.user.update).not.toHaveBeenCalled();
+    expect(db.user.updateMany).not.toHaveBeenCalled();
   });
 
   it('가맹점으로 올릴 때 소속을 확인한다', async () => {
@@ -148,7 +168,7 @@ describe('권한 부여', () => {
     await assignRole(superAdmin, 'u-target', role({
       role: 'MERCHANT', merchantId: MERCHANT_ID, reason: '입점 담당자',
     }));
-    expect(db.user.update.mock.calls[0]?.[0].data).toEqual({
+    expect(db.user.updateMany.mock.calls[0]?.[0].data).toEqual({
       role: 'MERCHANT', merchantId: MERCHANT_ID,
     });
   });
@@ -169,7 +189,7 @@ describe('권한 부여', () => {
     });
     await assignRole(superAdmin, 'u-target', role({ role: 'CUSTOMER', reason: '퇴사' }));
     // 소속이 남으면 권한만 내려가고 범위는 그대로인 계정이 된다
-    expect(db.user.update.mock.calls[0]?.[0].data.merchantId).toBeNull();
+    expect(db.user.updateMany.mock.calls[0]?.[0].data.merchantId).toBeNull();
   });
 
   it('변경 전 값을 감사 로그용으로 돌려준다', async () => {
@@ -212,5 +232,72 @@ describe('승인하면 계정과 브랜드가 이어진다', () => {
       await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '시험' }));
       expect(activate, s).not.toHaveBeenCalled();
     }
+  });
+});
+
+/**
+ * 읽은 뒤 쓰기 전에 대상이 바뀌는 경우.
+ *
+ * 권한 검사는 전부 **읽은 시점의 값**으로 판단한다. 그 사이에 대상이 바뀌면
+ * 그 판단이 무의미해지는데, 가장 나쁜 경우는 대상이 슈퍼관리자가 되는 것이다
+ * — 슈퍼관리자는 못 건드리게 막아 뒀는데 그 검사를 그대로 지나쳐 강등된다.
+ *
+ * 창이 좁아서 눈으로는 절대 못 본다. 그래서 **읽은 상태를 쓰기 조건에 함께
+ * 싣고**, 안 맞으면 0건이 되게 했다. 재고를 깎을 때와 같은 방식이다.
+ */
+describe('권한 부여 — 그 사이에 바뀌면', () => {
+  it('읽은 상태를 그대로 쓰기 조건에 싣는다', async () => {
+    db.user.findUnique.mockResolvedValue({
+      id: 'u-target', name: '홍길동', email: 'a@b.test',
+      role: 'ADMIN', merchantId: null, deletedAt: null,
+    });
+    // 승인 전 가맹점에는 계정을 못 붙인다 — 그 검사가 먼저 걸리지 않게 둔다
+    db.merchant.findUnique.mockResolvedValue({ status: 'APPROVED' });
+
+    await assignRole(superAdmin, 'u-target', role({ role: 'MERCHANT', merchantId: MERCHANT_ID, reason: '입점 승인에 따른 계정 연결' }));
+
+    const where = db.user.updateMany.mock.calls[0]?.[0].where;
+    // 셋 다 검사가 기대고 있던 값이다. 하나라도 빠지면 그만큼 창이 열린다.
+    expect(where).toMatchObject({ id: 'u-target', role: 'ADMIN', merchantId: null, deletedAt: null });
+  });
+
+  it('0건이면 실패로 본다 — 조용히 넘어가지 않는다', async () => {
+    db.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      assignRole(superAdmin, 'u-target', role({ role: 'ADMIN', reason: '운영 인수인계' })),
+    ).rejects.toMatchObject({ code: 'CHANGED_MEANWHILE', status: 409 });
+  });
+
+  it('0건이면 바뀐 값을 돌려주지 않는다', async () => {
+    // 여기서 조회까지 하면 "성공한 것처럼 보이는 응답" 이 나간다
+    db.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      assignRole(superAdmin, 'u-target', role({ role: 'ADMIN', reason: '운영 인수인계' })),
+    ).rejects.toThrow();
+    expect(db.user.findUniqueOrThrow).not.toHaveBeenCalled();
+  });
+});
+
+describe('입점 승인 — 두 사람이 동시에', () => {
+  it('최초 승인일을 읽은 값이 아니라 쓰는 순간에 판단한다', async () => {
+    /*
+     * 둘 다 "아직 비어 있다" 로 읽고 각자 지금 시각을 찍으면 뒤엣것이 이긴다.
+     * 그 날짜가 정산 기간의 기준이라 조용히 밀리면 정산이 통째로 어긋난다.
+     */
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
+
+    const call = db.merchant.updateMany.mock.calls[0]?.[0];
+    expect(call.where).toMatchObject({ id: MERCHANT_ID, approvedAt: null });
+  });
+
+  it('승인이 아니면 승인일을 건드리지 않는다', async () => {
+    await updateMerchantStatus(
+      superAdmin,
+      MERCHANT_ID,
+      status({ status: 'SUSPENDED', reason: '정산 서류 미비' }),
+    );
+    expect(db.merchant.updateMany).not.toHaveBeenCalled();
   });
 });

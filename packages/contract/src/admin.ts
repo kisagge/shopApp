@@ -50,6 +50,7 @@ export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 export const ADMIN_ERROR = [
   'MERCHANT_NOT_FOUND', 'USER_NOT_FOUND', 'CANNOT_CHANGE_OWN_ROLE',
   'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED', 'USER_CLOSED',
+  'CHANGED_MEANWHILE',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR)[number];
 
@@ -60,4 +61,12 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
   CANNOT_EDIT_SUPER_ADMIN: '슈퍼관리자 계정은 수정할 수 없습니다',
   MERCHANT_NOT_APPROVED: '승인되지 않은 가맹점에는 계정을 붙일 수 없습니다',
   USER_CLOSED: '탈퇴한 계정에는 권한을 줄 수 없습니다',
+  /*
+   * 읽은 뒤 쓰기 전에 대상이 바뀌었다.
+   *
+   * 권한 검사는 **읽은 시점의 값**으로 한다. 그 사이에 대상이 슈퍼관리자가
+   * 되면, 슈퍼관리자를 못 건드리게 막아 둔 검사를 그대로 지나쳐 강등된다.
+   * 그래서 쓸 때 조건을 함께 걸고, 안 맞으면 여기로 온다.
+   */
+  CHANGED_MEANWHILE: '그 사이 대상이 바뀌었습니다. 다시 확인하고 시도해 주세요',
 };

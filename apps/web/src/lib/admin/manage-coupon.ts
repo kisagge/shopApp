@@ -152,17 +152,30 @@ export async function updateCoupon(
   });
   if (!existing) throw new CouponError('NOT_FOUND', '쿠폰을 찾을 수 없습니다.', 404);
 
-  if (input.endsAt !== undefined) {
-    const next = new Date(input.endsAt);
-    if (existing.issuedCount > 0 && next.getTime() < existing.endsAt.getTime()) {
-      throw new CouponError('CANNOT_SHORTEN', '이미 발급된 쿠폰의 기간은 줄일 수 없습니다.', 409, {
-        endsAt: '기간을 줄이려면 쿠폰을 중지해 주세요',
-      });
-    }
+  /*
+   * 기간을 줄이려는가. 이미 나간 쿠폰이 있으면 막는다 — 받은 사람의 쿠폰이
+   * 뒤에서 짧아지면 안 된다.
+   */
+  const shortening =
+    input.endsAt !== undefined && new Date(input.endsAt).getTime() < existing.endsAt.getTime();
+
+  if (shortening && existing.issuedCount > 0) {
+    throw new CouponError('CANNOT_SHORTEN', '이미 발급된 쿠폰의 기간은 줄일 수 없습니다.', 409, {
+      endsAt: '기간을 줄이려면 쿠폰을 중지해 주세요',
+    });
   }
 
   const updated = await prisma.coupon.update({
-    where: { id },
+    /*
+     * **줄일 때만 조건을 건다.**
+     *
+     * 위 검사는 읽은 시점의 issuedCount 로 판단한다. 0 이던 쿠폰을 누가
+     * 받아 가는 사이에 기간이 줄면, 방금 받은 사람의 쿠폰이 뒤에서 짧아진다.
+     *
+     * 이름만 고칠 때까지 조건을 걸면 그 순간 누가 쿠폰을 받았다는 이유로
+     * 멀쩡한 수정이 실패한다. 막아야 하는 것은 **줄이는 것뿐**이다.
+     */
+    where: shortening ? { id, issuedCount: 0 } : { id },
     data: {
       ...(input.name === undefined ? {} : { name: input.name.trim() }),
       ...(input.endsAt === undefined ? {} : { endsAt: new Date(input.endsAt) }),
