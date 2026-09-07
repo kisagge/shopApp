@@ -13,12 +13,23 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   address: { findFirst: vi.fn<(...a: any[]) => any>() },
-  order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  order: {
+    findFirst: vi.fn<(...a: any[]) => any>(),
+    // 품절에 막히면 버려진 주문을 찾아본다 — 그 조회가 여기로 온다
+    findMany: vi.fn<(...a: any[]) => any>(),
+  },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>() },
   userCoupon: { findFirst: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
+
+/*
+ * 버려진 주문을 푸는 길은 사용자가 쓰는 그 길(cancelOrder)이다. 여기서는
+ * 그것이 성공했다고 두고, **품절 판정이 그 결과를 실제로 반영하는지**만 본다.
+ */
+const cancelOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/cancel-order', () => ({ cancelOrder }));
 
 const { createOrder, OrderError } = await import('~/lib/orders/create-order');
 
@@ -61,6 +72,9 @@ beforeEach(() => {
   ]);
   db.userCoupon.findFirst.mockResolvedValue(null);
   db.order.findFirst.mockResolvedValue(null);
+  // 기본은 "풀 것이 없다" — 품절은 품절이다
+  db.order.findMany.mockResolvedValue([]);
+  cancelOrder.mockResolvedValue(undefined);
   tx.productVariant.updateMany.mockResolvedValue({ count: 1 });
   tx.user.updateMany.mockResolvedValue({ count: 1 });
   tx.userCoupon.updateMany.mockResolvedValue({ count: 1 });
@@ -393,5 +407,88 @@ describe('같은 주문을 두 번 만들지 않는다', () => {
 
     expect(r.orderNo).toBe('20260831-7654321');
     expect(db.order.findFirst).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 품절이라고 말하기 전에 한 번 더 보는 것.
+ *
+ * 주문을 만드는 순간 재고가 깎이고, 결제하지 않고 떠난 주문은 회수 배치가
+ * 돌 때까지 그 재고를 물고 있다. 배치는 하루에 한 번 돈다 — 기한은 30분인데
+ * 회수는 24시간마다라, **그 사이에는 아무도 안 산 물건이 품절로 보인다.**
+ *
+ * 사는 사람에게는 그냥 품절이다. 왜 없는지도, 기다릴 이유가 있는지도 알 수
+ * 없다.
+ */
+describe('품절 — 버려진 주문이 물고 있던 것', () => {
+  /** 첫 시도만 재고가 없고, 두 번째는 있다 */
+  function outOfStockOnce(): void {
+    let first = true;
+    tx.productVariant.updateMany.mockImplementation(() => {
+      if (first) {
+        first = false;
+        return Promise.resolve({ count: 0 });
+      }
+      return Promise.resolve({ count: 1 });
+    });
+  }
+
+  it('풀 것이 있으면 풀고 한 번 다시 해 본다', async () => {
+    outOfStockOnce();
+    db.order.findMany.mockResolvedValue([
+      {
+        orderNo: '20260901-0000001',
+        status: 'PENDING',
+        placedAt: new Date('2026-01-01'),
+        /*
+         * **READY 여야 풀 수 있다.** 결제 키가 붙었다는 것은 승인 절차가
+         * 시작됐다는 뜻이고, 그 뒤는 사람이 대사할 자리다.
+         * 처음 이 검사를 쓸 때 payment: null 로 뒀더니 안 풀렸는데,
+         * 틀린 것은 정책이 아니라 내 고정물이었다.
+         */
+        payment: { status: 'READY', pgPaymentKey: null },
+      },
+    ]);
+
+    const r = await createOrder(request(), user);
+    expect(r.orderNo).toBe('20260831-1234567');
+  });
+
+  it('막힌 변형만 찾는다 — 남의 주문까지 건드리지 않는다', async () => {
+    outOfStockOnce();
+    db.order.findMany.mockResolvedValue([
+      {
+        orderNo: '20260901-0000001',
+        status: 'PENDING',
+        placedAt: new Date('2026-01-01'),
+        payment: { status: 'READY', pgPaymentKey: null },
+      },
+    ]);
+
+    await createOrder(request(), user);
+
+    // 사는 사람이 기다리는 자리다. 밀린 것을 다 따라잡는 것은 배치의 몫이다.
+    const where = db.order.findMany.mock.calls[0]?.[0].where;
+    expect(where.items.some.variantId.in).toEqual(['v-coat-m']);
+    expect(db.order.findMany.mock.calls[0]?.[0].take).toBeLessThanOrEqual(5);
+  });
+
+  it('풀 것이 없으면 품절이다 — 같은 실패를 두 번 겪게 하지 않는다', async () => {
+    tx.productVariant.updateMany.mockResolvedValue({ count: 0 });
+    db.order.findMany.mockResolvedValue([]);
+  cancelOrder.mockResolvedValue(undefined);
+
+    await expect(createOrder(request(), user)).rejects.toMatchObject({
+      code: 'OUT_OF_STOCK',
+      variantIds: ['v-coat-m'],
+    });
+    // 다시 시도하지 않는다. 두 번째도 같은 결과다.
+    expect(tx.productVariant.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('성공하는 주문에는 아무 값도 붙지 않는다', async () => {
+    // 여기까지 오는 것은 이미 실패한 요청뿐이어야 한다
+    await createOrder(request(), user);
+    expect(db.order.findMany).not.toHaveBeenCalled();
   });
 });

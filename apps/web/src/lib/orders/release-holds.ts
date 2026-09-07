@@ -31,7 +31,7 @@ const MAX_PER_RUN = 200;
 
 export async function releaseAbandonedHolds(
   now = new Date(),
-  options: { minutes?: number; limit?: number } = {},
+  options: { minutes?: number; limit?: number; variantIds?: readonly string[] } = {},
 ): Promise<ReleaseResult> {
   const minutes = options.minutes ?? PAYMENT_HOLD_MINUTES;
 
@@ -39,6 +39,16 @@ export async function releaseAbandonedHolds(
     where: {
       status: 'PENDING',
       placedAt: { lt: paymentHoldCutoff(now, minutes) },
+      /*
+       * **특정 변형만 풀 수도 있다.**
+       *
+       * 배치는 밀린 것을 순서대로 처리하지만, 주문을 만들다 품절에 막힌
+       * 자리에서는 **지금 사려는 그 변형**만 풀면 된다. 남의 주문까지
+       * 건드리면 사는 사람이 기다리는 시간에 관계없는 일이 붙는다.
+       */
+      ...(options.variantIds === undefined
+        ? {}
+        : { items: { some: { variantId: { in: [...options.variantIds] } } } }),
     },
     orderBy: { placedAt: 'asc' },
     take: options.limit ?? MAX_PER_RUN,

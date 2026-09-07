@@ -11,6 +11,16 @@ import type {
 } from '@shop/contract';
 import { ORDER_ERROR_MESSAGE } from '@shop/contract';
 import { quoteCart } from '~/lib/queries/cart';
+import { releaseAbandonedHolds } from './release-holds';
+
+/**
+ * 품절에 막혔을 때 한 번에 풀어 볼 주문 수.
+ *
+ * 이 자리는 사람이 결제 버튼을 누르고 기다리는 중이다. 밀린 것을 다
+ * 따라잡는 것은 배치의 몫이고, 여기서는 **지금 사려는 물건을 막고 있는
+ * 몇 건**만 본다.
+ */
+const RETRY_RELEASE_LIMIT = 5;
 
 export class OrderError extends Error {
   constructor(
@@ -124,6 +134,33 @@ export async function createOrder(
       const already = await findByIdempotencyKey(input.idempotencyKey, user.id);
       if (already) return already;
     }
+
+    /*
+     * **품절이라고 말하기 전에, 정말 없는지 한 번 더 본다.**
+     *
+     * 주문을 만드는 순간 재고가 깎이고, 결제하지 않고 떠난 주문은 회수
+     * 배치가 돌 때까지 그 재고를 물고 있다. 그 배치는 하루에 한 번 돈다
+     * (무료 요금제가 크론을 그렇게 묶는다). 기한은 30분인데 회수는 24시간
+     * 마다라, 그 사이에는 **아무도 안 산 물건이 품절로 보인다.**
+     *
+     * 사는 사람에게는 그냥 품절이다. 왜 없는지 알 방법도, 기다릴 이유를
+     * 알 방법도 없다.
+     *
+     * 그래서 막혔을 때만 그 변형의 버려진 주문을 풀고 한 번 다시 해 본다.
+     * **성공하는 주문에는 아무 값도 붙지 않는다** — 여기까지 오는 것은
+     * 이미 실패한 요청뿐이다.
+     */
+    if (error instanceof OrderError && error.code === 'OUT_OF_STOCK') {
+      const { released } = await releaseAbandonedHolds(new Date(), {
+        variantIds: error.variantIds,
+        // 사는 사람을 기다리게 하는 자리다. 밀린 것을 다 따라잡는 것은 배치의 몫이다.
+        limit: RETRY_RELEASE_LIMIT,
+      });
+
+      // 푼 것이 없으면 진짜 품절이다. 같은 실패를 두 번 겪게 하지 않는다.
+      if (released > 0) return await createWithRetry();
+    }
+
     throw error;
   }
 
