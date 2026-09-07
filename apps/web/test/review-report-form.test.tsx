@@ -105,3 +105,52 @@ describe('실패', () => {
     expect(screen.getByRole('group', { name: '신고 사유' })).toBeDefined();
   });
 });
+
+/**
+ * 초점.
+ *
+ * 이 폼은 **여는 순간 버튼이 사라지고** 그 자리를 차지한다. 초점을 챙기지
+ * 않으면 `<body>` 로 떨어진다 — 키보드 사용자는 탭을 눌러도 문서 맨 앞부터
+ * 다시 시작하고, 낭독기는 무엇이 열렸는지 말하지 않는다.
+ *
+ * **자동 접근성 훑기로는 안 잡힌다.** axe 는 정지한 화면의 마크업을 보지,
+ * 누른 뒤 초점이 어디로 갔는지는 보지 않는다.
+ */
+describe('신고 폼 — 초점', () => {
+  it('열면 폼으로 옮긴다 — 버튼이 사라지므로 갈 곳을 정해 줘야 한다', async () => {
+    render(<ReviewReport reviewId="r-1" alreadyReported={false} />);
+    await userEvent.click(screen.getByRole('button', { name: '신고' }));
+
+    const form = document.querySelector('form');
+    expect(form).not.toBeNull();
+    expect(document.activeElement).toBe(form);
+    // body 로 떨어지지 않았다는 것이 요점이다
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('열린 폼은 무엇이 열렸는지 이름을 갖는다', async () => {
+    // 초점만 옮기고 이름이 없으면 낭독기가 "양식" 이라고만 읽는다
+    render(<ReviewReport reviewId="r-1" alreadyReported={false} />);
+    await userEvent.click(screen.getByRole('button', { name: '신고' }));
+
+    expect(document.querySelector('form')?.getAttribute('aria-label')).toBe('신고');
+  });
+
+  it('닫으면 누른 버튼으로 돌아온다', async () => {
+    render(<ReviewReport reviewId="r-1" alreadyReported={false} />);
+    await userEvent.click(screen.getByRole('button', { name: '신고' }));
+    await userEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    const trigger = screen.getByRole('button', { name: '신고' });
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('처음 그릴 때는 초점을 끌어오지 않는다', () => {
+    /*
+     * 리뷰 목록에는 이 버튼이 여럿 있다. 처음 그릴 때마다 초점을 옮기면
+     * 화면을 열자마자 초점이 마지막 버튼으로 튄다.
+     */
+    render(<ReviewReport reviewId="r-1" alreadyReported={false} />);
+    expect(document.activeElement).toBe(document.body);
+  });
+});

@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import { REPORT_REASON, type ReportReason } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
@@ -27,6 +28,11 @@ export function ReviewReport({
   const [done, setDone] = useState(alreadyReported);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * 여는 순간 이 버튼이 사라지고 폼이 그 자리를 차지한다. 초점을 챙기지
+   * 않으면 body 로 떨어져 키보드 사용자가 자기 자리를 잃는다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
 
   if (done) {
     return (
@@ -38,6 +44,7 @@ export function ReviewReport({
     return (
       <button
         type="button"
+        ref={triggerRef}
         onClick={() => setOpen(true)}
         aria-expanded={false}
         aria-controls={formId}
@@ -84,8 +91,15 @@ export function ReviewReport({
   return (
     <form
       id={formId}
+      ref={panelRef}
+      /*
+       * 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다(-1). 열릴 때 우리가
+       * 옮겨 줄 뿐, 평소에 탭으로 폼 껍데기에 걸릴 이유는 없다.
+       */
+      tabIndex={-1}
+      aria-label={t('review.report')}
       onSubmit={(event) => void submit(event)}
-      className="mt-2 flex w-full flex-col gap-2 rounded-sm bg-[var(--surface)] p-3"
+      className="mt-2 flex w-full flex-col gap-2 rounded-sm bg-[var(--surface)] p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
     >
       <fieldset className="flex flex-col gap-1.5 border-0 p-0">
         <legend className="text-[11px] font-medium">{t('review.reportReason')}</legend>

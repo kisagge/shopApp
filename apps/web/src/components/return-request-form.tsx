@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState, type FormEvent } from 'react';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import {
@@ -25,6 +26,11 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
   const t = useT();
   const formId = useId();
   const [open, setOpen] = useState(false);
+  /*
+   * 여는 순간 이 버튼이 사라지고 폼이 그 자리를 차지한다. 초점을 챙기지
+   * 않으면 body 로 떨어져 키보드 사용자가 자기 자리를 잃는다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
   const [type, setType] = useState<ReturnType>('RETURN');
   const [reason, setReason] = useState<ReturnReason>('CHANGED_MIND');
   const [pending, setPending] = useState(false);
@@ -68,6 +74,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
     return (
       <Button
         type="button"
+        ref={triggerRef}
         variant="secondary"
         size="md"
         onClick={() => setOpen(true)}
@@ -82,10 +89,14 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
   return (
     <form
       id={formId}
+      ref={panelRef}
+      // 초점을 받되 탭 순서에는 넣지 않는다. 열릴 때 우리가 옮겨 줄 뿐이다.
+      tabIndex={-1}
+      aria-labelledby={`${formId}-title`}
       onSubmit={(e) => onSubmit(e)}
-      className="flex flex-col gap-5 rounded-sm border border-[var(--border)] p-4"
+      className="flex flex-col gap-5 rounded-sm border border-[var(--border)] p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
     >
-      <h3 className="text-sm font-semibold">{t('ret.request')}</h3>
+      <h3 id={`${formId}-title`} className="text-sm font-semibold">{t('ret.request')}</h3>
 
       {error && (
         <p role="alert" className="rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[13px] text-accent">

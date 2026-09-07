@@ -69,9 +69,24 @@ export async function addFirstProductToCart(
    */
   let variantId: string | undefined;
   for (let attempt = 0; attempt < 30 && !variantId; attempt += 1) {
-    const cart = await page.request.get('/api/cart');
-    const body = (await cart.json()) as { items?: { variantId: string }[] };
-    variantId = body.items?.[0]?.variantId;
+    /*
+     * **요청이 던져도 기다림을 이어 간다.**
+     *
+     * 이 고리는 "장바구니에 줄이 생길 때까지 기다린다" 는 뜻이다. 그런데
+     * 예외를 안 잡아 두었더니 ECONNRESET 하나에 명세가 통째로 졌다 —
+     * 실제로 CI 에서 두 번 그랬고, 다시 돌리면 통과했다. 서버가 잠깐 연결을
+     * 끊은 것이지 장바구니가 잘못된 것이 아니다.
+     *
+     * 산발적으로 지는 검사는 **없는 검사보다 나쁘다.** 진짜 회귀를 봐도
+     * "또 그거겠지" 하고 넘기게 된다.
+     */
+    try {
+      const cart = await page.request.get('/api/cart');
+      const body = (await cart.json()) as { items?: { variantId: string }[] };
+      variantId = body.items?.[0]?.variantId;
+    } catch {
+      // 다음 회차에 다시 묻는다. 서른 번을 다 쓰고도 못 얻으면 null 이 나간다.
+    }
     if (!variantId) await page.waitForTimeout(200);
   }
   return variantId ?? null;
