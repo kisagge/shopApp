@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useId, useRef, useState } from 'react';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field } from '@shop/ui';
 import { BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, type BannerTone } from '@shop/core';
@@ -49,6 +50,11 @@ function fromLocalInput(value: string): string | null {
 export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
   const router = useRouter();
   const [banners, setBanners] = useState<readonly BannerItem[]>(initial);
+  /*
+   * 지우기 버튼은 자기 줄과 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 여럿을 정리하려면 탭으로 문서 맨 앞부터 매번 다시 내려와야 한다.
+   */
+  const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(banners.length);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState('');
@@ -151,11 +157,14 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
       {error && <p role="alert" className="text-[12px] text-accent">{error}</p>}
 
       {banners.length === 0 ? (
-        <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
+        <p
+          ref={emptyRef as React.RefObject<HTMLParagraphElement>}
+          tabIndex={-1}
+          role="status" className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
           배너가 없습니다. 추가하면 홈 최상단에 노출됩니다.
         </p>
       ) : (
-        <ol className="flex flex-col gap-4">
+        <ol ref={listRef as React.RefObject<HTMLOListElement>} className="flex flex-col gap-4">
           {banners.map((banner, index) => (
             <li key={banner.id}>
               <BannerCard
@@ -167,7 +176,10 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
                 statusTone={STATUS_TONE[banner.status] ?? 'neutral'}
                 onSave={(body) => patch(banner.id, body)}
                 onMove={(dir) => move(index, dir)}
-                onDelete={() => remove(banner)}
+                onDelete={() => {
+                  rememberRemoval(index);
+                  void remove(banner);
+                }}
                 onUploaded={(updated) => {
                   setBanners(banners.map((b) => (b.id === updated.id ? updated : b)));
                   setStatus('배경 이미지를 바꿨습니다.');
@@ -304,6 +316,7 @@ function BannerCard({
             <Button
               type="button" size="sm" variant="danger"
               aria-label={`${index + 1}번째 배너 삭제`}
+              data-remove-row=""
               disabled={busy} onClick={onDelete}
             >
               삭제

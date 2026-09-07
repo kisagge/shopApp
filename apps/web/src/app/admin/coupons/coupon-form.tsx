@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { Button, Field } from '@shop/ui';
 import { generateCouponCode, COUPON_KIND_LABEL } from '@shop/core';
 import type { CouponRow, NamedOption, Target } from './types';
@@ -40,6 +41,11 @@ export function CouponForm({
    * 기준을 채워 쓰는 일이 없어야 한다.
    */
   const [targets, setTargets] = useState<Target[]>([]);
+  /*
+   * 대상을 빼면 그 칩과 버튼이 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 여럿을 정리할 때마다 탭으로 처음부터 다시 내려와야 한다.
+   */
+  const { listRef, rememberRemoval } = useRemovalFocus(targets.length);
   const [productQuery, setProductQuery] = useState('');
   const [productHits, setProductHits] = useState<NamedOption[]>([]);
   const [searching, setSearching] = useState(false);
@@ -233,12 +239,17 @@ export function CouponForm({
         </p>
 
         {targets.length > 0 && (
-          <ul className="flex flex-wrap gap-1.5">
-            {targets.map((t) => (
+          <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-wrap gap-1.5">
+            {targets.map((t, index) => (
               <li key={`${t.targetType}-${t.targetId}`}>
                 <button
                   type="button"
-                  onClick={() => toggleTarget(t)}
+                  data-remove-row=""
+                  onClick={() => {
+                    // 빼는 순간 이 버튼도 사라진다. 어느 자리였는지 먼저 기억한다.
+                    rememberRemoval(index);
+                    toggleTarget(t);
+                  }}
                   aria-label={`${nameOf(t)} 대상에서 빼기`}
                   className="flex items-center gap-1.5 rounded-full border border-n-900/20 bg-[var(--surface)] px-3 py-1 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
                 >

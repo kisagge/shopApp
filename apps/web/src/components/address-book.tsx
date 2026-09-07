@@ -6,6 +6,7 @@ import { MAX_ADDRESSES } from '@shop/core';
 import { AddressForm, type SavedAddress } from '~/components/address-form';
 import { formatMoney } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { DEFAULT_SHIPPING } from '@shop/core';
 
 /**
@@ -20,6 +21,14 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
   const locale = useLocale();
   const [addresses, setAddresses] = useState<readonly SavedAddress[]>(initial);
   const [adding, setAdding] = useState(initial.length === 0);
+  /*
+   * 지우기 버튼은 자기 줄과 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 주소 셋을 정리하려면 탭으로 문서 맨 앞부터 세 번 내려와야 한다.
+   *
+   * 다 지우면 등록 폼이 열리므로(setAdding) 목록 자리를 대신할 것이 없다 —
+   * 그때는 폼 쪽이 초점을 가져가는 것이 맞고, 여기서는 손대지 않는다.
+   */
+  const { listRef, rememberRemoval } = useRemovalFocus(addresses.length);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** 스크린리더에 결과를 알린다. 목록만 바뀌면 무슨 일이 일어났는지 모른다. */
@@ -88,8 +97,8 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
       )}
 
       {addresses.length > 0 && (
-        <ul className="flex flex-col gap-2.5">
-          {addresses.map((a) => (
+        <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-col gap-2.5">
+          {addresses.map((a, index) => (
             <li
               key={a.id}
               className="flex flex-wrap items-start justify-between gap-4 rounded-sm border border-[var(--border)] p-4"
@@ -135,7 +144,11 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                   size="sm"
                   disabled={busy !== null}
                   aria-label={t('addr.deleteNamed', { name: a.recipient })}
-                  onClick={() => remove(a)}
+                  data-remove-row=""
+                  onClick={() => {
+                    rememberRemoval(index);
+                    void remove(a);
+                  }}
                 >
                   {t('addr.delete')}
                 </Button>

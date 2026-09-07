@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { Badge, Button } from '@shop/ui';
 import { MAX_COLLECTION_ITEMS } from '@shop/core';
 import type { PickedProduct } from './types';
@@ -20,6 +21,11 @@ export function ProductPicker({
   onSave: (products: readonly PickedProduct[]) => void;
 }) {
   const [list, setList] = useState<readonly PickedProduct[]>(picked);
+  /*
+   * 빼기 버튼은 자기 줄과 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 여럿을 빼려면 탭으로 문서 맨 앞부터 다시 내려와야 한다.
+   */
+  const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(list.length);
   const [term, setTerm] = useState('');
   const [found, setFound] = useState<readonly PickedProduct[]>([]);
   const [searching, setSearching] = useState(false);
@@ -80,11 +86,16 @@ export function ProductPicker({
       </div>
 
       {list.length === 0 ? (
-        <p className="text-[12px] text-[var(--fg-muted)]">
+        <p
+          ref={emptyRef as React.RefObject<HTMLParagraphElement>}
+          tabIndex={-1}
+          role="status"
+          className="text-[12px] text-[var(--fg-muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
+        >
           아직 담긴 상품이 없습니다. 담기 전에는 손님 화면에 나오지 않습니다.
         </p>
       ) : (
-        <ol className="flex flex-col gap-1.5">
+        <ol ref={listRef as React.RefObject<HTMLOListElement>} className="flex flex-col gap-1.5">
           {list.map((p, index) => (
             <li
               key={p.id}
@@ -114,7 +125,12 @@ export function ProductPicker({
               <Button
                 type="button" size="sm" variant="ghost"
                 aria-label={`${p.name} 빼기`}
-                onClick={() => setList(list.filter((x) => x.id !== p.id))}
+                data-remove-row=""
+                onClick={() => {
+                  // 빼는 순간 이 버튼도 사라진다. 어느 자리였는지 먼저 기억한다.
+                  rememberRemoval(index);
+                  setList(list.filter((x) => x.id !== p.id));
+                }}
               >
                 빼기
               </Button>

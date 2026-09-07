@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import {
   INQUIRY_TOPIC, SUPPORT_POST_KIND, topicRequired,
@@ -66,6 +67,13 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
   const router = useRouter();
   const t = useT();
   const formId = useId();
+
+  /*
+   * 내리기 버튼은 자기 줄과 함께 사라진다. 다만 여기는 지운 뒤 서버에서
+   * 목록을 다시 받아 오므로(router.refresh) 줄이 사라지는 시점이 한 박자
+   * 늦다 — 훅이 목록 길이를 보고 있어 그때 초점을 옮긴다.
+   */
+  const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(initial.length);
 
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
@@ -289,12 +297,15 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
         </p>
 
         {initial.length === 0 ? (
-          <p className="rounded-md border border-[var(--border)] bg-[var(--bg)] py-20 text-center text-[13px] text-[var(--fg-muted)]">
+          <p
+            ref={emptyRef as React.RefObject<HTMLParagraphElement>}
+            tabIndex={-1}
+            role="status" className="rounded-md border border-[var(--border)] bg-[var(--bg)] py-20 text-center text-[13px] text-[var(--fg-muted)]">
             아직 등록한 글이 없습니다.
           </p>
         ) : (
-          <ul className="flex list-none flex-col gap-2 p-0">
-            {initial.map((post) => (
+          <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex list-none flex-col gap-2 p-0">
+            {initial.map((post, index) => (
               <li
                 key={post.id}
                 className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4"
@@ -324,7 +335,11 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                   </button>
                   <button
                     type="button"
-                    onClick={() => void remove(post)}
+                    data-remove-row=""
+                    onClick={() => {
+                      rememberRemoval(index);
+                      void remove(post);
+                    }}
                     disabled={pending}
                     className="h-9 rounded-sm border border-n-300 px-3 text-[12px] text-accent disabled:opacity-40"
                   >

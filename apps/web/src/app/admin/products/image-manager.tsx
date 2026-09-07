@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { useId, useRef, useState } from 'react';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { MAX_IMAGES_PER_PRODUCT } from '@shop/core';
@@ -31,6 +32,11 @@ export function ImageManager({
 }) {
   const router = useRouter();
   const [images, setImages] = useState<readonly ImageRow[]>(initial);
+  /*
+   * 지우기 버튼은 자기 줄과 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 여럿을 정리하려면 탭으로 문서 맨 앞부터 매번 다시 내려와야 한다.
+   */
+  const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(images.length);
   const [alts, setAlts] = useState<Record<string, string>>(() =>
     Object.fromEntries(initial.map((i) => [i.id, i.alt])),
   );
@@ -153,11 +159,14 @@ export function ImageManager({
       )}
 
       {images.length === 0 ? (
-        <p className="text-[13px] text-[var(--fg-muted)]">
+        <p
+          ref={emptyRef as React.RefObject<HTMLParagraphElement>}
+          tabIndex={-1}
+          role="status" className="text-[13px] text-[var(--fg-muted)]">
           등록된 이미지가 없습니다. 첫 번째 이미지가 목록의 대표 이미지가 됩니다.
         </p>
       ) : (
-        <ol className="flex flex-col gap-3">
+        <ol ref={listRef as React.RefObject<HTMLOListElement>} className="flex flex-col gap-3">
           {images.map((image, index) => (
             <li
               key={image.id}
@@ -212,7 +221,11 @@ export function ImageManager({
                     type="button" size="sm" variant="danger"
                     aria-label={`${index + 1}번째 이미지 삭제`}
                     disabled={busy !== null}
-                    onClick={() => remove(image)}
+                    data-remove-row=""
+                    onClick={() => {
+                      rememberRemoval(index);
+                      void remove(image);
+                    }}
                   >
                     삭제
                   </Button>
