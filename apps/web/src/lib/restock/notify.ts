@@ -1,6 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS, restockMail } from '@shop/core';
+import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
+import type { Locale } from '@shop/i18n';
+import { restockMail } from '~/lib/mail/notices';
+import { localeOf } from '~/lib/mail/recipient';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
 import { recordNotifications } from '~/lib/notifications/record';
@@ -27,6 +30,8 @@ export class RestockError extends Error {
 export interface RestockNotice {
   readonly userId: string;
   readonly email: string;
+  /** 받는 사람이 고른 말. 고른 적 없으면 기본 말이 들어온다. */
+  readonly locale: Locale;
   readonly productName: string;
   readonly optionLabel: string;
   readonly productSlug: string;
@@ -56,6 +61,7 @@ const mailNotifier: RestockNotifier = {
             productName: n.productName,
             optionLabel: n.optionLabel,
             url: absoluteUrl(`/product/${n.productSlug}`),
+            locale: n.locale,
           }),
         ),
       ),
@@ -160,7 +166,7 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
       id: true,
       userId: true,
       variantId: true,
-      user: { select: { email: true } },
+      user: { select: { email: true, locale: true } },
       variant: {
         select: { label: true, product: { select: { name: true, slug: true } } },
       },
@@ -185,6 +191,7 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
   const notices: RestockNotice[] = pending.map((p) => ({
     userId: p.userId,
     email: p.user.email,
+    locale: localeOf(p.user.locale),
     productName: p.variant.product.name,
     optionLabel: p.variant.label,
     productSlug: p.variant.product.slug,

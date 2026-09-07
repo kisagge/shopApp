@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isLocale, LOCALE_COOKIE } from '@shop/i18n';
+import { prisma } from '@shop/db';
+import { getSessionUser } from '@shop/auth/session';
 
 /**
  * 언어를 고른다.
@@ -45,6 +47,27 @@ export async function POST(request: Request) {
   const next = safeNext(form.get('next'));
 
   if (!isLocale(locale)) return backTo(next);
+
+  /*
+   * **로그인했으면 계정에도 남긴다.**
+   *
+   * 쿠키는 이 브라우저의 것이라, 메일을 보낼 때는 읽을 수 없다. 문의 답변이나
+   * 재입고 알림은 **요청한 사람이 아니라 우리가 나중에 보내는 것**이라 그때는
+   * 요청도 쿠키도 없다.
+   *
+   * 여기서만 쓰는 이유는 이것이 **고른 순간**이기 때문이다. 평범한 요청마다
+   * 덮어쓰면 기기마다 브라우저 언어가 다를 때 마지막으로 접속한 기기가
+   * 이기는데, 그건 고른 것이 아니다.
+   *
+   * 실패해도 삼킨다. 언어를 못 저장했다고 화면 전환을 막을 이유가 없다 —
+   * 쿠키는 이미 바뀌었고, 다음에 다시 고르면 그때 저장된다.
+   */
+  const user = await getSessionUser(request.headers);
+  if (user) {
+    await prisma.user
+      .update({ where: { id: user.id }, data: { locale } })
+      .catch(() => null);
+  }
 
   const response = backTo(next);
   response.cookies.set(LOCALE_COOKIE, locale, {

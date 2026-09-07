@@ -60,7 +60,7 @@ async function loadForAnswer(inquiryId: string) {
           brand: { select: { merchantId: true } },
         },
       },
-      author: { select: { email: true, name: true } },
+      author: { select: { email: true, name: true, locale: true } },
     },
   });
   if (!inquiry) throw new InquiryError('INQUIRY_NOT_FOUND', 404);
@@ -76,6 +76,8 @@ export interface AnsweredInquiry {
   readonly productSlug: string | null;
   readonly authorEmail: string;
   readonly authorName: string;
+  /** 물어본 사람이 고른 말. 답변을 쓴 운영자의 말이 아니다. */
+  readonly authorLocale: string | null;
   readonly question: string;
   readonly answer: string;
 }
@@ -121,6 +123,7 @@ export async function answerInquiry(
     productSlug: inquiry.product?.slug ?? null,
     authorEmail: inquiry.author.email,
     authorName: inquiry.author.name,
+    authorLocale: inquiry.author.locale,
     question: inquiry.content,
     answer: updated.answer ?? input.answer,
   };

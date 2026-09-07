@@ -172,6 +172,9 @@ importers:
       '@shop/db':
         specifier: workspace:*
         version: link:../db
+      '@shop/i18n':
+        specifier: workspace:*
+        version: link:../i18n
       '@shop/mail':
         specifier: workspace:*
         version: link:../mail

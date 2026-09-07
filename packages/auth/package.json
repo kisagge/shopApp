@@ -18,9 +18,10 @@
   "dependencies": {
     "@shop/core": "workspace:*",
     "@shop/db": "workspace:*",
-    "better-auth": "1.7.2",
+    "@shop/i18n": "workspace:*",
+    "@shop/mail": "workspace:*",
     "@shop/native": "workspace:*",
-    "@shop/mail": "workspace:*"
+    "better-auth": "1.7.2"
   },
   "devDependencies": {
     "@shop/config": "workspace:*",

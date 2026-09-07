@@ -1,5 +1,6 @@
 import 'server-only';
-import { inquiryAnswerMail } from '@shop/core';
+import { inquiryAnswerMail } from '~/lib/mail/notices';
+import { localeOf } from '~/lib/mail/recipient';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
 import type { AnsweredInquiry } from './write';
@@ -20,6 +21,8 @@ export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<v
     await getMailer().send(
       inquiryAnswerMail({
         to: inquiry.authorEmail,
+        // **답변을 쓴 운영자의 말이 아니라 물어본 사람의 말이다.**
+        locale: localeOf(inquiry.authorLocale),
         ...(inquiry.productName ? { productName: inquiry.productName } : {}),
         question: inquiry.question,
         answer: inquiry.answer,

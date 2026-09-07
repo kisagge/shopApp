@@ -1,9 +1,14 @@
 /**
  * 메일 문안.
  *
- * **여기에는 보내는 코드가 없다.** 무엇을 쓸지만 정하고, 실제 발송은
- * @shop/mail 이 맡는다 — 정책은 core, 실행은 바깥이라는 이 저장소의 결을
- * 그대로 따른다. 덕분에 문안은 네트워크 없이 그냥 테스트할 수 있다.
+ * **여기에는 보내는 코드도, 문구도 없다.** 껍데기와 이스케이프만 둔다.
+ *
+ * 문구가 여기 있었을 때는 전부 한국어였다 — core 는 의존성이 없는 순수 정책
+ * 묶음이라 사전을 가져올 수 없기 때문이다. 그래서 무슨 말을 쓸지는 부르는
+ * 쪽이 정하게 옮겼다: 주문·재입고·문의는 apps/web, 인증은 packages/auth.
+ *
+ * 실제 발송은 @shop/mail 이 맡는다 — 정책은 core, 실행은 바깥이라는 이
+ * 저장소의 결을 그대로 따른다.
  */
 
 export interface MailMessage {
@@ -57,11 +62,6 @@ export function mailShell(input: {
   ].join('');
 }
 
-/** 지금까지의 메일은 전부 한국어다. 받는 사람의 말을 알 길이 없어서다. */
-const KO_FOOTER = '포트폴리오 목적으로 제작된 화면입니다. 이 메일은 발신 전용입니다.';
-
-const shell = (heading: string, bodyHtml: string): string =>
-  mailShell({ heading, bodyHtml, footer: KO_FOOTER });
 
 export function mailButton(url: string, label: string): string {
   return button(url, label);
@@ -76,100 +76,11 @@ function button(url: string, label: string): string {
   ].join('');
 }
 
-export interface RestockMailInput {
-  readonly to: string;
-  readonly productName: string;
-  readonly optionLabel: string;
-  readonly url: string;
-}
 
-export function restockMail(input: RestockMailInput): MailMessage {
-  const item = `${input.productName} (${input.optionLabel})`;
-  return {
-    to: input.to,
-    // 제목에 상품명을 넣는다 — 여러 개를 신청해 뒀다면 어느 것인지가 먼저다
-    subject: `[PLAIN] ${item} 재입고`,
-    text: [
-      `기다리시던 ${item} 이 다시 입고되었습니다.`,
-      '',
-      input.url,
-      '',
-      '재고는 금방 소진될 수 있습니다.',
-    ].join('\n'),
-    html: shell(
-      '재입고되었습니다',
-      [
-        `<p style="margin:0">기다리시던 <b>${escapeHtml(item)}</b> 이 다시 입고되었습니다.</p>`,
-        button(input.url, '상품 보러 가기'),
-        '<p style="color:#6f6a63;font-size:13px;margin:0">재고는 금방 소진될 수 있습니다.</p>',
-      ].join(''),
-    ),
-  };
-}
 
-export interface LinkMailInput {
-  readonly to: string;
-  readonly name: string;
-  readonly url: string;
-}
 
-export function verifyEmailMail(input: LinkMailInput): MailMessage {
-  return {
-    to: input.to,
-    subject: '[PLAIN] 이메일 주소를 확인해 주세요',
-    text: [
-      `${input.name} 님, 아래 주소로 이메일 확인을 완료해 주세요.`,
-      '',
-      input.url,
-      '',
-      '본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다.',
-    ].join('\n'),
-    html: shell(
-      '이메일 주소를 확인해 주세요',
-      [
-        `<p style="margin:0">${escapeHtml(input.name)} 님, 아래 버튼으로 확인을 완료해 주세요.</p>`,
-        button(input.url, '이메일 확인하기'),
-        '<p style="color:#6f6a63;font-size:13px;margin:0">본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다.</p>',
-      ].join(''),
-    ),
-  };
-}
 
-export function resetPasswordMail(input: LinkMailInput): MailMessage {
-  return {
-    to: input.to,
-    subject: '[PLAIN] 비밀번호 재설정',
-    text: [
-      `${input.name} 님, 아래 주소에서 비밀번호를 새로 정할 수 있습니다.`,
-      '',
-      input.url,
-      '',
-      // 요청하지 않은 사람에게 "무시하세요" 만 말하면 불안하다. 아무 일도
-      // 일어나지 않았다는 사실을 함께 알려 준다.
-      '본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다. 비밀번호는 그대로입니다.',
-    ].join('\n'),
-    html: shell(
-      '비밀번호 재설정',
-      [
-        `<p style="margin:0">${escapeHtml(input.name)} 님, 아래 버튼에서 비밀번호를 새로 정할 수 있습니다.</p>`,
-        button(input.url, '비밀번호 재설정'),
-        '<p style="color:#6f6a63;font-size:13px;margin:0">본인이 요청하지 않았다면 이 메일을 무시하셔도 됩니다. 비밀번호는 그대로입니다.</p>',
-      ].join(''),
-    ),
-  };
-}
 
-export interface InquiryAnswerMailInput {
-  readonly to: string;
-  /**
-   * 어떤 상품에 대한 물음이었는가. **없을 수 있다** — 배송이나 환불처럼
-   * 상품과 무관한 문의는 고객센터로 들어온다.
-   */
-  readonly productName?: string | undefined;
-  readonly question: string;
-  readonly answer: string;
-  readonly url: string;
-}
 
 /**
  * 문의에 답이 달렸을 때.
@@ -180,35 +91,3 @@ export interface InquiryAnswerMailInput {
  * 너무 길면 자른다 — 메일 미리보기에 본문이 통째로 밀려 들어가면 제목
  * 옆이 지저분해진다.
  */
-export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
-  const clip = (value: string, max: number) =>
-    value.length > max ? `${value.slice(0, max)}…` : value;
-  const question = clip(input.question, 200);
-  const answer = clip(input.answer, 400);
-  // 상품 없는 문의도 온다. 이름 자리를 비워 두면 "undefined 문의" 가 나간다.
-  const about = input.productName ?? '고객센터';
-
-  return {
-    to: input.to,
-    subject: `[PLAIN] ${about} 문의에 답변이 등록되었습니다`,
-    text: [
-      `${about} 에 남기신 문의에 답변이 등록되었습니다.`,
-      '',
-      `문의: ${question}`,
-      `답변: ${answer}`,
-      '',
-      input.url,
-    ].join('\n'),
-    html: shell(
-      '문의에 답변이 등록되었습니다',
-      [
-        `<p style="margin:0"><b>${escapeHtml(about)}</b> 에 남기신 문의에 답변이 등록되었습니다.</p>`,
-        `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">문의</p>`,
-        `<p style="margin:4px 0 0">${escapeHtml(question)}</p>`,
-        `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">답변</p>`,
-        `<p style="margin:4px 0 0">${escapeHtml(answer)}</p>`,
-        button(input.url, input.productName ? '상품에서 보기' : '문의 내역 보기'),
-      ].join(''),
-    ),
-  };
-}

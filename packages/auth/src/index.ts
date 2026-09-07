@@ -1,7 +1,9 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
-import { verifyEmailMail, resetPasswordMail, SIGNUP_POINTS, rewardExpiresAt } from '@shop/core';
+import { SIGNUP_POINTS, rewardExpiresAt } from '@shop/core';
+import { verifyEmailMail, resetPasswordMail, localeForUser } from './mail';
+import { resolveLocale } from '@shop/i18n/locale';
 import { getMailer } from '@shop/mail';
 import { prisma } from '@shop/db';
 
@@ -126,10 +128,15 @@ export const auth = betterAuth({
      * 실서비스에서는 반드시 켠다.
      */
     requireEmailVerification: false,
-    async sendResetPassword({ user, url }) {
+    async sendResetPassword({ user, url }, request) {
       // 실패하면 그대로 던진다. 오지 않는 메일을 기다리게 두면 안 된다.
       await getMailer().send(
-        resetPasswordMail({ to: user.email, name: user.name, url }),
+        resetPasswordMail({
+          to: user.email,
+          name: user.name,
+          url,
+          locale: await localeForUser(user.id, request),
+        }),
       );
     },
   },
@@ -143,7 +150,7 @@ export const auth = betterAuth({
      */
     sendOnSignUp: true,
     autoSignInAfterVerification: true,
-    async sendVerificationEmail({ user, url }) {
+    async sendVerificationEmail({ user, url }, request) {
       /**
        * 여기서는 삼킨다. 재설정 메일과 반대다.
        *
@@ -155,7 +162,14 @@ export const auth = betterAuth({
        * 시드가 만드는 계정은 전부 .test 주소(RFC 6761)라 실제로 반송된다.
        */
       try {
-        await getMailer().send(verifyEmailMail({ to: user.email, name: user.name, url }));
+        await getMailer().send(
+          verifyEmailMail({
+            to: user.email,
+            name: user.name,
+            url,
+            locale: await localeForUser(user.id, request),
+          }),
+        );
       } catch (error) {
         console.error('[auth] 확인 메일 발송 실패', error);
       }
@@ -238,7 +252,29 @@ export const auth = betterAuth({
          * 되돌리지 않는다. 포인트를 못 받는 것보다 가입이 실패하는 쪽이
          * 훨씬 나쁘고, 못 받은 것은 원장을 보면 나중에 채울 수 있다.
          */
-        async after(user) {
+        async after(user, ctx) {
+          /*
+           * **가입 화면을 보던 말을 남긴다.**
+           *
+           * 나중에 이 사람에게 메일을 보낼 때 쓴다 — 문의 답변이나 재입고
+           * 알림은 우리가 나중에 보내는 것이라 그때는 요청도 쿠키도 없다.
+           *
+           * 여기와 언어 고르기(POST /api/locale) 두 곳에서만 쓴다. 둘 다
+           * **의도한 순간**이다. 평범한 요청마다 덮어쓰면 기기마다 브라우저
+           * 언어가 다를 때 마지막으로 접속한 기기가 이기는데, 그건 고른 것이
+           * 아니다.
+           *
+           * 실패해도 삼킨다. 말을 못 남겼다고 가입이 실패하면 안 된다 —
+           * 포인트와 같은 판단이고, 없으면 기본 말로 나간다.
+           */
+          const chosen = resolveLocale({
+            cookie: null,
+            acceptLanguage: ctx?.headers?.get('accept-language') ?? null,
+          });
+          await prisma.user
+            .update({ where: { id: user.id }, data: { locale: chosen } })
+            .catch(() => null);
+
           try {
             await prisma.$transaction([
               prisma.pointTransaction.create({
