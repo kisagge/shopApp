@@ -1,0 +1,33 @@
+{
+  "//": "의존성 권고 중 지금은 두고 보는 것. 이름만 적지 않고 왜 두는지 적는다 — 이유가 남아 있어야 나중에 그 판단이 아직 맞는지 볼 수 있다.",
+  "tar": {
+    "note": "빌드·설치 때만 도는 도구 사슬 안에 있다. 우리 코드가 tar 를 부르지 않고, 서버 요청 경로에도 없다. 여기 실린 것들은 악의적인 아카이브를 풀 때 나는 문제인데 우리는 남이 준 아카이브를 풀지 않는다. 상위 패키지가 올려 주면 함께 사라진다.",
+    "advisories": [
+      "GHSA-23hp-3jrh-7fpw",
+      "GHSA-34x7-hfp2-rc4v",
+      "GHSA-8qq5-rm4j-mr97",
+      "GHSA-83g3-92jg-28cx",
+      "GHSA-qffp-2rhf-9h96",
+      "GHSA-9ppj-qmqm-q256",
+      "GHSA-r6q2-hw4h-h46w",
+      "GHSA-8x88-c5mf-7j5w",
+      "GHSA-r292-9mhp-454m",
+      "GHSA-vmf3-w455-68vh",
+      "GHSA-w8wr-v893-vjvp",
+      "GHSA-gvwx-54wh-qm9j"
+    ]
+  },
+  "mysql2": {
+    "note": "이 저장소는 Postgres 를 쓴다. Prisma 와 Better Auth 가 드라이버를 선택 의존으로 선언할 뿐이고 우리 쪽에서 MySQL 연결을 여는 코드가 없다 — 실린 문제는 둘 다 MySQL 서버와 말을 주고받을 때 나는 것이라 그 경로가 아예 돌지 않는다.",
+    "advisories": [
+      "GHSA-3f6p-5ww8-9rcr",
+      "GHSA-rgwj-5xj2-c3m3"
+    ]
+  },
+  "deepmerge-ts": {
+    "note": "설정 병합에만 쓰이는 도구 사슬 안에 있다. 문제는 스스로를 참조하는 객체를 병합할 때 나는데, 그런 값은 우리가 만들지 않는 정적 설정에서만 온다.",
+    "advisories": [
+      "GHSA-ggr8-5vv4-36mx"
+    ]
+  }
+}

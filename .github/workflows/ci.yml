@@ -90,6 +90,11 @@ jobs:
           BETTER_AUTH_URL: http://localhost:3100
 
       # 린트를 먼저 돌린다. 가장 빠르고, 여기서 걸리는 것은 대개 가장 고치기 쉽다.
+      - name: 의존성 권고
+        # 지금 뜬 것으로 빨갛게 만들지 않는다. 목록에 없는 새 권고만 잡는다 —
+        # tooling/audit.mjs 와 audit-allow.json 참고.
+        run: pnpm audit:ci
+
       - name: 린트
         run: pnpm turbo run lint
 

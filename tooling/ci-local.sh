@@ -44,6 +44,11 @@ pnpm --filter @shop/db exec prisma migrate deploy
 pnpm --filter @shop/db run seed
 pnpm --filter @shop/auth run seed
 
+# CI 와 같은 순서다. 의존성 권고를 먼저 보는 이유는 이것만 turbo 밖에
+# 있어서다 — 패키지별 작업이 아니라 잠금 파일 하나를 보는 일이다.
+echo "▸ audit"
+node tooling/audit.mjs
+
 for step in lint typecheck test build e2e; do
   echo "▸ $step"
   pnpm turbo run "$step"
