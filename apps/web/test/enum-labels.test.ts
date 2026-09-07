@@ -1,15 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ORDER_STATUS, MEMBER_GRADE, RETURN_TYPE, RETURN_REASON, RETURN_STATUS,
-  SIZE_FIT, REPORT_REASON,
+  ORDER_STATUS, RETURN_TYPE, RETURN_REASON,
   ORDER_STATUS_LABEL, RETURN_TYPE_LABEL, RETURN_REASON_LABEL,
   CLOSURE_EFFECT, CLOSURE_BLOCK,
 } from '@shop/core';
 import { LOCALES, createTranslator, messageKeys } from '@shop/i18n';
-import {
-  ORDER_STATUS_KEY, GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY,
-  RETURN_STATUS_KEY, SIZE_FIT_KEY, REPORT_REASON_KEY,
-} from '~/lib/i18n/enum-labels';
+import { ORDER_STATUS_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY } from '~/lib/i18n/enum-labels';
 import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
 
 /**
@@ -20,31 +16,59 @@ import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
  * 같은 글자가 그대로 뜬다. 그 조용한 실수를 여기서 잡는다.
  */
 
-const GROUPS = [
-  ['주문 상태', ORDER_STATUS, ORDER_STATUS_KEY],
-  ['회원 등급', MEMBER_GRADE, GRADE_KEY],
-  ['반품 종류', RETURN_TYPE, RETURN_TYPE_KEY],
-  ['반품 사유', RETURN_REASON, RETURN_REASON_KEY],
-  ['반품 상태', RETURN_STATUS, RETURN_STATUS_KEY],
-  ['사이즈 표현', SIZE_FIT, SIZE_FIT_KEY],
-  ['신고 사유', REPORT_REASON, REPORT_REASON_KEY],
-] as const;
+/**
+ * 이름표 표를 **폴더에서 모은다.**
+ *
+ * 예전에는 일곱 짝을 손으로 적어 두었다. 그 사이 표는 열셋으로 늘었고,
+ * 장바구니 문제 · 빈 결과 · 포인트 사유 · 리뷰 정렬 · 문의 주제 다섯이
+ * **아무도 안 보는 채로** 있었다. 값 하나를 더해도 컴파일은 통과하므로,
+ * 검사가 보지 않으면 화면에 `cartIssue.OUT_OF_STOCK` 같은 열쇠가 그대로 뜬다.
+ *
+ * 같은 실수를 접근성 훑기 · 번들 상한 · 요청 제한에서 이미 했다. 손 목록은
+ * 늘 늦게 자란다. 그래서 목록을 만들지 않고 모듈에서 모은다 — 새 표를
+ * 더하면 이름이 `_KEY` 로 끝나는 것만으로 검사에 들어온다.
+ */
+const modules = import.meta.glob('../src/lib/i18n/*.ts', { eager: true }) as Record<
+  string,
+  Record<string, unknown>
+>;
+
+/** 이름이 _KEY 로 끝나고 값이 전부 문자열인 것 = 이름표 표 */
+function labelMaps(): [string, Record<string, string>][] {
+  const found: [string, Record<string, string>][] = [];
+  for (const [path, mod] of Object.entries(modules)) {
+    const file = path.split('/').pop() ?? path;
+    for (const [name, value] of Object.entries(mod)) {
+      if (!name.endsWith('_KEY')) continue;
+      if (typeof value !== 'object' || value === null) continue;
+      const entries = Object.entries(value as Record<string, unknown>);
+      if (entries.length === 0 || !entries.every(([, v]) => typeof v === 'string')) continue;
+      found.push([`${file} · ${name}`, value as Record<string, string>]);
+    }
+  }
+  return found.sort(([a], [b]) => a.localeCompare(b));
+}
+
+const MAPS = labelMaps();
 
 describe('도메인 값의 이름표', () => {
   const known = new Set<string>(messageKeys());
 
-  it.each(GROUPS)('%s — 모든 값에 사전 열쇠가 있다', (_name, values, keys) => {
-    for (const value of values) {
-      const key = (keys as Record<string, string>)[value]!;
-      expect(known.has(key), `${key} 가 사전에 없다`).toBe(true);
+  it('표를 실제로 모아 왔다', () => {
+    // glob 이 어긋나면 아래 검사가 전부 통과해 버린다. 지금 열셋이다.
+    expect(MAPS.length).toBeGreaterThanOrEqual(13);
+  });
+
+  it.each(MAPS)('%s — 모든 값에 사전 열쇠가 있다', (_name, keys) => {
+    for (const [value, key] of Object.entries(keys)) {
+      expect(known.has(key), `${value} → ${key} 가 사전에 없다`).toBe(true);
     }
   });
 
-  it.each(GROUPS)('%s — 세 언어 모두 빈 문구가 아니다', (_name, values, keys) => {
+  it.each(MAPS)('%s — 세 언어 모두 빈 문구가 아니다', (_name, keys) => {
     for (const locale of LOCALES) {
       const t = createTranslator(locale);
-      for (const value of values) {
-        const key = (keys as Record<string, string>)[value]!;
+      for (const key of Object.values(keys)) {
         expect(t(key as never).trim(), `${locale}/${key}`).not.toBe('');
       }
     }
