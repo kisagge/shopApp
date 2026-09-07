@@ -65,3 +65,33 @@ describe('목록 태그와 role', () => {
     expect(found).toBe(true);
   });
 });
+
+/**
+ * role="radiogroup" 은 키보드 동작까지 갖춰야 한다.
+ *
+ * role 을 얹으면 낭독기는 **네이티브 라디오처럼 다뤄지리라 기대한다** —
+ * 탭으로 들어와 화살표로 고르는 것. 버튼만 나열해 두면 마크업은 완벽한데
+ * 화살표가 아무 일도 하지 않고, 항목 전부가 탭 순서에 남는다.
+ *
+ * **접근성 훑기가 구조적으로 못 잡는다.** axe 는 정지한 화면을 본다 —
+ * role 도 aria-checked 도 제자리에 있으니 통과한다. 없는 것은 동작이다.
+ */
+describe('라디오 묶음은 키보드로 다룰 수 있다', () => {
+  const files = walk(SRC).filter((f) => readFileSync(f, 'utf8').includes('role="radiogroup"'));
+
+  it('라디오 묶음을 실제로 찾아냈다', () => {
+    // 지금 둘이다(결제 수단 · 상품 옵션). 못 찾으면 아래가 조용히 통과한다.
+    expect(files.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it.each(files.map((f) => f.slice(SRC.length + 1)))('%s 가 키보드 규칙을 쓴다', (rel) => {
+    const source = readFileSync(join(SRC, rel), 'utf8');
+    expect(
+      source,
+      `${rel} 의 라디오 묶음은 화살표로 옮겨 다닐 수 없다. useRadioGroup 을 쓴다.`,
+    ).toContain('useRadioGroup');
+    // 훅만 부르고 펼치지 않으면 아무 일도 일어나지 않는다
+    expect(source, `${rel} 에 groupProps 가 안 붙었다`).toContain('groupProps');
+    expect(source, `${rel} 에 radioProps 가 안 붙었다`).toContain('radioProps(');
+  });
+});

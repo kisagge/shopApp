@@ -5,6 +5,7 @@ import { Button, Price } from '@shop/ui';
 import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
 import { useCartStore } from '~/stores/cart';
+import { useRadioGroup } from '~/lib/a11y/use-radio-group';
 import type { ProductDetail } from '~/lib/queries/catalog/products';
 import { useT } from '~/lib/i18n/client';
 
@@ -67,54 +68,16 @@ export function ProductOptions({
   return (
     <div className="flex flex-col gap-6">
       {product.optionGroups.map((group) => (
-        <section key={group.id} aria-labelledby={`opt-${group.id}`}>
-          <h2 id={`opt-${group.id}`} className="mb-2.5 text-[13px] font-semibold">
-            {group.name}
-          </h2>
-          {/*
-            목록이 아니라 라디오 그룹이다.
-            전에는 <ul role="radiogroup"> 이었는데, role 을 얹는 순간 ul 의 목록
-            의미가 사라져서 그 안의 li 가 **목록 없는 항목**이 된다. 낭독기에는
-            "라디오 그룹" 과 "목록" 이 겹쳐 들리고, 검사는 li 가 갈 곳이 없다고
-            말한다. 라디오 그룹은 애초에 목록이 아니므로 껍데기를 걷어냈다.
-          */}
-          <div role="radiogroup" aria-labelledby={`opt-${group.id}`} className="grid grid-cols-4 gap-2">
-            {group.values.map((value) => {
-              const on = picked[group.id] === value.id;
-              const available = availability.get(value.id) ?? false;
-              return (
-                <div key={value.id}>
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={on}
-                    aria-disabled={!available}
-                    onClick={() => {
-                      if (!available) return;
-                      setPicked((prev) => ({ ...prev, [group.id]: value.id }));
-                      setAdded(false);
-                    }}
-                    className={[
-                      'h-12 w-full rounded-sm border text-sm',
-                      !available
-                        ? 'border-n-100 bg-[var(--surface)] text-n-400 line-through'
-                        : on
-                          ? 'border-n-900 bg-n-900 font-semibold text-n-0'
-                          : 'border-n-300 bg-[var(--bg)] text-[var(--fg)]',
-                    ].join(' ')}
-                  >
-                    {value.value}
-                  </button>
-                  {!available && (
-                    <span className="mt-1 block text-center text-[10px] text-[var(--fg-muted)]">
-                      {t('catalog.soldOut')}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </section>
+        <OptionGroup
+          key={group.id}
+          group={group}
+          picked={picked[group.id] ?? null}
+          availability={availability}
+          onPick={(valueId) => {
+            setPicked((prev) => ({ ...prev, [group.id]: valueId }));
+            setAdded(false);
+          }}
+        />
       ))}
 
       {selected && (
@@ -210,5 +173,92 @@ export function ProductOptions({
       </>
       )}
     </div>
+  );
+}
+
+
+/**
+ * 옵션 한 묶음.
+ *
+ * **컴포넌트로 뺀 이유는 훅 때문이다.** 키보드 규칙은 묶음마다 자기 항목
+ * 목록을 알아야 하는데, 그리는 자리가 map 안이라 거기서는 훅을 부를 수 없다.
+ */
+function OptionGroup({
+  group,
+  picked,
+  availability,
+  onPick,
+}: {
+  group: ProductDetail['optionGroups'][number];
+  picked: string | null;
+  availability: ReadonlyMap<string, boolean>;
+  onPick: (valueId: string) => void;
+}) {
+  const t = useT();
+
+  const { groupProps, radioProps } = useRadioGroup({
+    items: group.values.map((v) => ({
+      id: v.id,
+      // 품절 사이즈는 보이되 화살표로 건너뛴다. 고를 수 없는 것에 멈춰 설 이유가 없다.
+      disabled: !(availability.get(v.id) ?? false),
+    })),
+    checked: picked,
+    onSelect: onPick,
+  });
+
+  return (
+    <section aria-labelledby={`opt-${group.id}`}>
+      <h2 id={`opt-${group.id}`} className="mb-2.5 text-[13px] font-semibold">
+        {group.name}
+      </h2>
+      {/*
+        목록이 아니라 라디오 그룹이다.
+        전에는 <ul role="radiogroup"> 이었는데, role 을 얹는 순간 ul 의 목록
+        의미가 사라져서 그 안의 li 가 **목록 없는 항목**이 된다. 낭독기에는
+        "라디오 그룹" 과 "목록" 이 겹쳐 들리고, 검사는 li 가 갈 곳이 없다고
+        말한다. 라디오 그룹은 애초에 목록이 아니므로 껍데기를 걷어냈다.
+      */}
+      <div
+        role="radiogroup"
+        aria-labelledby={`opt-${group.id}`}
+        className="grid grid-cols-4 gap-2"
+        {...groupProps}
+      >
+        {group.values.map((value) => {
+          const on = picked === value.id;
+          const available = availability.get(value.id) ?? false;
+          return (
+            <div key={value.id}>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-disabled={!available}
+                {...radioProps(value.id)}
+                onClick={() => {
+                  if (!available) return;
+                  onPick(value.id);
+                }}
+                className={[
+                  'h-12 w-full rounded-sm border text-sm',
+                  !available
+                    ? 'border-n-100 bg-[var(--surface)] text-n-400 line-through'
+                    : on
+                      ? 'border-n-900 bg-n-900 font-semibold text-n-0'
+                      : 'border-n-300 bg-[var(--bg)] text-[var(--fg)]',
+                ].join(' ')}
+              >
+                {value.value}
+              </button>
+              {!available && (
+                <span className="mt-1 block text-center text-[10px] text-[var(--fg-muted)]">
+                  {t('catalog.soldOut')}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
   );
 }

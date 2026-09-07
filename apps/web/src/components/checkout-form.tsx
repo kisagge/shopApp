@@ -10,6 +10,7 @@ import { AddressPicker } from '~/components/address-picker';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
+import { useRadioGroup } from '~/lib/a11y/use-radio-group';
 import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
@@ -79,6 +80,17 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
     () => (realGateway ? PAYMENT_METHOD_CODE.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD_CODE),
     [realGateway],
   );
+
+  /*
+   * role="radiogroup" 을 얹으면 낭독기는 네이티브 라디오처럼 다뤄지리라
+   * 기대한다 — 탭으로 들어와 화살표로 고르는 것. 버튼만 나열해 두었더니
+   * 화살표가 아무 일도 하지 않았고, 수단 넷이 모두 탭 순서에 있었다.
+   */
+  const methodKeys = useRadioGroup({
+    items: methods.map((m) => ({ id: m })),
+    checked: method,
+    onSelect: setMethod,
+  });
   const [agreed, setAgreed] = useState(false);
   const [memo, setMemo] = useState('');
   const [pointsToUse, setPointsToUse] = useState(0);
@@ -378,13 +390,19 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
           고쳤는데 여기 하나가 더 있었다. 훑기가 결제 화면을 지나가지 않아
           그동안 아무도 몰랐다.
         */}
-        <div role="radiogroup" aria-labelledby="method-title" className="grid grid-cols-2 gap-2">
+        <div
+          role="radiogroup"
+          aria-labelledby="method-title"
+          className="grid grid-cols-2 gap-2"
+          {...methodKeys.groupProps}
+        >
           {methods.map((m) => (
             <div key={m}>
               <button
                 type="button"
                 role="radio"
                 aria-checked={method === m}
+                {...methodKeys.radioProps(m)}
                 onClick={() => setMethod(m)}
                 className={[
                   'h-12 w-full rounded-sm border text-sm',
