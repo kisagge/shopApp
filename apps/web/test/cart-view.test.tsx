@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CartQuoteResponse } from '@shop/contract';
 
@@ -154,5 +155,73 @@ describe('장바구니 사진', () => {
 
     // 사진이 없다고 이름까지 없어지지 않는다
     expect(screen.getByRole('img', { name: /오버사이즈 울 블렌드 코트/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * 초점.
+ *
+ * ✕ 를 누르면 **그 버튼이 속한 줄이 통째로 사라진다.** 챙기지 않으면 초점이
+ * `<body>` 로 떨어지고, 키보드로 세 줄을 지우려면 탭으로 문서 맨 앞부터 세 번
+ * 내려와야 한다.
+ *
+ * **자동 접근성 훑기로는 안 잡힌다.** 정지한 화면의 마크업은 지우기 전이나
+ * 후나 멀쩡하다 — 사라진 뒤 초점이 어디 있는지는 axe 가 보지 않는다.
+ */
+describe('장바구니 — 줄을 지운 뒤 초점', () => {
+  beforeEach(() => {
+    // 이 묶음은 초점만 본다. 금액은 관계없으므로 견적을 비워 둔다.
+    useCartQuote.mockReturnValue({ data: undefined, isPending: false, isError: false });
+  });
+
+  const three = [
+    item({ variantId: 'v-1', productName: '코트' }),
+    item({ variantId: 'v-2', productName: '니트' }),
+    item({ variantId: 'v-3', productName: '팬츠' }),
+  ];
+
+  const removeButtons = () =>
+    [...document.querySelectorAll<HTMLElement>('[data-remove-row]')];
+
+  it('가운데 줄을 지우면 그 자리에 온 줄로 간다', async () => {
+    useCartStore.setState({ items: three });
+    render(<CartView />);
+
+    await userEvent.click(removeButtons()[1]!);
+
+    // 지운 자리를 이어받은 줄. 위에서 아래로 지워 나가는 동작이 끊기지 않는다.
+    expect(document.activeElement).toBe(removeButtons()[1]);
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('마지막 줄을 지우면 그 앞줄로 간다', async () => {
+    useCartStore.setState({ items: three });
+    render(<CartView />);
+
+    await userEvent.click(removeButtons()[2]!);
+
+    const left = removeButtons();
+    expect(left).toHaveLength(2);
+    expect(document.activeElement).toBe(left[1]);
+  });
+
+  it('다 지우면 비었다는 말로 간다', async () => {
+    /*
+     * 마지막 줄을 지우면 목록이 통째로 다른 화면으로 바뀐다. 초점이 갈 곳이
+     * 없으면 낭독기는 장바구니가 비었다는 말을 하지 않는다.
+     */
+    useCartStore.setState({ items: [item({ variantId: 'v-1' })] });
+    render(<CartView />);
+
+    await userEvent.click(removeButtons()[0]!);
+
+    expect(document.activeElement).toBe(screen.getByRole('status'));
+    expect(document.activeElement).toHaveTextContent('장바구니가 비어 있습니다');
+  });
+
+  it('처음 그릴 때는 초점을 끌어오지 않는다', () => {
+    useCartStore.setState({ items: three });
+    render(<CartView />);
+    expect(document.activeElement).toBe(document.body);
   });
 });

@@ -9,6 +9,7 @@ import type { CartQuoteLine } from '@shop/contract';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useCartStore, type CartItem } from '~/stores/cart';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
@@ -44,7 +45,13 @@ export function CartView() {
     return map;
   }, [quote.data]);
 
-  if (items.length === 0) return <EmptyCart />;
+  /*
+   * 줄을 지우면 그 줄의 ✕ 버튼도 함께 사라진다. 챙기지 않으면 초점이 body 로
+   * 떨어져, 세 줄을 지우려면 탭으로 문서 맨 앞부터 세 번 내려와야 한다.
+   */
+  const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(items.length);
+
+  if (items.length === 0) return <EmptyCart headingRef={emptyRef} />;
 
   const buyableCount = (quote.data?.lines ?? []).filter((l) => l.quantity > 0).length;
 
@@ -75,8 +82,8 @@ export function CartView() {
         </button>
       </div>
 
-      <ul className="flex flex-col">
-        {items.map((item) => (
+      <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-col">
+        {items.map((item, index) => (
           <li key={item.variantId} className="border-b border-[var(--border)] px-4 py-5 md:px-0">
             <CartRow
               item={item}
@@ -84,6 +91,8 @@ export function CartView() {
               loading={quote.isPending && item.selected}
               onToggle={() => toggleSelected(item.variantId)}
               onRemove={() => {
+                // 어느 자리였는지 먼저 기억한다. 지운 뒤에는 알 방법이 없다.
+                rememberRemoval(index);
                 remove(item.variantId);
                 track('remove_from_cart', {
                   productId: item.productId,
@@ -212,6 +221,8 @@ function CartRow({
           <button
             type="button"
             aria-label={t('cart.removeItem', { name: item.productName })}
+            // 지운 뒤 옆 줄을 찾는 표시. 클래스 이름에 기대면 스타일을 바꿀 때 끊긴다.
+            data-remove-row=""
             onClick={onRemove}
             className="-mt-1 -mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center text-[var(--fg-muted)]"
           >
@@ -360,12 +371,24 @@ function Summary({
   );
 }
 
-function EmptyCart() {
+function EmptyCart({ headingRef }: { headingRef?: React.RefObject<HTMLElement | null> }) {
   const t = useT();
 
   return (
     <div className="flex flex-col items-center gap-6 px-4 py-24">
-      <p className="text-[15px] text-[var(--fg-muted)]">{t('cart.empty')}</p>
+      {/*
+        마지막 줄을 지우면 목록이 통째로 이 화면으로 바뀐다. 초점이 갈 곳이
+        없으면 body 로 떨어지고, 낭독기는 장바구니가 비었다는 말을 하지 않는다.
+        tabIndex -1 이라 평소 탭 순서에는 걸리지 않는다.
+      */}
+      <p
+        ref={headingRef as React.RefObject<HTMLParagraphElement>}
+        tabIndex={-1}
+        role="status"
+        className="text-[15px] text-[var(--fg-muted)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--fg)]"
+      >
+        {t('cart.empty')}
+      </p>
       <Link
         href="/"
         className="inline-flex h-12 items-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline"
