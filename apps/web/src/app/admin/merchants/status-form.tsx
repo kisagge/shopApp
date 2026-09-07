@@ -3,9 +3,8 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-import {
-  MERCHANT_STATUS, MERCHANT_STATUS_LABEL, type MerchantStatusInput,
-} from '@shop/contract';
+import { MERCHANT_STATUS, MERCHANT_STATUS_LABEL } from '@shop/core';
+import type { MerchantStatusInput } from '@shop/contract';
 
 /**
  * 입점 상태 변경.

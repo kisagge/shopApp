@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PAYMENT_METHOD_CODE, type PaymentMethodCode } from '@shop/core';
 import { cartLineInputSchema } from './cart';
 import { cuidSchema, wonSchema } from './common';
 
@@ -10,8 +11,8 @@ import { cuidSchema, wonSchema } from './common';
  * 다시 계산했다는 뜻이고, 그때는 주문을 만들지 않고 사용자에게 다시 보여 준다.
  */
 
-export const PAYMENT_METHOD = ['CARD', 'TRANSFER', 'VIRTUAL_ACCOUNT', 'EASY_PAY'] as const;
-export type PaymentMethodInput = (typeof PAYMENT_METHOD)[number];
+/** 목록은 core 의 PAYMENT_METHOD_CODE 다 — 계약은 그것으로 스키마만 만든다 */
+export type PaymentMethodInput = PaymentMethodCode;
 
 /**
  * 새로 입력한 배송지.
@@ -58,7 +59,7 @@ export const createOrderRequestSchema = z
       .string()
       .regex(/^[A-Za-z0-9-]{16,64}$/)
       .optional(),
-    paymentMethod: z.enum(PAYMENT_METHOD),
+    paymentMethod: z.enum(PAYMENT_METHOD_CODE),
     /** 약관 동의 없이 주문을 만들지 않는다 */
     agreedToTerms: z.literal(true, 'valid.agreeRequired'),
   })

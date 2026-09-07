@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { hasPermission } from '@shop/core';
-import { MERCHANT_STATUS_LABEL, type MerchantStatusInput } from '@shop/contract';
+import { hasPermission, MERCHANT_STATUS_LABEL } from '@shop/core';
+import type { MerchantStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchants } from '~/lib/queries/admin/merchants';
 import { MerchantStatusForm } from './status-form';

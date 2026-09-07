@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MERCHANT_STATUS, type MerchantStatus } from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -8,15 +9,8 @@ import { cuidSchema } from './common';
  * 감사 로그에 "무엇을" 만 남고 "왜" 가 빠지면 나중에 판단할 수 없기 때문이다.
  */
 
-export const MERCHANT_STATUS = ['PENDING', 'APPROVED', 'SUSPENDED', 'TERMINATED'] as const;
-export type MerchantStatusInput = (typeof MERCHANT_STATUS)[number];
-
-export const MERCHANT_STATUS_LABEL: Readonly<Record<MerchantStatusInput, string>> = {
-  PENDING: '승인 대기',
-  APPROVED: '정상',
-  SUSPENDED: '일시 정지',
-  TERMINATED: '해지',
-};
+/** 목록 자체는 core 에 있다 — 여기서 다시 내보내면 화면이 계약을 통해 가져가게 된다 */
+export type MerchantStatusInput = MerchantStatus;
 
 export const updateMerchantStatusSchema = z
   .object({

@@ -4,11 +4,8 @@ import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Badge, Button, Field, Price } from '@shop/ui';
-import { won, MIN_POINTS_USE, isBlurDataUrl } from '@shop/core';
-import {
-  PAYMENT_METHOD,
-  type CreateOrderResponse, type OrderError, type PaymentMethodInput,
-} from '@shop/contract';
+import { won, MIN_POINTS_USE, isBlurDataUrl, PAYMENT_METHOD_CODE } from '@shop/core';
+import type { CreateOrderResponse, OrderError, PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { track } from '~/lib/analytics/client';
 import { useCartQuote } from '~/lib/use-cart-quote';
@@ -79,7 +76,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
    */
   const realGateway = isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY']);
   const methods = useMemo(
-    () => (realGateway ? PAYMENT_METHOD.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD),
+    () => (realGateway ? PAYMENT_METHOD_CODE.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD_CODE),
     [realGateway],
   );
   const [agreed, setAgreed] = useState(false);

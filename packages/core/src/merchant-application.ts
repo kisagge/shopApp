@@ -58,6 +58,24 @@ export function brandSlugOf(name: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * 가맹점 상태.
+ *
+ * 계약(@shop/contract)에 있던 것을 여기로 옮겼다. **값 목록이지 주고받는
+ * 모양이 아니다.** 계약은 Zod 를 안고 있어서, 화면이 이 목록 하나를 쓰려고
+ * 계약을 가져오면 Zod 384KB 가 브라우저 번들에 딸려 들어온다.
+ * 계약은 이 목록으로 스키마를 만들고, 화면은 목록만 가져간다.
+ */
+export const MERCHANT_STATUS = ['PENDING', 'APPROVED', 'SUSPENDED', 'TERMINATED'] as const;
+export type MerchantStatus = (typeof MERCHANT_STATUS)[number];
+
+export const MERCHANT_STATUS_LABEL: Readonly<Record<MerchantStatus, string>> = {
+  PENDING: '승인 대기',
+  APPROVED: '정상',
+  SUSPENDED: '일시 정지',
+  TERMINATED: '해지',
+};
+
 export const MERCHANT_APPLICATION_ERROR = {
   ALREADY_MERCHANT: '이미 가맹점 계정입니다.',
   NOT_APPLICABLE: '고객 계정만 입점을 신청할 수 있습니다.',
