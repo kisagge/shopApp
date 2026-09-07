@@ -61,7 +61,8 @@ export default defineConfig({
     {
       name: 'customer',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.customer },
-      testMatch: /(customer|review-helpful|notifications|order-idempotency|a11y-account)\.spec\.ts/,
+      testMatch:
+        /(customer|review-helpful|notifications|order-idempotency|a11y-account)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
@@ -119,6 +120,18 @@ export default defineConfig({
        * packages/auth 의 단위 테스트가 지킨다.
        */
       AUTH_RATE_LIMIT: 'off',
+      /**
+       * 결제 게이트웨이를 Mock 으로 대놓고 고른다.
+       *
+       * 이게 없으면 승인 뒤가 화면 검사를 한 번도 지나가지 못한다 — 이 서버는
+       * `next start` 로 도는 프로덕션 빌드라 실제 결제 키를 요구받는다.
+       *
+       * **운영으로 새면 결제 없이 주문이 확정된다.** 그래서 게이트웨이 쪽에
+       * 두 겹을 뒀다: 운영 배포(VERCEL_ENV=production)에서 켜면 던지고,
+       * 진짜 키가 있는데 켜도 던진다. 커밋된 설정에 이 이름이 없다는 것까지
+       * 단위 검사가 지킨다.
+       */
+      PAYMENT_GATEWAY: 'mock',
     },
   },
 });
