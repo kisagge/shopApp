@@ -55,6 +55,57 @@ export interface FacetValue {
 }
 
 /**
+ * 옷 사이즈의 정해진 차례.
+ *
+ * 알파벳순으로 두면 L · M · S · XL 이 되어 뜻이 없다. 사람이 아는 차례가
+ * 따로 있으므로 여기 적어 둔다.
+ */
+const LETTER_SIZES = ['XXS', 'XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL'];
+
+/**
+ * 매대 전체에서 값이 놓일 자리.
+ *
+ * **상품마다 매긴 순번은 여기서 쓸 수 없다.** 그 값은 "이 상품의 옵션 중
+ * 몇 번째" 라는 뜻이라, 사이즈가 ['M','L'] 인 상품은 M 에 0 을 준다. 여러
+ * 상품을 접으면 그 0 들이 뒤섞여 `250 FREE M S 260 L 270 XL` 같은 목록이
+ * 나온다 — 실제로 브랜드 화면이 그랬다.
+ *
+ * 상품이 여덟일 때는 사이즈가 몇 개 없어 티가 안 났다. 매대가 자라면서
+ * 드러난 종류다.
+ */
+function sizeRank(value: string): [number, number, string] {
+  const letter = LETTER_SIZES.indexOf(value.toUpperCase());
+  if (letter !== -1) return [0, letter, value];
+
+  // 신발 250 · 허리 28 · 벨트 90 — 숫자는 숫자끼리 오름차순
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) return [1, numeric, value];
+
+  // FREE 처럼 크기가 아닌 것은 맨 뒤로. 사이에 끼면 흐름이 끊긴다.
+  return [2, 0, value];
+}
+
+/**
+ * 고를 수 있는 값을 사람이 읽는 차례로 놓는다.
+ *
+ * 색은 정해진 차례가 없어 가나다순으로 둔다 — 아무 순서보다 **예측할 수
+ * 있는 순서**가 낫다. 같은 화면을 두 번 열었을 때 자리가 바뀌지 않는다.
+ */
+export function sortFacetValues(key: FacetKey, values: readonly FacetValue[]): FacetValue[] {
+  const sorted = [...values];
+  if (key === 'size') {
+    sorted.sort((a, b) => {
+      const [ga, na, va] = sizeRank(a.value);
+      const [gb, nb, vb] = sizeRank(b.value);
+      return ga - gb || na - nb || va.localeCompare(vb, 'ko');
+    });
+    return sorted;
+  }
+  sorted.sort((a, b) => a.value.localeCompare(b.value, 'ko'));
+  return sorted;
+}
+
+/**
  * 지금 화면에서 고를 수 있는 값들.
  *
  * **전체 목록을 그대로 두지 않는다.** 니트 화면에 "34" 같은 청바지 사이즈를

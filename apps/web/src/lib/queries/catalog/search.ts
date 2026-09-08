@@ -3,8 +3,8 @@ import { cachedRead, TAG, TTL } from '~/lib/cache';
 import { prisma, Prisma } from '@shop/db';
 import {
   DEFAULT_SORT,
-  normalizeSearchTerm, normalizePriceRange, FACET_GROUP, EMPTY_FACETS,
-  type ProductSort, type Facets, type FacetValue,
+  normalizeSearchTerm, normalizePriceRange, FACET_GROUP, EMPTY_FACETS, sortFacetValues,
+  type ProductSort, type Facets, type FacetValue, type FacetKey,
 } from '@shop/core';
 import {
   onDisplay, sellableBrand, listSelect, toListItem, type ProductListItem,
@@ -240,10 +240,16 @@ const facetRows = cachedRead(
       select: {
         value: true,
         swatchHex: true,
-        sortOrder: true,
         group: { select: { name: true } },
       },
-      orderBy: [{ sortOrder: 'asc' }, { value: 'asc' }],
+      /*
+       * 값의 순번은 **그 상품 안에서만** 뜻이 있다 — 옵션 그룹이 상품마다
+       * 따로 있기 때문이다. 상세 화면에서는 그 순번이 맞지만, 여러 상품의
+       * 값을 한 목록으로 접는 여기서는 쓸 수 없다. 그래서 뽑지도 않는다.
+       * 여기서 정렬하는 것은 같은 값을 먼저 만나는 행을 고정하기 위한
+       * 것뿐이고, 화면에 놓일 차례는 fold 안에서 core 가 정한다.
+       */
+      orderBy: { value: 'asc' },
     });
   },
   { key: ['facets'], tags: [TAG.catalog], revalidate: TTL.catalog },
@@ -264,16 +270,21 @@ export async function getFacets(filter: {
 
   /*
    * 같은 값이 상품마다 따로 있으므로 여기서 접는다. DB 에 distinct 를
-   * 맡기면 스와치 색과 정렬 순서를 함께 가져올 수 없다.
+   * 맡기면 스와치 색을 함께 가져올 수 없다.
+   *
+   * 차례는 DB 가 정해 주지 못한다. 옵션 값의 순번은 **그 상품 안에서의
+   * 순번**이라, 여러 상품을 접으면 뜻을 잃는다. 매대 전체의 차례는
+   * core 가 안다.
    */
-  const fold = (groupName: string): FacetValue[] => {
+  const fold = (key: FacetKey): FacetValue[] => {
+    const groupName = FACET_GROUP[key];
     const seen = new Map<string, FacetValue>();
     for (const row of rows) {
       if (row.group.name !== groupName || seen.has(row.value)) continue;
       seen.set(row.value, { value: row.value, swatchHex: row.swatchHex });
     }
-    return [...seen.values()];
+    return sortFacetValues(key, [...seen.values()]);
   };
 
-  return { color: fold(FACET_GROUP.color), size: fold(FACET_GROUP.size) };
+  return { color: fold('color'), size: fold('size') };
 }
