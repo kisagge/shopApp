@@ -27,12 +27,26 @@ import { LocaleProvider } from '~/lib/i18n/client';
  *
  * 굵기를 새로 쓰려면 여기 한 줄을 더해야 한다. 그 한 줄이 수십 KB 라는 것을
  * 알고 더하는 편이 낫다.
+ *
+ * **미리 받지 않는다(preload: false).** 굵기를 줄여도 조각 수는 그대로였다.
+ * 재 보니 매대 한 화면이 글꼴 파일 208개 1,833KB 를 받고 있었는데, 그 화면이
+ * 실제로 쓰는 것은 **35개 334KB** 였다 — 나머지 173개는 화면에 없는 글자의
+ * 조각이다.
+ *
+ * 미리 받기를 켜 두면 `<link rel=preload>` 155줄이 그 전부를 가장 높은
+ * 우선순위로 끌어온다. 사진과 스크립트가 그 뒤에 줄을 선다. 끄면 브라우저가
+ * @font-face 의 unicode-range 를 보고 **필요한 조각만** 가져간다.
+ *
+ * 글자가 안 보이는 시간은 생기지 않는다 — display: 'swap' 이라 대체 글꼴로
+ * 먼저 그리고, next/font 가 크기를 맞춘 대체본을 만들어 두므로 바뀔 때
+ * 레이아웃도 튀지 않는다.
  */
 const sans = IBM_Plex_Sans_KR({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
   variable: '--font-plex-kr',
   display: 'swap',
+  preload: false,
 });
 
 const serif = Hahmlet({
@@ -40,6 +54,7 @@ const serif = Hahmlet({
   weight: ['500'],
   variable: '--font-hahmlet',
   display: 'swap',
+  preload: false,
 });
 
 const DESCRIPTION = '오래 두고 입을 것만 골라 담은 편집숍';
