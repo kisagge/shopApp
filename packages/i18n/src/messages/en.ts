@@ -573,6 +573,12 @@ export const en: Dictionary = {
   'error.heading': 'This page did not load',
   'error.note': 'It may be temporary. Try again, and if it keeps happening, get in touch with the number below.',
   'error.digest': 'Error {digest}',
+  'error.checkoutHeading': 'Something went wrong during checkout',
+  'error.checkoutNote': 'Your order may already have been placed. Please check your orders before trying again — you could place a paid order twice.',
+  'error.checkoutOrders': 'Check my orders',
+  'error.checkoutCart': 'Back to cart',
+  'error.adminHeading': "This page didn't load",
+  'error.adminNote': 'Other menus still work. If this keeps happening, report it with the ID below.',
 
   'api.unauthorized': 'Please sign in.',
   'api.forbidden': 'You do not have permission.',

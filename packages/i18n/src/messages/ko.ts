@@ -597,6 +597,12 @@ export const ko = {
   'error.heading': '화면을 불러오지 못했습니다',
   'error.note': '일시적인 문제일 수 있습니다. 다시 시도해 보시고, 계속되면 아래 번호와 함께 문의해 주세요.',
   'error.digest': '오류 번호 {digest}',
+  'error.checkoutHeading': '주문 도중 문제가 생겼습니다',
+  'error.checkoutNote': '주문이 이미 만들어졌을 수 있습니다. 다시 시도하기 전에 주문 내역을 먼저 확인해 주세요 — 결제가 끝난 주문을 다시 넣게 될 수 있습니다.',
+  'error.checkoutOrders': '주문 내역 확인',
+  'error.checkoutCart': '장바구니로',
+  'error.adminHeading': '이 화면을 불러오지 못했습니다',
+  'error.adminNote': '다른 메뉴는 그대로 쓸 수 있습니다. 계속되면 아래 번호와 함께 알려 주세요.',
 
   // ── 입력 검증 ───────────────────────────────────────────
   //

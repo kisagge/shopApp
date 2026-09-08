@@ -569,6 +569,12 @@ export const ja: Dictionary = {
   'error.heading': '画面を読み込めませんでした',
   'error.note': '一時的な問題かもしれません。もう一度お試しいただき、続く場合は下の番号を添えてお問い合わせください。',
   'error.digest': 'エラー番号 {digest}',
+  'error.checkoutHeading': 'ご注文の途中で問題が発生しました',
+  'error.checkoutNote': 'ご注文がすでに完了している可能性があります。もう一度お試しになる前に注文履歴をご確認ください — 決済済みの注文を重ねてしまう恐れがあります。',
+  'error.checkoutOrders': '注文履歴を確認',
+  'error.checkoutCart': 'カートへ戻る',
+  'error.adminHeading': 'この画面を読み込めませんでした',
+  'error.adminNote': '他のメニューはそのままご利用いただけます。続く場合は下の番号とともにお知らせください。',
 
   'api.unauthorized': 'ログインが必要です。',
   'api.forbidden': '権限がありません。',
