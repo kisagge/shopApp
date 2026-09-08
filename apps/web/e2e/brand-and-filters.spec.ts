@@ -169,3 +169,27 @@ test('가격으로 좁히면 실제 가격과 맞는다', async ({ page }) => {
   // 조건에 맞는데 빠진 것이 없어야 한다 — 파는 가격이 0 으로 남으면 여기서 걸린다
   expect(above.length).toBe(all.filter((p) => p >= min).length);
 });
+
+test('칩을 전부 눌러도 조건이 사라지지 않는다', async ({ page }) => {
+  /*
+   * 상한이 10 이던 시절, 상품이 서른넷이 되면서 검색 화면에 사이즈 칩이
+   * 열둘 떴다. 전부 누르면 계약이 넘친다며 고른 것을 **통째로 버렸고**,
+   * 화면은 조건 없는 목록과 빈 체크박스로 돌아왔다. 누른 사람에게는 아무
+   * 일도 일어나지 않은 것으로 보인다.
+   *
+   * 단위 검사로는 못 봤다. 매대가 상한보다 많은 값을 내놓아야 생기는
+   * 일이라, 진짜 매대를 눌러 봐야 드러난다.
+   */
+  await page.goto('/search?q=울');
+
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+  const chips = page.locator('label:has(input[name="size"])');
+  const count = await chips.count();
+  expect(count).toBeGreaterThan(10); // 상한을 넘겨야 이 명세가 뜻을 가진다
+
+  for (let i = 0; i < count; i += 1) await chips.nth(i).click();
+  await page.getByRole('button', { name: '적용' }).click();
+
+  await expect(page.getByRole('checkbox', { name: 'M', exact: true })).toBeChecked();
+  expect(await page.locator('input[name="size"]:checked').count()).toBe(count);
+});

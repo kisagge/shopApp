@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  PRODUCT_SORT, MAX_SEARCH_LENGTH, MAX_FACET_VALUES, normalizeFacetValues,
+  PRODUCT_SORT, MAX_SEARCH_LENGTH, normalizeFacetValues,
 } from '@shop/core';
 
 /**
@@ -10,11 +10,27 @@ import {
  * 잘못된 값은 **거절하지 않고 기본값으로 되돌린다** — 링크를 잘못 받았다고
  * 오류 화면을 띄우면 아무것도 못 한다.
  */
-/** 주소에서 온 값을 배열로 맞추고, 다듬고, 개수를 자른다. */
+/**
+ * 주소에서 온 값을 배열로 맞추고, 다듬고, 개수를 자른다.
+ *
+ * **자르는 것과 버리는 것은 다르다.** 예전에는 여기서 `.max(MAX_FACET_VALUES)`
+ * 로 막았는데, Zod 의 max 는 넘치면 통째로 실패하고 그 실패를 아래 catch 가
+ * 빈 배열로 삼켰다. 상품이 서른넷이 되어 사이즈 칩이 열둘 뜨자, 그걸 전부
+ * 누른 사람은 조건 없는 목록과 빈 체크박스를 받았다 — 아무 일도 일어나지
+ * 않은 것처럼 보인다.
+ *
+ * 개수를 자르는 일은 normalizeFacetValues 가 한다. 넘쳐도 앞의 것들은
+ * 살아남으므로 화면이 조용히 초기화되지 않는다.
+ *
+ * 바깥 상한은 그대로 둔다. 주소에 값을 수천 개 붙여 파서를 밀어붙이는 것은
+ * 사람이 아니라 장난이라, 그 자리에서는 버리는 것이 맞다.
+ */
+const RAW_LIMIT = 200;
+
 const facetValues = z
   .preprocess(
     (raw) => (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]),
-    z.array(z.string().trim().min(1).max(30)).max(MAX_FACET_VALUES),
+    z.array(z.string().trim().min(1).max(30)).max(RAW_LIMIT),
   )
   .transform((values) => normalizeFacetValues(values))
   .catch([]);

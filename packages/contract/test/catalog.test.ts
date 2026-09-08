@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { MAX_FACET_VALUES } from '@shop/core';
 import { catalogQuerySchema } from '../src/catalog';
 
 /**
@@ -25,9 +26,27 @@ describe('색상·사이즈 파라미터', () => {
     expect(catalogQuerySchema.parse({ color: ['블랙', '블랙'] }).color).toEqual(['블랙']);
   });
 
-  it('개수가 넘치면 통째로 버린다 — 목록을 망가뜨리지 않는다', () => {
-    const many = Array.from({ length: 30 }, (_, i) => `v${i}`);
-    expect(catalogQuerySchema.parse({ size: many }).size).toEqual([]);
+  it('매대가 내놓는 만큼은 다 고를 수 있다', () => {
+    /*
+     * 여기가 무너져 있었다. 상한이 10 이던 시절, 검색 화면 한 곳에 사이즈
+     * 칩이 열둘 떴는데 그걸 전부 누르면 계약이 고른 것을 통째로 버렸다.
+     * 화면은 조건 없는 목록과 빈 체크박스로 돌아왔다 — 누른 사람에게는
+     * 아무 일도 일어나지 않은 것으로 보인다.
+     */
+    const twelve = Array.from({ length: 12 }, (_, i) => `v${i}`);
+    expect(catalogQuerySchema.parse({ size: twelve }).size).toHaveLength(12);
+  });
+
+  it('상한을 넘겨도 버리지 않고 자른다', () => {
+    // 버리면 조건이 조용히 사라진다. 자르면 적어도 누른 대로 좁혀진다.
+    const many = Array.from({ length: MAX_FACET_VALUES + 20 }, (_, i) => `v${i}`);
+    expect(catalogQuerySchema.parse({ size: many }).size).toHaveLength(MAX_FACET_VALUES);
+  });
+
+  it('장난 수준으로 많이 붙이면 그때는 버린다', () => {
+    // 주소에 값을 수백 개 매다는 것은 사람이 하는 일이 아니다.
+    const absurd = Array.from({ length: 5_000 }, (_, i) => `v${i}`);
+    expect(catalogQuerySchema.parse({ size: absurd }).size).toEqual([]);
   });
 
   it('이상한 값이 와도 화면이 죽지 않는다', () => {
