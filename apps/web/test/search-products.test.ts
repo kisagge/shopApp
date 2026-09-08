@@ -183,3 +183,80 @@ describe('페이지네이션', () => {
     expect(db.product.findMany.mock.calls[0]?.[0].take).toBe(49);
   });
 });
+
+/**
+ * 쪽 나눔.
+ *
+ * **아직 한 번도 안 돌았다.** 한 쪽이 24개인데 가장 큰 카테고리가 13개라,
+ * 화면에서는 "더 보기" 가 나타날 일이 없다. 매대가 자라는 날 처음 도는
+ * 코드이고, 그날 틀리면 손님이 상품을 못 보거나 같은 상품을 두 번 본다.
+ *
+ * 그래서 여기서 미리 밟아 둔다.
+ */
+const argsOf = (call = 0) => db.product.findMany.mock.calls[call]?.[0];
+
+describe('쪽 나눔', () => {
+  it('한 개를 더 청구해 더 있는지 본다 — 두 번 묻지 않는다', async () => {
+    await searchProducts({ take: 3 });
+    // 총 건수를 세는 질의로 판단하면 쪽마다 두 번 묻게 된다
+    expect(argsOf().take).toBe(4);
+  });
+
+  it('더 있으면 청구한 한 개는 돌려주지 않는다', async () => {
+    db.product.findMany.mockResolvedValue([row('a'), row('b'), row('c'), row('d')]);
+
+    const page = await searchProducts({ take: 3 });
+
+    expect(page.items).toHaveLength(3);
+    expect(page.items.map((i) => i.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('다음 커서는 돌려준 마지막 것이다 — 넘겨다본 것이 아니다', async () => {
+    /*
+     * 여기서 'd' 를 주면 다음 쪽이 'd' 다음부터 시작해 **'d' 가 통째로
+     * 건너뛰어진다.** 화면에서는 상품 하나가 조용히 사라진다.
+     */
+    db.product.findMany.mockResolvedValue([row('a'), row('b'), row('c'), row('d')]);
+
+    const page = await searchProducts({ take: 3 });
+
+    expect(page.nextCursor).toBe('c');
+  });
+
+  it('마지막 쪽이면 커서를 주지 않는다', async () => {
+    db.product.findMany.mockResolvedValue([row('a'), row('b')]);
+
+    const page = await searchProducts({ take: 3 });
+
+    expect(page.items).toHaveLength(2);
+    expect(page.nextCursor).toBeNull();
+  });
+
+  it('커서를 받으면 그 줄은 건너뛴다', async () => {
+    // skip 이 없으면 쪽마다 첫 줄이 앞 쪽의 마지막 줄과 겹친다
+    await searchProducts({ take: 3, cursor: 'c' });
+
+    expect(argsOf().cursor).toEqual({ id: 'c' });
+    expect(argsOf().skip).toBe(1);
+  });
+
+  it('첫 쪽에서만 총 건수를 센다', async () => {
+    /*
+     * 화면이 이미 총 건수를 들고 있다. 쪽마다 다시 세면 "더 보기" 를 누를
+     * 때마다 전체를 훑는 질의가 하나씩 더 붙는다.
+     */
+    await searchProducts({ take: 3 });
+    expect(db.product.count).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    db.product.findMany.mockResolvedValue([]);
+    await searchProducts({ take: 3, cursor: 'c' });
+    expect(db.product.count).not.toHaveBeenCalled();
+  });
+
+  it('한 쪽에 담을 수 있는 양에 상한이 있다', async () => {
+    // 주소로 take 를 크게 넣어 전체를 한 번에 긁어 가지 못하게 한다
+    await searchProducts({ take: 10_000 });
+    expect(argsOf().take).toBeLessThanOrEqual(49);
+  });
+});
