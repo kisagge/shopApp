@@ -20,6 +20,20 @@ type Button = ReturnType<Page['getByRole']>;
 async function openProductWithReviews(page: Page) {
   await page.goto('/product/oversized-wool-coat');
   await expect(page.getByRole('heading', { name: '리뷰' })).toBeVisible();
+
+  /*
+   * **로그인 상태를 먼저 확인한다.**
+   *
+   * 표 단추는 `loggedIn && !isMine` 일 때만 그려지고, 아니면 숫자만 남는다.
+   * 그래서 세션이 없으면 아래에서 "단추를 30초 기다렸지만 없다" 로 진다 —
+   * 실제로 그렇게 졌는데, 그 문구만 봐서는 리뷰가 안 온 것인지 로그인이
+   * 안 된 것인지 알 수 없었다. 여기서 갈라 두면 다음번에는 실패가 스스로
+   * 원인을 말한다.
+   */
+  await expect(
+    page.locator('header a[href="/mypage"]'),
+    '로그인 상태로 열려야 표 단추가 그려진다',
+  ).toBeVisible();
 }
 
 /**

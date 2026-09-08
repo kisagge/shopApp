@@ -1,4 +1,14 @@
 import { test, expect } from '@playwright/test';
+import { STATE_FILE } from './state';
+
+/*
+ * **자기 손님으로 돈다.** 이 명세는 서버 장바구니를 비우고 채운다.
+ * 다른 명세와 계정을 나눠 쓰면 한쪽이 비우는 순간 다른 쪽이 빈
+ * 장바구니를 보게 된다 — 실제로 그렇게 산발로 졌다.
+ */
+test.use({ storageState: STATE_FILE.cartOrdering });
+// 이 파일 안에서도 장바구니를 나눠 쓰므로 한 번에 하나씩 돈다
+test.describe.configure({ mode: 'serial' });
 
 /**
  * 같은 주문을 두 번 만들지 않는다.

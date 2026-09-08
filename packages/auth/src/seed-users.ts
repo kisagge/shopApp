@@ -1,6 +1,6 @@
 import { resolve } from 'node:path';
 import { config } from 'dotenv';
-import { SEED_PASSWORD } from './seed-fixtures';
+import { SEED_PASSWORD, SEED_ACCOUNT, CART_ACCOUNTS } from './seed-fixtures';
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
 import { assertSeedTarget, prisma } from '@shop/db';
@@ -38,6 +38,20 @@ const USERS: SeedUser[] = [
   { email: 'contact@studionoon.test', name: '스튜디오눈 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00001' },
   { email: 'contact@atelierk.test', name: '아뜰리에케이 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00002' },
   { email: 'contact@moor.test', name: '무어 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00003' },
+
+  /*
+   * **장바구니를 쥐는 검사마다 손님 하나씩.**
+   *
+   * 서버 장바구니는 계정에 하나뿐이고 저장이 통째로 바꾸는 방식이라, 한
+   * 계정을 나눠 쓰면 한 검사가 비우는 순간 다른 검사의 장바구니가 사라진다.
+   * 자세한 사연은 seed-fixtures 의 SEED_ACCOUNT 주석에 적어 두었다.
+   */
+  ...CART_ACCOUNTS.map((key, i) => ({
+    email: SEED_ACCOUNT[key],
+    name: `장바구니 손님 ${i + 1}`,
+    role: 'CUSTOMER' as const,
+    phone: `010-0000-100${i + 1}`,
+  })),
 ];
 
 async function main(): Promise<void> {
@@ -122,6 +136,26 @@ async function main(): Promise<void> {
       address2: '101동 1102호', isDefault: true,
     },
   });
+
+  /*
+   * 장바구니 손님들에게도 배송지를 준다. **없으면 주문이 아예 안 만들어져서**
+   * 결제 검사가 배송지 칸을 못 찾고 멈춘다 — 데모 계정이 그 자리를 이미 한 번
+   * 겪었다. id 는 위와 같은 이유로 계약의 형식을 지킨다.
+   */
+  for (const [i, key] of CART_ACCOUNTS.entries()) {
+    const buyer = await prisma.user.findUniqueOrThrow({ where: { email: SEED_ACCOUNT[key] } });
+    const id = `seedaddrcartcustomer000${i + 1}`;
+    await prisma.address.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id, userId: buyer.id, label: '집',
+        recipient: buyer.name, phone: `010-0000-100${i + 1}`,
+        postalCode: '04766', address1: '서울 성동구 왕십리로 000',
+        address2: `10${i + 1}동 1102호`, isDefault: true,
+      },
+    });
+  }
 
   console.log(`계정 시드 완료 — 전부 비밀번호는 ${PASSWORD}`);
 }

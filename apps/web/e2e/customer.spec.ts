@@ -90,6 +90,15 @@ test('주소 검색 버튼이 입력칸과 어긋나지 않는다', async ({ pag
 test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 말한다', async ({ page }) => {
   await page.goto('/product/wool-double-jacket');
 
+  /*
+   * 신고 단추도 로그인한 사람에게만 그려진다(canReport). 세션이 없으면
+   * "단추가 없다" 로 지는데, 그 문구는 리뷰가 없는 것과 구분되지 않는다.
+   */
+  await expect(
+    page.locator('header a[href="/mypage"]'),
+    '로그인 상태로 열려야 신고 단추가 그려진다',
+  ).toBeVisible();
+
   const report = page.getByRole('button', { name: '신고' }).first();
   await expect(report).toBeVisible();
   await expect(report).toHaveAttribute('aria-expanded', 'false');

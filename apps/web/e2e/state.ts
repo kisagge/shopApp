@@ -1,8 +1,20 @@
-/** 역할별 세션 파일. .gitignore 의 test-results/ 아래에 둔다. */
+/**
+ * 역할별 세션 파일. .gitignore 의 test-results/ 아래에 둔다.
+ *
+ * **장바구니를 쥐는 명세는 저마다 자기 손님을 쓴다.** 서버 장바구니는
+ * 계정에 하나뿐이고 저장이 통째로 바꾸는 방식이라, 한 계정을 나눠 쓰면
+ * 한쪽이 비우는 순간 다른 쪽 것이 사라진다 — 그런데 이 명세들은 하나같이
+ * "먼저 비우고 담는" 것으로 시작한다. 자세한 사연은 seed-fixtures 에 있다.
+ */
 export const STATE_FILE = {
   customer: 'test-results/.auth/customer.json',
   admin: 'test-results/.auth/admin.json',
   merchant: 'test-results/.auth/merchant.json',
+
+  cartOrdering: 'test-results/.auth/cart-ordering.json',
+  cartPayment: 'test-results/.auth/cart-payment.json',
+  cartA11y: 'test-results/.auth/cart-a11y.json',
+  cartBudget: 'test-results/.auth/cart-budget.json',
 } as const;
 
 /**
