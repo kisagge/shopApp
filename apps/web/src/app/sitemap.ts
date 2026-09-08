@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
-import { getAllProductSlugs, getTopCategories } from '~/lib/queries/catalog/products';
+import { getAllProductSlugs, getIndexableCategorySlugs } from '~/lib/queries/catalog/products';
 import { getLiveCollections } from '~/lib/queries/catalog/collections';
 import { getSellableBrandSlugs } from '~/lib/queries/catalog/brands';
+import { getNotices } from '~/lib/queries/support';
 import { absoluteUrl } from '~/lib/urls';
 
 /**
@@ -36,9 +37,14 @@ import { absoluteUrl } from '~/lib/urls';
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [slugs, categories, collections, brands] = await Promise.all([
+  const [products, categories, collections, brands, notices] = await Promise.all([
     getAllProductSlugs(),
-    getTopCategories(),
+    /*
+     * **하위 갈래까지 넣는다.** 헤더가 쓰는 목록(최상위만)을 그대로 쓰다가
+     * 여덟 개가 빠져 있었다 — 열리고 noindex 도 없는 화면이 사이트맵에만
+     * 없었다.
+     */
+    getIndexableCategorySlugs(),
     /*
      * **지금 열려 있는 기획전만 넣는다.** 조회가 게시 기간과 담긴 상품까지
      * 보므로, 끝났거나 빈 기획전의 주소가 새어 나가지 않는다 — 검색 결과에서
@@ -47,6 +53,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getLiveCollections(),
     // 팔 수 있는 브랜드만. 정지된 가맹점의 주소를 색인에 남기지 않는다.
     getSellableBrandSlugs(),
+    // 공지는 내용이 있는 공개 화면이다. 넣지 않을 이유가 없었다.
+    getNotices(),
   ]);
   const now = new Date();
 
@@ -57,8 +65,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'daily',
       priority: 1,
     },
-    ...categories.map((category) => ({
-      url: absoluteUrl(`/category/${category.slug}`),
+    ...categories.map((slug) => ({
+      url: absoluteUrl(`/category/${slug}`),
       lastModified: now,
       changeFrequency: 'daily' as const,
       priority: 0.8,
@@ -69,17 +77,42 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly' as const,
       priority: 0.6,
     })),
+    {
+      url: absoluteUrl('/collections'),
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
     ...collections.map((collection) => ({
       url: absoluteUrl(`/collection/${collection.slug}`),
       lastModified: now,
       changeFrequency: 'weekly' as const,
       priority: 0.8,
     })),
-    ...slugs.map((slug) => ({
-      url: absoluteUrl(`/product/${slug}`),
-      lastModified: now,
+    ...products.map((product) => ({
+      url: absoluteUrl(`/product/${product.slug}`),
+      // 그 상품이 실제로 바뀐 때. 전부에 오늘을 찍으면 아무 뜻이 없다.
+      lastModified: product.updatedAt,
       changeFrequency: 'weekly' as const,
       priority: 0.7,
+    })),
+    {
+      url: absoluteUrl('/support'),
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
+      url: absoluteUrl('/support/notice'),
+      lastModified: notices[0]?.publishedAt ?? now,
+      changeFrequency: 'weekly',
+      priority: 0.4,
+    },
+    ...notices.map((notice) => ({
+      url: absoluteUrl(`/support/notice/${notice.id}`),
+      lastModified: notice.publishedAt ?? now,
+      changeFrequency: 'yearly' as const,
+      priority: 0.3,
     })),
   ];
 }

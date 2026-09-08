@@ -221,13 +221,49 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 }
 
 /** 상세 페이지의 정적 경로 생성에 쓴다 */
-export async function getAllProductSlugs(): Promise<string[]> {
-  const rows = await prisma.product.findMany({
+export async function getAllProductSlugs(): Promise<
+  { slug: string; updatedAt: Date }[]
+> {
+  return prisma.product.findMany({
     where: onDisplay(),
-    select: { slug: true },
+    // 마지막으로 바뀐 때를 함께 준다. 사이트맵이 오늘 날짜를 전부에 찍으면
+    // 매일 전부 바뀌었다고 말하는 셈이라, 크롤러가 그 값을 믿지 않게 된다.
+    select: { slug: true, updatedAt: true },
   });
-  return rows.map((r) => r.slug);
 }
+
+/**
+ * 색인에 넣을 갈래.
+ *
+ * **하위 갈래도 넣는다.** 헤더가 쓰는 getTopCategories 를 그대로 쓰다가
+ * 여덟 개가 빠져 있었다 — `/category/outer-coat` 같은 화면은 멀쩡히 열리고
+ * noindex 도 없는데 사이트맵에만 없었다. 긴 꼬리 검색이 닿는 자리가 바로
+ * 그 화면들이다.
+ *
+ * **상품이 없는 갈래는 뺀다.** 검색 결과에서 들어왔더니 빈 화면인 주소를
+ * 만들지 않는 것 — 기획전을 넣을 때와 같은 규칙이다. 상품은 잎 갈래에
+ * 달리므로 자기 것과 자식 것을 함께 센다.
+ */
+export const getIndexableCategorySlugs = cachedRead(
+  async (): Promise<string[]> => {
+    const rows = await prisma.category.findMany({
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        slug: true,
+        _count: { select: { products: { where: onDisplay() } } },
+        children: {
+          select: { _count: { select: { products: { where: onDisplay() } } } },
+        },
+      },
+    });
+    return rows
+      .filter(
+        (c) => c._count.products + c.children.reduce((n, k) => n + k._count.products, 0) > 0,
+      )
+      .map((c) => c.slug);
+  },
+  { key: ['indexable-categories'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
 
 /** 카테고리 트리 — 목록 페이지의 사이드바 */
 export async function getCategoryWithChildren(slug: string) {
