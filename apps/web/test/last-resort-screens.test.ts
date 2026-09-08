@@ -58,6 +58,25 @@ describe('깨졌을 때 뜨는 화면도 세 말을 갖춘다', () => {
    * 그렇게 적혀 있는데, 적어 두는 것만으로는 지켜지지 않는다 — 글꼴 하나를
    * 예쁘게 바꾸려다 링크를 다는 것이 자연스러운 실수다.
    */
+  it('연결이 돌아오면 스스로 다시 들어간다', () => {
+    /*
+     * 비행기 모드를 끄는 것은 이 화면을 보고 있는 동안 일어난다. 단추를
+     * 눌러야만 다시 시도하면, 연결이 이미 돌아왔는데도 앱은 계속 "연결할
+     * 수 없습니다" 를 띄운 채로 있다.
+     */
+    expect(read(OFFLINE)).toMatch(/addEventListener\(\s*'online'/);
+    expect(read(OFFLINE)).toContain('location.reload()');
+  });
+
+  it('아직 끊겨 있을 때 누르면 눌린 티를 낸다', () => {
+    // 그대로 새로고침하면 같은 화면이라 단추가 고장 난 줄 안다
+    expect(read(OFFLINE)).toContain('navigator.onLine');
+  });
+
+  it('움직임을 줄이라는 설정을 따른다', () => {
+    expect(read(OFFLINE)).toContain('prefers-reduced-motion');
+  });
+
   it('오프라인 화면이 바깥에서 아무것도 불러오지 않는다', () => {
     const source = read(OFFLINE);
     const remote = source.match(/(?:src|href)\s*=\s*["']\s*(?:https?:)?\/\//gi) ?? [];

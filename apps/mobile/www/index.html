@@ -38,6 +38,15 @@
     button { background: #eeece8; color: #1a1917; }
   }
   main { max-width: 320px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
+  /* 아직 끊겨 있을 때 단추가 눌린 티를 내는 흔들림 */
+  @keyframes nudge {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes nudge { 0%, 100% { transform: none; } }
+  }
   h1 { margin: 0; font-size: 19px; font-weight: 600; letter-spacing: 0.16em; }
   p { margin: 0; font-size: 14px; }
   .hint { color: #6f6a63; font-size: 13px; }
@@ -59,7 +68,7 @@
     <h1>PLAIN</h1>
     <p id="title">연결할 수 없습니다.</p>
     <p class="hint" id="hint">네트워크 상태를 확인한 뒤 다시 시도해 주세요.</p>
-    <button type="button" id="retry" onclick="location.reload()">다시 시도</button>
+    <button type="button" id="retry">다시 시도</button>
   </main>
 
 <script>
@@ -111,6 +120,34 @@
     document.getElementById('title').textContent = t.title;
     document.getElementById('hint').textContent = t.hint;
     document.getElementById('retry').textContent = t.retry;
+
+    /*
+     * **연결이 돌아오면 스스로 들어간다.**
+     *
+     * 비행기 모드를 끄거나 와이파이가 잡히는 것은 사용자가 이 화면을 보고
+     * 있는 동안 일어난다. 그런데 예전에는 단추를 눌러야만 다시 시도해서,
+     * 연결이 이미 돌아왔는데도 앱은 계속 "연결할 수 없습니다" 를 띄우고
+     * 있었다. 기다리게 할 이유가 없다.
+     */
+    window.addEventListener('online', function () { location.reload(); });
+
+    /*
+     * 아직 끊긴 채로 누르면 **눌린 티를 낸다.**
+     *
+     * 그대로 새로고침하면 같은 화면이 다시 그려지는데, 화면이 안 바뀌니
+     * 사용자는 단추가 고장 난 줄 안다. 한 번 흔들어 "눌리긴 했고 아직
+     * 안 된다" 를 말한다.
+     */
+    document.getElementById('retry').addEventListener('click', function () {
+      if (navigator.onLine === false) {
+        var main = document.querySelector('main');
+        main.style.animation = 'none';
+        void main.offsetWidth;
+        main.style.animation = 'nudge .3s';
+        return;
+      }
+      location.reload();
+    });
   })();
 </script>
 </body>
