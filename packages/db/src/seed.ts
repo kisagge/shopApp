@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 // 모노레포 루트의 .env 를 읽는다 (cwd 는 packages/db)
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
-import { searchTextFor } from '@shop/core';
+import { searchTextFor, sellingPriceOf } from '@shop/core';
 import { prisma } from './client';
 import { assertSeedTarget } from './seed-target';
 import { seedReviews } from './seed-reviews';
@@ -515,7 +515,8 @@ async function main(): Promise<void> {
         // 검색이 보는 칸. 어드민 쓰기 경로와 같은 규칙을 쓴다 — 여기서
         // 빠뜨렸더니 갓 시드한 DB 에서 검색이 아무것도 못 찾았다.
         searchText: searchTextFor({ name: p.name, brandName: brand.name }),
-        salePrice: p.salePrice, brandId: brand.id, categoryId: category.id,
+        salePrice: p.salePrice, sellingPrice: sellingPriceOf(p),
+        brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
         // 평점 집계는 여기서 건드리지 않는다. reviews 테이블이 진실이고
         // seedReviews 가 원본을 세어 채운다. 여기서 0 으로 되돌리면
@@ -527,6 +528,9 @@ async function main(): Promise<void> {
         slug: p.slug, name: p.name, description: p.description,
         searchText: searchTextFor({ name: p.name, brandName: brand.name }),
         listPrice: p.listPrice, salePrice: p.salePrice,
+        // 파는 가격은 파생값이지만 컬럼이다. 여기서 빠뜨리면 기본값 0 이
+        // 되고, 가격 범위 필터와 가격순 정렬에서 상품이 통째로 사라진다.
+        sellingPrice: sellingPriceOf(p),
         brandId: brand.id, categoryId: category.id,
         status: totalStock === 0 ? 'SOLD_OUT' : 'ACTIVE',
         // 평점은 0 에서 시작한다. 뒷받침하는 Review 행 없이 숫자만 넣으면
@@ -626,7 +630,52 @@ async function main(): Promise<void> {
 
   await seedReviews();
 
+  await assertDerivedColumns();
+
   console.log('시드 완료');
+}
+
+/**
+ * 파생 칸이 원본과 맞는지 본다.
+ *
+ * **두 번 당한 자리다.** searchText 가 시드에서 빠져 갓 시드한 DB 에서
+ * 검색이 아무것도 못 찾았고, 그것을 고친 뒤에도 sellingPrice 가 같은
+ * 방식으로 빠져 서른넷 중 스물여섯이 가격 필터에서 사라졌다. 둘 다
+ * 시드가 성공했다고 말하는 채로 잘못돼 있었다.
+ *
+ * 목록을 손으로 적지 않는다. **행을 직접 세어** 원본과 다른 것이 하나라도
+ * 있으면 시드를 실패로 끝낸다. 다음에 파생 칸이 하나 더 늘면 그때 여기에
+ * 한 줄을 더하는 것으로 같은 보호를 받는다.
+ */
+async function assertDerivedColumns(): Promise<void> {
+  const rows = await prisma.product.findMany({
+    select: {
+      slug: true, name: true, listPrice: true, salePrice: true,
+      sellingPrice: true, searchText: true,
+      brand: { select: { name: true } },
+    },
+  });
+
+  const broken = rows.filter(
+    (r) =>
+      r.sellingPrice !== sellingPriceOf(r) ||
+      r.searchText !== searchTextFor({ name: r.name, brandName: r.brand.name }),
+  );
+
+  if (broken.length > 0) {
+    for (const r of broken) {
+      console.error(
+        `  ${r.slug}  파는가격 ${r.sellingPrice} (${sellingPriceOf(r)} 여야 함)` +
+          `  검색칸 "${r.searchText}"`,
+      );
+    }
+    throw new Error(
+      `파생 칸이 원본과 어긋난 상품 ${broken.length}개. ` +
+        '가격이나 이름을 쓰는 경로가 파생 칸을 함께 쓰지 않은 것이다.',
+    );
+  }
+
+  console.log(`  파생 칸 확인 — 상품 ${rows.length}개 모두 원본과 맞음`);
 }
 
 main()

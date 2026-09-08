@@ -141,3 +141,21 @@ export function emptyResultReason(applied: {
 export function searchTextFor(input: { name: string; brandName: string }): string {
   return `${input.name} ${input.brandName}`.toLowerCase();
 }
+
+/**
+ * 실제로 파는 가격.
+ *
+ * 파생값인데도 컬럼으로 저장한다 — Prisma 는 COALESCE 로 정렬하지 못하고,
+ * 가져와서 JS 로 정렬하면 커서 페이지네이션이 깨진다. 인덱스도 못 건다.
+ *
+ * **searchTextFor 와 똑같은 이유로 여기 있다.** 그때는 규칙이 어드민 쓰기
+ * 경로에만 있어서 시드가 검색 칸을 비워 뒀고, 갓 시드한 DB 에서 검색이
+ * 아무것도 못 찾았다. 이 칸은 같은 실수가 한 번 더 났다 — 시드가 안 쓰니
+ * 기본값 0 으로 남았고, 서른넷 중 스물여섯이 `가격 10만원 이상` 에서
+ * 사라졌다. 파는 가격이 0 이니 조건에 걸릴 리가 없다.
+ *
+ * 파생 규칙은 파생값을 쓰는 모든 경로가 같은 것을 봐야 한다. 그래서 여기다.
+ */
+export function sellingPriceOf(input: { listPrice: number; salePrice: number | null }): number {
+  return input.salePrice ?? input.listPrice;
+}

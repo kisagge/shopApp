@@ -137,3 +137,35 @@ test('접은 채로 정렬만 바꿔도 조건이 풀리지 않는다', async ({
   await expect(page).toHaveURL(/size=L/);
   await expect(page).toHaveURL(/sort=price_asc/);
 });
+
+test('가격으로 좁히면 실제 가격과 맞는다', async ({ page }) => {
+  /*
+   * 이 명세가 없어서 못 봤다. 파는 가격은 `salePrice ?? listPrice` 인
+   * 파생 컬럼인데 시드가 그 칸을 안 써서 기본값 0 으로 남았고, 서른넷 중
+   * 스물여섯이 `10만원 이상` 에서 통째로 사라졌다. 파는 가격이 0 이니
+   * 걸릴 리가 없다.
+   *
+   * 그래서 **개수가 아니라 화면에 적힌 가격**을 본다. 남은 것이 전부 조건
+   * 안에 있는지, 그리고 좁히기 전보다 줄었는지 — 둘 다 봐야 한다. 개수만
+   * 보면 0 개도 통과한다.
+   */
+  const priced = async (url: string) => {
+    await page.goto(url);
+    await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+    return page.locator('#main [data-price]').evaluateAll((els) =>
+      els.map((e) => Number((e as HTMLElement).dataset['price'])),
+    );
+  };
+
+  const all = await priced('/category/outer');
+  expect(all.length).toBeGreaterThan(1);
+
+  const min = 200_000;
+  const above = await priced(`/category/outer?minPrice=${min}`);
+
+  expect(above.length).toBeGreaterThan(0);
+  expect(above.length).toBeLessThan(all.length);
+  expect(above.every((p) => p >= min)).toBe(true);
+  // 조건에 맞는데 빠진 것이 없어야 한다 — 파는 가격이 0 으로 남으면 여기서 걸린다
+  expect(above.length).toBe(all.filter((p) => p >= min).length);
+});

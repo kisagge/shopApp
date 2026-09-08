@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizeSearchTerm, normalizePriceRange, emptyResultReason,
-  isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH,
+  isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH, sellingPriceOf,
 } from '../src/catalog';
 
 describe('검색어 정규화', () => {
@@ -133,5 +133,22 @@ describe('빈 결과 안내', () => {
     expect(emptyResultReason({ hasQuery: false, hasPriceRange: false, hasCategory: false })).toBe(
       'no_products',
     );
+  });
+});
+
+
+describe('파는 가격', () => {
+  it('할인가가 있으면 그것이 파는 가격이다', () => {
+    expect(sellingPriceOf({ listPrice: 413_000, salePrice: 289_000 })).toBe(289_000);
+  });
+
+  it('할인가가 없으면 정가로 판다', () => {
+    // null 을 0 으로 접으면 그 상품은 가격 필터에서 통째로 사라진다.
+    expect(sellingPriceOf({ listPrice: 198_000, salePrice: null })).toBe(198_000);
+  });
+
+  it('무료 상품이라도 0 을 정가로 되돌리지 않는다', () => {
+    // ?? 가 아니라 || 를 쓰면 0원이 정가로 뒤집힌다.
+    expect(sellingPriceOf({ listPrice: 10_000, salePrice: 0 })).toBe(0);
   });
 });

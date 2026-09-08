@@ -50,7 +50,13 @@ export function Price({
   const hasDiscount = listPrice !== undefined && discountPercent !== undefined && discountPercent > 0;
 
   return (
-    <p className={cn('flex flex-col gap-0.5', className)}>
+    /*
+     * data-price 는 **파는 가격 그 값**이다. 화면 글자는 말과 자리에 따라
+     * `289,000원` · `₩289,000` 으로 달라지고 취소선 정가·할인율이 같은
+     * 상자 안에 섞여 있어, 글자에서 숫자를 되캐내는 것은 규칙을 두 벌
+     * 만드는 일이다. 가격으로 좁히는 명세가 이 값을 본다.
+     */
+    <p data-price={amount} className={cn('flex flex-col gap-0.5', className)}>
       {hasDiscount && (
         <span className={cn('tnum text-n-500', s.strike)}>
           <VisuallyHidden>{t('price.listPrice')} </VisuallyHidden>

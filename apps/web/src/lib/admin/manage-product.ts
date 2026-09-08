@@ -4,7 +4,7 @@ import {
   canManageProduct, merchantScope, becameAvailable, hasPermission,
   needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
   type Actor, type ProductStatus,
-  searchTextFor, isSlugTaken,
+  searchTextFor, sellingPriceOf, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
 import {
@@ -43,7 +43,8 @@ function priceFields(input: { listPrice: number; salePrice: number | null }) {
   return {
     listPrice: input.listPrice,
     salePrice: input.salePrice,
-    sellingPrice: input.salePrice ?? input.listPrice,
+    // 파생 규칙은 core 에 있다 — 시드도 같은 것을 쓴다
+    sellingPrice: sellingPriceOf(input),
   };
 }
 
