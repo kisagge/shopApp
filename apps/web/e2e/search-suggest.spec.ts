@@ -33,15 +33,28 @@ async function suggest(page: Page, term: string) {
     .toBe('true');
 }
 
-test('두 글자부터 제안한다', async ({ page }) => {
+test('로마자는 두 글자부터, 한글은 한 음절부터 제안한다', async ({ page }) => {
+  /*
+   * 한글만 다르게 대한다. `a` 한 글자는 서른넷 중 열아홉을 물어 제안이
+   * 아니라 목록이 되지만, `울` 은 여덟만 문다.
+   *
+   * 검색은 이미 `울` 로 여덟 개를 찾는데 자동완성만 조용했다. 치는 동안에는
+   * 안 파는 물건처럼 보이고, 엔터를 눌러야 있다는 것을 안다.
+   */
   await page.goto('/');
   // 먼저 살아 있는 것을 확인하고 — 그래야 아래의 "안 뜬다" 가 뜻을 갖는다
   await suggest(page, '코트');
 
-  await page.locator(box).fill('코');
+  await suggest(page, '울');
+  await expect(page.getByRole('option').first()).toBeVisible();
 
+  await page.locator(box).fill('a');
   await expect(page.locator(box)).toHaveAttribute('aria-expanded', 'false');
   await expect(page.getByRole('option')).toHaveCount(0);
+
+  // 자판에서 조합 중에 지나가는 낱자는 아직 낱말이 아니다
+  await page.locator(box).fill('ㅋ');
+  await expect(page.locator(box)).toHaveAttribute('aria-expanded', 'false');
 });
 
 test('키보드만으로 고른 곳까지 간다', async ({ page }) => {

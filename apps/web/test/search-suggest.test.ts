@@ -34,11 +34,18 @@ beforeEach(() => {
 });
 
 describe('자동완성', () => {
-  it('한 글자에는 DB 를 부르지 않는다', async () => {
-    expect(await getSearchSuggestions('코')).toEqual([]);
+  it('로마자 한 글자에는 DB 를 부르지 않는다', async () => {
+    // 'a' 하나가 서른넷 중 열아홉을 문다. 그건 제안이 아니라 목록이다.
+    expect(await getSearchSuggestions('a')).toEqual([]);
     expect(db.product.findMany).not.toHaveBeenCalled();
     expect(db.brand.findMany).not.toHaveBeenCalled();
     expect(db.category.findMany).not.toHaveBeenCalled();
+  });
+
+  it('한글 한 음절에는 부른다 — 검색이 찾는 것을 자동완성도 안다', async () => {
+    // `울` 은 여덟만 문다. 검색은 찾는데 여기만 조용하면 안 파는 것처럼 보인다.
+    await getSearchSuggestions('울');
+    expect(db.product.findMany).toHaveBeenCalled();
   });
 
   it('공백만 친 것도 부르지 않는다', async () => {

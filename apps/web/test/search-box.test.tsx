@@ -37,14 +37,24 @@ async function typeAndWait(text = '코트') {
 }
 
 describe('검색 자동완성 창', () => {
-  it('한 글자에는 부르지 않는다', async () => {
+  it('로마자 한 글자에는 부르지 않는다', async () => {
     const user = userEvent.setup();
     render(<SearchBox id="q" />);
-    await user.type(box(), '코');
+    await user.type(box(), 'a');
 
     await new Promise((r) => setTimeout(r, 300));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(box()).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('한글 한 음절에는 부른다', async () => {
+    // 문지기가 core 한 곳에 있어야 검색과 자동완성이 같은 답을 낸다
+    const user = userEvent.setup();
+    render(<SearchBox id="q" />);
+    await user.type(box(), '울');
+
+    await new Promise((r) => setTimeout(r, 300));
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it('치는 도중의 글자마다 부르지 않는다 — 마지막 것만 부른다', async () => {

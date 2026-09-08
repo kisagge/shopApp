@@ -55,10 +55,23 @@ export const MAX_SEARCH_LENGTH = 60;
  */
 const STANDS_ALONE = /[\uAC00-\uD7A3\u4E00-\u9FFF\u3040-\u30FF]/u;
 
+/**
+ * 이 한 글자만으로 찾을 만한가.
+ *
+ * **내보내는 이유가 있다.** 검색과 자동완성은 서로 다른 질문에 답한다 —
+ * "검색어로 쓸 수 있는가" 와 "제안을 시작할 만큼 쳤는가". 두 문지기를 따로
+ * 두는 것은 맞지만, **한 음절이 낱말이라는 사실에는 둘이 다르게 답하면
+ * 안 된다.** 실제로 그랬다. 검색은 `울` 로 여덟 개를 찾는데 자동완성은
+ * 아무것도 내놓지 않아, 치는 동안에는 안 파는 물건처럼 보였다.
+ */
+export function standsAlone(term: string): boolean {
+  return STANDS_ALONE.test(term);
+}
+
 export function normalizeSearchTerm(raw: string): string | null {
   const trimmed = raw.trim().replace(/\s+/g, ' ');
   if (trimmed.length === 0) return null;
-  if (trimmed.length < MIN_SEARCH_LENGTH && !STANDS_ALONE.test(trimmed)) return null;
+  if (trimmed.length < MIN_SEARCH_LENGTH && !standsAlone(trimmed)) return null;
   return trimmed.slice(0, MAX_SEARCH_LENGTH);
 }
 

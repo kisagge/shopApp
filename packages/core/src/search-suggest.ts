@@ -1,14 +1,26 @@
 /**
  * 검색 도우미 규칙. 순수 로직만, I/O 없음.
  */
+import { standsAlone } from './catalog';
 
-/** 자동완성을 시작하는 글자 수. 한 글자로는 카탈로그 절반이 걸린다. */
+/**
+ * 자동완성을 시작하는 글자 수.
+ *
+ * 로마자 한 글자로는 카탈로그 절반이 걸린다 — `a` 하나가 서른넷 중 열아홉을
+ * 문다. 그건 제안이 아니라 목록이다.
+ *
+ * **한글 한 음절은 다르다.** `울` 은 여덟 개만 문다. 그래서 이 수가 아니라
+ * standsAlone 이 먼저 답한다.
+ */
 export const SUGGEST_MIN_LENGTH = 2;
 
 /** 한 번에 보여 줄 제안 수. 목록이 길면 고르는 것이 더 오래 걸린다. */
 export const SUGGEST_LIMIT = 8;
 
-export const canSuggest = (term: string): boolean => term.trim().length >= SUGGEST_MIN_LENGTH;
+export const canSuggest = (term: string): boolean => {
+  const trimmed = term.trim();
+  return trimmed.length >= SUGGEST_MIN_LENGTH || standsAlone(trimmed);
+};
 
 /**
  * 인기 검색어로 내보낼 만한가.

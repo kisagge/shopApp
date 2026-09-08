@@ -2,21 +2,53 @@ import { describe, it, expect } from 'vitest';
 import {
   canSuggest, SUGGEST_MIN_LENGTH, popularTerms, POPULAR_MIN_SESSIONS,
 } from '../src/search-suggest';
+import { normalizeSearchTerm } from '../src/catalog';
 
 describe('자동완성을 언제 시작하는가', () => {
-  it('너무 짧으면 시작하지 않는다 — 한 글자로는 카탈로그 절반이 걸린다', () => {
-    expect(canSuggest('코')).toBe(false);
-    expect(canSuggest('코트')).toBe(true);
+  it('로마자 한 글자로는 시작하지 않는다 — 카탈로그 절반이 걸린다', () => {
+    // 서른넷 중 열아홉이 'a' 를 문다. 그건 제안이 아니라 목록이다.
+    expect(canSuggest('a')).toBe(false);
+    expect(canSuggest('wo')).toBe(true);
+  });
+
+  it('한글 한 음절로는 시작한다 — 검색과 답이 같아야 한다', () => {
+    /*
+     * 여기가 어긋나 있었다. 검색은 `울` 로 여덟 개를 찾는데 자동완성은
+     * 아무것도 내놓지 않아, 치는 동안에는 안 파는 물건처럼 보였다.
+     * 두 문지기는 서로 다른 질문에 답하지만, **한 음절이 낱말이라는
+     * 사실에는 다르게 답하면 안 된다.**
+     */
+    expect(canSuggest('울')).toBe(true);
+    expect(normalizeSearchTerm('울')).not.toBeNull();
+    expect(canSuggest('코')).toBe(true);
+  });
+
+  it('조합 중인 낱자는 아직 낱말이 아니다', () => {
+    // 한글 자판에서 ㅋ 을 지나가는 것뿐이라, 받으면 뜻 없는 검색이 나간다
+    expect(canSuggest('ㅋ')).toBe(false);
+    expect(canSuggest('ㅇ')).toBe(false);
   });
 
   it('공백만 친 것은 검색어가 아니다', () => {
     expect(canSuggest('   ')).toBe(false);
-    expect(canSuggest(' 코 ')).toBe(false);
+    expect(canSuggest(' a ')).toBe(false);
+  });
+
+  it('한 글자에 대해 두 문지기의 답이 늘 같다', () => {
+    /*
+     * 문지기가 둘이면 언젠가 어긋난다 — 실제로 어긋나서, 검색은 찾는데
+     * 자동완성만 조용한 상태가 한동안 있었다. 사람이 한 글자만 친 순간이
+     * 정확히 그 어긋남이 보이는 자리라, 거기서만큼은 답이 같아야 한다.
+     */
+    const samples = [...'울코a1가한漢あア ㅋㅇ-'];
+    for (const c of samples) {
+      expect([c, canSuggest(c)]).toEqual([c, normalizeSearchTerm(c) !== null]);
+    }
   });
 
   it('기준 길이는 한 곳에서 온다', () => {
-    expect(canSuggest('가'.repeat(SUGGEST_MIN_LENGTH))).toBe(true);
-    expect(canSuggest('가'.repeat(SUGGEST_MIN_LENGTH - 1))).toBe(false);
+    expect(canSuggest('a'.repeat(SUGGEST_MIN_LENGTH))).toBe(true);
+    expect(canSuggest('a'.repeat(SUGGEST_MIN_LENGTH - 1))).toBe(false);
   });
 });
 
