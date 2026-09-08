@@ -49,6 +49,38 @@ describe('색인에서 빼는 경로', () => {
     expect(readFileSync(join(APP, 'robots.ts'), 'utf8')).toContain('DISALLOWED_PATHS');
   });
 
+  it('robots.txt 가 그 경로를 진짜로 막는다', async () => {
+    /*
+     * **목록을 가져다 쓰는 것만으로는 모자랐다.** 위 검사는 robots.ts 가
+     * DISALLOWED_PATHS 라는 글자를 담고 있는지만 봤고, 그 사이 코드가
+     * 경로마다 빗금을 덧붙이고 있었다 — `/cart/`. robots 규칙은 앞자리
+     * 맞춤이라 `/cart` 는 그것으로 시작하지 않는다. 운영에서 /cart ·
+     * /login · /signup · /search 가 전부 200 으로 열려 있었다.
+     *
+     * 그래서 글자가 아니라 **내보내는 줄을 규칙대로 적용해** 본다.
+     */
+    const { default: robots } = await import('../src/app/robots');
+    const rules = robots().rules;
+    const disallow = (Array.isArray(rules) ? rules : [rules]).flatMap((r) =>
+      typeof r.disallow === 'string' ? [r.disallow] : (r.disallow ?? []),
+    );
+
+    // robots.txt 의 판정: 경로가 규칙으로 시작하면 막힌 것이다
+    const blocked = (path: string) => disallow.some((rule) => path.startsWith(rule));
+
+    expect(disallow.length).toBeGreaterThan(0);
+    for (const path of DISALLOWED_PATHS) {
+      expect(blocked(path), `${path} 자체가 막혀야 한다`).toBe(true);
+      expect(blocked(`${path}/foo`), `${path} 아래도 막혀야 한다`).toBe(true);
+      expect(blocked(`${path}?q=1`), `${path} 의 질의 주소도 막혀야 한다`).toBe(true);
+    }
+
+    // 매대는 열려 있어야 한다 — 다 막아 버리면 위 검사는 늘 통과한다
+    for (const open of ['/', '/product/x', '/category/outer', '/brand/x', '/support']) {
+      expect(blocked(open), `${open} 는 열려 있어야 한다`).toBe(false);
+    }
+  });
+
   it('사이트맵에 넣는 경로가 robots 와 모순되지 않는다', () => {
     /*
      * **긁지 말라고 해 놓고 사이트맵에 넣으면 서로 반대말을 한다.**
