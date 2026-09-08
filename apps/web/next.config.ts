@@ -101,6 +101,21 @@ const config: NextConfig = {
      * 전부 깨지는데, 그게 배포 뒤에야 드러난다.
      */
     remotePatterns: [{ protocol: 'https' as const, hostname: remoteImageHost, pathname: '/**' }],
+
+    /**
+     * AVIF 를 먼저 준다.
+     *
+     * 기본값은 WebP 하나뿐이다. 옷 가게 화면은 무게의 대부분이 사진이라
+     * 여기서 줄이는 것이 가장 크다 — 카드 한 장이 640px 에서 WebP 로
+     * 103KB 인데, 그런 카드가 매대 한 화면에 열셋이다.
+     *
+     * 받아 주는 브라우저에만 나간다(Accept 헤더로 고른다). 못 받는
+     * 브라우저는 그대로 WebP 를 받으므로 잃는 것이 없다.
+     *
+     * 처음 한 번은 변환이 느리다. 그 뒤로는 캐시에서 나가고, 상품이
+     * 서른넷인 매대에서는 그 한 번의 값이 크지 않다.
+     */
+    formats: ['image/avif', 'image/webp'],
   },
 };
 
