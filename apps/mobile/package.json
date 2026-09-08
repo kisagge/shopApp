@@ -8,7 +8,8 @@
     "ios": "cap open ios",
     "android": "cap open android",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "splash": "node scripts/make-splash.mjs"
   },
   "dependencies": {
     "@capacitor/android": "8.0.0",
@@ -16,6 +17,7 @@
     "@capacitor/core": "8.0.0",
     "@capacitor/ios": "8.0.0",
     "@capacitor/preferences": "8.0.0",
+    "@capacitor/splash-screen": "8.0.0",
     "@capgo/capacitor-social-login": "8.5.5"
   },
   "devDependencies": {
@@ -23,6 +25,7 @@
     "@shop/config": "workspace:*",
     "@types/node": "24.10.1",
     "eslint": "10.9.1",
+    "sharp": "0.35.4",
     "typescript": "6.0.3"
   }
 }

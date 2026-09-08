@@ -6,6 +6,7 @@ import { AnalyticsProvider } from '~/components/analytics-provider';
 import { WebVitalsReporter } from '~/components/web-vitals-reporter';
 import { CartSync } from '~/components/cart-sync';
 import { NativeSession } from '~/components/native-session';
+import { NativeSplash } from '~/components/native-splash';
 import { ServiceWorker } from '~/components/service-worker';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
@@ -122,6 +123,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <CartSync />
             {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
             <NativeSession />
+            <NativeSplash />
             <ServiceWorker />
           </Providers>
         </LocaleProvider>

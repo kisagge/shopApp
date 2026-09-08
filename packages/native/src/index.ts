@@ -24,6 +24,17 @@ interface CapacitorBridge {
      * 타입을 여기 손으로 적는다. 패키지를 import 하면 이 패키지의 "의존성
      * 0개" 가 깨지고, 브라우저로 들어온 사람에게까지 그 코드가 나간다.
      */
+    /**
+     * @capacitor/splash-screen. 시작 화면을 우리가 내린다.
+     *
+     * 셸은 배포된 웹앱을 **네트워크로** 받아 온다 — 앱 안에 화면이 들어
+     * 있는 것이 아니다. 그래서 시작 화면을 그냥 두면 웹이 아직 오지 않은
+     * 동안 흰 화면이 남고, 사용자는 앱이 멈춘 줄 안다. 화면이 그려진
+     * 뒤에 우리가 내린다.
+     */
+    SplashScreen?: {
+      hide(options?: { fadeOutDuration?: number }): Promise<void>;
+    };
     SocialLogin?: {
       initialize(options: {
         google?: { webClientId?: string; iOSClientId?: string; iOSServerClientId?: string };
@@ -53,6 +64,25 @@ const bridge = (): CapacitorBridge | null =>
  */
 export function isNativeShell(): boolean {
   return bridge()?.isNativePlatform?.() === true;
+}
+
+/**
+ * 시작 화면을 내린다.
+ *
+ * **화면이 그려진 뒤에 부른다.** 설정에도 상한(launchShowDuration)을 두었지만
+ * 그건 안전망이다 — 웹이 먼저 오면 그만큼 일찍 내리는 것이 맞다.
+ *
+ * 셸 밖에서는 아무 일도 하지 않는다. 실패해도 삼킨다 — 시작 화면이 안
+ * 내려가는 것보다 나쁜 것은 없지만, 그건 상한이 대신 처리한다.
+ */
+export async function hideSplash(): Promise<void> {
+  const plugin = bridge()?.Plugins?.SplashScreen;
+  if (!plugin) return;
+  try {
+    await plugin.hide({ fadeOutDuration: 200 });
+  } catch {
+    // 이미 내려갔거나 셸이 이 플러그인을 안 실었다. 둘 다 할 일이 없다.
+  }
 }
 
 /** 'ios' | 'android' | 'web'. 셸 밖에서는 'web'. */

@@ -122,6 +122,16 @@
     document.getElementById('retry').textContent = t.retry;
 
     /*
+     * **여기서도 시작 화면을 내린다.**
+     *
+     * 이 화면이 뜨는 상황은 웹앱이 못 온 상황이라, 웹이 내려 주기를 기다릴
+     * 수 없다. 그대로 두면 상한(6초)이 지날 때까지 "연결할 수 없습니다" 가
+     * 시작 화면에 가려 보이지 않는다 — 정작 사용자에게 할 말이 있는 화면인데.
+     */
+    var splash = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen;
+    if (splash) { try { splash.hide({ fadeOutDuration: 200 }); } catch (e) {} }
+
+    /*
      * **연결이 돌아오면 스스로 들어간다.**
      *
      * 비행기 모드를 끄거나 와이파이가 잡히는 것은 사용자가 이 화면을 보고

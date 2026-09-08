@@ -61,6 +61,34 @@ const config: CapacitorConfig = {
     // 배포 빌드에서 웹뷰 디버거를 열어 두지 않는다
     webContentsDebuggingEnabled: false,
   },
+
+  plugins: {
+    /**
+     * 시작 화면.
+     *
+     * **이 셸에는 특히 필요하다.** 앱 안에 화면이 들어 있는 것이 아니라
+     * 배포된 웹앱을 네트워크로 받아 오므로, 켜고 나서 첫 화면이 그려지기까지
+     * 웹보다 오래 걸린다. 그 사이를 비워 두면 흰 화면이고, 사용자는 앱이
+     * 멈춘 줄 안다.
+     *
+     * **내리는 것은 웹이 한다.** 화면이 그려진 그 순간을 아는 것은 웹뿐이다
+     * (@shop/native 의 hideSplash). 여기 적은 시간은 그 신호가 영영 안 올
+     * 때를 대비한 **상한**이다 — 웹뷰가 아예 못 뜨는 상황에서 시작 화면이
+     * 영원히 남는 것이 가장 나쁘다. autoHide 를 끄면 정확히 그렇게 된다.
+     *
+     * 돌아가는 동그라미는 두지 않는다. 이 앱이 기다리는 것은 한 번의
+     * 화면 도착이라, 멈춰 있는 워드마크가 더 조용하다.
+     */
+    SplashScreen: {
+      launchAutoHide: true,
+      launchShowDuration: 6_000,
+      launchFadeOutDuration: 200,
+      showSpinner: false,
+      // 웹앱의 밝은 배경과 같은 색. 이어지는 화면과 이음매가 안 보이게 한다.
+      backgroundColor: '#fefdfc',
+      androidScaleType: 'CENTER_CROP',
+    },
+  },
 };
 
 export default config;
