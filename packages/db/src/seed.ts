@@ -6,6 +6,7 @@ config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
 import { searchTextFor } from '@shop/core';
 import { prisma } from './client';
+import { assertSeedTarget } from './seed-target';
 import { seedReviews } from './seed-reviews';
 import { seedSupport } from './seed-support';
 import { seedCollections } from './seed-collections';
@@ -456,6 +457,8 @@ const PRODUCTS: SeedProduct[] = [
 ];
 
 async function main(): Promise<void> {
+  // 어디에 쓰는지 먼저 밝힌다. 원격이면 승인이 없을 때 여기서 멈춘다.
+  assertSeedTarget('시드');
   console.log('시드 시작');
 
   // ── 카테고리 (부모 먼저, 자식 나중)

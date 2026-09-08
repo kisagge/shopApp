@@ -3,7 +3,7 @@ import { config } from 'dotenv';
 import { SEED_PASSWORD } from './seed-fixtures';
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
-import { prisma } from '@shop/db';
+import { assertSeedTarget, prisma } from '@shop/db';
 import type { UserRole } from '@shop/core';
 import { auth } from './index';
 
@@ -41,6 +41,7 @@ const USERS: SeedUser[] = [
 ];
 
 async function main(): Promise<void> {
+  assertSeedTarget('계정 시드');
   console.log('계정 시드 시작');
 
   for (const u of USERS) {
