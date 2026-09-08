@@ -85,10 +85,30 @@ interface Dead {
   readonly name: string;
 }
 
+/**
+ * 언급 횟수를 **한 번에** 센다.
+ *
+ * 처음에는 이름마다 전체 소스를 정규식으로 갈랐다. 내보내기가 천 개쯤이고
+ * 소스가 몇 MB 라 이름 × 소스 만큼 일을 했고, **혼자 돌릴 때는 0.6초인데
+ * 병렬로 도는 CI 에서 5초를 넘겨 졌다.**
+ *
+ * 산발적으로 지는 검사는 없는 검사보다 나쁘다 — 진짜 회귀를 봐도 "또
+ * 그거겠지" 하고 넘기게 된다. 그래서 시간을 늘리지 않고 세는 방법을 바꿨다:
+ * 소스를 한 번만 훑어 이름별 횟수를 세어 두고, 그다음은 찾아보기만 한다.
+ */
+function mentionCounts(): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const file of files(SEARCHED)) {
+    const source = readFileSync(file, 'utf8');
+    for (const token of source.match(/[A-Za-z_$][A-Za-z0-9_$]*/g) ?? []) {
+      counts.set(token, (counts.get(token) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
 function deadExports(): Dead[] {
-  const haystack = files(SEARCHED)
-    .map((f) => readFileSync(f, 'utf8'))
-    .join('\n');
+  const counts = mentionCounts();
 
   const dead: Dead[] = [];
   for (const file of files(DECLARED)) {
@@ -102,8 +122,7 @@ function deadExports(): Dead[] {
       if (FRAMEWORK.has(name)) continue;
 
       // 자기 선언 한 번을 빼고 남는 언급이 있으면 살아 있다
-      const mentions = haystack.split(new RegExp(`\\b${name}\\b`)).length - 1;
-      if (mentions <= 1) dead.push({ file: file.slice(ROOT.length + 1), name });
+      if ((counts.get(name) ?? 0) <= 1) dead.push({ file: file.slice(ROOT.length + 1), name });
     }
   }
   return dead;
