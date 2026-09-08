@@ -35,6 +35,29 @@ interface CapacitorBridge {
     SplashScreen?: {
       hide(options?: { fadeOutDuration?: number }): Promise<void>;
     };
+    /**
+     * @capacitor/share. 시스템 공유 시트를 연다.
+     *
+     * **웹의 navigator.share 로는 안 되는 자리가 있다.** 안드로이드 웹뷰는
+     * 그 API 를 아예 주지 않아서, 셸 안에서는 공유가 조용히 사라진다.
+     * 셸이 실어 주는 플러그인이 있으면 그쪽을 먼저 쓴다.
+     */
+    /**
+     * @capacitor/app. 앱이 링크로 열렸을 때를 듣는다.
+     *
+     * 셸은 이미 그 도메인을 띄우고 있지만, 밖에서 링크로 들어와도 웹뷰는
+     * **보고 있던 자리에 그대로 있다.** 어느 주소로 들어왔는지 아는 것은
+     * 여기뿐이라, 그 값을 받아 화면을 옮긴다.
+     */
+    App?: {
+      addListener(
+        event: 'appUrlOpen',
+        handler: (data: { url: string }) => void,
+      ): Promise<{ remove(): Promise<void> }>;
+    };
+    Share?: {
+      share(options: { title?: string; text?: string; url?: string }): Promise<unknown>;
+    };
     SocialLogin?: {
       initialize(options: {
         google?: { webClientId?: string; iOSClientId?: string; iOSServerClientId?: string };
@@ -83,6 +106,62 @@ export async function hideSplash(): Promise<void> {
   } catch {
     // 이미 내려갔거나 셸이 이 플러그인을 안 실었다. 둘 다 할 일이 없다.
   }
+}
+
+/**
+ * 시스템 공유 시트를 연다.
+ *
+ * 셸이 이 플러그인을 안 실었거나 셸 밖이면 **false 를 돌려준다** — 부르는
+ * 쪽이 다음 수단(navigator.share · 주소 복사)으로 넘어갈 수 있게 한다.
+ * 사용자가 시트를 그냥 닫은 것도 성공으로 본다. 취소는 실패가 아니다.
+ */
+export async function nativeShare(options: {
+  title?: string;
+  text?: string;
+  url?: string;
+}): Promise<boolean> {
+  const plugin = bridge()?.Plugins?.Share;
+  if (!plugin) return false;
+  try {
+    await plugin.share(options);
+  } catch {
+    // 취소했거나 보낼 곳이 없다. 어느 쪽이든 여기서 더 할 일은 없다.
+  }
+  return true;
+}
+
+/**
+ * 링크로 앱이 열렸을 때 그 주소를 받는다.
+ *
+ * **같은 출처의 주소만 넘긴다.** 앱 링크는 우리 도메인만 잡도록 걸려 있지만,
+ * 커스텀 스킴이나 남이 만든 인텐트로도 이 자리가 불릴 수 있다. 밖에서 준
+ * 주소를 그대로 열면 웹뷰를 아무 데나 보내는 통로가 된다 — 웹뷰에는
+ * 주소창이 없어서 사용자는 어디에 있는지 알 수 없다.
+ *
+ * 정리를 돌려준다. 부르는 쪽이 화면을 떠날 때 떼면 된다.
+ */
+export function onAppUrlOpen(handler: (path: string) => void): () => void {
+  const plugin = bridge()?.Plugins?.App;
+  if (!plugin || typeof window === 'undefined') return () => undefined;
+
+  let remove: (() => Promise<void>) | null = null;
+  void plugin
+    .addListener('appUrlOpen', ({ url }) => {
+      try {
+        const incoming = new URL(url);
+        if (incoming.origin !== window.location.origin) return;
+        handler(incoming.pathname + incoming.search + incoming.hash);
+      } catch {
+        // 주소로 읽히지 않는 것은 우리 것이 아니다
+      }
+    })
+    .then((handle) => {
+      remove = () => handle.remove();
+    });
+
+  return () => {
+    void remove?.();
+  };
 }
 
 /** 'ios' | 'android' | 'web'. 셸 밖에서는 'web'. */

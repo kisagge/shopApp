@@ -101,3 +101,46 @@ Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다�
 `ios/`·`android/` 의 뼈대는 커밋한다(설정을 손으로 고칠 일이 있다). 다만
 `cap sync` 가 매번 새로 만드는 것들 — 웹 자산 사본, Pods, Gradle 캐시 — 은
 `.gitignore` 에 둔다.
+
+## 딥링크를 실제로 켜려면
+
+파일은 다 들어 있지만 **사람이 넣어야 하는 값이 둘** 남아 있다. 둘 다 없으면
+맺음 파일이 404 로 나가고, 링크는 조용히 브라우저로 열린다.
+
+### 안드로이드
+
+서명 인증서의 SHA-256 지문을 웹앱 환경에 넣는다. 여러 개면 쉼표로 잇는다
+(디버그 키·배포 키·구글 플레이 재서명 키가 서로 다르다).
+
+```
+ANDROID_CERT_SHA256=AA:BB:...:FF
+```
+
+지문 보기:
+
+```bash
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android
+```
+
+### iOS
+
+애플 팀 ID 를 웹앱 환경에 넣는다.
+
+```
+APPLE_TEAM_ID=ABCDE12345
+```
+
+그리고 **Xcode 에서 한 걸음**: App 타깃 → Signing & Capabilities →
+Associated Domains 를 켠다. `App/App.entitlements` 는 이미 있지만, 그 자리를
+켜야 서명에 실려 간다. 유료 개발자 계정이 필요하다.
+
+### 확인
+
+```bash
+curl https://<도메인>/.well-known/assetlinks.json
+curl https://<도메인>/.well-known/apple-app-site-association
+```
+
+404 면 값이 아직 안 들어간 것이다. 자리만 채운 파일을 올리지 않는 이유는
+애플·구글이 그것을 받아 가 캐시하기 때문이다 — 없는 것이 틀린 것보다 낫다.
+

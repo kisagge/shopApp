@@ -22,6 +22,26 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!--
+                앱 링크.
+
+                공유받은 https 주소를 브라우저가 아니라 이 앱이 연다.
+                autoVerify 를 켜면 설치할 때 안드로이드가 그 도메인의
+                /.well-known/assetlinks.json 을 받아 가 서명 지문을 견주고,
+                맞을 때만 "이 앱이 연다" 로 굳힌다 — 아무 앱이나 남의 도메인
+                링크를 가로채지 못하게 하는 장치다.
+
+                지문이 안 맞거나 파일이 없으면 조용히 브라우저로 간다.
+                호스트는 capacitor.config 의 PRODUCTION_URL 과 같아야 하고,
+                apps/web 의 검사가 그것을 지킨다.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="shop-app-web-tau.vercel.app" />
+            </intent-filter>
+
         </activity>
 
         <provider

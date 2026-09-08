@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  유니버설 링크.
+
+  공유받은 https 주소를 사파리가 아니라 이 앱이 연다. iOS 는 앱을 설치할 때
+  이 도메인의 /.well-known/apple-app-site-association 을 받아 가, 거기 적힌
+  팀 ID·번들 ID 가 이 앱과 맞을 때만 연결을 굳힌다.
+
+  **Xcode 에서 한 걸음이 더 필요하다.** 이 파일만 두어서는 서명에 실려 가지
+  않는다 — Signing & Capabilities 에서 Associated Domains 를 켜서 이 파일을
+  붙여야 한다. 그 자리에는 유료 개발자 계정이 필요하고, 그래서 여기서
+  대신 해 둘 수 있는 것은 파일까지다. apps/mobile/README.md 에 적어 두었다.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:shop-app-web-tau.vercel.app</string>
+	</array>
+</dict>
+</plist>
