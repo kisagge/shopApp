@@ -282,6 +282,13 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
               onPicked={(picked) => {
                 setDefaultAddress(picked);
                 setEditingAddress(false);
+                /*
+                 * 주문서에서 배송지를 정한 순간이다. 이미 기본 배송지가
+                 * 있는 사람은 여기를 지나지 않으므로, 이 이벤트의 수는
+                 * **주소를 새로 넣어야 했던 사람**의 수가 된다 — 결제까지
+                 * 가는 길에서 어디가 걸리는지 보는 값이다.
+                 */
+                track('add_shipping_info', { remote: picked.isRemoteArea });
               }}
               onCancel={() => setEditingAddress(false)}
             />
