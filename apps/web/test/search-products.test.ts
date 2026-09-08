@@ -38,8 +38,19 @@ describe('검색어', () => {
     expect(whereOf().searchText).toEqual({ contains: 'moor' });
   });
 
-  it('한 글자면 검색어로 치지 않는다', async () => {
-    const page = await searchProducts({ q: '코' });
+  it('한글 한 글자도 검색어로 친다 — 한 글자가 낱말이다', async () => {
+    /*
+     * 예전에는 한 글자를 전부 거절했다. 운영에서 "울" 을 찾으면 상품 서른넷
+     * 중 여덟이 걸려야 하는데 0건이 나갔다 — 근거였던 "카탈로그 전체가
+     * 걸린다" 는 라틴 문자 이야기였다("a" 는 열아홉에 걸린다).
+     */
+    const page = await searchProducts({ q: '울' });
+    expect(page.term).toBe('울');
+    expect(whereOf().searchText).toEqual({ contains: '울' });
+  });
+
+  it('라틴 한 글자는 여전히 검색어로 치지 않는다', async () => {
+    const page = await searchProducts({ q: 'a' });
     expect(page.term).toBeNull();
     expect(whereOf().searchText).toBeUndefined();
   });

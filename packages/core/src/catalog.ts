@@ -31,15 +31,34 @@ export function isProductSort(value: string): value is ProductSort {
 /**
  * 검색어 정규화.
  *
- * 앞뒤 공백과 가운데 연속 공백을 정리한다. 한 글자는 받지 않는다 —
- * 카탈로그 전체가 걸려 검색이라 부를 수 없는 결과가 나온다.
+ * 앞뒤 공백과 가운데 연속 공백을 정리한다.
+ *
+ * **한 글자를 거절하던 규칙이 한국어에서는 틀렸다.** 근거는 "카탈로그 전체가
+ * 걸려 검색이라 부를 수 없다" 였는데, 그건 라틴 문자 이야기다 — `a` 는 거의
+ * 모든 것에 걸린다. 한글은 **한 글자가 낱말**이다: 울 · 백 · 컵 · 톱.
+ *
+ * 실제로 "울" 은 상품 서른넷 중 여덟에 걸린다. 카탈로그 전체가 아니라 쓸 만한
+ * 결과인데, 손님에게는 아무것도 없다고 나갔다.
+ *
+ * 낱자(ㄱ, ㅏ)는 여전히 거절한다 — **조합 중이라는 뜻**이지 낱말이 아니다.
+ * 한자와 가나도 한 글자로 뜻이 서므로 함께 받는다.
  */
 export const MIN_SEARCH_LENGTH = 2;
 export const MAX_SEARCH_LENGTH = 60;
 
+/**
+ * 한 글자로도 뜻이 서는 문자.
+ *
+ * 완성된 한글 음절 · 한자 · 가나. **낱자 영역(U+3131–U+318E)은 뺐다** —
+ * 한글 자판에서 조합 중에 나오는 값이라, 받으면 글자를 치는 동안 뜻 없는
+ * 검색이 계속 나간다.
+ */
+const STANDS_ALONE = /[\uAC00-\uD7A3\u4E00-\u9FFF\u3040-\u30FF]/u;
+
 export function normalizeSearchTerm(raw: string): string | null {
   const trimmed = raw.trim().replace(/\s+/g, ' ');
-  if (trimmed.length < MIN_SEARCH_LENGTH) return null;
+  if (trimmed.length === 0) return null;
+  if (trimmed.length < MIN_SEARCH_LENGTH && !STANDS_ALONE.test(trimmed)) return null;
   return trimmed.slice(0, MAX_SEARCH_LENGTH);
 }
 

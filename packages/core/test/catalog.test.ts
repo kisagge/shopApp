@@ -13,9 +13,38 @@ describe('검색어 정규화', () => {
     expect(normalizeSearchTerm('울    코트')).toBe('울 코트');
   });
 
-  it('한 글자는 받지 않는다 — 카탈로그 전체가 걸린다', () => {
-    expect(normalizeSearchTerm('울')).toBeNull();
-    expect(normalizeSearchTerm(' 코 ')).toBeNull();
+  /*
+   * 예전에는 한 글자를 전부 거절했다. 근거는 "카탈로그 전체가 걸린다" 였는데
+   * **그건 라틴 문자 이야기였다.** 한글은 한 글자가 낱말이라, 운영에서
+   * "울" 을 찾으면 상품 서른넷 중 여덟이 걸려야 하는데 0건이 나갔다.
+   */
+  it('한글 한 글자는 낱말이라 받는다', () => {
+    expect(normalizeSearchTerm('울')).toBe('울');
+    expect(normalizeSearchTerm(' 코 ')).toBe('코');
+  });
+
+  it('한자와 가나도 한 글자로 뜻이 선다', () => {
+    expect(normalizeSearchTerm('麻')).toBe('麻');
+    expect(normalizeSearchTerm('綿')).toBe('綿');
+  });
+
+  it('라틴 한 글자는 여전히 받지 않는다 — 거의 모든 것에 걸린다', () => {
+    expect(normalizeSearchTerm('a')).toBeNull();
+    expect(normalizeSearchTerm('7')).toBeNull();
+  });
+
+  it('낱자는 받지 않는다 — 조합 중이라는 뜻이지 낱말이 아니다', () => {
+    /*
+     * 한글 자판에서 "코" 를 치는 도중에 ㅋ 가 지나간다. 받으면 글자를 치는
+     * 동안 뜻 없는 검색이 계속 나간다.
+     */
+    expect(normalizeSearchTerm('ㅋ')).toBeNull();
+    expect(normalizeSearchTerm('ㅏ')).toBeNull();
+  });
+
+  it('빈 값은 받지 않는다', () => {
+    expect(normalizeSearchTerm('')).toBeNull();
+    expect(normalizeSearchTerm('   ')).toBeNull();
   });
 
   it(`${MIN_SEARCH_LENGTH}글자부터 받는다`, () => {
