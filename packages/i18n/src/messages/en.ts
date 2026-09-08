@@ -85,6 +85,7 @@ export const en: Dictionary = {
   'catalog.color': 'Colour',
   'catalog.size': 'Size',
   'catalog.resetFilters': 'Clear filters',
+  'catalog.filterCount': '{count} applied',
   'brand.eyebrow': 'BRAND',
   'brand.empty': 'This brand has no products right now.',
   'brand.all': 'All products from this brand',

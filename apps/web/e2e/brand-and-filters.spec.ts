@@ -57,6 +57,9 @@ test('색상·사이즈로 좁힐 수 있고, 고른 것이 주소에 남는다'
   await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
   expect(await page.locator('#main a[href^="/product/"]').count()).toBeGreaterThan(1);
 
+  // 조건이 없으면 접혀 있다. 옷 가게에서 먼저 보여야 하는 것은 옷이다.
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+
   /*
    * 체크박스는 label 안에 sr-only 로 들어 있다 — 눈에 보이는 것은 칩이고,
    * 사람이 누르는 것도 칩이다. 그래서 label 을 누른다.
@@ -95,4 +98,42 @@ test('자바스크립트 없이도 좁혀진다 — 평범한 GET 폼이다', as
 
   await expect(page.getByRole('checkbox', { name: '28', exact: true })).toBeChecked();
   await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+});
+
+
+test('조건이 없으면 좁혀 보기는 접혀 있다', async ({ page }) => {
+  /*
+   * 상품이 여덟일 때는 색이 서넛이라 한 줄이었다. 서른넷이 되면서 아우터
+   * 한 곳에만 색이 열둘 — 접지 않으면 좁은 화면에서 옷이 접힌 곳 아래로
+   * 밀린다.
+   */
+  await page.goto('/category/outer');
+
+  await expect(page.locator('summary', { hasText: '상품 좁혀 보기' })).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'L', exact: true })).toBeHidden();
+});
+
+test('조건이 걸려 있으면 펼쳐진 채로 온다', async ({ page }) => {
+  // 접어 두면 무엇 때문에 목록이 줄었는지 알 수 없다.
+  await page.goto('/category/outer?size=L');
+
+  await expect(page.getByRole('checkbox', { name: 'L', exact: true })).toBeVisible();
+  await expect(page.getByText('1개 적용 중')).toBeVisible();
+});
+
+test('접은 채로 정렬만 바꿔도 조건이 풀리지 않는다', async ({ page }) => {
+  /*
+   * details 안의 체크박스는 접혀 있어도 폼과 함께 넘어간다 — disabled 가
+   * 아니기 때문이다. 여기서 풀린다면 접기를 잘못 만든 것이다.
+   */
+  await page.goto('/category/outer?size=L');
+
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click(); // 접는다
+  await expect(page.getByRole('checkbox', { name: 'L', exact: true })).toBeHidden();
+
+  await page.getByLabel('정렬').selectOption('price_asc');
+  await page.getByRole('button', { name: '적용' }).click();
+
+  await expect(page).toHaveURL(/size=L/);
+  await expect(page).toHaveURL(/sort=price_asc/);
 });

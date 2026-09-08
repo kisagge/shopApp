@@ -91,6 +91,7 @@ export const ko = {
   'catalog.color': '색상',
   'catalog.size': '사이즈',
   'catalog.resetFilters': '조건 초기화',
+  'catalog.filterCount': '{count}개 적용 중',
   'brand.eyebrow': '브랜드',
   'brand.empty': '지금 이 브랜드의 상품이 없습니다.',
   'brand.all': '브랜드 상품 전체',

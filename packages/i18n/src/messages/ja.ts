@@ -81,6 +81,7 @@ export const ja: Dictionary = {
   'catalog.color': 'カラー',
   'catalog.size': 'サイズ',
   'catalog.resetFilters': '条件をリセット',
+  'catalog.filterCount': '{count}件適用中',
   'brand.eyebrow': 'ブランド',
   'brand.empty': 'このブランドの商品は現在ありません。',
   'brand.all': 'このブランドの商品をすべて見る',
