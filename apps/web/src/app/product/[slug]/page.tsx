@@ -20,6 +20,7 @@ import { ProductReviews } from '~/components/product-reviews';
 import { ProductInquiries } from '~/components/product-inquiries';
 import { SectionSkeleton, StripSkeleton } from '~/components/section-skeleton';
 import { WishlistButton } from '~/components/wishlist-button';
+import { ShareButton } from '~/components/share-button';
 import { RecordRecentView } from '~/components/record-recent-view';
 import { RecentlyViewed } from '~/components/recently-viewed';
 import { Recommendations } from '~/components/recommendations';
@@ -243,13 +244,17 @@ export default async function ProductPage({ params, searchParams }: Params) {
             </Link>
             <div className="flex items-start justify-between gap-4">
               <h1 className="text-xl leading-snug font-semibold tracking-tight md:text-[26px]">{product.name}</h1>
-              <WishlistButton
-                productId={product.id}
-                productName={product.name}
-                initialWishlisted={wishlisted.has(product.id)}
-                loggedIn={viewer !== null}
-                size="md"
-              />
+              {/* 찜은 계정에 남기는 것, 공유는 밖으로 내보내는 것 — 나란히 둔다 */}
+              <span className="flex shrink-0 items-start gap-1.5">
+                <ShareButton productId={product.id} productName={product.name} size="md" />
+                <WishlistButton
+                  productId={product.id}
+                  productName={product.name}
+                  initialWishlisted={wishlisted.has(product.id)}
+                  loggedIn={viewer !== null}
+                  size="md"
+                />
+              </span>
             </div>
             {product.rating !== undefined && (
               <p className="flex items-center gap-1.5 text-[13px] text-[var(--fg-secondary)]">

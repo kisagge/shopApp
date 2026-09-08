@@ -46,6 +46,12 @@ export const eventInputSchema = z.discriminatedUnion('name', [
   ev('add_shipping_info', { method: z.string().max(32).optional() }),
   ev('add_payment_info', { method: z.string().max(32).optional() }),
   ev('add_to_wishlist', { productId: cuidSchema }),
+  /*
+   * 어떤 길로 나갔는지(method)를 함께 남긴다. 네이티브 공유 시트로 나간
+   * 것과 주소를 복사한 것은 뜻이 다르다 — 뒤엣것은 공유할 곳을 못 찾아
+   * 직접 옮긴 것에 가깝다.
+   */
+  ev('share', { productId: cuidSchema, method: z.string().max(32) }),
   ev('search', { query: z.string().trim().min(1).max(128), resultCount: z.int().min(0).optional() }),
   ev('login', { method: z.string().max(32).optional() }),
   ev('sign_up', { method: z.string().max(32).optional() }),

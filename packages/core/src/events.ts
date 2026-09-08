@@ -21,6 +21,7 @@ export const COMMERCE_EVENT = [
   'refund',
   'search',
   'add_to_wishlist',
+  'share',
   'login',
   'sign_up',
   'page_view',
