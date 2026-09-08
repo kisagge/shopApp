@@ -95,8 +95,22 @@ test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 �
    * "단추가 없다" 로 지는데, 그 문구는 리뷰가 없는 것과 구분되지 않는다.
    */
   await expect(
-    page.locator('header a[href="/mypage"]'),
+    // 헤더에는 /mypage 링크가 둘이다 — 좁은 화면용 메뉴와 넓은 화면용.
+    // CSS 로 고르면 둘 다 잡혀 strict 위반이 난다. 역할과 이름으로 고른다.
+    page.getByRole('link', { name: '마이페이지' }),
     '로그인 상태로 열려야 신고 단추가 그려진다',
+  ).toBeVisible();
+
+  /*
+   * 요약("리뷰 6")은 캐시를 지나오고 목록은 매번 새로 읽는다. 둘이 어긋나면
+   * 6개라고 적어 놓고 아무것도 없는 화면이 되는데, 그때 아래 실패 문구는
+   * "신고 단추가 없다" 뿐이라 원인이 안 보인다.
+   */
+  const heading = page.getByRole('heading', { name: /^리뷰 \d+$/, level: 2 });
+  await expect(heading).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: /^리뷰/ }).getByRole('article').first(),
+    `${await heading.textContent()} 라고 적어 놓고 목록이 비어 있다`,
   ).toBeVisible();
 
   const report = page.getByRole('button', { name: '신고' }).first();

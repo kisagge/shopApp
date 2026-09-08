@@ -17,9 +17,31 @@ test.describe.configure({ mode: 'serial' });
 type Page = import('@playwright/test').Page;
 type Button = ReturnType<Page['getByRole']>;
 
+/**
+ * 리뷰 구역이 **말과 내용이 맞는 상태**로 열렸는지까지 본다.
+ *
+ * 요약("리뷰 6")은 캐시를 지나오고 목록은 매번 새로 읽는다. 둘이 어긋나면
+ * 6개라고 적힌 자리 아래에 아무것도 없는 화면이 나오는데, 그때 실패 문구는
+ * "단추를 못 찾았다" 뿐이라 리뷰가 없는 것인지 로그인이 안 된 것인지
+ * 알 수 없다. 실제로 그 상태를 한참 헤맸다 — 원인은 지운 DB 때문에 낡아
+ * 버린 빌드 캐시였다.
+ */
+async function expectReviewsRendered(page: Page) {
+  const heading = page.getByRole('heading', { name: /^리뷰 \d+$/, level: 2 });
+  await expect(heading).toBeVisible();
+
+  const said = Number(/(\d+)/.exec((await heading.textContent()) ?? '')![1]);
+  if (said === 0) return;
+
+  await expect(
+    page.getByRole('region', { name: /^리뷰/ }).getByRole('article').first(),
+    `리뷰 ${said}개라고 적어 놓고 목록이 비어 있다 — 요약과 목록이 서로 다른 것을 보고 있다`,
+  ).toBeVisible();
+}
+
 async function openProductWithReviews(page: Page) {
   await page.goto('/product/oversized-wool-coat');
-  await expect(page.getByRole('heading', { name: '리뷰' })).toBeVisible();
+  await expectReviewsRendered(page);
 
   /*
    * **로그인 상태를 먼저 확인한다.**
@@ -31,7 +53,7 @@ async function openProductWithReviews(page: Page) {
    * 원인을 말한다.
    */
   await expect(
-    page.locator('header a[href="/mypage"]'),
+    page.getByRole('link', { name: '마이페이지' }),
     '로그인 상태로 열려야 표 단추가 그려진다',
   ).toBeVisible();
 }
