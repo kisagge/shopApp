@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   shippingBorneBy, returnWindowDays, checkReturnEligibility, canRequestReturn,
+  availableReturnReasons,
+  RETURN_REASON,
 } from '../src/return-request';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -75,9 +77,29 @@ describe('신청 기한', () => {
 describe('상태', () => {
   const now = new Date(delivered.getTime() + DAY);
 
-  it('구매확정하면 버튼으로 열지 않는다', () => {
-    const r = checkReturnEligibility({ status: 'CONFIRMED', deliveredAt: delivered, reason: 'DEFECT', now });
+  /**
+   * 확정은 "이대로 받겠다" 는 뜻이지 판매자 잘못까지 떠안겠다는 뜻이 아니다.
+   */
+  it('구매확정 뒤에도 하자는 받는다', () => {
+    for (const reason of ['DEFECT', 'WRONG_ITEM', 'DAMAGED'] as const) {
+      const r = checkReturnEligibility({ status: 'CONFIRMED', deliveredAt: delivered, reason, now });
+      expect(r, reason).toMatchObject({ ok: true, borneBy: 'SELLER' });
+    }
+  });
+
+  it('구매확정 뒤 단순 변심은 막는다 — 확정이 곧 그 답이었다', () => {
+    const r = checkReturnEligibility({
+      status: 'CONFIRMED', deliveredAt: delivered, reason: 'CHANGED_MIND', now,
+    });
     expect(r).toMatchObject({ ok: false, code: 'ALREADY_CONFIRMED' });
+  });
+
+  it('확정이 기한을 늘려 주지는 않는다', () => {
+    const late = new Date(delivered.getTime() + 31 * DAY);
+    const r = checkReturnEligibility({
+      status: 'CONFIRMED', deliveredAt: delivered, reason: 'DEFECT', now: late,
+    });
+    expect(r).toMatchObject({ ok: false, code: 'WINDOW_CLOSED' });
   });
 
   it('이미 접수됐으면 다시 못 낸다', () => {
@@ -116,8 +138,41 @@ describe('버튼을 띄울지', () => {
     expect(canRequestReturn({ status: 'DELIVERED', deliveredAt: delivered, now })).toBe(false);
   });
 
-  it('구매확정이면 감춘다', () => {
+  /** 사유를 아직 모르는 시점이라 넉넉하게 본다. 눌러서 고르면 그때 정확히 다시 본다. */
+  it('구매확정이어도 띄운다 — 하자 신고를 할 수 있는 사람에게 버튼이 없으면 안 된다', () => {
     const now = new Date(delivered.getTime() + DAY);
-    expect(canRequestReturn({ status: 'CONFIRMED', deliveredAt: delivered, now })).toBe(false);
+    expect(canRequestReturn({ status: 'CONFIRMED', deliveredAt: delivered, now })).toBe(true);
+  });
+});
+
+describe('고를 수 있는 사유', () => {
+  it('배송완료 뒤에는 다 고를 수 있다', () => {
+    expect(availableReturnReasons('DELIVERED')).toEqual([...RETURN_REASON]);
+  });
+
+  /**
+   * 화면이 고를 수 없는 것을 내밀면 사람은 그것을 골라 제출하고 나서야 안
+   * 된다는 말을 듣는다. 구매확정한 주문에서 단순 변심이 기본값으로 선택돼
+   * 있던 자리가 그랬다.
+   */
+  it('구매확정 뒤에는 판매자 귀책만 남는다', () => {
+    const reasons = availableReturnReasons('CONFIRMED');
+
+    expect(reasons).not.toContain('CHANGED_MIND');
+    expect(reasons.length).toBeGreaterThan(0);
+  });
+
+  it('고를 수 있는 사유는 전부 실제로 신청이 된다 — 목록과 판정이 어긋나면 안 된다', () => {
+    const delivered = new Date('2026-09-01T00:00:00Z');
+    const now = new Date('2026-09-05T00:00:00Z');
+
+    for (const status of ['DELIVERED', 'CONFIRMED'] as const) {
+      for (const reason of availableReturnReasons(status)) {
+        expect(
+          checkReturnEligibility({ status, deliveredAt: delivered, reason, now }),
+          `${status}/${reason}`,
+        ).toMatchObject({ ok: true });
+      }
+    }
   });
 });

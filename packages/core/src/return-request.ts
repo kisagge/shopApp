@@ -58,6 +58,18 @@ const WINDOW_DAYS: Readonly<Record<ReturnReason, number>> = {
 
 export const returnWindowDays = (reason: ReturnReason): number => WINDOW_DAYS[reason];
 
+/**
+ * 이 상태에서 고를 수 있는 사유.
+ *
+ * **화면과 서버가 같은 목록을 본다.** 화면이 고를 수 없는 것을 내밀면 사람은
+ * 그것을 골라 제출하고 나서야 안 된다는 말을 듣는다 — 구매확정한 주문에서
+ * 단순 변심이 기본값으로 선택돼 있던 자리가 그랬다.
+ */
+export function availableReturnReasons(status: OrderStatus): readonly ReturnReason[] {
+  // 확정은 "이대로 받겠다" 는 뜻이라 변심의 길이 닫힌다. 판매자 귀책은 남는다.
+  return status === 'CONFIRMED' ? SELLER_FAULT : RETURN_REASON;
+}
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const;
@@ -92,15 +104,26 @@ export function checkReturnEligibility(input: {
   const { status, deliveredAt, reason, now } = input;
 
   /**
-   * 구매확정하면 끝이다. 적립이 확정되고 정산도 넘어간 뒤라 되돌리려면
-   * 돈이 여러 곳에서 역으로 흘러야 한다. 그건 고객센터가 사람 손으로
-   * 처리할 일이지 버튼으로 열어 둘 일이 아니다.
+   * 구매확정 뒤에는 **판매자 귀책만** 받는다.
+   *
+   * 확정은 "이대로 받겠다" 는 뜻이라 단순 변심의 길은 여기서 닫힌다. 그런데
+   * 물건에 하자가 있거나 다른 것이 왔다면 그건 확정과 무관한 이야기다 —
+   * 확정은 사업자 편의로 둔 개념일 뿐이고, 그 한 번의 클릭으로 사람이
+   * 판매자 잘못까지 떠안기로 한 것은 아니다.
+   *
+   * 예전에는 확정이면 사유를 묻지도 않고 막고 "고객센터로 문의해 주세요" 를
+   * 내보냈다. **그 뒤가 코드에 없었다** — 문의를 받아도 처리할 길이 없었다.
+   *
+   * 되돌리는 돈의 길은 이미 나 있다. 적립은 환불이 회수하고(refund-order),
+   * 정산은 이미 지급된 것만 빼도록 되어 있다(`deductibleFromSettlement`) —
+   * 그 조건이 지금까지 아무것도 고르지 않았던 이유가 바로 이 길이 막혀
+   * 있었기 때문이다.
    */
-  if (status === 'CONFIRMED') {
+  if (status === 'CONFIRMED' && shippingBorneBy(reason) !== 'SELLER') {
     return {
       ok: false,
       code: 'ALREADY_CONFIRMED',
-      message: '구매확정된 주문입니다. 고객센터로 문의해 주세요.',
+      message: '구매확정한 주문은 단순 변심으로 반품할 수 없습니다.',
     };
   }
 
@@ -117,7 +140,7 @@ export function checkReturnEligibility(input: {
     };
   }
 
-  if (status !== 'SHIPPED' && status !== 'DELIVERED') {
+  if (status !== 'SHIPPED' && status !== 'DELIVERED' && status !== 'CONFIRMED') {
     return { ok: false, code: 'NOT_ELIGIBLE', message: '신청할 수 없는 주문입니다.' };
   }
 

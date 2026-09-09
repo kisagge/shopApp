@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
+const reclaimPurchaseReward = vi.hoisted(() =>
+  vi.fn<(...a: any[]) => any>(() => Promise.resolve({ reclaimed: 0, shortfall: 0 })),
+);
+vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward }));
+
 const tx = vi.hoisted(() => ({
   order: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
@@ -239,5 +244,31 @@ describe('환불 시각', () => {
 
     const [args] = tx.order.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
     expect(args.data).not.toHaveProperty('canceledAt');
+  });
+});
+
+/**
+ * 확정 뒤에도 하자 반품을 받게 되면서, 확정으로 준 적립을 되가져와야 한다.
+ * 물건도 돌아오고 돈도 돌아가는데 적립만 남으면 되풀이하는 만큼 쌓인다.
+ */
+describe('구매확정 적립', () => {
+  it('환불하면 회수를 부른다', async () => {
+    await refundOrder('20260904-1234567', admin, '하자 반품', gateway);
+
+    expect(reclaimPurchaseReward).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'o-1' }));
+  });
+
+  it('회수한 금액을 결과에 실어 준다 — 운영자가 무엇이 일어났는지 봐야 한다', async () => {
+    reclaimPurchaseReward.mockResolvedValueOnce({ reclaimed: 2_890, shortfall: 0 });
+
+    const out = await refundOrder('20260904-1234567', admin, '하자 반품', gateway);
+
+    expect(out.rewardReclaimed).toBe(2_890);
+  });
+
+  it('확정에 이른 적 없는 주문이면 0 이다', async () => {
+    const out = await refundOrder('20260904-1234567', admin, '취소 환불', gateway);
+
+    expect(out.rewardReclaimed).toBe(0);
   });
 });

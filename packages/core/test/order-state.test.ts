@@ -23,9 +23,13 @@ describe('주문 상태 전이', () => {
     expect(canTransition('SHIPPED', 'RETURN_REQUESTED')).toBe(true);
   });
 
-  it('구매확정은 종착 상태다', () => {
-    expect(isTerminal('CONFIRMED')).toBe(true);
-    expect(nextStatuses('CONFIRMED')).toHaveLength(0);
+  /**
+   * 확정 뒤에 갈 수 있는 곳은 반품 접수 하나뿐이다. 어떤 사유로 갈 수 있는지는
+   * 상태 기계가 아니라 반품 정책이 정한다 — 여기는 길만 낸다.
+   */
+  it('구매확정 뒤에는 반품 접수로만 갈 수 있다', () => {
+    expect(nextStatuses('CONFIRMED')).toEqual(['RETURN_REQUESTED']);
+    expect(isTerminal('CONFIRMED')).toBe(false);
   });
 
   it('반품 접수는 철회해서 배송중으로 되돌릴 수 있다', () => {
@@ -98,10 +102,11 @@ describe('환불로 들어오는 길', () => {
     expect(isTerminal('REFUNDED')).toBe(true);
   });
 
-  it('구매확정된 주문은 환불로 갈 수 없다', () => {
-    // 적립이 이미 나간 뒤라, 갈 수 있게 하려면 회수 경로가 먼저 필요하다
+  it('구매확정에서 환불로 한 홉에 가지는 않는다 — 물건을 먼저 받아야 한다', () => {
     expect(canTransition('CONFIRMED', 'REFUNDED')).toBe(false);
-    expect(isTerminal('CONFIRMED')).toBe(true);
+    // 반품 접수 → 반품 완료 → 환불. 그 길을 지나야 한다.
+    expect(canTransition('CONFIRMED', 'RETURN_REQUESTED')).toBe(true);
+    expect(canTransition('RETURNED', 'REFUNDED')).toBe(true);
   });
 });
 

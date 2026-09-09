@@ -252,7 +252,7 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
         {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}
-        {showReturnForm && <ReturnRequestForm orderNo={order.orderNo} />}
+        {showReturnForm && <ReturnRequestForm orderNo={order.orderNo} status={order.status} />}
         <div className="flex gap-2">
           <Link
             href="/mypage/orders"

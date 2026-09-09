@@ -36,7 +36,19 @@ const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
   PREPARING: ['SHIPPED', 'CANCELLED'],
   SHIPPED: ['DELIVERED', 'RETURN_REQUESTED'],
   DELIVERED: ['CONFIRMED', 'RETURN_REQUESTED'],
-  CONFIRMED: [],
+  /*
+   * **구매확정은 종착이 아니다.**
+   *
+   * 확정은 "이대로 받겠다" 는 뜻이라 단순 변심의 길은 여기서 닫힌다. 그런데
+   * 물건에 하자가 있거나 다른 것이 왔다면 그건 확정과 무관한 이야기다 —
+   * 확정은 사업자 편의로 둔 개념일 뿐, 판매자 귀책까지 사람이 포기한 것은
+   * 아니다. 실제로 그렇게 막아 두었더니 하자 신고에 "고객센터로 문의해
+   * 주세요" 만 나갔고, 그 뒤는 코드에 없었다.
+   *
+   * 어떤 사유로 올 수 있는지는 `checkReturnEligibility` 가 정한다 —
+   * 상태 기계는 길만 내고 그 길의 조건은 반품 정책이 갖는다.
+   */
+  CONFIRMED: ['RETURN_REQUESTED'],
   CANCELLED: ['REFUNDED'],
   RETURN_REQUESTED: ['RETURNED', 'SHIPPED'], // 반품 철회 시 배송중으로 되돌림
   RETURNED: ['REFUNDED'],

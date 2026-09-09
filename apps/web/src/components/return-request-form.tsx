@@ -5,7 +5,7 @@ import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import {
-  RETURN_TYPE, RETURN_REASON,
+  RETURN_TYPE, availableReturnReasons, type OrderStatus,
   shippingBorneBy, returnWindowDays,
   type ReturnReason, type ReturnType,
 } from '@shop/core';
@@ -21,7 +21,15 @@ import { RETURN_TYPE_KEY, RETURN_REASON_KEY } from '~/lib/i18n/enum-labels';
  * 부담 주체를 화면에서 계산해 보여 주지만 **그 값을 서버로 보내지는 않는다.**
  * 서버가 사유에서 다시 정한다 — 보내면 누구나 판매자 부담으로 바꿀 수 있다.
  */
-export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
+export function ReturnRequestForm({
+  orderNo,
+  status,
+}: {
+  orderNo: string;
+  /** 이 상태에서 고를 수 있는 사유만 내민다. 확정 뒤에는 판매자 귀책뿐이다. */
+  status: OrderStatus;
+}) {
+  const reasons = availableReturnReasons(status);
   const router = useRouter();
   const t = useT();
   const formId = useId();
@@ -32,7 +40,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
    */
   const { triggerRef, panelRef } = useDisclosureFocus(open);
   const [type, setType] = useState<ReturnType>('RETURN');
-  const [reason, setReason] = useState<ReturnReason>('CHANGED_MIND');
+  const [reason, setReason] = useState<ReturnReason>(reasons[0]!);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -131,7 +139,7 @@ export function ReturnRequestForm({ orderNo }: { orderNo: string }) {
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">{t('ret.reason')}</legend>
-        {RETURN_REASON.map((r) => (
+        {reasons.map((r) => (
           <label
             key={r}
             className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"

@@ -1,4 +1,5 @@
 import 'server-only';
+import { reclaimPurchaseReward } from '~/lib/orders/reclaim-reward';
 import { prisma } from '@shop/db';
 import {
   transition, canRefundOrder, ORDER_STATUS_LABEL,
@@ -21,6 +22,8 @@ export interface RefundResult {
   /** 되돌린 재고 수량 합계. 취소분은 이미 풀려 있어 0이다. */
   readonly stockRestored: number;
   readonly pointsReturned: number;
+  /** 구매확정으로 줬다가 되가져온 적립. 확정에 이른 적 없는 주문이면 0 이다. */
+  readonly rewardReclaimed: number;
 }
 
 /**
@@ -113,6 +116,7 @@ export async function refundOrder(
   const refunded = order.payable;
   let stockRestored = 0;
   let pointsReturned = 0;
+  let rewardReclaimed = 0;
 
   await prisma.$transaction(async (tx) => {
     // 조건부 UPDATE — 그 사이 다른 요청이 먼저 환불했으면 0건이 나온다
@@ -167,6 +171,13 @@ export async function refundOrder(
       pointsReturned = order.pointsUsed;
     }
 
+    /*
+     * 구매확정으로 준 적립은 되가져온다. 물건도 돌아오고 돈도 돌아가는데
+     * 적립만 남으면, 확정 → 적립 → 하자 반품을 되풀이하는 만큼 쌓인다.
+     * 확정에 이른 적 없는 주문이면 줄 적립도 없어서 아무 일도 하지 않는다.
+     */
+    rewardReclaimed = (await reclaimPurchaseReward(tx, order)).reclaimed;
+
     // 쿠폰 되살리기. 이미 풀려 있어도 같은 결과라 그대로 둔다.
     if (order.usedCouponId) {
       await tx.userCoupon.update({ where: { id: order.usedCouponId }, data: { usedAt: null } });
@@ -209,5 +220,12 @@ export async function refundOrder(
     props: { reason, fromReturn },
   });
 
-  return { orderNo: order.orderNo, orderStatus: 'REFUNDED', refunded, stockRestored, pointsReturned };
+  return {
+    orderNo: order.orderNo,
+    orderStatus: 'REFUNDED',
+    refunded,
+    stockRestored,
+    pointsReturned,
+    rewardReclaimed,
+  };
 }

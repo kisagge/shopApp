@@ -26,13 +26,31 @@ describe('환불 상태', () => {
 
 describe('정산 차감', () => {
   /**
-   * 차감 규칙(`confirmedAt !== null`)이 옳은 이유가 여기 있다. 구매확정이
-   * 종착이 아니게 되면 확정된 주문도 환불될 수 있고, 그때는 **차감이 실제로
-   * 일어나야 한다.** 이 검사는 그 변화를 알아채라고 있는 것이지, 종착임을
-   * 영원히 못 박으려는 것이 아니다.
+   * 이 검사는 **차감 규칙이 살아 있는지**를 본다.
+   *
+   * 처음에는 "구매확정은 종착이다" 였다. 그때는 확정된 주문이 환불될 수 없어서
+   * `confirmedAt !== null` 조건이 아무것도 고르지 않았고, 그래도 지우지 않은
+   * 이유가 "나중에 확정 뒤 환불을 허용하면 규칙이 저절로 맞기 때문" 이었다.
+   *
+   * **그날이 왔다.** 확정 뒤에도 하자 반품을 받게 되면서 확정 → 반품 접수 →
+   * 반품 완료 → 환불의 길이 열렸고, 이제 차감이 실제로 일어난다.
    */
-  it('구매확정은 종착이다 — 확정된 주문은 환불될 수 없다', () => {
-    expect(statusesAfterSettlementSale()).toEqual([]);
+  it('구매확정 뒤에도 환불에 이를 수 있다 — 그래서 차감이 실제로 일어난다', () => {
+    expect(statusesAfterSettlementSale()).toEqual(['RETURN_REQUESTED']);
+
+    // 그 길 끝에 환불이 있다
+    const reach = (from: OrderStatus): ReadonlySet<OrderStatus> => {
+      const seen = new Set<OrderStatus>();
+      const queue: OrderStatus[] = [from];
+      while (queue.length > 0) {
+        const s = queue.pop()!;
+        if (seen.has(s)) continue;
+        seen.add(s);
+        for (const n of nextStatuses(s)) queue.push(n);
+      }
+      return seen;
+    };
+    expect(reach('CONFIRMED').has('REFUNDED')).toBe(true);
   });
 
   it('지급된 적 없는 주문은 빼지 않는다 — 가맹점이 받은 적 없는 돈을 토해낸다', () => {

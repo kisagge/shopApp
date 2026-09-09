@@ -94,11 +94,26 @@ describe('신청 자격', () => {
     expect(r.orderStatus).toBe('RETURN_REQUESTED');
   });
 
-  it('구매확정된 주문은 버튼으로 받지 않는다', async () => {
+  /**
+   * 확정은 "이대로 받겠다" 는 뜻이지 판매자 잘못까지 떠안겠다는 뜻이 아니다.
+   * 예전에는 사유를 묻지도 않고 막고 "고객센터로 문의해 주세요" 를 내보냈는데,
+   * 그 뒤가 코드에 없었다.
+   */
+  it('구매확정된 주문도 하자면 받는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'CONFIRMED' }));
+
+    const r = await requestReturn(
+      '20260901-0000001', { type: 'RETURN', reason: 'DEFECT' }, user, now,
+    );
+
+    expect(r.orderStatus).toBe('RETURN_REQUESTED');
+  });
+
+  it('구매확정된 주문에 단순 변심은 여전히 막는다', async () => {
     db.order.findFirst.mockResolvedValue(order({ status: 'CONFIRMED' }));
 
     await expect(
-      requestReturn('20260901-0000001', { type: 'RETURN', reason: 'DEFECT' }, user, now),
+      requestReturn('20260901-0000001', { type: 'RETURN', reason: 'CHANGED_MIND' }, user, now),
     ).rejects.toMatchObject({ code: 'ALREADY_CONFIRMED' });
   });
 
