@@ -1,29 +1,20 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Badge, Button, Field, Price } from '@shop/ui';
-import { won, MIN_POINTS_USE, isBlurDataUrl, PAYMENT_METHOD_CODE } from '@shop/core';
-import type { CreateOrderResponse, OrderError, PaymentMethodInput } from '@shop/contract';
+import { useState, useMemo, type FormEvent } from 'react';
+import { Badge, Button, Field } from '@shop/ui';
+import { MIN_POINTS_USE, PAYMENT_METHOD_CODE } from '@shop/core';
+import type { PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
-import { track } from '~/lib/analytics/client';
+import { OrderItems } from '~/components/checkout/order-items';
+import { PaymentMethods } from '~/components/checkout/payment-methods';
+import { OrderTotal } from '~/components/checkout/order-total';
+import { usePlaceOrder } from '~/lib/checkout/place-order';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
-import { useRadioGroup } from '~/lib/a11y/use-radio-group';
-import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
+import { track } from '~/lib/analytics/client';
+import { formatMoney, formatNumber } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
-import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
-import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
-import { openPaymentWindow, isUsableClientKey } from '~/lib/payments/client';
-import { useMemo } from 'react';
-
-const METHOD_KEY: Record<PaymentMethodInput, MessageKey> = {
-  CARD: 'payMethod.CARD',
-  TRANSFER: 'payMethod.TRANSFER',
-  VIRTUAL_ACCOUNT: 'payMethod.VIRTUAL_ACCOUNT',
-  EASY_PAY: 'payMethod.EASY_PAY',
-};
+import { isUsableClientKey } from '~/lib/payments/client';
 
 interface SavedAddress {
   id: string; label: string | null; recipient: string; phone: string;
@@ -31,26 +22,21 @@ interface SavedAddress {
 }
 
 /**
- * 결제 시도 하나를 가리키는 열쇠.
+ * 주문서.
  *
- * randomUUID 는 보안 컨텍스트에서만 있다. 개발 중 http 로 열어 두면 없어서
- * 여기서 통째로 터지는데, **그러면 주문 화면 자체가 안 열린다** — 중복을
- * 막으려다 주문을 못 하게 만드는 셈이다. 없으면 난수로 물러난다.
+ * **여기 남은 것은 상태와 짜임뿐이다.** 무엇을 사는지·어떻게 낼지·얼마인지를
+ * 그리는 일은 checkout/ 아래로 나갔고, 주문을 만들어 결제까지 가는 흐름은
+ * lib/checkout/place-order 가 맡는다.
+ *
+ * 나눈 기준은 줄 수가 아니라 **바뀌는 이유**다. 화면 조각은 문구와 배치가
+ * 바뀌고, 주문 흐름은 결제사와 서버 계약이 바뀐다. 한 파일에 두면 그 둘이
+ * 서로를 가려서, 돈이 걸린 자리를 고칠 때마다 250줄짜리 JSX 를 헤치고
+ * 들어가야 했다.
  */
-function newOrderKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  return [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
-}
-
 export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
   const t = useT();
   const locale = useLocale();
   const money = (amount: number) => formatMoney(locale, amount);
-  const router = useRouter();
 
   /**
    * 배송지를 상태로 들고 있는다.
@@ -81,29 +67,16 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
     [realGateway],
   );
 
-  /*
-   * role="radiogroup" 을 얹으면 낭독기는 네이티브 라디오처럼 다뤄지리라
-   * 기대한다 — 탭으로 들어와 화살표로 고르는 것. 버튼만 나열해 두었더니
-   * 화살표가 아무 일도 하지 않았고, 수단 넷이 모두 탭 순서에 있었다.
-   */
-  const methodKeys = useRadioGroup({
-    items: methods.map((m) => ({ id: m })),
-    checked: method,
-    onSelect: setMethod,
-  });
   const [agreed, setAgreed] = useState(false);
   const [memo, setMemo] = useState('');
   const [pointsToUse, setPointsToUse] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState(false);
-  /**
-   * 이 결제 시도의 열쇠.
-   *
-   * **화면이 살아 있는 동안 같은 값을 쓴다.** 그래야 두 번 눌렀거나 응답을
-   * 못 받아 다시 보냈을 때 서버가 같은 시도인 줄 알아본다. 매번 새로 만들면
-   * 열쇠가 있어도 없는 것과 같다.
+
+  /*
+   * 주문 만들기부터 결제 승인까지는 훅이 맡는다. 요청이 둘이고 그 사이에
+   * 브라우저가 다른 곳으로 떠날 수 있는 흐름이라, 화면 사이에 끼워 두면
+   * 어디서 끝나는지 읽을 수 없다.
    */
-  const [orderKey] = useState(newOrderKey);
+  const { place, pending, error } = usePlaceOrder();
 
   const quote = useCartQuote({
     items: selected,
@@ -127,97 +100,19 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
      * 대신 눌리기는 하므로 조건을 핸들러가 지켜야 한다. 예전에는 배송지만
      * 보고 지나가서, 두 번 누르면 주문이 두 개 만들어졌다.
      */
-    if (!canOrder || !defaultAddress) return;
-    setError(null);
-    setPending(true);
+    if (!canOrder || !defaultAddress || !q) return;
 
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        lines: selected.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
-        addressId: defaultAddress.id,
-        ...(memo.trim() ? { deliveryMemo: memo.trim() } : {}),
-        ...(pointsToUse > 0 ? { pointsToUse } : {}),
-        paymentMethod: method,
-        // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다
-        browserSessionId: getSessionId(),
-        // 같은 시도를 두 번 보내도 주문은 하나다
-        idempotencyKey: orderKey,
-        agreedToTerms: true,
-      }),
+    const { refetchQuote } = await place({
+      items: selected,
+      addressId: defaultAddress.id,
+      memo,
+      pointsToUse,
+      method,
+      payable: q.payable,
     });
 
-    setPending(false);
-
-    if (!res.ok) {
-      const body = (await res.json()) as Partial<OrderError> & { message?: string };
-      setError(body.message ?? t('checkout.orderFailed'));
-      // 재고 문제면 금액을 다시 받아 화면을 갱신한다
-      if (body.code === 'OUT_OF_STOCK') void quote.refetch();
-      return;
-    }
-
-    const order = (await res.json()) as CreateOrderResponse;
-    track('add_payment_info', { method });
-
-    /**
-     * 결제창.
-     *
-     * 클라이언트 키가 있으면 실제 토스 결제창을 띄운다. 창이 성공하면
-     * 토스가 /checkout/success 로 **리다이렉트**하고 승인은 거기서 서버가
-     * 한다 — 이 함수 뒤의 코드는 실행되지 않는다.
-     *
-     * 키가 없으면 Mock 으로 간다. 로컬에서 키 없이도 주문 흐름 전체를
-     * 볼 수 있어야 한다. 서버 쪽 승인 흐름(금액 검증·멱등·상태 전이)은 같다.
-     */
-    const clientKey = process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'];
-    if (isUsableClientKey(clientKey) && method !== 'EASY_PAY') {
-      // 주문에 들어간 항목은 결제창을 열기 전에 장바구니에서 뺀다.
-      // 창이 뜨면 이 페이지는 떠나므로 뒤에서 지울 기회가 없다.
-      for (const i of selected) useCartStore.getState().remove(i.variantId);
-      try {
-        await openPaymentWindow({
-          clientKey,
-          customerKey: getAnonymousId(),
-          orderNo: order.orderNo,
-          orderName:
-            selected.length === 1
-              ? (selected[0]?.productName ?? t('checkout.orderFallbackName'))
-              : `${selected[0]?.productName ?? t('checkout.orderFallbackName')} ${t('order.moreItems', { count: selected.length - 1 })}`,
-          amount: order.payable,
-          method,
-          origin: window.location.origin,
-        });
-      } catch {
-        // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있으므로
-        // 주문 화면에서 다시 시도할 수 있다.
-        router.push(`/order/${order.orderNo}?payment=failed`);
-      }
-      return;
-    }
-
-    setPending(true);
-    const mockKey = `${method === 'VIRTUAL_ACCOUNT' ? 'mock_va' : 'mock'}_${order.orderNo}`;
-    const confirmRes = await fetch(`/api/orders/${order.orderNo}/confirm`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ paymentKey: mockKey, amount: order.payable }),
-    });
-    setPending(false);
-
-    // 주문에 들어간 항목만 장바구니에서 뺀다
-    for (const i of selected) useCartStore.getState().remove(i.variantId);
-
-    if (!confirmRes.ok) {
-      // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 시도할 수 있다.
-      const body = (await confirmRes.json()) as { message?: string };
-      setError(`${body.message ?? t('checkout.approveFailed')} ${t('checkout.retryFromOrders')}`);
-      router.push(`/order/${order.orderNo}`);
-      return;
-    }
-
-    router.push(`/order/${order.orderNo}`);
+    // 재고 문제로 막힌 것이면 금액을 다시 받아 화면을 갱신한다
+    if (refetchQuote) void quote.refetch();
   }
 
   if (selected.length === 0) {
@@ -311,54 +206,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
           />
         </section>
 
-      <section aria-labelledby="items-title">
-        <h2 id="items-title" className="mb-3.5 text-sm font-semibold">
-          {t('checkout.items')} <span className="tnum text-[var(--fg-muted)]">{selected.length}</span>
-        </h2>
-        <ul className="flex flex-col gap-3">
-          {selected.map((i) => {
-            const line = q?.lines.find((l) => l.variantId === i.variantId);
-            return (
-              <li key={i.variantId} className="flex items-center justify-between gap-3">
-                {/*
-                  결제 직전에 무엇을 사는지 다시 보여 준다. 장바구니에서
-                  담을 때 본 것과 같은 사진이라야 대조가 된다.
-                */}
-                {line?.imageUrl && (
-                  <span className="relative h-14 w-11 shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
-                    <Image
-                      src={line.imageUrl}
-                      alt=""
-                      aria-hidden="true"
-                      fill
-                      sizes="44px"
-                      {...(isBlurDataUrl(line.blurDataUrl)
-                        ? { placeholder: 'blur' as const, blurDataURL: line.blurDataUrl }
-                        : {})}
-                      className="object-cover"
-                    />
-                  </span>
-                )}
-                <span className="flex flex-1 flex-col gap-0.5">
-                  <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brand}</span>
-                  <span className="text-[13px]">{i.productName}</span>
-                  <span className="text-[11px] text-[var(--fg-muted)]">
-                    {i.optionLabel} · <span className="tnum">{i.quantity}</span>
-                  </span>
-                  {line?.issue && (
-                    <span role="status">
-                      <Badge tone="danger">{t(CART_ISSUE_KEY[line.issue])}</Badge>
-                    </span>
-                  )}
-                </span>
-                <span className="tnum text-sm font-semibold">
-                  {line ? money(line.subtotal) : '—'}
-                </span>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      <OrderItems items={selected} quote={q} money={money} />
 
       {q && q.pointsAvailable > 0 && (
         <section aria-labelledby="point-title">
@@ -389,85 +237,14 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         </section>
       )}
 
-      <section aria-labelledby="method-title">
-        <h2 id="method-title" className="mb-3.5 text-sm font-semibold">{t('checkout.method')}</h2>
-        {/*
-          목록이 아니라 라디오 그룹이다. role 을 얹는 순간 ul 의 목록 의미가
-          사라져서 그 안의 li 가 갈 곳을 잃는다 — 상품 옵션에서 같은 것을
-          고쳤는데 여기 하나가 더 있었다. 훑기가 결제 화면을 지나가지 않아
-          그동안 아무도 몰랐다.
-        */}
-        <div
-          role="radiogroup"
-          aria-labelledby="method-title"
-          className="grid grid-cols-2 gap-2"
-          {...methodKeys.groupProps}
-        >
-          {methods.map((m) => (
-            <div key={m}>
-              <button
-                type="button"
-                role="radio"
-                aria-checked={method === m}
-                {...methodKeys.radioProps(m)}
-                onClick={() => setMethod(m)}
-                className={[
-                  'h-12 w-full rounded-sm border text-sm',
-                  method === m
-                    ? 'border-n-900 bg-n-900 font-medium text-n-0'
-                    : 'border-n-300 bg-[var(--bg)]',
-                ].join(' ')}
-              >
-                {t(METHOD_KEY[m])}
-              </button>
-            </div>
-          ))}
-        </div>
-        {/*
-          무엇으로 도는지 사실대로 말한다. 결제창이 뜨지 않는데 주문이 완료되는
-          것은 놀랄 일이므로 미리 알려야 하고, 반대로 실제 결제창이 뜰 때
-          "연동이 안 됐다" 고 적혀 있으면 그것대로 사람을 헷갈리게 만든다.
-        */}
-        <p className="mt-3 rounded-sm bg-[var(--surface)] px-3.5 py-2.5 text-xs leading-relaxed text-[var(--fg-secondary)]">
-          {realGateway ? (
-            <>
-              {t('checkout.tossOn')}
-            </>
-          ) : (
-            <>
-              {t('checkout.tossOff')}
-            </>
-          )}
-        </p>
-      </section>
+      <PaymentMethods
+        methods={methods}
+        method={method}
+        onSelect={setMethod}
+        realGateway={realGateway}
+      />
 
-      <section aria-labelledby="total-title">
-        <h2 id="total-title" className="mb-3.5 text-sm font-semibold">{t('checkout.total')}</h2>
-        {quote.isPending || !q ? (
-          <p className="text-[13px] text-[var(--fg-muted)]">{t('cart.calculating')}</p>
-        ) : (
-          <dl className="flex flex-col gap-2.5">
-            <Row label={t('cart.subtotal')} value={money(q.listTotal)} />
-            {q.productDiscount > 0 && (
-              <Row label={t('cart.productDiscount')} value={`-${money(q.productDiscount)}`} accent />
-            )}
-            {q.couponDiscount > 0 && (
-              <Row label={t('cart.couponDiscount')} value={`-${money(q.couponDiscount)}`} accent />
-            )}
-            {q.pointsUsed > 0 && (
-              <Row label={t('cart.pointsUsed')} value={`-${money(q.pointsUsed)}`} accent />
-            )}
-            <Row
-              label={t('cart.shippingFee')}
-              value={q.shippingFee === 0 ? t('cart.freeShipping') : money(q.shippingFee)}
-            />
-            <div className="mt-1 flex items-baseline justify-between border-t border-[var(--border)] pt-3.5">
-              <dt className="text-[15px] font-semibold">{t('checkout.finalTotal')}</dt>
-              <dd><Price amount={won(q.payable)} size="md" /></dd>
-            </div>
-          </dl>
-        )}
-      </section>
+      <OrderTotal quote={q} pending={quote.isPending} money={money} />
 
       <section aria-labelledby="agree-title">
         <h2 id="agree-title" className="sr-only">{t('checkout.terms')}</h2>
@@ -507,15 +284,6 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
             : t('checkout.submit')}
       </Button>
       </form>
-    </div>
-  );
-}
-
-function Row({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return (
-    <div className="flex items-center justify-between">
-      <dt className="text-[13px] text-[var(--fg-secondary)]">{label}</dt>
-      <dd className={`tnum text-[13px] ${accent ? 'text-accent' : ''}`}>{value}</dd>
     </div>
   );
 }
