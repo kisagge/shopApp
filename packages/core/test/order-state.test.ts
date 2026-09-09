@@ -3,6 +3,7 @@ import {
   orderFilterStatuses, ORDER_FILTER_GROUP, ORDER_FILTER_TAB,
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
+  statusBeforeReturn,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -150,5 +151,51 @@ describe('주문 내역에서 걸러 볼 칸', () => {
   it('하나짜리 상태도 목록으로 돌려준다', () => {
     // 부르는 쪽이 "하나인가 묶음인가" 를 다시 나누지 않게 한다
     expect(orderFilterStatuses('SHIPPED')).toEqual(['SHIPPED']);
+  });
+});
+
+/**
+ * 반품을 반려하면 **왔던 자리로** 되돌아가야 한다.
+ *
+ * 예전에는 무조건 배송중이었다. 반품이 배송중·배송완료에서만 올 수 있어서
+ * 그래도 됐는데, 구매확정에서도 올 수 있게 되면서 깨졌다.
+ */
+describe('반품을 반려했을 때 돌아갈 자리', () => {
+  const at = new Date('2026-09-01T00:00:00Z');
+
+  it('확정까지 갔던 주문은 확정으로 돌아간다', () => {
+    expect(statusBeforeReturn({ confirmedAt: at, deliveredAt: at })).toBe('CONFIRMED');
+  });
+
+  it('배송완료까지 갔던 주문은 배송완료로 돌아간다', () => {
+    expect(statusBeforeReturn({ confirmedAt: null, deliveredAt: at })).toBe('DELIVERED');
+  });
+
+  it('배송 중이었으면 배송중으로 돌아간다', () => {
+    expect(statusBeforeReturn({ confirmedAt: null, deliveredAt: null })).toBe('SHIPPED');
+  });
+
+  it('돌아갈 자리는 전부 실제로 갈 수 있는 곳이다 — 상태머신이 막으면 반려가 터진다', () => {
+    for (const order of [
+      { confirmedAt: at, deliveredAt: at },
+      { confirmedAt: null, deliveredAt: at },
+      { confirmedAt: null, deliveredAt: null },
+    ]) {
+      expect(canTransition('RETURN_REQUESTED', statusBeforeReturn(order))).toBe(true);
+    }
+  });
+
+  /** 틀리려면 덜 나아간 쪽으로 틀려야 한다 — 확정한 적 없는 주문을 확정으로 되돌리면 안 된다 */
+  it('시각이 아예 없으면 확정으로 보지 않는다', () => {
+    expect(statusBeforeReturn({ confirmedAt: undefined, deliveredAt: undefined })).toBe('SHIPPED');
+    expect(statusBeforeReturn({ confirmedAt: undefined, deliveredAt: at })).toBe('DELIVERED');
+  });
+
+  /**
+   * 확정 시각은 정산 매출의 축이다. 배송중으로 되돌리면 다시 확정될 때 그
+   * 값이 덮이고, 이미 지급한 달의 매출이 다른 달로 옮겨간다.
+   */
+  it('확정됐던 주문을 배송중으로 되돌리지 않는다', () => {
+    expect(statusBeforeReturn({ confirmedAt: at, deliveredAt: at })).not.toBe('SHIPPED');
   });
 });

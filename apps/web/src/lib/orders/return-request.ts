@@ -4,6 +4,7 @@ import {
   checkReturnEligibility, shippingBorneBy, transition, canRefundOrder,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type ReturnReason, type ReturnType,
+  statusBeforeReturn,
 } from '@shop/core';
 
 /**
@@ -126,6 +127,8 @@ export async function resolveReturn(
     where: { orderNo },
     select: {
       id: true, orderNo: true, status: true,
+      // 반려하면 왔던 자리로 되돌린다. 그 자리를 이 두 시각으로 되짚는다.
+      confirmedAt: true, deliveredAt: true,
       returnRequests: {
         orderBy: { requestedAt: 'desc' },
         take: 1,
@@ -144,13 +147,19 @@ export async function resolveReturn(
   const approve = input.action === 'APPROVE';
 
   /**
-   * 반려하면 배송중으로 되돌린다.
+   * 반려하면 **왔던 자리로** 되돌린다.
    *
-   * 상태머신이 RETURN_REQUESTED 에서 갈 수 있는 곳으로 둔 자리다.
-   * 배송완료였더라도 배송중으로 돌아가는데, 그 뒤 다시 배송완료로 갈 수
-   * 있으므로 막다른 길은 아니다.
+   * 예전에는 무조건 배송중이었다. 반품이 배송중·배송완료에서만 올 수 있어서
+   * 그래도 됐는데, 구매확정에서도 올 수 있게 되면서 깨졌다 — 확정된 주문이
+   * 배송중으로 되돌아가면 사람에게는 이미 받은 물건이 "배송중" 으로 보이고,
+   * 다시 확정될 때 `confirmedAt` 이 덮여 **이미 지급한 달의 매출이 다른 달로
+   * 옮겨간다.**
+   *
+   * 시각은 다시 쓰지 않는다. 상태만 되돌린다.
    */
-  const nextOrderStatus = approve ? order.status : transition(order.status, 'SHIPPED');
+  const nextOrderStatus = approve
+    ? order.status
+    : transition(order.status, statusBeforeReturn(order));
 
   await prisma.$transaction(async (tx) => {
     await tx.returnRequest.update({

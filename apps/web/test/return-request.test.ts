@@ -21,7 +21,8 @@ const delivered = new Date('2026-09-01T10:00:00+09:00');
 const now = new Date(delivered.getTime() + 2 * DAY);
 
 const order = (over: Record<string, unknown> = {}) => ({
-  id: 'o-1', orderNo: '20260901-0000001', status: 'DELIVERED', deliveredAt: delivered, ...over,
+  id: 'o-1', orderNo: '20260901-0000001', status: 'DELIVERED',
+  deliveredAt: delivered, confirmedAt: null, ...over,
 });
 
 beforeEach(() => {
@@ -147,6 +148,8 @@ describe('교환도 같은 창구로 받는다', () => {
 describe('운영진 처리', () => {
   const requested = {
     id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
+    // Prisma 는 없는 시각을 null 로 준다. 픽스처도 그래야 진짜와 같다.
+    confirmedAt: null, deliveredAt: delivered,
     returnRequests: [{ id: 'r-1', status: 'REQUESTED' }],
   };
 
@@ -167,14 +170,14 @@ describe('운영진 처리', () => {
     expect(db.order.updateMany).not.toHaveBeenCalled();
   });
 
-  it('반려하면 배송중으로 되돌린다 — 안 되돌리면 주문이 반품접수에 갇힌다', async () => {
+  it('반려하면 왔던 자리로 되돌린다 — 안 되돌리면 주문이 반품접수에 갇힌다', async () => {
     const r = await resolveReturn(
       '20260901-0000001',
       { action: 'REJECT', rejectReason: '사용 흔적이 있습니다' },
       admin,
     );
 
-    expect(r.orderStatus).toBe('SHIPPED');
+    expect(r.orderStatus).toBe('DELIVERED');
     expect(db.order.updateMany).toHaveBeenCalled();
   });
 
@@ -209,5 +212,49 @@ describe('운영진 처리', () => {
     await expect(
       resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin),
     ).rejects.toMatchObject({ code: 'NO_REQUEST' });
+  });
+});
+
+/**
+ * 반려하면 **왔던 자리로** 되돌아가야 한다.
+ *
+ * 예전에는 무조건 배송중이었다. 구매확정에서도 반품이 올 수 있게 되면서
+ * 깨졌다 — 확정된 주문이 배송중으로 되돌아가면 사람에게는 이미 받은 물건이
+ * "배송중" 으로 보이고, 다시 확정될 때 `confirmedAt` 이 덮여 이미 지급한
+ * 달의 매출이 다른 달로 옮겨간다.
+ */
+describe('반품을 반려했을 때', () => {
+  const pending = { id: 'rr-1', status: 'REQUESTED' };
+
+  const resolveFrom = async (over: Record<string, unknown>) => {
+    db.order.findFirst.mockResolvedValue(order({ ...over, returnRequests: [pending] }));
+    return resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '하자 아님' }, admin);
+  };
+
+  it('확정까지 갔던 주문은 확정으로 돌아간다', async () => {
+    const r = await resolveFrom({ status: 'RETURN_REQUESTED', confirmedAt: delivered });
+
+    expect(r.orderStatus).toBe('CONFIRMED');
+  });
+
+  it('배송완료까지 갔던 주문은 배송완료로 돌아간다', async () => {
+    const r = await resolveFrom({ status: 'RETURN_REQUESTED', confirmedAt: null });
+
+    expect(r.orderStatus).toBe('DELIVERED');
+  });
+
+  it('배송 중이었으면 배송중으로 돌아간다', async () => {
+    const r = await resolveFrom({ status: 'RETURN_REQUESTED', confirmedAt: null, deliveredAt: null });
+
+    expect(r.orderStatus).toBe('SHIPPED');
+  });
+
+  /** 확정 시각이 덮이면 이미 지급한 달의 매출이 다른 달로 옮겨간다 */
+  it('되돌리면서 시각을 다시 쓰지 않는다', async () => {
+    await resolveFrom({ status: 'RETURN_REQUESTED', confirmedAt: delivered });
+
+    const [args] = db.order.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
+    expect(args.data).not.toHaveProperty('confirmedAt');
+    expect(args.data).not.toHaveProperty('deliveredAt');
   });
 });

@@ -50,7 +50,21 @@ const TRANSITIONS: Readonly<Record<OrderStatus, readonly OrderStatus[]>> = {
    */
   CONFIRMED: ['RETURN_REQUESTED'],
   CANCELLED: ['REFUNDED'],
-  RETURN_REQUESTED: ['RETURNED', 'SHIPPED'], // 반품 철회 시 배송중으로 되돌림
+  /*
+   * 반려하면 **왔던 자리로** 되돌린다.
+   *
+   * 예전에는 배송중 하나뿐이었다. 반품이 배송중·배송완료에서만 올 수 있었고,
+   * 배송완료였더라도 배송중으로 갔다가 다시 배송완료로 갈 수 있으니 막다른
+   * 길은 아니었다.
+   *
+   * **구매확정에서도 올 수 있게 되면서 그 단순화가 깨졌다.** 확정된 주문을
+   * 배송중으로 되돌리면 사람에게는 이미 받은 물건이 "배송중" 으로 보이고,
+   * 더 나쁜 것은 다시 확정될 때 `confirmedAt` 이 덮인다는 점이다 — 그 값이
+   * 정산 매출의 축이라, 이미 지급한 달의 매출이 다른 달로 옮겨간다.
+   *
+   * 어디로 되돌릴지는 `statusBeforeReturn` 이 정한다.
+   */
+  RETURN_REQUESTED: ['RETURNED', 'SHIPPED', 'DELIVERED', 'CONFIRMED'],
   RETURNED: ['REFUNDED'],
   REFUNDED: [],
 };
@@ -183,4 +197,29 @@ export function orderFilterStatuses(value: string | undefined): readonly OrderSt
   // 상태 판정은 화면 쪽에 흩어져 있었다. 이 함수를 쓰는 곳이 늘면서
   // 여기로 모은다 — 목록이 core 에 있으니 판정도 여기가 맞다.
   return (ORDER_STATUS as readonly string[]).includes(value) ? [value as OrderStatus] : null;
+}
+
+/**
+ * 반품 신청이 어느 자리에서 왔는가.
+ *
+ * 신청을 반려할 때 **왔던 자리로** 되돌리려고 쓴다. 따로 기록하지 않고
+ * 주문이 이미 들고 있는 시각으로 되짚는다 — 그 시각들이 곧 "이 주문이
+ * 어디까지 갔었는가" 의 기록이다.
+ *
+ * 되돌릴 때 그 시각들을 **다시 쓰지 않는다.** 확정 시각은 정산 매출의
+ * 축이라, 덮으면 이미 지급한 달의 매출이 다른 달로 옮겨간다.
+ */
+export function statusBeforeReturn(order: {
+  readonly confirmedAt: Date | null | undefined;
+  readonly deliveredAt: Date | null | undefined;
+}): OrderStatus {
+  /*
+   * 값이 **없으면 없는 것으로 본다.** 처음에는 `!== null` 로 적었는데, 값을
+   * 빠뜨린 자리에서 `undefined` 가 오자 "확정됨" 으로 읽혔다 — 확정된 적
+   * 없는 주문을 확정으로 되돌리는 쪽이라 위험한 방향이다. 틀리려면
+   * 덜 나아간 쪽으로 틀려야 한다.
+   */
+  if (order.confirmedAt) return 'CONFIRMED';
+  if (order.deliveredAt) return 'DELIVERED';
+  return 'SHIPPED';
 }
