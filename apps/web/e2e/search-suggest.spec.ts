@@ -84,8 +84,17 @@ test('Escape 로 닫고 폼으로 검색한다 — 자동완성은 얹은 것이
   await page.locator(box).press('Escape');
   await expect(page.locator(box)).toHaveAttribute('aria-expanded', 'false');
 
+  /*
+   * **친 글자가 남아 있어야 한다.** type="search" 인 칸에서 Escape 는
+   * 브라우저가 값을 지우는 기본 동작인데, 값을 React 가 들고 있어서
+   * 지워지는 것은 화면뿐이었다 — 눈에는 비었는데 폼은 옛 값을 들고 있는
+   * 어긋난 상태다. 그대로 엔터를 누르면 빈 검색이 나갔고, 이 명세가 주소
+   * 모양만 보고 있어서 `/search?q=` 로도 통과해 아무도 몰랐다.
+   */
+  await expect(page.locator(box)).toHaveValue('코트');
+
   await page.locator(box).press('Enter');
-  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page).toHaveURL(/\/search\?q=%EC%BD%94%ED%8A%B8/);
 });
 
 test('빈 검색 화면은 인기 검색어가 없어도 막다른 길이 아니다', async ({ page }) => {

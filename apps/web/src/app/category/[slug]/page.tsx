@@ -102,18 +102,18 @@ export default async function CategoryPage({ params, searchParams }: Params) {
       {category.children.length > 0 && (
         <nav aria-label={t('category.subcategories')} className="border-b border-[var(--border)]">
           <ul className="flex gap-1 overflow-x-auto">
-            <li>
+            <li className="shrink-0">
               <Link
                 href={`/category/${category.slug}`}
                 aria-current="page"
-                className="inline-flex h-12 items-center px-4 text-sm font-semibold shadow-[inset_0_-2px_0_var(--fg)]"
+                className="inline-flex h-12 items-center whitespace-nowrap px-4 text-sm font-semibold shadow-[inset_0_-2px_0_var(--fg)]"
               >
                 {t('category.all')}
               </Link>
             </li>
             {category.children.map((c) => (
-              <li key={c.slug}>
-                <Link href={`/category/${c.slug}`} className="inline-flex h-12 items-center px-4 text-sm text-[var(--fg-muted)]">
+              <li key={c.slug} className="shrink-0">
+                <Link href={`/category/${c.slug}`} className="inline-flex h-12 items-center whitespace-nowrap px-4 text-sm text-[var(--fg-muted)]">
                   {categoryName(locale, c.slug, c.name)}
                 </Link>
               </li>

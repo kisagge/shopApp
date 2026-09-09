@@ -56,11 +56,11 @@ export default async function MyOrdersPage({
 
       <nav aria-label={t('order.statusFilter')} className="mb-6 border-b border-[var(--border)]">
         <ul className="flex gap-1 overflow-x-auto">
-          <li>
+          <li className="shrink-0">
             <Link
               href="/mypage/orders"
               {...(filter === undefined ? { 'aria-current': 'page' as const } : {})}
-              className={`inline-flex h-11 items-center px-3 text-[13px] no-underline ${
+              className={`inline-flex h-11 items-center whitespace-nowrap px-3 text-[13px] no-underline ${
                 filter === undefined
                   ? 'font-semibold text-[var(--fg)] shadow-[inset_0_-2px_0_var(--fg)]'
                   : 'text-[var(--fg-muted)]'
@@ -70,7 +70,7 @@ export default async function MyOrdersPage({
             </Link>
           </li>
           {TRACKED_STATUSES.map((s) => (
-            <li key={s}>
+            <li key={s} className="shrink-0">
               <Link
                 href={`/mypage/orders?status=${s}`}
                 {...(filter === s ? { 'aria-current': 'page' as const } : {})}

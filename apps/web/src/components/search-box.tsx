@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { canSuggest, SUGGEST_MIN_LENGTH } from '@shop/core';
+import { canSuggest, SUGGEST_MIN_LENGTH, normalizeSearchTerm } from '@shop/core';
 import type { SearchSuggestion } from '~/lib/queries/catalog/suggest';
 import { useT } from '~/lib/i18n/client';
 
@@ -61,6 +61,52 @@ export function SearchBox({
 
   const eligible = canSuggest(term);
 
+  /**
+   * 너무 짧아서 화면을 통째로 바꿀 수는 없다고 말한 자리.
+   *
+   * **예전에는 검색 화면으로 보내 놓고 거기서 말했다.** 두 글자를 안 쳤다는
+   * 이유로 보던 화면이 사라지고, 돌아오려면 뒤로 가기를 눌러야 했다 —
+   * 알려 주려고 한 일이 오히려 하던 일을 끊는다. 여기서 막고 여기서 말한다.
+   *
+   * **자바스크립트가 없으면 그대로 넘어간다.** 그때는 검색 화면이 같은 말을
+   * 하므로 길이 막히지는 않는다 — 이 자리는 그 위에 얹는 편의다.
+   */
+  const [tooShort, setTooShort] = useState(false);
+
+  /*
+   * **지우는 이펙트를 두지 않는다.** 글자가 다시 쓸 만해지면 저절로
+   * 사라져야 하는데, 그걸 이펙트에서 setState 로 되돌리면 렌더가 한 번 더
+   * 돈다. 이 파일이 `closed` 를 다루는 방식과 같다 — 사용자가 한 일만
+   * 상태로 두고 나머지는 지금 값에서 끌어낸다.
+   *
+   * 판단은 core 가 한다. 여기서 길이를 세면 검색이 무엇을 받아 주는지가
+   * 두 곳에 적히고, 한글 한 음절 같은 예외에서 곧바로 갈라진다.
+   */
+  const showTooShort = tooShort && normalizeSearchTerm(term) === null;
+
+  /*
+   * **폼은 우리 것이 아니다.** 헤더와 메뉴가 각자 <form> 을 두르고 이
+   * 상자를 안에 넣는다 — 자바스크립트 없이도 검색이 되게 하려고 그렇게
+   * 짜여 있다. 그래서 감싸고 있는 폼을 찾아 제출을 가로챈다.
+   */
+  useEffect(() => {
+    const form = rootRef.current?.closest('form');
+    if (!form) return;
+
+    const onSubmit = (event: SubmitEvent) => {
+      const input = form.querySelector('input[name="q"]');
+      const value = input instanceof HTMLInputElement ? input.value : '';
+      if (normalizeSearchTerm(value) !== null) return;
+
+      // 너무 짧다. 화면을 바꾸지 않고 이 자리에서 말한다.
+      event.preventDefault();
+      setTooShort(true);
+    };
+
+    form.addEventListener('submit', onSubmit);
+    return () => form.removeEventListener('submit', onSubmit);
+  }, []);
+
   // 글자마다 부르지 않는다. 치는 도중의 중간 글자는 대부분 버려진다.
   useEffect(() => {
     if (!canSuggest(term)) return;
@@ -114,6 +160,21 @@ export function SearchBox({
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'Escape') {
+      /*
+       * **브라우저가 칸을 비우는 것을 막는다.**
+       *
+       * type="search" 인 칸에서 Escape 는 브라우저가 값을 지우는 기본
+       * 동작이다. 그런데 이 칸은 React 가 값을 들고 있어서, 지워지는 것은
+       * 화면뿐이고 상태는 그대로 남는다 — 사람 눈에는 비어 있는데 폼은
+       * 옛 값을 들고 있는, 둘이 어긋난 상태가 된다.
+       *
+       * 실제로 그 상태에서 엔터를 누르면 **빈 검색**이 나갔다. 명세가
+       * 주소 모양만 보고 있어서 `/search?q=` 로도 통과해 아무도 몰랐다.
+       *
+       * Escape 로 하려던 일은 목록을 닫는 것이다. 친 글자를 지우는 것이
+       * 아니다.
+       */
+      event.preventDefault();
       setClosed(true);
       return;
     }
@@ -197,6 +258,20 @@ export function SearchBox({
         >
           {t('common.search')}
         </button>
+      )}
+
+      {/*
+        **입력칸 바로 아래에 붙인다.** 화면 구석에 띄우면 무엇에 대한 말인지
+        눈으로 이어 붙여야 하고, 낭독기에서는 더 그렇다. 잘못된 자리 옆이
+        가장 짧은 거리다. role=status 라 하던 말을 끊지 않는다.
+      */}
+      {showTooShort && (
+        <p
+          role="status"
+          className={`absolute top-full z-30 mt-1 rounded-sm bg-n-900 px-3 py-2 text-[12px] text-n-0 ${menu ? 'inset-x-0' : 'right-0 left-0 whitespace-nowrap'}`}
+        >
+          {t('search.tooShort', { min: SUGGEST_MIN_LENGTH })}
+        </p>
       )}
 
       {/*

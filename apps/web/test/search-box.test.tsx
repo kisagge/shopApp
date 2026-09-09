@@ -211,3 +211,50 @@ describe('검색 자동완성 창', () => {
     expect(box()).toHaveProperty('name', 'q');
   });
 });
+
+describe('너무 짧게 치고 보냈을 때', () => {
+  /**
+   * 예전에는 검색 화면으로 보내 놓고 거기서 "두 글자 이상" 이라고 말했다.
+   * 두 글자를 안 쳤다는 이유로 **보던 화면이 사라지고**, 돌아오려면 뒤로
+   * 가기를 눌러야 했다 — 알려 주려는 일이 하던 일을 끊는다.
+   */
+  const renderInForm = () => {
+    const onSubmit = vi.fn((e: Event) => e.preventDefault());
+    render(
+      <form method="get" action="/search" onSubmit={onSubmit as never}>
+        <SearchBox id="q" />
+      </form>,
+    );
+    return onSubmit;
+  };
+
+  it('화면을 바꾸지 않고 그 자리에서 말한다', async () => {
+    const user = userEvent.setup();
+    renderInForm();
+
+    await user.type(box(), 'a{Enter}');
+
+    expect(await screen.findByText(/글자 이상/)).toBeInTheDocument();
+  });
+
+  it('한글 한 음절은 막지 않는다', async () => {
+    // `울` 은 서른넷 중 여덟을 문다 — 검색이 받아 주는 글자다
+    const user = userEvent.setup();
+    renderInForm();
+
+    await user.type(box(), '울{Enter}');
+
+    expect(screen.queryByText(/글자 이상/)).toBeNull();
+  });
+
+  it('더 치면 스스로 사라진다', async () => {
+    const user = userEvent.setup();
+    renderInForm();
+
+    await user.type(box(), 'a{Enter}');
+    expect(await screen.findByText(/글자 이상/)).toBeInTheDocument();
+
+    await user.type(box(), 'b');
+    expect(screen.queryByText(/글자 이상/)).toBeNull();
+  });
+});

@@ -75,11 +75,11 @@ export default async function AdminOrdersPage({
       <div className="p-8">
         <nav aria-label="주문 상태 필터" className="mb-5 border-b border-[var(--border)]">
           <ul className="flex gap-1 overflow-x-auto">
-            <li>
+            <li className="shrink-0">
               <Link
                 href={{ pathname: '/admin/orders', query: { ...(q ? { q } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) } }}
                 {...(filter === undefined ? { 'aria-current': 'page' as const } : {})}
-                className={`inline-flex h-11 items-center px-3.5 text-[13px] no-underline ${
+                className={`inline-flex h-11 items-center whitespace-nowrap px-3.5 text-[13px] no-underline ${
                   filter === undefined
                     ? 'font-semibold text-[var(--fg)] shadow-[inset_0_-2px_0_var(--fg)]'
                     : 'text-[var(--fg-muted)]'
@@ -89,7 +89,7 @@ export default async function AdminOrdersPage({
               </Link>
             </li>
             {FILTERS.map((s) => (
-              <li key={s}>
+              <li key={s} className="shrink-0">
                 <Link
                   href={{ pathname: '/admin/orders', query: { ...kept, status: s } }}
                   {...(filter === s ? { 'aria-current': 'page' as const } : {})}
