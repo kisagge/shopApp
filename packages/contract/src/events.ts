@@ -18,14 +18,18 @@ const clientIdSchema = z
   .regex(/^[A-Za-z0-9_-]{8,64}$/, 'valid.idFormat');
 
 /** 앱 내부 경로만 받는다. 절대 URL 을 그대로 저장하면 외부 도메인이 섞인다. */
-const pathSchema = z.string().min(1).max(512).startsWith('/', 'valid.pathFormat');
+const pathSchema = z
+  .string()
+  .min(1, 'valid.pathFormat')
+  .max(512, 'valid.tooLongChars')
+  .startsWith('/', 'valid.pathFormat');
 
 const base = z.object({
   occurredAt: z.iso.datetime({ offset: true }),
   sessionId: clientIdSchema,
   anonymousId: clientIdSchema,
   path: pathSchema,
-  referrer: z.string().max(1024).nullish(),
+  referrer: z.string().max(1024, 'valid.tooLongChars').nullish(),
 });
 
 const ev = <N extends string, S extends z.ZodRawShape>(name: N, shape: S) =>
@@ -34,30 +38,40 @@ const ev = <N extends string, S extends z.ZodRawShape>(name: N, shape: S) =>
 export const eventInputSchema = z.discriminatedUnion('name', [
   ev('page_view', {}),
   ev('view_item_list', {
-    listId: z.string().max(64).optional(),
-    itemCount: z.int().min(0).max(500).optional(),
+    listId: z.string().max(64, 'valid.tooLongChars').optional(),
+    itemCount: z.int().min(0, 'valid.tooSmall').max(500, 'valid.tooBig').optional(),
   }),
   ev('view_item', { productId: cuidSchema, variantId: cuidSchema.optional() }),
-  ev('select_item', { productId: cuidSchema, listId: z.string().max(64).optional() }),
+  ev('select_item', {
+    productId: cuidSchema,
+    listId: z.string().max(64, 'valid.tooLongChars').optional(),
+  }),
   ev('add_to_cart', { productId: cuidSchema, variantId: cuidSchema, quantity: quantitySchema }),
   ev('remove_from_cart', { productId: cuidSchema, variantId: cuidSchema, quantity: quantitySchema }),
-  ev('view_cart', { itemCount: z.int().min(0).max(200) }),
-  ev('begin_checkout', { itemCount: z.int().min(1).max(200) }),
-  ev('add_shipping_info', { method: z.string().max(32).optional() }),
-  ev('add_payment_info', { method: z.string().max(32).optional() }),
+  ev('view_cart', { itemCount: z.int().min(0, 'valid.tooSmall').max(200, 'valid.tooBig') }),
+  ev('begin_checkout', { itemCount: z.int().min(1, 'valid.tooSmall').max(200, 'valid.tooBig') }),
+  ev('add_shipping_info', { method: z.string().max(32, 'valid.tooLongChars').optional() }),
+  ev('add_payment_info', { method: z.string().max(32, 'valid.tooLongChars').optional() }),
   ev('add_to_wishlist', { productId: cuidSchema }),
   /*
    * 어떤 길로 나갔는지(method)를 함께 남긴다. 네이티브 공유 시트로 나간
    * 것과 주소를 복사한 것은 뜻이 다르다 — 뒤엣것은 공유할 곳을 못 찾아
    * 직접 옮긴 것에 가깝다.
    */
-  ev('share', { productId: cuidSchema, method: z.string().max(32) }),
-  ev('search', { query: z.string().trim().min(1).max(128), resultCount: z.int().min(0).optional() }),
-  ev('login', { method: z.string().max(32).optional() }),
-  ev('sign_up', { method: z.string().max(32).optional() }),
+  ev('share', { productId: cuidSchema, method: z.string().max(32, 'valid.tooLongChars') }),
+  ev('search', {
+    query: z.string().trim().min(1, 'valid.tooShortChars').max(128, 'valid.tooLongChars'),
+    resultCount: z.int().min(0, 'valid.tooSmall').optional(),
+  }),
+  ev('login', { method: z.string().max(32, 'valid.tooLongChars').optional() }),
+  ev('sign_up', { method: z.string().max(32, 'valid.tooLongChars').optional() }),
   // purchase / refund 는 서버만 기록한다. 수집 API 가 이름으로 거부하므로
   // 여기 정의는 서버 측 기록 함수의 타입을 위한 것이다.
-  ev('purchase', { orderId: orderNoSchema, value: wonSchema, itemCount: z.int().min(1) }),
+  ev('purchase', {
+    orderId: orderNoSchema,
+    value: wonSchema,
+    itemCount: z.int().min(1, 'valid.tooSmall'),
+  }),
   ev('refund', { orderId: orderNoSchema, value: wonSchema }),
   /*
    * 실사용자 성능.
@@ -69,9 +83,9 @@ export const eventInputSchema = z.discriminatedUnion('name', [
    */
   ev('web_vitals', {
     metric: z.enum(WEB_VITAL),
-    value: z.number().min(0).max(600_000),
+    value: z.number().min(0, 'valid.tooSmall').max(600_000, 'valid.tooBig'),
     rating: z.enum(['good', 'needs-improvement', 'poor']),
-    navigationType: z.string().max(24).optional(),
+    navigationType: z.string().max(24, 'valid.tooLongChars').optional(),
   }),
 ]);
 

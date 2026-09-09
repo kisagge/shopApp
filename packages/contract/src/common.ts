@@ -4,7 +4,7 @@ import { z } from 'zod';
 export const wonSchema = z
   .int('valid.moneyInteger')
   .nonnegative('valid.moneyMin')
-  .max(Number.MAX_SAFE_INTEGER);
+  .max(Number.MAX_SAFE_INTEGER, 'valid.tooBig');
 
 export const quantitySchema = z
   .int('valid.quantityInteger')

@@ -20,7 +20,7 @@ import { BANNER_TONE } from '@shop/core';
 const internalPath = z
   .string()
   .trim()
-  .max(200)
+  .max(200, 'valid.tooLongChars')
   // eslint-disable-next-line no-control-regex
   .regex(/^\/(?![/\\])[^\u0000-\u001f\\]*$/, 'valid.internalPathOnly');
 
@@ -30,10 +30,10 @@ const dateInput = z
   .transform((v) => (v === '' || v === null ? null : new Date(v)));
 
 const bannerShape = {
-  eyebrow: z.string().trim().max(40).nullable(),
-  headline: z.string().trim().min(1, 'valid.titleRequired').max(60),
-  subcopy: z.string().trim().max(200).nullable(),
-  ctaLabel: z.string().trim().max(20).nullable(),
+  eyebrow: z.string().trim().max(40, 'valid.tooLongChars').nullable(),
+  headline: z.string().trim().min(1, 'valid.titleRequired').max(60, 'valid.tooLongChars'),
+  subcopy: z.string().trim().max(200, 'valid.tooLongChars').nullable(),
+  ctaLabel: z.string().trim().max(20, 'valid.tooLongChars').nullable(),
   href: internalPath.nullable(),
   tone: z.enum(BANNER_TONE),
   isActive: z.boolean(),
@@ -80,7 +80,7 @@ export const updateBannerSchema = z
 export type UpdateBannerInput = z.infer<typeof updateBannerSchema>;
 
 export const reorderBannerSchema = z.object({
-  orderedIds: z.array(z.string()).min(1).max(20),
+  orderedIds: z.array(z.string()).min(1, 'valid.tooFewItems').max(20, 'valid.tooManyItems'),
 });
 
 export const BANNER_ERROR = ['BANNER_NOT_FOUND', 'TOO_MANY_BANNERS'] as const;

@@ -7,7 +7,8 @@ import { BUSINESS_NUMBER_PATTERN, normalizeBusinessNumber } from '@shop/core';
  * 정산 계좌는 **받지 않는다.** 심사를 통과할지 모르는 시점에 계좌를
  * 모아 둘 이유가 없고, 승인 뒤 가맹점 화면에서 받는 편이 맞다.
  */
-const trimmed = (max: number) => z.string().trim().min(1).max(max);
+const trimmed = (max: number) =>
+  z.string().trim().min(1, 'valid.tooShortChars').max(max, 'valid.tooLongChars');
 
 export const applyMerchantSchema = z.object({
   /** 운영진 화면에 뜨는 이름 */
@@ -22,7 +23,7 @@ export const applyMerchantSchema = z.object({
     .transform(normalizeBusinessNumber)
     .refine((v) => BUSINESS_NUMBER_PATTERN.test(v), 'valid.bizNumberFormat'),
   representative: trimmed(20),
-  contactEmail: z.email('valid.emailFormat').max(120),
+  contactEmail: z.email('valid.emailFormat').max(120, 'valid.tooLongChars'),
   contactPhone: trimmed(20),
 });
 export type ApplyMerchantInput = z.infer<typeof applyMerchantSchema>;

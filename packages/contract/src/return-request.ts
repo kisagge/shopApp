@@ -10,7 +10,7 @@ import { RETURN_TYPE, RETURN_REASON } from '@shop/core';
 export const returnRequestSchema = z.object({
   type: z.enum(RETURN_TYPE),
   reason: z.enum(RETURN_REASON),
-  detail: z.string().trim().max(500).optional(),
+  detail: z.string().trim().max(500, 'valid.tooLongChars').optional(),
 });
 export type ReturnRequestInput = z.infer<typeof returnRequestSchema>;
 
@@ -29,7 +29,7 @@ export const resolveReturnSchema = z.discriminatedUnion('action', [
       .string({ error: 'valid.rejectReasonRequired' })
       .trim()
       .min(1, 'valid.rejectReasonRequired')
-      .max(300),
+      .max(300, 'valid.tooLongChars'),
   }),
 ]);
 export type ResolveReturnInput = z.infer<typeof resolveReturnSchema>;

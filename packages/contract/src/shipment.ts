@@ -13,7 +13,7 @@ export const registerShipmentSchema = z.object({
     .string()
     .trim()
     .min(1, 'valid.trackingRequired')
-    .max(40)
+    .max(40, 'valid.tooLongChars')
     .refine((v) => {
       const digits = v.replace(/\D/g, '');
       return digits.length >= 9 && digits.length <= 20;

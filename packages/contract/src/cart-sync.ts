@@ -10,11 +10,11 @@ import { cuidSchema } from './common';
  */
 const cartLineSchema = z.object({
   variantId: cuidSchema,
-  quantity: z.int().min(1).max(MAX_QUANTITY),
+  quantity: z.int('valid.quantityInteger').min(1, 'valid.quantityMin').max(MAX_QUANTITY, 'valid.quantityMax'),
   selected: z.boolean(),
 });
 
 export const cartSyncSchema = z.object({
-  lines: z.array(cartLineSchema).max(MAX_CART_LINES),
+  lines: z.array(cartLineSchema).max(MAX_CART_LINES, 'valid.tooManyItems'),
 });
 export type CartSyncInput = z.infer<typeof cartSyncSchema>;

@@ -15,7 +15,7 @@ export type MerchantStatusInput = MerchantStatus;
 export const updateMerchantStatusSchema = z
   .object({
     status: z.enum(MERCHANT_STATUS),
-    reason: z.string().trim().max(300).default(''),
+    reason: z.string().trim().max(300, 'valid.tooLongChars').default(''),
   })
   // 승인은 이유가 없어도 되지만 **불이익을 주는 처분에는 이유를 남긴다.**
   // 정지된 가맹점이 왜 정지됐는지 아무도 모르는 상태가 되면 안 된다.
@@ -33,7 +33,7 @@ export const assignRoleSchema = z
     role: z.enum(USER_ROLE_INPUT),
     /** MERCHANT 로 올릴 때만 채운다 */
     merchantId: cuidSchema.nullable().default(null),
-    reason: z.string().trim().min(1, 'valid.reasonRequired').max(300),
+    reason: z.string().trim().min(1, 'valid.reasonRequired').max(300, 'valid.tooLongChars'),
   })
   .refine((v) => v.role !== 'MERCHANT' || v.merchantId !== null, {
     // 소속 없는 가맹점 계정은 아무것도 볼 수 없다. hasPermission 이 merchantId

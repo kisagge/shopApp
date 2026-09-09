@@ -66,7 +66,7 @@ const priceBound = z.preprocess(
 );
 
 export const catalogQuerySchema = z.object({
-  q: z.string().max(MAX_SEARCH_LENGTH).optional(),
+  q: z.string().max(MAX_SEARCH_LENGTH, 'valid.tooLongChars').optional(),
   sort: z.enum(PRODUCT_SORT).catch('recommended'),
   minPrice: priceBound,
   maxPrice: priceBound,

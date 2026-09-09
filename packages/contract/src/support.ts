@@ -14,11 +14,11 @@ import {
 export const supportPostSchema = z
   .object({
     kind: z.enum(SUPPORT_POST_KIND),
-    title: z.string().trim().min(2, 'valid.titleRequired').max(SUPPORT_TITLE_MAX_LENGTH),
-    body: z.string().trim().min(2, 'valid.bodyRequired').max(SUPPORT_BODY_MAX_LENGTH),
+    title: z.string().trim().min(2, 'valid.titleRequired').max(SUPPORT_TITLE_MAX_LENGTH, 'valid.tooLongChars'),
+    body: z.string().trim().min(2, 'valid.bodyRequired').max(SUPPORT_BODY_MAX_LENGTH, 'valid.tooLongChars'),
     topic: z.enum(INQUIRY_TOPIC).nullish(),
     pinned: z.boolean().default(false),
-    sortOrder: z.number().int().min(0).max(9_999).default(0),
+    sortOrder: z.number().int('valid.integerOnly').min(0, 'valid.tooSmall').max(9_999, 'valid.tooBig').default(0),
     /** 지금 내보낼지. 끄면 초안으로 남는다. */
     published: z.boolean().default(false),
   })

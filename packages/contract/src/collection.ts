@@ -23,14 +23,14 @@ const slug = z
   .string()
   .trim()
   .min(2, 'valid.slugFormat')
-  .max(60)
+  .max(60, 'valid.tooLongChars')
   .regex(COLLECTION_SLUG_PATTERN, 'valid.slugFormat');
 
 const collectionShape = {
   slug,
-  title: z.string().trim().min(1, 'valid.titleRequired').max(60),
-  subtitle: z.string().trim().max(120).nullable(),
-  description: z.string().trim().max(600).nullable(),
+  title: z.string().trim().min(1, 'valid.titleRequired').max(60, 'valid.tooLongChars'),
+  subtitle: z.string().trim().max(120, 'valid.tooLongChars').nullable(),
+  description: z.string().trim().max(600, 'valid.tooLongChars').nullable(),
   tone: z.enum(BANNER_TONE),
   isActive: z.boolean(),
   startsAt: dateInput,
@@ -70,14 +70,14 @@ export type UpdateCollectionInput = z.infer<typeof updateCollectionSchema>;
  */
 export const setCollectionItemsSchema = z.object({
   productIds: z
-    .array(z.string().min(1))
+    .array(z.string().min(1, 'valid.idFormat'))
     .max(MAX_COLLECTION_ITEMS, 'valid.tooManyItems')
     .refine((ids) => new Set(ids).size === ids.length, { message: 'valid.duplicateItems' }),
 });
 export type SetCollectionItemsInput = z.infer<typeof setCollectionItemsSchema>;
 
 export const reorderCollectionSchema = z.object({
-  orderedIds: z.array(z.string()).min(1).max(50),
+  orderedIds: z.array(z.string()).min(1, 'valid.tooFewItems').max(50, 'valid.tooManyItems'),
 });
 
 export const COLLECTION_ERROR = [

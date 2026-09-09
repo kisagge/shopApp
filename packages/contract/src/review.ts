@@ -11,7 +11,7 @@ import { cuidSchema } from './common';
  */
 
 const reviewShape = {
-  rating: z.int().min(RATING_MIN, 'valid.ratingRequired').max(RATING_MAX),
+  rating: z.int().min(RATING_MIN, 'valid.ratingRequired').max(RATING_MAX, 'valid.tooBig'),
   content: z
     .string()
     .trim()
@@ -19,9 +19,9 @@ const reviewShape = {
     .max(2000, 'valid.tooLongChars'),
   sizeFit: z.enum(SIZE_FIT).nullable(),
   /** cm — 체형은 사이즈 판단에 실제로 도움이 된다. 선택 사항이다. */
-  height: z.int().min(100).max(250).nullable(),
+  height: z.int().min(100, 'valid.tooSmall').max(250, 'valid.tooBig').nullable(),
   /** kg */
-  weight: z.int().min(20).max(300).nullable(),
+  weight: z.int().min(20, 'valid.tooSmall').max(300, 'valid.tooBig').nullable(),
 };
 
 /**
@@ -83,6 +83,6 @@ export type ReportReviewInput = z.infer<typeof reportReviewSchema>;
 
 /** 운영진의 신고 처리. 글을 내리는 것은 삭제 API 가 따로 맡는다. */
 export const dismissReportsSchema = z.object({
-  note: z.string().trim().max(500).nullable().default(null),
+  note: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
 });
 export type DismissReportsInput = z.infer<typeof dismissReportsSchema>;

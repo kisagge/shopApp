@@ -16,7 +16,7 @@ import { COUPON_KIND, COUPON_CODE_PATTERN } from '@shop/core';
  */
 export const couponTargetSchema = z.object({
   targetType: z.enum(['PRODUCT', 'BRAND', 'CATEGORY']),
-  targetId: z.string().min(1).max(40),
+  targetId: z.string().min(1, 'valid.tooShortChars').max(40, 'valid.tooLongChars'),
 });
 export type CouponTargetInput = z.infer<typeof couponTargetSchema>;
 
@@ -26,16 +26,16 @@ export const createCouponSchema = z.object({
     .trim()
     .transform((v) => v.toUpperCase().replace(/[\s-]/g, ''))
     .refine((v) => COUPON_CODE_PATTERN.test(v), 'valid.couponCodeFormat'),
-  name: z.string().trim().min(1, 'valid.couponNameRequired').max(60),
+  name: z.string().trim().min(1, 'valid.couponNameRequired').max(60, 'valid.tooLongChars'),
   kind: z.enum(COUPON_KIND),
-  value: z.number().int().min(0).max(10_000_000).default(0),
-  percent: z.number().int().min(0).max(100).default(0),
-  maxDiscount: z.number().int().min(0).max(10_000_000).nullable().default(null),
-  minimumOrder: z.number().int().min(0).max(10_000_000).default(0),
-  issueLimit: z.number().int().min(0).max(1_000_000).nullable().default(null),
-  startsAt: z.string().datetime({ offset: true }),
-  endsAt: z.string().datetime({ offset: true }),
-  targets: z.array(couponTargetSchema).max(200).default([]),
+  value: z.number().int('valid.moneyInteger').min(0, 'valid.moneyMin').max(10_000_000, 'valid.tooBig').default(0),
+  percent: z.number().int('valid.integerOnly').min(0, 'valid.percentMin').max(100, 'valid.percentMax').default(0),
+  maxDiscount: z.number().int('valid.moneyInteger').min(0, 'valid.moneyMin').max(10_000_000, 'valid.tooBig').nullable().default(null),
+  minimumOrder: z.number().int('valid.moneyInteger').min(0, 'valid.moneyMin').max(10_000_000, 'valid.tooBig').default(0),
+  issueLimit: z.number().int('valid.integerOnly').min(0, 'valid.tooSmall').max(1_000_000, 'valid.tooBig').nullable().default(null),
+  startsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }),
+  endsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }),
+  targets: z.array(couponTargetSchema).max(200, 'valid.tooManyItems').default([]),
 });
 export type CreateCouponInput = z.infer<typeof createCouponSchema>;
 
@@ -46,8 +46,8 @@ export type CreateCouponInput = z.infer<typeof createCouponSchema>;
  * 지우고 다시 만드는 편이 명확하다. 이름·종료일·중지만 연다.
  */
 export const updateCouponSchema = z.object({
-  name: z.string().trim().min(1).max(60).optional(),
-  endsAt: z.string().datetime({ offset: true }).optional(),
+  name: z.string().trim().min(1, 'valid.couponNameRequired').max(60, 'valid.tooLongChars').optional(),
+  endsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }).optional(),
   isActive: z.boolean().optional(),
 });
 export type UpdateCouponInput = z.infer<typeof updateCouponSchema>;
@@ -59,5 +59,5 @@ export const claimCouponSchema = z.object({
 
 /** 어드민이 여러 사용자에게 지급 */
 export const issueCouponSchema = z.object({
-  userIds: z.array(z.string()).min(1, 'valid.pickUsers').max(500),
+  userIds: z.array(z.string()).min(1, 'valid.pickUsers').max(500, 'valid.tooManyItems'),
 });

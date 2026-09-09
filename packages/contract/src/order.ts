@@ -22,7 +22,7 @@ export type PaymentMethodInput = PaymentMethodCode;
  * 판정한다 — core 의 isRemoteAreaPostalCode.
  */
 export const shippingAddressSchema = z.object({
-  recipient: z.string().trim().min(1, 'valid.recipientRequired').max(50),
+  recipient: z.string().trim().min(1, 'valid.recipientRequired').max(50, 'valid.tooLongChars'),
   phone: z
     .string()
     .trim()
@@ -30,24 +30,24 @@ export const shippingAddressSchema = z.object({
     // 한 모양으로 통일하므로(core 의 normalizePhone) 입력 단계에서 막을 이유가 없다.
     .regex(/^01[016789][-\s]?\d{3,4}[-\s]?\d{4}$/, 'valid.phoneFormat'),
   postalCode: z.string().trim().regex(/^\d{5}$/, 'valid.zipFormat'),
-  address1: z.string().trim().min(1, 'valid.addressRequired').max(200),
-  address2: z.string().trim().max(200).optional(),
+  address1: z.string().trim().min(1, 'valid.addressRequired').max(200, 'valid.tooLongChars'),
+  address2: z.string().trim().max(200, 'valid.tooLongChars').optional(),
 });
 export type ShippingAddressInput = z.infer<typeof shippingAddressSchema>;
 
 export const createOrderRequestSchema = z
   .object({
-    lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100),
+    lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100, 'valid.tooManyItems'),
     /** 저장된 배송지를 쓰거나, 새로 입력하거나 — 둘 중 하나여야 한다 */
     addressId: cuidSchema.optional(),
     address: shippingAddressSchema.optional(),
-    deliveryMemo: z.string().trim().max(100).optional(),
-    couponCode: z.string().trim().min(1).max(64).optional(),
+    deliveryMemo: z.string().trim().max(100, 'valid.tooLongChars').optional(),
+    couponCode: z.string().trim().min(1, 'valid.couponCodeRequired').max(64, 'valid.tooLongChars').optional(),
     pointsToUse: wonSchema.optional(),
     /** 브라우저 세션 식별자. 퍼널 연결용이라 없어도 주문은 된다. */
     browserSessionId: z
       .string()
-      .regex(/^[A-Za-z0-9_-]{8,64}$/)
+      .regex(/^[A-Za-z0-9_-]{8,64}$/, 'valid.idFormat')
       .optional(),
     /**
      * 같은 주문을 두 번 만들지 않기 위한 열쇠.
@@ -57,7 +57,7 @@ export const createOrderRequestSchema = z
      */
     idempotencyKey: z
       .string()
-      .regex(/^[A-Za-z0-9-]{16,64}$/)
+      .regex(/^[A-Za-z0-9-]{16,64}$/, 'valid.idFormat')
       .optional(),
     paymentMethod: z.enum(PAYMENT_METHOD_CODE),
     /** 약관 동의 없이 주문을 만들지 않는다 */
