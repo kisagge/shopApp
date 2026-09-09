@@ -7,6 +7,8 @@ import type { CartItem } from '~/stores/cart';
 export interface QuoteInput {
   readonly items: readonly CartItem[];
   readonly couponCode?: string;
+  /** 쿠폰을 쓰지 않겠다고 고른 경우에만 false. 안 보내면 서버가 가장 나은 것을 붙인다. */
+  readonly useCoupon?: boolean;
   readonly pointsToUse?: number;
   readonly isRemoteArea?: boolean;
 }
@@ -22,7 +24,9 @@ export function useCartQuote(input: QuoteInput) {
   const lines = input.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity }));
 
   return useQuery<CartQuoteResponse>({
-    queryKey: ['cart-quote', lines, input.couponCode, input.pointsToUse, input.isRemoteArea],
+    queryKey: [
+      'cart-quote', lines, input.couponCode, input.useCoupon, input.pointsToUse, input.isRemoteArea,
+    ],
     enabled: lines.length > 0,
     queryFn: async () => {
       const res = await fetch('/api/cart/quote', {
@@ -31,6 +35,7 @@ export function useCartQuote(input: QuoteInput) {
         body: JSON.stringify({
           lines,
           ...(input.couponCode ? { couponCode: input.couponCode } : {}),
+          ...(input.useCoupon === false ? { useCoupon: false } : {}),
           ...(input.pointsToUse ? { pointsToUse: input.pointsToUse } : {}),
           isRemoteArea: input.isRemoteArea ?? false,
         }),

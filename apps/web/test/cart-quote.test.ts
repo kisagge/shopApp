@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const findManyVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const findFirstUserCoupon = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+/** 견적은 쓸 수 있는 쿠폰 목록도 함께 돌려준다 */
+const findManyUserCoupons = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/db', () => ({
   prisma: {
     productVariant: { findMany: findManyVariants },
-    userCoupon: { findFirst: findFirstUserCoupon },
+    userCoupon: { findFirst: findFirstUserCoupon, findMany: findManyUserCoupons },
   },
 }));
 
@@ -27,6 +29,7 @@ const viewer = { id: 'u-1', pointBalance: 3_240 };
 
 beforeEach(() => {
   findManyVariants.mockReset();
+  findManyUserCoupons.mockReset().mockResolvedValue([]);
   findFirstUserCoupon.mockReset().mockResolvedValue(null);
 });
 
@@ -289,5 +292,167 @@ describe('줄마다 사진을 함께 준다', () => {
     const q = await quoteCart({ lines: [{ variantId: 'v-gone', quantity: 1 }], isRemoteArea: false }, viewer);
 
     expect(q.lines[0]).toMatchObject({ issue: 'NOT_FOUND', imageUrl: null });
+  });
+});
+
+/**
+ * 견적이 **쓸 수 있는 쿠폰과 각각 깎이는 금액까지** 함께 돌려준다.
+ *
+ * 쿠폰을 받을 수는 있는데 쓸 수가 없었다 — 서버는 코드를 받으면 계산할 줄
+ * 알았지만 어느 화면도 코드를 보내지 않았다. 화면이 따로 세게 두면 결제
+ * 금액과 어긋나는 날이 오므로, 세는 일을 견적이 맡는다.
+ */
+describe('쓸 수 있는 쿠폰 제안', () => {
+  const userCoupon = (code: string, over: Record<string, unknown> = {}) => ({
+    expiresAt: new Date('2026-12-31T00:00:00Z'),
+    coupon: {
+      code, name: `${code} 쿠폰`, kind: 'AMOUNT', value: 5_000, percent: 0,
+      maxDiscount: null, minimumOrder: 0, targets: [], ...over,
+    },
+  });
+
+  beforeEach(() => {
+    findManyVariants.mockResolvedValue([variant()]);
+  });
+
+  it('비로그인은 빈 목록이다 — 남의 쿠폰을 보여 줄 일이 없다', async () => {
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, null);
+
+    expect(q.coupons).toEqual([]);
+    expect(findManyUserCoupons).not.toHaveBeenCalled();
+  });
+
+  it('많이 깎이는 순으로 준다 — 화면이 다시 정렬하지 않게', async () => {
+    findManyUserCoupons.mockResolvedValue([
+      userCoupon('SMALL', { value: 1_000 }),
+      userCoupon('BIG', { value: 9_000 }),
+    ]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.coupons.map((c) => c.code)).toEqual(['BIG', 'SMALL']);
+    expect(q.coupons[0]?.discount).toBe(9_000);
+  });
+
+  /** 목록에서 빼면 "내 쿠폰이 어디 갔지" 가 된다 */
+  it('못 쓰는 쿠폰도 0 으로 함께 준다', async () => {
+    findManyUserCoupons.mockResolvedValue([
+      userCoupon('OK'),
+      userCoupon('HIGH', { minimumOrder: 9_999_999 }),
+    ]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.coupons).toHaveLength(2);
+    expect(q.coupons.find((c) => c.code === 'HIGH')?.discount).toBe(0);
+  });
+
+  it('담긴 것이 없으면 제안하지 않는다 — 0 원짜리 목록은 보여 줄 값어치가 없다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('OK')]);
+    findManyVariants.mockResolvedValue([]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'gone', quantity: 1 }], isRemoteArea: false }, viewer);
+
+    expect(q.coupons).toEqual([]);
+  });
+
+  /** 화면이 보는 금액과 결제될 금액이 어긋나면 사람은 어느 쪽도 믿을 수 없다 */
+  it('제안한 금액이 그 쿠폰을 붙였을 때의 할인액과 같다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
+    findFirstUserCoupon.mockResolvedValue(userCoupon('BIG', { value: 9_000 }));
+
+    const offered = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, viewer);
+    const applied = await quoteCart(
+      { lines: [{ variantId: 'v-coat-m', quantity: 1 }], couponCode: 'BIG', isRemoteArea: false },
+      viewer,
+    );
+
+    expect(applied.couponDiscount).toBe(offered.coupons[0]?.discount);
+  });
+});
+
+/**
+ * **고른 것이 없으면 서버가 가장 많이 깎이는 것을 붙인다.**
+ *
+ * 코드를 외워 넣게 하지 않으려는 것이다. 화면이 고르면 서버가 정한 금액과
+ * 어긋날 자리가 생기므로, 고르는 일도 여기서 한다.
+ */
+describe('쿠폰 자동 적용', () => {
+  const userCoupon = (code: string, over: Record<string, unknown> = {}) => ({
+    expiresAt: new Date('2026-12-31T00:00:00Z'),
+    coupon: {
+      code, name: `${code} 쿠폰`, kind: 'AMOUNT', value: 5_000, percent: 0,
+      maxDiscount: null, minimumOrder: 0, targets: [], ...over,
+    },
+  });
+  const cart = { lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false };
+
+  beforeEach(() => {
+    findManyVariants.mockResolvedValue([variant()]);
+  });
+
+  it('아무것도 안 고르면 가장 많이 깎이는 것이 붙는다', async () => {
+    findManyUserCoupons.mockResolvedValue([
+      userCoupon('SMALL', { value: 1_000 }),
+      userCoupon('BIG', { value: 9_000 }),
+    ]);
+
+    const q = await quoteCart(cart, viewer);
+
+    expect(q.couponCode).toBe('BIG');
+    expect(q.couponDiscount).toBe(9_000);
+  });
+
+  /** 코드를 비워 보내는 것만으로는 "아직 안 골랐다" 와 구분되지 않는다 */
+  it('쓰지 않겠다고 하면 붙이지 않는다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
+
+    const q = await quoteCart({ ...cart, useCoupon: false }, viewer);
+
+    expect(q.couponCode).toBeNull();
+    expect(q.couponDiscount).toBe(0);
+  });
+
+  /** 두 값이 어긋나게 오면 마지막으로 누른 것 — "쓰지 않기" 를 따른다 */
+  it('쓰지 않기와 코드가 함께 오면 쓰지 않는다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
+    findFirstUserCoupon.mockResolvedValue(userCoupon('BIG', { value: 9_000 }));
+
+    const q = await quoteCart({ ...cart, couponCode: 'BIG', useCoupon: false }, viewer);
+
+    expect(q.couponCode).toBeNull();
+    expect(q.couponDiscount).toBe(0);
+  });
+
+  it('고른 것이 있으면 그것을 쓴다 — 우리가 더 나은 것으로 바꾸지 않는다', async () => {
+    findManyUserCoupons.mockResolvedValue([
+      userCoupon('SMALL', { value: 1_000 }),
+      userCoupon('BIG', { value: 9_000 }),
+    ]);
+    findFirstUserCoupon.mockResolvedValue(userCoupon('SMALL', { value: 1_000 }));
+
+    const q = await quoteCart({ ...cart, couponCode: 'SMALL' }, viewer);
+
+    expect(q.couponCode).toBe('SMALL');
+    expect(q.couponDiscount).toBe(1_000);
+  });
+
+  it('쓸 수 있는 것이 하나도 없으면 아무것도 붙지 않는다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('HIGH', { minimumOrder: 9_999_999 })]);
+
+    const q = await quoteCart(cart, viewer);
+
+    expect(q.couponCode).toBeNull();
+    expect(q.couponDiscount).toBe(0);
+  });
+
+  /** 화면은 무엇이 붙었는지 이 값으로 안다 — 이름만으로는 다시 찾을 수 없다 */
+  it('붙은 쿠폰의 코드와 이름을 함께 알려 준다', async () => {
+    findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
+
+    const q = await quoteCart(cart, viewer);
+
+    expect(q.couponCode).toBe('BIG');
+    expect(q.couponName).toBe('BIG 쿠폰');
   });
 });

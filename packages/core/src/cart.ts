@@ -140,8 +140,8 @@ export function calculateCart(input: CartInput): CartTotals {
    * 1) 5,000원짜리 티셔츠 전용 10,000원 쿠폰이 다른 상품 값까지 깎는다.
    * 2) 최소 주문 금액을 대상 아닌 상품으로 채울 수 있다.
    */
-  const couponBase = eligibleTotal(input.coupon, input.lines, lines);
-  const couponDiscount = resolveCoupon(input.coupon, couponBase);
+  const couponBase = couponBaseOf(input.coupon, input.lines, lines);
+  const couponDiscount = couponDiscountOf(input.coupon, couponBase);
   const afterCoupon = subtractToZero(merchandiseTotal, couponDiscount);
 
   const pointsUsed = resolvePoints(input.pointsToUse, input.pointsAvailable, afterCoupon);
@@ -166,7 +166,7 @@ export function calculateCart(input: CartInput): CartTotals {
 }
 
 /** 쿠폰 대상 줄들의 판매가 합계. 대상이 없으면 전체 합계. */
-function eligibleTotal(
+function couponBaseOf(
   coupon: Coupon | undefined,
   inputLines: readonly CartLine[],
   totals: readonly CartLineTotal[],
@@ -193,7 +193,7 @@ function eligibleTotal(
   return add(...eligible.map((l) => l.subtotal));
 }
 
-function resolveCoupon(coupon: Coupon | undefined, base: Won): Won {
+function couponDiscountOf(coupon: Coupon | undefined, base: Won): Won {
   if (!coupon) return ZERO;
   if (base < coupon.minimumOrder) return ZERO;
 

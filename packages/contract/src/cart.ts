@@ -20,6 +20,14 @@ export const cartQuoteRequestSchema = z.object({
   lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100, 'valid.tooManyItems'),
   /** 쿠폰도 코드만 받는다. 할인 조건은 서버가 안다. */
   couponCode: z.string().trim().min(1, 'valid.couponCodeRequired').max(64, 'valid.tooLongChars').optional(),
+  /**
+   * 쿠폰을 쓸 것인가.
+   *
+   * **아무것도 안 보내면 서버가 가장 많이 깎이는 것을 붙인다.** 사람이 코드를
+   * 외워 넣게 하지 않으려는 것이다. 그래서 "안 쓰겠다" 는 뜻을 따로 말해야
+   * 한다 — 코드를 비워 보내는 것만으로는 "아직 안 골랐다" 와 구분되지 않는다.
+   */
+  useCoupon: z.boolean().default(true),
   pointsToUse: wonSchema.optional(),
   isRemoteArea: z.boolean().default(false),
 });
@@ -71,6 +79,22 @@ export const cartQuoteLineSchema = z.object({
 });
 export type CartQuoteLine = z.infer<typeof cartQuoteLineSchema>;
 
+/**
+ * 이 장바구니에 쓸 수 있는 내 쿠폰 하나.
+ *
+ * **깎이는 금액을 견적이 직접 계산해 준다.** 화면이 따로 세면 결제 금액과
+ * 어긋나는 날이 오고, 그때 사람은 어느 쪽을 믿어야 할지 알 수 없다.
+ * 못 쓰는 쿠폰도 `discount: 0` 으로 함께 온다 — 목록에서 빼면 "내 쿠폰이
+ * 어디 갔지" 가 된다.
+ */
+export const cartCouponOfferSchema = z.object({
+  code: z.string(),
+  name: z.string(),
+  discount: wonSchema,
+  expiresAt: z.string(),
+});
+export type CartCouponOffer = z.infer<typeof cartCouponOfferSchema>;
+
 export const cartQuoteResponseSchema = z.object({
   lines: z.array(cartQuoteLineSchema),
   listTotal: wonSchema,
@@ -79,6 +103,10 @@ export const cartQuoteResponseSchema = z.object({
   couponDiscount: wonSchema,
   /** 적용된 쿠폰 이름. 코드가 유효하지 않으면 null */
   couponName: z.string().nullable(),
+  /** 실제로 붙은 쿠폰 코드. 서버가 골라 붙였을 수도 있어 화면이 이 값을 봐야 한다. */
+  couponCode: z.string().nullable(),
+  /** 쓸 수 있는 것이 앞에, 많이 깎이는 순. 비로그인은 빈 목록이다. */
+  coupons: z.array(cartCouponOfferSchema),
   pointsUsed: wonSchema,
   pointsAvailable: wonSchema,
   shippingFee: wonSchema,

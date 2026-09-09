@@ -29,6 +29,8 @@ function newOrderKey(): string {
 export interface PlaceOrderInput {
   readonly items: readonly CartItem[];
   readonly addressId: string;
+  /** 고른 쿠폰 코드. 안 쓰면 넣지 않는다. */
+  readonly couponCode?: string | undefined;
   readonly memo: string;
   readonly pointsToUse: number;
   readonly method: PaymentMethodInput;
@@ -77,6 +79,12 @@ export function usePlaceOrder() {
         lines: input.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
         addressId: input.addressId,
         ...(input.memo.trim() ? { deliveryMemo: input.memo.trim() } : {}),
+        /*
+         * **견적에 붙인 쿠폰은 주문에도 붙어야 한다.** 화면에서는 깎인 금액이
+         * 보이는데 주문이 제값으로 만들어지면, 사람은 결제창에서야 다른 숫자를
+         * 본다. 서버가 다시 검증하므로 여기서 보내는 것은 "무엇을 골랐는가" 다.
+         */
+        ...(input.couponCode ? { couponCode: input.couponCode } : {}),
         ...(input.pointsToUse > 0 ? { pointsToUse: input.pointsToUse } : {}),
         paymentMethod: input.method,
         // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다

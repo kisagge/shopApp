@@ -57,7 +57,7 @@ const quote = (over: Partial<CartQuoteResponse> = {}): CartQuoteResponse => ({
     quantity: 1, requestedQuantity: 1, subtotal: 289_000, stock: 12, issue: null,
   }],
   listTotal: 413_000, productDiscount: 124_000, merchandiseTotal: 289_000,
-  couponDiscount: 0, couponName: null, pointsUsed: 0, pointsAvailable: 3_240,
+  couponDiscount: 0, couponName: null, couponCode: null, coupons: [], pointsUsed: 0, pointsAvailable: 3_240,
   shippingFee: 0, isFreeShipping: true, remainingForFreeShipping: 0,
   payable: 289_000, rewardPoints: 2_890,
   ...over,

@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   calculateCart, discountRateOf, won, ZERO,
   type CartLine, type Coupon,
+  couponOffers, bestCoupon,
 } from '@shop/core';
 import {
   type CartQuoteRequest, type CartQuoteResponse, type CartQuoteLine, type LineIssue,
@@ -15,8 +16,16 @@ import {
  * 담았는지만 말한다. 담아 둔 사이에 값이 오르거나 품절될 수 있어서, 줄마다
  * 무슨 일이 있었는지(issue)를 함께 돌려준다.
  */
+/**
+ * 계약의 요청 모양에서 `useCoupon` 만 선택으로 둔다.
+ *
+ * 계약에는 기본값이 있어서(`.default(true)`) 바깥에서 오는 값은 늘 채워져
+ * 있지만, 서버 안에서 부르는 자리(주문 생성·검사)는 그것까지 적을 이유가 없다.
+ */
+type QuoteInput = Omit<CartQuoteRequest, 'useCoupon'> & { readonly useCoupon?: boolean };
+
 export async function quoteCart(
-  input: CartQuoteRequest,
+  input: QuoteInput,
   /**
    * 보는 사람. **적립률을 함께 받는다.**
    *
@@ -132,7 +141,10 @@ export async function quoteCart(
    * 전체밖에 모른다. 전체로 재면 대상 아닌 상품으로 기준을 채울 수 있다.
    * 판정은 calculateCart 안에서 올바른 기준으로 한 번만 한다.
    */
-  const resolved = await resolveCoupon(input.couponCode, viewer?.id ?? null);
+  const [asked, mine] = await Promise.all([
+    resolveCoupon(input.couponCode, viewer?.id ?? null),
+    usableCoupons(viewer?.id ?? null),
+  ]);
 
   const pointsAvailable = won(viewer?.pointBalance ?? 0);
 
@@ -140,12 +152,42 @@ export async function quoteCart(
     return {
       lines,
       listTotal: ZERO, productDiscount: ZERO, merchandiseTotal: ZERO,
-      couponDiscount: ZERO, couponName: null,
+      couponDiscount: ZERO, couponName: null, couponCode: null,
+      // 담긴 것이 없으면 어느 쿠폰도 쓸 수 없다. 0 원짜리 목록을 보여 주지 않는다.
+      coupons: [],
       pointsUsed: ZERO, pointsAvailable,
       shippingFee: ZERO, isFreeShipping: false, remainingForFreeShipping: ZERO,
       payable: ZERO, rewardPoints: ZERO,
     };
   }
+
+  /*
+   * **고른 것이 없으면 서버가 가장 많이 깎이는 것을 붙인다.**
+   *
+   * 쿠폰을 받을 수는 있는데 쓸 수가 없었다 — 코드를 보내는 화면이 없었기
+   * 때문이다. 그렇다고 코드를 외워 넣게 하는 것은 답이 아니다. 정률은 상한이,
+   * 정액은 최소 주문 금액이, 어떤 것은 대상 상품이 걸려서 어느 것이 유리한지는
+   * 하나씩 넣어 봐야 알 수 있다. 그 계산은 여기서 한다.
+   *
+   * 사람이 "쓰지 않기" 를 고르면 `useCoupon: false` 로 온다 — 코드를 비워
+   * 보내는 것만으로는 "아직 안 골랐다" 와 구분되지 않는다.
+   */
+  const auto =
+    input.useCoupon !== false && asked === null
+      ? bestCoupon(
+          mine.map((m) => ({ coupon: m.coupon, expiresAt: m.expiresAt, ref: m })),
+          payableLines,
+        )
+      : null;
+  /*
+   * **붙일지 말지를 한 곳에서 정한다.** 쓰지 않겠다고 했으면 코드를 함께
+   * 보냈더라도 붙이지 않는다 — 두 값이 어긋나게 오면 사람이 마지막으로 누른
+   * 것을 따르는 편이 맞고, 그것이 "쓰지 않기" 다.
+   */
+  const resolved =
+    input.useCoupon === false
+      ? null
+      : (asked ?? (auto === null ? null : { coupon: auto.coupon, name: auto.ref.name }));
 
   const totals = calculateCart({
     lines: payableLines,
@@ -165,6 +207,23 @@ export async function quoteCart(
     merchandiseTotal: totals.merchandiseTotal,
     couponDiscount: totals.couponDiscount,
     couponName: totals.couponDiscount > 0 ? (resolved?.name ?? null) : null,
+    couponCode: totals.couponDiscount > 0 ? (resolved?.coupon.code ?? null) : null,
+    /*
+     * **깎이는 금액을 여기서 세어 준다.** 화면이 따로 세면 결제 금액과 어긋나는
+     * 날이 오고, 그때 사람은 어느 쪽을 믿어야 할지 알 수 없다. 많이 깎이는
+     * 순으로 두어 화면이 다시 정렬하지 않게 한다.
+     */
+    coupons: couponOffers(
+      mine.map((m) => ({ coupon: m.coupon, expiresAt: m.expiresAt, ref: m })),
+      payableLines,
+    )
+      .map((o) => ({
+        code: o.coupon.code,
+        name: o.ref.name,
+        discount: o.discount,
+        expiresAt: o.ref.expiresAt.toISOString(),
+      }))
+      .sort((a, b) => b.discount - a.discount || a.expiresAt.localeCompare(b.expiresAt)),
     pointsUsed: totals.pointsUsed,
     pointsAvailable,
     shippingFee: totals.shipping.fee,
@@ -216,6 +275,15 @@ async function resolveCoupon(
   // 대상 행이 하나도 없으면 장바구니 전체가 대상이다.
   // ?? [] 를 둔 이유: 나중에 select 에서 targets 를 빠뜨리면 조용히
   // undefined 가 되어 터진다 — 이 저장소에서 이미 겪은 유형이다.
+  return { coupon: toCoupon(c), name: c.name };
+}
+
+/** DB 행에서 core 가 아는 쿠폰 모양으로. **한 곳에서만 옮긴다** — 코드로 찾는 길과
+ * 목록으로 보여 주는 길이 다르게 옮기면 같은 쿠폰이 두 값을 갖는다. */
+function toCoupon(c: CouponRow): Coupon {
+  // 대상 행이 하나도 없으면 장바구니 전체가 대상이다.
+  // ?? [] 를 둔 이유: 나중에 select 에서 targets 를 빠뜨리면 조용히
+  // undefined 가 되어 터진다 — 이 저장소에서 이미 겪은 유형이다.
   const targets = c.targets ?? [];
   const scope =
     targets.length === 0
@@ -227,13 +295,51 @@ async function resolveCoupon(
         };
 
   const base = { code: c.code, minimumOrder: won(c.minimumOrder), ...(scope ? { scope } : {}) };
-  const coupon: Coupon =
-    c.kind === 'AMOUNT'
-      ? { kind: 'amount', value: won(c.value), ...base }
-      : {
-          kind: 'percent', percent: c.percent,
-          maxDiscount: c.maxDiscount === null ? null : won(c.maxDiscount),
-          ...base,
-        };
-  return { coupon, name: c.name };
+  return c.kind === 'AMOUNT'
+    ? { kind: 'amount', value: won(c.value), ...base }
+    : {
+        kind: 'percent', percent: c.percent,
+        maxDiscount: c.maxDiscount === null ? null : won(c.maxDiscount),
+        ...base,
+      };
+}
+
+interface CouponRow {
+  readonly code: string;
+  readonly name: string;
+  readonly kind: string;
+  readonly value: number;
+  readonly percent: number;
+  readonly maxDiscount: number | null;
+  readonly minimumOrder: number;
+  readonly targets?: readonly { targetType: string; targetId: string }[] | undefined;
+}
+
+/**
+ * 이 사람이 지금 쓸 수 있는 쿠폰 전부.
+ *
+ * **못 쓰는 것까지 다 가져오지는 않는다** — 만료됐거나 이미 쓴 것은 장바구니와
+ * 무관하게 못 쓴다. 다만 최소 주문 금액이 모자라서 못 쓰는 것은 가져온다.
+ * 그건 조금 더 담으면 쓸 수 있다는 뜻이라 화면이 말해 줄 값어치가 있다.
+ */
+async function usableCoupons(userId: string | null): Promise<
+  readonly { coupon: Coupon; name: string; expiresAt: Date }[]
+> {
+  if (!userId) return [];
+
+  const now = new Date();
+  const rows = await prisma.userCoupon.findMany({
+    where: {
+      userId,
+      usedAt: null,
+      expiresAt: { gt: now },
+      coupon: { isActive: true, startsAt: { lte: now }, endsAt: { gte: now } },
+    },
+    select: {
+      expiresAt: true,
+      coupon: { include: { targets: { select: { targetType: true, targetId: true } } } },
+    },
+  });
+
+  return rows.map((r) => ({ coupon: toCoupon(r.coupon), name: r.coupon.name, expiresAt: r.expiresAt }));
 }

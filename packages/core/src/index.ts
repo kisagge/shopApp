@@ -1,6 +1,7 @@
 export * from './money';
 export * from './shipping';
 export * from './cart';
+export * from './coupon-pick';
 export * from './order-state';
 export * from './revenue';
 export * from './compare';

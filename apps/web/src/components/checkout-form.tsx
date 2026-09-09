@@ -7,6 +7,7 @@ import type { PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { OrderItems } from '~/components/checkout/order-items';
 import { PaymentMethods } from '~/components/checkout/payment-methods';
+import { CouponPicker } from '~/components/checkout/coupon-picker';
 import { OrderTotal } from '~/components/checkout/order-total';
 import { usePlaceOrder } from '~/lib/checkout/place-order';
 import { useCartQuote } from '~/lib/use-cart-quote';
@@ -72,14 +73,33 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
   const [pointsToUse, setPointsToUse] = useState(0);
 
   /*
+   * 사람이 고른 쿠폰. **셋을 구분한다.**
+   *   undefined — 아직 고른 적 없음 (우리가 가장 나은 것을 붙여 준다)
+   *   null      — 쓰지 않겠다고 고름
+   *   문자열    — 그 쿠폰을 고름
+   *
+   * 셋을 둘로 줄이면 "쓰지 않기" 를 고른 사람에게 다음 견적에서 쿠폰이 다시
+   * 붙는다. 그리고 이것을 **이펙트로 세우지 않는다** — 이펙트에서 setState 를
+   * 하면 렌더가 한 번 더 돌고, 그 사이 화면에는 쿠폰이 없는 금액이 보인다.
+   * 고른 적 없으면 제안을 쓰는 것뿐이니 파생시키면 된다.
+   */
+  const [choice, setChoice] = useState<string | null | undefined>(undefined);
+
+  /*
    * 주문 만들기부터 결제 승인까지는 훅이 맡는다. 요청이 둘이고 그 사이에
    * 브라우저가 다른 곳으로 떠날 수 있는 흐름이라, 화면 사이에 끼워 두면
    * 어디서 끝나는지 읽을 수 없다.
    */
   const { place, pending, error } = usePlaceOrder();
 
+  /*
+   * **고른 적이 없으면 서버가 가장 나은 것을 붙인다.** 화면은 무엇이 붙었는지
+   * 응답에서 읽는다 — 여기서 고르면 서버가 정한 금액과 어긋날 자리가 생긴다.
+   */
   const quote = useCartQuote({
     items: selected,
+    ...(typeof choice === 'string' ? { couponCode: choice } : {}),
+    ...(choice === null ? { useCoupon: false } : {}),
     pointsToUse,
     isRemoteArea: defaultAddress?.isRemoteArea ?? false,
   });
@@ -107,6 +127,8 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
       addressId: defaultAddress.id,
       memo,
       pointsToUse,
+      // 견적에 붙은 것을 그대로 주문에 싣는다 — 서버가 골라 준 것도 포함이다
+      ...(q.couponCode ? { couponCode: q.couponCode } : {}),
       method,
       payable: q.payable,
     });
@@ -236,6 +258,14 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
           </div>
         </section>
       )}
+
+      <CouponPicker
+        offers={q?.coupons ?? []}
+        selected={q?.couponCode ?? null}
+        autoPicked={choice === undefined && (q?.couponCode ?? null) !== null}
+        onSelect={setChoice}
+        money={money}
+      />
 
       <PaymentMethods
         methods={methods}
