@@ -21,6 +21,14 @@ import { prisma } from '@shop/db';
 import { imageObjectKey, verifyImageBytes } from '@shop/core';
 import { makeBlur } from '../src/lib/images/blur';
 
+/**
+ * 저장소에 진짜로 올라간 사진인가.
+ *
+ * 시드가 걸어 두는 자리표시는 앱 안의 파일(`/seed/…`)이라 상대 경로다.
+ * 그것을 사진으로 치면 진짜 사진이 영영 올라가지 않는다.
+ */
+const isUploaded = (url: string | null): boolean => url !== null && url.startsWith('http');
+
 const ACCESS_KEY = process.env['UNSPLASH_ACCESS_KEY'];
 
 /** 어느 기획전에 어떤 사진을 깔지. 담긴 상품은 DB 시드가 정한다. */
@@ -168,7 +176,12 @@ async function main(): Promise<void> {
       console.warn(`없는 기획전 ${slug} — pnpm db:seed 를 먼저 돌려 주세요`);
       continue;
     }
-    if (collection.imageUrl) {
+    /*
+     * **자리표시는 사진이 있는 것으로 치지 않는다.** 시드가 앱 안의
+     * 자리표시(/seed/…)를 걸어 두는데, 그걸 "이미 있음" 으로 읽으면 진짜
+     * 사진이 영영 올라가지 않는다. 바깥에 올라간 것만 진짜다.
+     */
+    if (isUploaded(collection.imageUrl)) {
       console.log(`건너뜀 ${collection.title} — 이미 사진이 있음`);
       continue;
     }
@@ -201,7 +214,7 @@ async function main(): Promise<void> {
 
     for (const banner of banners) {
       const hero =
-        banner.imageUrl === null ? await fetchHero(link.photo, `banner-${banner.id}`, used) : null;
+        isUploaded(banner.imageUrl) ? null : await fetchHero(link.photo, `banner-${banner.id}`, used);
 
       await prisma.banner.update({
         where: { id: banner.id },

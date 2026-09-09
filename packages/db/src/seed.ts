@@ -93,6 +93,30 @@ interface SeedProduct {
   soldCount: number;
 }
 
+/**
+ * 홈 히어로 문구. 예전에는 seed-banners 스크립트에만 있었다 —
+ * 사진을 올리는 김에 만들던 것이라, 사진이 없는 곳에는 배너도 없었다.
+ */
+const BANNERS = [
+  {
+    eyebrow: 'EDITORIAL · 01',
+    headline: '겨울을 오래\n입는 방법',
+    subcopy:
+      '한 벌로 계절을 나는 아우터 12선. 소재와 무게, 그리고 오래 두고 입을 만한 실루엣을 기준으로 골랐습니다.',
+    ctaLabel: '기획전 보기',
+    href: '/category/outer',
+    tone: 'sand',
+  },
+  {
+    eyebrow: 'EDITORIAL · 02',
+    headline: '매일 입는 니트',
+    subcopy: '보풀이 덜 생기는 조직과 실을 골랐습니다. 세탁 후에도 처음의 두께를 지킵니다.',
+    ctaLabel: '니트 보기',
+    href: '/category/knit',
+    tone: 'olive',
+  },
+];
+
 const PRODUCTS: SeedProduct[] = [
   {
     slug: 'oversized-wool-coat', name: '오버사이즈 울 블렌드 코트',
@@ -624,6 +648,8 @@ async function main(): Promise<void> {
   // 계정은 @shop/auth 의 시드가 만든다. 비밀번호 해시를 여기서 흉내 내지 않고
   // 실제 가입 API 를 호출하기 위해서다. pnpm db:seed 가 두 단계를 이어서 돌린다.
 
+  await seedBanners();
+
   await seedCollections();
 
   await seedSupport();
@@ -647,6 +673,32 @@ async function main(): Promise<void> {
  * 있으면 시드를 실패로 끝낸다. 다음에 파생 칸이 하나 더 늘면 그때 여기에
  * 한 줄을 더하는 것으로 같은 보호를 받는다.
  */
+/**
+ * 홈 히어로.
+ *
+ * **여기 없으면 갓 시드한 매대의 첫 화면이 비어 있다.** 배너는 지금까지
+ * 따로 도는 스크립트(seed:banners)에만 있었는데, 그건 사진을 올리는 김에
+ * 만들던 것이라 CI 와 새로 받은 사람에게는 히어로가 아예 없었다 — 홈에서
+ * 가장 큰 자리이고, 캐러셀 조작 장치를 확인하는 검사도 그래서 매번
+ * 건너뛰었다.
+ *
+ * 사진은 자리표시를 건다. 진짜 사진은 seed:banners 가 나중에 덮는다.
+ */
+async function seedBanners(): Promise<void> {
+  const already = await prisma.banner.count();
+  if (already > 0) {
+    console.log(`  배너 ${already}개 (이미 있어 두었습니다)`);
+    return;
+  }
+
+  for (const [i, banner] of BANNERS.entries()) {
+    await prisma.banner.create({
+      data: { ...banner, sortOrder: i, imageUrl: '/seed/banner.png', imageAlt: '' },
+    });
+  }
+  console.log(`  배너 ${BANNERS.length}개`);
+}
+
 async function assertDerivedColumns(): Promise<void> {
   const rows = await prisma.product.findMany({
     select: {

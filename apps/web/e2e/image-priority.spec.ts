@@ -47,7 +47,11 @@ test('표시 크기를 실제 자리에 맞춘다 — 어긋나면 최적화가 
     .locator('#main img[sizes]')
     .evaluateAll((els) => els.map((e) => e.getAttribute('sizes')));
 
-  // 사진이 없는 DB 에서는 볼 것이 없다. 있으면 자리에 맞아야 한다.
-  test.skip(sizes.length === 0, '이 DB 에는 기획전 사진이 없다');
+  /*
+   * **건너뛰지 않는다.** 시드가 기획전에 사진을 안 걸어서 이 검사가 CI 에서
+   * 한 번도 돌지 않았다. 이제 앱 안의 자리표시를 걸어 두므로, 사진이 없다는
+   * 것은 시드가 되돌아갔다는 뜻이다.
+   */
+  expect(sizes.length, '시드가 기획전 사진을 걸어야 이 검사가 볼 것이 있다').toBeGreaterThan(0);
   expect(sizes, '두 칸 격자에 100vw 를 쓰면 안 된다').not.toContain('100vw');
 });

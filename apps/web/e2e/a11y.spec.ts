@@ -36,9 +36,14 @@ test('찜 버튼의 이름이 상태를 말한다 — 하트 모양은 눈에만
 test('캐러셀 화살표가 본문 위에 겹치지 않는다', async ({ page }) => {
   await page.goto('/');
 
+  /*
+   * **건너뛰지 않는다.** 예전에는 배너가 없으면 조용히 넘어갔는데, 시드가
+   * 배너를 아예 안 만들어서 이 검사가 CI 에서 **한 번도 돌지 않았다** —
+   * 매 실행의 "2 skipped" 가 그것이었다. 이제 시드가 둘을 만들므로, 없다는
+   * 것은 시드가 되돌아갔다는 뜻이다.
+   */
   const prev = page.getByRole('button', { name: /이전 배너/ });
-  const count = await prev.count();
-  test.skip(count === 0, '배너가 하나뿐이라 조작 장치가 없다');
+  await expect(prev, '시드가 배너를 둘 이상 만들어야 조작 장치가 그려진다').toBeVisible();
 
   const arrow = await prev.boundingBox();
   expect(arrow).not.toBeNull();

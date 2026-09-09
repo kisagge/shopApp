@@ -3,14 +3,20 @@ import { prisma } from './client';
 /**
  * 기획전 시드.
  *
- * **사진은 넣지 않는다.** 사진은 바깥(Unsplash)과 저장소가 있어야 하는데
- * CI 에는 둘 다 없다. 여기서 만드는 것은 구조 — 어떤 묶음이 있고 무엇이
- * 담겼는지 — 이고, 사진은 `pnpm --filter @shop/web seed:collections` 가
- * 나중에 덮는다.
+ * **진짜 사진은 넣지 않는다.** 사진은 바깥(Unsplash)과 저장소가 있어야
+ * 하는데 CI 에는 둘 다 없다. 여기서 만드는 것은 구조 — 어떤 묶음이 있고
+ * 무엇이 담겼는지 — 이고, 진짜 사진은 `pnpm --filter @shop/web
+ * seed:collections` 가 나중에 덮는다.
  *
  * 카테고리·브랜드·쿠폰과 같은 자리다. 이것이 없으면 **CI 가 기획전 화면을
  * 한 번도 지나가지 않는다.**
+ *
+ * **대신 자리표시 한 장을 건다.** 사진이 아예 없으면 화면에 <img> 가 안
+ * 그려지고, 그러면 "표시 크기가 자리에 맞는가" 같은 검사가 볼 것이 없어
+ * 조용히 건너뛴다 — 매 CI 실행의 "2 skipped" 가 그것이었다. 앱 안에
+ * 들어 있는 파일이라 바깥도 저장소도 필요 없다.
  */
+const PLACEHOLDER_IMAGE = '/seed/collection.png';
 const COLLECTIONS = [
   {
     slug: 'winter-outer',
@@ -61,6 +67,7 @@ export async function seedCollections(): Promise<void> {
         description: spec.description,
         tone: spec.tone,
         sortOrder: index,
+        // 사진은 건드리지 않는다 — 진짜 사진이 올라가 있으면 그대로 둔다
       },
       create: {
         slug: spec.slug,
@@ -70,6 +77,8 @@ export async function seedCollections(): Promise<void> {
         tone: spec.tone,
         sortOrder: index,
         isActive: true,
+        imageUrl: PLACEHOLDER_IMAGE,
+        imageAlt: '',
       },
       select: { id: true },
     });
