@@ -35,11 +35,41 @@ const facetValues = z
   .transform((values) => normalizeFacetValues(values))
   .catch([]);
 
+/**
+ * 브랜드 축.
+ *
+ * 색·사이즈와 달리 브랜드는 옵션 값이 아니라 **관계**다. 그래서 같은 다듬기를
+ * 쓰되(개수를 자르고 중복을 접는다) 값의 모양은 슬러그로 본다 — 아무 글자나
+ * 받아 IN 절에 넣을 이유가 없다.
+ */
+const brandValues = z
+  .preprocess(
+    (raw) => (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]),
+    z.array(z.string().trim().regex(/^[a-z0-9-]{1,64}$/)).max(RAW_LIMIT),
+  )
+  .transform((values) => normalizeFacetValues(values))
+  .catch([]);
+
+/**
+ * 가격 칸 하나.
+ *
+ * **빈 칸은 "안 정했다" 이지 0 이 아니다.** 예전에는 coerce 에 그대로
+ * 넘겼는데 `Number('')` 는 0 이라, 폼을 그냥 내면 `maxPrice=0` 이 되어
+ * **매대가 통째로 비었다.** 아무것도 안 고르고 적용을 눌러도 그랬다 —
+ * 색을 하나 고르고 적용을 누르는 흔한 동선이 정확히 이 자리다.
+ *
+ * `0` 을 손으로 친 것은 그대로 0 이다. 그건 사용자가 정한 값이다.
+ */
+const priceBound = z.preprocess(
+  (raw) => (raw === '' || raw === null ? undefined : raw),
+  z.coerce.number().int().min(0).max(100_000_000).optional().catch(undefined),
+);
+
 export const catalogQuerySchema = z.object({
   q: z.string().max(MAX_SEARCH_LENGTH).optional(),
   sort: z.enum(PRODUCT_SORT).catch('recommended'),
-  minPrice: z.coerce.number().int().min(0).max(100_000_000).optional().catch(undefined),
-  maxPrice: z.coerce.number().int().min(0).max(100_000_000).optional().catch(undefined),
+  minPrice: priceBound,
+  maxPrice: priceBound,
   /** 커서 페이지네이션. 마지막으로 본 상품 id */
   cursor: z.string().optional(),
   /**
@@ -51,5 +81,12 @@ export const catalogQuerySchema = z.object({
    */
   color: facetValues,
   size: facetValues,
+  /**
+   * 브랜드로 좁히기. `?brand=studio-noon&brand=moor`.
+   *
+   * 브랜드 화면(/brand/[slug])에서는 쓰지 않는다 — 거기서는 브랜드가 이미
+   * 주소로 정해져 있어서, 그 안에서 또 고르는 것은 뜻이 없다.
+   */
+  brand: brandValues,
 });
 export type CatalogQuery = z.infer<typeof catalogQuerySchema>;

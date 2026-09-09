@@ -54,6 +54,23 @@ describe('색상·사이즈 파라미터', () => {
     expect(catalogQuerySchema.parse({ size: { a: 1 } }).size).toEqual([]);
   });
 
+  it('빈 가격 칸은 안 정한 것이다 — 0 이 아니다', () => {
+    /*
+     * **여기가 무너져 있었다.** 폼의 가격 칸은 비어 있는 채로 함께 넘어간다.
+     * `Number('')` 이 0 이라 `maxPrice=0` 이 되었고, 그러면 0원 이하인
+     * 상품만 남아 **매대가 통째로 비었다.** 색 하나 고르고 적용을 누르는
+     * 흔한 동선이 정확히 이 자리다.
+     */
+    const parsed = catalogQuerySchema.parse({ minPrice: '', maxPrice: '' });
+    expect(parsed.minPrice).toBeUndefined();
+    expect(parsed.maxPrice).toBeUndefined();
+  });
+
+  it('손으로 친 0 은 0 이다', () => {
+    // 빈 칸과 다르다. 그건 사용자가 정한 값이다.
+    expect(catalogQuerySchema.parse({ maxPrice: '0' }).maxPrice).toBe(0);
+  });
+
   it('정렬·가격은 그대로 동작한다', () => {
     const parsed = catalogQuerySchema.parse({ sort: 'price_asc', minPrice: '10000' });
     expect(parsed.sort).toBe('price_asc');
