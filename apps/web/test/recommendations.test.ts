@@ -26,7 +26,7 @@ const row = (id: string, over: Record<string, unknown> = {}) => ({
   ratingSum: 0,
   reviewCount: 0,
   publishedAt: new Date('2020-01-01'),
-  brand: { name: 'BRAND' },
+  brand: { name: 'BRAND' }, category: { slug: 'outer-coat' },
   images: [],
   variants: [{ stock: 3 }],
   ...over,

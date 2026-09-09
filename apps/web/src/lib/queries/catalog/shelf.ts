@@ -36,6 +36,8 @@ export interface ProductListItem {
   readonly id: string;
   readonly slug: string;
   readonly brand: string;
+  /** 이 상품이 실제로 속한 갈래. 비교는 같은 갈래끼리만 한다. */
+  readonly categorySlug: string;
   readonly name: string;
   readonly price: Won;
   readonly listPrice: Won | undefined;
@@ -62,6 +64,7 @@ export const listSelect = {
   reviewCount: true,
   publishedAt: true,
   brand: { select: { name: true } },
+  category: { select: { slug: true } },
   images: {
     select: { url: true, alt: true, blurDataUrl: true },
     orderBy: { sortOrder: 'asc' },
@@ -90,6 +93,7 @@ type ListRow = {
    */
   publishedAt: Date | string | null;
   brand: { name: string };
+  category: { slug: string };
   images: { url: string; alt: string; blurDataUrl: string | null }[];
   variants: { stock: number }[];
 };
@@ -109,6 +113,7 @@ export function toListItem(p: ListRow, now: number): ProductListItem {
     id: p.id,
     slug: p.slug,
     brand: p.brand.name,
+    categorySlug: p.category.slug,
     name: p.name,
     price,
     listPrice: rate > 0 ? listPrice : undefined,

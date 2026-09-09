@@ -168,3 +168,26 @@ test.describe('모바일 메뉴', () => {
   });
 });
 
+
+/**
+ * 비교표는 **진짜 표**라야 한다.
+ *
+ * div 로 격자를 그리면 눈으로는 같아 보이지만, 낭독기는 칸마다 "이건 무슨
+ * 값이고 어느 상품 것인지" 를 말해 주지 못한다 — 표의 줄·열 머리가 하는
+ * 일이 그것이다. 비교는 칸을 서로 견주는 화면이라 이 구분이 특히 필요하다.
+ */
+test('비교표에 줄 머리와 열 머리가 있다', async ({ page }) => {
+  await page.goto('/compare?slugs=oversized-wool-coat,single-chesterfield-coat', MARKUP_ONLY);
+
+  await expect(page.getByRole('rowheader', { name: '판매가' })).toBeVisible();
+  await expect(page.getByRole('columnheader')).not.toHaveCount(0);
+  // 표에는 무엇을 견주는 표인지 적힌 설명이 있어야 한다
+  await expect(page.locator('table caption')).toHaveCount(1);
+});
+
+test('비교표에서 나은 값은 굵기만으로 알리지 않는다', async ({ page }) => {
+  await page.goto('/compare?slugs=oversized-wool-coat,single-chesterfield-coat', MARKUP_ONLY);
+
+  // 굵은 글씨는 눈에만 보인다. 낭독기에도 같은 말이 가야 한다.
+  await expect(page.getByText('이 줄에서 가장 나음').first()).toBeAttached();
+});

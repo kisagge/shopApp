@@ -41,7 +41,7 @@ const card = (over: Record<string, unknown> = {}) => ({
 const productRow = (id: string) => ({
   id, slug: id, name: id, listPrice: 10_000, salePrice: null,
   ratingSum: 0, reviewCount: 0, publishedAt: new Date('2026-01-01'),
-  brand: { name: 'BRAND' }, images: [], variants: [{ stock: 3 }],
+  brand: { name: 'BRAND' }, category: { slug: 'outer-coat' }, images: [], variants: [{ stock: 3 }],
 });
 
 beforeEach(() => {

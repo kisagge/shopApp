@@ -156,7 +156,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           </div>
         ) : (
           <TrackedProductList listId={`category_${category.slug}`} itemCount={products.length}>
-            <ProductGrid products={products}
+            <ProductGrid products={products} compare
             />
           </TrackedProductList>
         )}

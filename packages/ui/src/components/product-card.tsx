@@ -107,6 +107,14 @@ export interface ProductCardProps {
    * 링크 **바깥**에 그려지므로 카드 이동과 키보드 순서가 꼬이지 않는다.
    */
   readonly wishlistButton?: ReactNode;
+  /**
+   * 카드 맨 아래에 붙는 조작 장치(비교 담기 같은 것).
+   *
+   * **링크 밖에 둔다.** 카드 전체가 상품으로 가는 링크라, 그 안에 버튼을
+   * 넣으면 누를 때마다 페이지가 함께 넘어가거나 중첩된 대화형 요소가 되어
+   * 키보드 차례가 꼬인다.
+   */
+  readonly footer?: ReactNode;
   readonly className?: string;
 }
 
@@ -123,7 +131,7 @@ const TONE = {
 export function ProductCard({
   href, brand, name, price, listPrice, discountPercent,
   rating, reviewCount, soldOut = false, isNew = false,
-  image, placeholderTone = 'sand', linkComponent, wishlistButton, className,
+  image, placeholderTone = 'sand', linkComponent, wishlistButton, footer, className,
   imageComponent, imageSizes, imagePriority = false, locale = DEFAULT_LOCALE,
 }: ProductCardProps) {
   const Link = linkComponent ?? DefaultLink;
@@ -206,6 +214,7 @@ export function ProductCard({
           )}
         </div>
       </Link>
+      {footer}
     </article>
   );
 }

@@ -16,6 +16,7 @@ import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
 import { getDictionary, getLocale, getT } from '~/lib/i18n/server';
 import { LocaleProvider } from '~/lib/i18n/client';
+import { CompareTray } from '~/components/compare-tray';
 
 /**
  * 굵기는 **실제로 쓰는 것만** 부른다.
@@ -118,6 +119,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               </main>
               <SiteFooter />
             </div>
+            {/* 담아 둔 것이 없으면 아무것도 그리지 않는다 */}
+            <CompareTray />
             <AnalyticsProvider />
             {/* 실사용자 성능. 같은 파이프라인으로 나간다. */}
             <WebVitalsReporter />

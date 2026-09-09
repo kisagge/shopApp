@@ -104,7 +104,7 @@ export default async function BrandPage({ params, searchParams }: Params) {
           </div>
         ) : (
           <TrackedProductList listId={`brand_${brand.slug}`} itemCount={products.length}>
-            <ProductGrid products={products} />
+            <ProductGrid products={products} compare />
           </TrackedProductList>
         )}
 

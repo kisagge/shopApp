@@ -89,7 +89,7 @@ export default async function CollectionPage({ params }: Params) {
             itemCount={collection.items.length}
           >
             {/* 위에 큰 머리 그림이 있다. 격자까지 미리 받으면 그것과 나눠 쓴다. */}
-            <ProductGrid products={collection.items} priorityCount={0} />
+            <ProductGrid products={collection.items} priorityCount={0} compare />
           </TrackedProductList>
         )}
       </section>

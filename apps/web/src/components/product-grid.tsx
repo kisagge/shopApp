@@ -5,6 +5,7 @@ import { getLocale } from '~/lib/i18n/server';
 import type { ProductListItem } from '~/lib/queries/catalog/shelf';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { WishlistButton } from './wishlist-button';
+import { CompareToggle } from './compare-toggle';
 import { AppLink } from './app-link';
 import { AppImage } from './app-image';
 
@@ -57,6 +58,7 @@ export async function ProductGrid({
   columns = 'lg:grid-cols-4',
   imageSizes = DEFAULT_SIZES,
   priorityCount = ABOVE_FOLD,
+  compare = false,
 }: {
   products: readonly ProductListItem[];
   columns?: string;
@@ -70,6 +72,14 @@ export async function ProductGrid({
    * 미리 받기는 화면의 가장 큰 그림 하나를 위한 것이지, 목록이 아니다.
    */
   priorityCount?: number;
+  /**
+   * 카드마다 비교 담기를 붙일지.
+   *
+   * **훑어보는 목록에만 붙인다**(카테고리·검색·브랜드·기획전). 홈의
+   * 추천 줄은 고르는 자리가 아니라 보여 주는 자리라, 거기까지 체크박스를
+   * 깔면 화면이 조작 장치로 덮인다.
+   */
+  compare?: boolean;
 }) {
   const [viewer, locale] = await Promise.all([getSessionUser(await headers()), getLocale()]);
   const wishlisted = viewer
@@ -91,6 +101,9 @@ export async function ProductGrid({
              * 먼저 그릴지 알 수 없어져서 붙이지 않은 것과 같아진다.
              */
             imagePriority={i < priorityCount}
+            {...(compare
+              ? { footer: <CompareToggle slug={p.slug} categorySlug={p.categorySlug} name={p.name} /> }
+              : {})}
             brand={p.brand}
             name={p.name}
             price={p.price}

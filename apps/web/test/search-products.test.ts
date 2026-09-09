@@ -11,7 +11,7 @@ const { searchProducts } = await import('~/lib/queries/catalog/search');
 const row = (id: string, over: Record<string, unknown> = {}) => ({
   id, slug: `p-${id}`, name: '코트', listPrice: 100_000, salePrice: null,
   ratingSum: 0, reviewCount: 0, publishedAt: new Date('2026-01-01'),
-  brand: { name: 'MOOR' }, images: [], variants: [{ stock: 3 }],
+  brand: { name: 'MOOR' }, category: { slug: 'outer-coat' }, images: [], variants: [{ stock: 3 }],
   ...over,
 });
 

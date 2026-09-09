@@ -34,6 +34,9 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['결제 실패', '/checkout/fail'],
   ['탈퇴 완료', '/account/closed'],
   ['오프라인', '/offline'],
+  // 표는 줄·열 머리가 어긋나기 쉬운 자리다. 눈으로는 멀쩡해 보인다.
+  ['상품 비교', '/compare?slugs=oversized-wool-coat,single-chesterfield-coat'],
+  ['상품 비교 — 고른 것이 모자랄 때', '/compare?slugs=oversized-wool-coat'],
 ];
 
 for (const [name, path] of PAGES) {
