@@ -336,6 +336,7 @@ export const ko = {
   'my.addressesLead': '기본 배송지는 주문할 때 처음 선택됩니다.',
 
   'order.heading': '주문 내역',
+  'order.closed': '취소·반품',
   'order.empty': '주문 내역이 없습니다.',
   'order.emptyFiltered': '{status} 상태의 주문이 없습니다.',
   'order.statusFilter': '주문 상태 필터',

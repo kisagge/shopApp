@@ -323,6 +323,7 @@ export const en: Dictionary = {
   'my.addressesLead': 'Your default address is selected first at checkout.',
 
   'order.heading': 'Orders',
+  'order.closed': 'Cancelled & returned',
   'order.empty': 'You have no orders yet.',
   'order.emptyFiltered': 'No orders are {status}.',
   'order.statusFilter': 'Filter by status',

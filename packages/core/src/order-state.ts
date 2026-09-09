@@ -120,3 +120,55 @@ export function slowestFulfillmentStatus(
   }
   return slowest;
 }
+
+/**
+ * 주문 내역에서 걸러 볼 수 있는 칸.
+ *
+ * **탭이 열 상태 중 다섯만 덮고 있었다.** 구매확정·취소·반품·환불은 "전체"
+ * 에서만 보였는데, 자동 구매확정이 돌면 지난 주문 대부분이 CONFIRMED 가
+ * 된다 — 시간이 갈수록 탭이 아무것도 못 걸러 내는 쪽으로 간다.
+ *
+ * **끝난 것들은 한 칸으로 묶는다.** 취소·반품접수·반품완료·환불완료를 따로
+ * 두면 탭이 아홉이 되는데, 사는 사람 입장에서 그 넷은 "무르는 중이거나
+ * 물렀다" 하나다. 반면 배송 단계는 지금 어디쯤인지가 곧 궁금한 것이라
+ * 하나씩 둔다.
+ *
+ * 열쇠는 주소에 그대로 실린다. 상태 이름과 겹치지 않게 소문자로 둔다 —
+ * `?status=closed` 는 CLOSED 라는 상태가 아니라 묶음이라는 뜻이다.
+ */
+export const ORDER_FILTER_GROUP = {
+  closed: ['CANCELLED', 'RETURN_REQUESTED', 'RETURNED', 'REFUNDED'],
+} as const satisfies Readonly<Record<string, readonly OrderStatus[]>>;
+
+export type OrderFilterGroup = keyof typeof ORDER_FILTER_GROUP;
+
+/**
+ * 주문 내역 화면의 칸들. 왼쪽부터 이 차례로 놓인다.
+ *
+ * **여기 두는 이유는 검사 때문이다.** 목록이 화면에 있으면 "어느 상태도
+ * 갈 곳이 없어서는 안 된다" 를 아무도 확인할 수 없다 — 실제로 다섯 칸만
+ * 있는 채로 나머지 다섯 상태가 "전체" 에서만 보이고 있었다.
+ */
+export const ORDER_FILTER_TAB = [
+  'PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CONFIRMED', 'closed',
+] as const;
+
+export type OrderFilterTab = (typeof ORDER_FILTER_TAB)[number];
+
+export function isOrderFilterGroup(value: string): value is OrderFilterGroup {
+  return Object.hasOwn(ORDER_FILTER_GROUP, value);
+}
+
+/**
+ * 주소에서 온 값을 실제로 걸 상태 목록으로 편다.
+ *
+ * 하나짜리 상태도 목록으로 돌려준다 — 부르는 쪽이 "하나인가 묶음인가" 를
+ * 다시 나누지 않게 하려는 것이다. 모르는 값은 거르지 않는 것과 같다.
+ */
+export function orderFilterStatuses(value: string | undefined): readonly OrderStatus[] | null {
+  if (value === undefined) return null;
+  if (isOrderFilterGroup(value)) return ORDER_FILTER_GROUP[value];
+  // 상태 판정은 화면 쪽에 흩어져 있었다. 이 함수를 쓰는 곳이 늘면서
+  // 여기로 모은다 — 목록이 core 에 있으니 판정도 여기가 맞다.
+  return (ORDER_STATUS as readonly string[]).includes(value) ? [value as OrderStatus] : null;
+}

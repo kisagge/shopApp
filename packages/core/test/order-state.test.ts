@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  orderFilterStatuses, ORDER_FILTER_GROUP, ORDER_FILTER_TAB,
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
 } from '../src/order-state';
@@ -101,5 +102,48 @@ describe('환불로 들어오는 길', () => {
     // 적립이 이미 나간 뒤라, 갈 수 있게 하려면 회수 경로가 먼저 필요하다
     expect(canTransition('CONFIRMED', 'REFUNDED')).toBe(false);
     expect(isTerminal('CONFIRMED')).toBe(true);
+  });
+});
+
+describe('주문 내역에서 걸러 볼 칸', () => {
+  it('모든 상태가 어느 탭으로든 닿는다', () => {
+    /*
+     * **여기가 비어 있었다.** 탭이 열 상태 중 다섯만 덮고 있어서 구매확정·
+     * 취소·반품·환불은 "전체" 에서만 보였다. 자동 구매확정이 돌면 지난 주문
+     * 대부분이 CONFIRMED 가 되므로, 시간이 갈수록 탭이 아무것도 못 걸러 낸다.
+     *
+     * 화면이 무엇을 그리든, **어느 상태도 갈 곳이 없어서는 안 된다.**
+     */
+    const covered = new Set<string>();
+    for (const tab of ORDER_FILTER_TAB) {
+      for (const status of orderFilterStatuses(tab) ?? []) covered.add(status);
+    }
+
+    expect(
+      ORDER_STATUS.filter((s) => !covered.has(s)),
+      '이 상태들은 어느 탭에도 없어 "전체" 에서만 보인다',
+    ).toEqual([]);
+  });
+
+  it('묶음이 서로 겹치지 않는다', () => {
+    // 겹치면 같은 주문이 두 칸에 나오고, 사용자는 왜인지 알 수 없다
+    const seen = new Set<string>();
+    for (const statuses of Object.values(ORDER_FILTER_GROUP)) {
+      for (const s of statuses) {
+        expect(seen.has(s), `${s} 가 두 묶음에 있다`).toBe(false);
+        seen.add(s);
+      }
+    }
+  });
+
+  it('모르는 값은 거르지 않는 것과 같다', () => {
+    // 주소는 사용자가 고칠 수 있다. 오류 화면을 띄울 일이 아니다.
+    expect(orderFilterStatuses('엉뚱한값')).toBeNull();
+    expect(orderFilterStatuses(undefined)).toBeNull();
+  });
+
+  it('하나짜리 상태도 목록으로 돌려준다', () => {
+    // 부르는 쪽이 "하나인가 묶음인가" 를 다시 나누지 않게 한다
+    expect(orderFilterStatuses('SHIPPED')).toEqual(['SHIPPED']);
   });
 });

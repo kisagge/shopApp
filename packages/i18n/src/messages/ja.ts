@@ -319,6 +319,7 @@ export const ja: Dictionary = {
   'my.addressesLead': '既定のお届け先が注文時に最初に選ばれます。',
 
   'order.heading': '注文履歴',
+  'order.closed': 'キャンセル・返品',
   'order.empty': '注文履歴がありません。',
   'order.emptyFiltered': '{status} の注文がありません。',
   'order.statusFilter': '注文状態フィルター',

@@ -91,11 +91,16 @@ export interface MyOrderSummary {
 /** 주문 내역. status 를 주면 그 상태만 거른다. */
 export async function getMyOrders(
   userId: string,
-  status?: OrderStatus,
+  /**
+   * 걸러 볼 상태들. **하나도 묶음도 같은 모양으로 받는다** — 부르는 쪽이
+   * "취소·반품" 처럼 여럿을 묶은 칸을 다시 나누지 않게 하려는 것이다.
+   * 목록을 무엇으로 펴는지는 core 의 orderFilterStatuses 가 정한다.
+   */
+  statuses?: readonly OrderStatus[] | null,
   take = 20,
 ): Promise<MyOrderSummary[]> {
   const orders = await prisma.order.findMany({
-    where: { userId, ...(status ? { status } : {}) },
+    where: { userId, ...(statuses && statuses.length > 0 ? { status: { in: [...statuses] } } : {}) },
     orderBy: { placedAt: 'desc' },
     take,
     select: {

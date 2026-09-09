@@ -3,10 +3,12 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import type { OrderStatus } from '@shop/core';
+import {
+  orderFilterStatuses, isOrderFilterGroup, ORDER_FILTER_TAB, type OrderStatus,
+} from '@shop/core';
 import { formatMoney } from '@shop/i18n';
 import { getSessionUser } from '@shop/auth/session';
-import { getMyOrders, isOrderStatus, TRACKED_STATUSES } from '~/lib/queries/mypage';
+import { getMyOrders } from '~/lib/queries/mypage';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
 import { ORDER_STATUS_KEY } from '~/lib/i18n/enum-labels';
@@ -33,12 +35,18 @@ export default async function MyOrdersPage({
   if (!session) redirect('/login?next=/mypage/orders');
 
   const { status } = await searchParams;
-  // 알 수 없는 값이 오면 필터를 무시한다. 던지면 URL 을 만져 본 사용자에게
-  // 에러 화면이 뜨는데, 그건 과한 반응이다.
-  const filter = status && isOrderStatus(status) ? status : undefined;
+  /*
+   * 알 수 없는 값이 오면 필터를 무시한다. 던지면 URL 을 만져 본 사용자에게
+   * 에러 화면이 뜨는데, 그건 과한 반응이다.
+   *
+   * 상태 하나일 수도 있고 "취소·반품" 처럼 묶음일 수도 있다. 어느 쪽인지
+   * 펴는 일은 core 가 한다 — 화면이 그 목록을 들고 있으면 조회와 갈라진다.
+   */
+  const statuses = orderFilterStatuses(status);
+  const filter = statuses === null ? undefined : status;
 
   const [orders, locale, t] = await Promise.all([
-    getMyOrders(session.id, filter),
+    getMyOrders(session.id, statuses),
     getLocale(),
     getT(),
   ]);
@@ -69,7 +77,7 @@ export default async function MyOrdersPage({
               {t('order.all')}
             </Link>
           </li>
-          {TRACKED_STATUSES.map((s) => (
+          {ORDER_FILTER_TAB.map((s) => (
             <li key={s} className="shrink-0">
               <Link
                 href={`/mypage/orders?status=${s}`}
@@ -80,7 +88,7 @@ export default async function MyOrdersPage({
                     : 'text-[var(--fg-muted)]'
                 }`}
               >
-                {t(ORDER_STATUS_KEY[s])}
+                {isOrderFilterGroup(s) ? t('order.closed') : t(ORDER_STATUS_KEY[s])}
               </Link>
             </li>
           ))}
@@ -89,7 +97,11 @@ export default async function MyOrdersPage({
 
       {orders.length === 0 ? (
         <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-          {filter ? t('order.emptyFiltered', { status: t(ORDER_STATUS_KEY[filter]) }) : t('order.empty')}
+          {filter === undefined
+            ? t('order.empty')
+            : t('order.emptyFiltered', {
+                status: isOrderFilterGroup(filter) ? t('order.closed') : t(ORDER_STATUS_KEY[filter as OrderStatus]),
+              })}
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
