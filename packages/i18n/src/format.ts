@@ -39,6 +39,28 @@ export function formatMoney(locale: Locale, won: number): string {
 }
 
 /**
+ * 칩에 들어갈 짧은 금액.
+ *
+ * **가격 구간 칩에는 자리가 없다.** `100,000원~200,000원` 은 한 칩으로
+ * 두 줄이 되고, 넷을 늘어놓으면 좁혀 보기가 다시 벽이 된다. 사람도 그
+ * 자리에서는 `10만원` 이라고 말한다.
+ *
+ * 한국어 `10만원` · 일본어 `10万` · 영어 `₩100K`. 정확한 금액이 필요한
+ * 자리(가격표·주문서)에는 쓰지 않는다 — 거기서는 formatMoney 다.
+ */
+export function formatMoneyCompact(locale: Locale, won: number): string {
+  if (locale === 'ko') {
+    return `${numberFormat('compact', 'ko', { notation: 'compact', maximumFractionDigits: 0 }).format(won)}원`;
+  }
+  return numberFormat('compactCur', locale, {
+    style: 'currency',
+    currency: 'KRW',
+    notation: 'compact',
+    maximumFractionDigits: 0,
+  }).format(won);
+}
+
+/**
  * 금액을 기호·숫자·단위로 쪼갠다.
  *
  * 화면에서 **단위만 작게** 그리기 때문이다 — `413,000원` 의 '원' 은 숫자보다

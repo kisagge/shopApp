@@ -172,3 +172,65 @@ export function searchTextFor(input: { name: string; brandName: string }): strin
 export function sellingPriceOf(input: { listPrice: number; salePrice: number | null }): number {
   return input.salePrice ?? input.listPrice;
 }
+
+/**
+ * 가격 구간 프리셋.
+ *
+ * **숫자 두 칸만 두면 흔한 일이 가장 번거롭다.** "10만원 아래로 보고 싶다"
+ * 는 이 화면에서 가장 자주 하는 일인데, 그러려면 칸을 찾아 눌러 숫자를
+ * 치고 적용까지 세 걸음이었다. 한 번 누르면 끝나야 하는 종류다.
+ *
+ * **사다리를 매대에 맞춰 흔들지 않는다.** 카테고리마다 구간이 달라지면
+ * 같은 자리에 다른 값이 오고, 어제 누른 것을 오늘 못 찾는다. 지금 매대가
+ * 29,000 ~ 419,000 이라 이 다섯이면 어느 칸도 비지 않는다.
+ *
+ * id 는 주소에 그대로 실린다. 값이 아니라 이름이라 나중에 경계를 조정해도
+ * 예전 링크가 깨지지 않는다.
+ */
+export const PRICE_BUCKET = [
+  { id: 'under-100k', min: null, max: 99_999 },
+  { id: '100k-200k', min: 100_000, max: 199_999 },
+  { id: '200k-300k', min: 200_000, max: 299_999 },
+  { id: 'over-300k', min: 300_000, max: null },
+] as const;
+
+export type PriceBucketId = (typeof PRICE_BUCKET)[number]['id'];
+
+export const PRICE_BUCKET_IDS = PRICE_BUCKET.map((b) => b.id) as readonly PriceBucketId[];
+
+export function isPriceBucketId(value: string): value is PriceBucketId {
+  return PRICE_BUCKET_IDS.includes(value as PriceBucketId);
+}
+
+/** 구간 이름을 실제 범위로 편다. 모르는 이름은 범위가 없는 것과 같다. */
+export function priceBucketRange(
+  id: string,
+): { id: PriceBucketId; min: number | null; max: number | null } | null {
+  return PRICE_BUCKET.find((b) => b.id === id) ?? null;
+}
+
+/**
+ * 화면이 받은 세 값에서 실제로 걸 범위를 정한다.
+ *
+ * **어느 쪽이 이기는지 한 곳에서만 정한다.** 질의와 화면이 각자 판단하면
+ * 언젠가 갈라진다 — 목록은 좁혀졌는데 눌린 칩은 다른 것을 가리키는 식이다.
+ *
+ * 손으로 친 숫자가 이긴다. 빈 칸은 "안 정했다" 로 들어오므로, 숫자가 있다는
+ * 것은 사람이 그 값을 직접 넣었다는 뜻이다. 그때는 프리셋 칩도 눌리지 않은
+ * 것으로 그린다 — 눌린 칩과 다른 범위가 걸려 있으면 화면이 거짓말을 한다.
+ */
+export function resolvePriceRange(input: {
+  minPrice?: number | undefined;
+  maxPrice?: number | undefined;
+  price?: string | undefined;
+}): { min: number | null; max: number | null; bucket: string | null } {
+  const typed = input.minPrice !== undefined || input.maxPrice !== undefined;
+  if (typed) {
+    return { min: input.minPrice ?? null, max: input.maxPrice ?? null, bucket: null };
+  }
+
+  const bucket = input.price === undefined ? null : priceBucketRange(input.price);
+  if (bucket === null) return { min: null, max: null, bucket: null };
+
+  return { min: bucket.min, max: bucket.max, bucket: bucket.id };
+}

@@ -13,6 +13,7 @@ export {
 export { formatMessage, type Message, type Vars } from './message';
 export {
   formatMoney,
+  formatMoneyCompact,
   moneyParts,
   formatNumber,
   formatPercent,

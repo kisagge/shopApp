@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
-import { emptyResultReason } from '@shop/core';
+import { resolvePriceRange, emptyResultReason } from '@shop/core';
 import { categoryName } from '@shop/i18n';
 import { getCategoryWithChildren } from '~/lib/queries/catalog/products';
 import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
@@ -36,14 +36,16 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   const { slug } = await params;
   const raw = await searchParams;
   const query = catalogQuerySchema.parse(raw);
+  // 손으로 친 숫자와 구간 프리셋 중 어느 쪽이 이기는지는 core 가 정한다
+  const price = resolvePriceRange(query);
 
   const [category, page, facets, brands] = await Promise.all([
     getCategoryWithChildren(slug),
     searchProducts({
       categorySlug: slug,
       sort: query.sort,
-      minPrice: query.minPrice,
-      maxPrice: query.maxPrice,
+      minPrice: price.min ?? undefined,
+      maxPrice: price.max ?? undefined,
       color: query.color,
       size: query.size,
       brands: query.brand,
@@ -126,6 +128,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           sort={query.sort}
           minPrice={query.minPrice}
           maxPrice={query.maxPrice}
+          priceBucket={price.bucket}
           total={page.total}
           facets={facets}
           selected={{ color: query.color, size: query.size }}
@@ -143,7 +146,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
                 EMPTY_RESULT_KEY[
                   emptyResultReason({
                     hasQuery: false,
-                    hasPriceRange: query.minPrice !== undefined || query.maxPrice !== undefined,
+                    hasPriceRange: price.min !== null || price.max !== null,
                     hasCategory: true,
                   })
                 ],

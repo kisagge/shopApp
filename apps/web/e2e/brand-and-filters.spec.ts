@@ -285,3 +285,65 @@ test('가격을 비워 둔 채 적용해도 매대가 남는다', async ({ page 
   await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
   expect(await page.locator('#main a[href^="/product/"]').count()).toBe(before);
 });
+
+test('가격 구간을 한 번 눌러 좁힌다', async ({ page }) => {
+  /*
+   * 숫자 두 칸만 두면 "10만원 아래로 보고 싶다" 는 흔한 일이 칸 찾기·
+   * 타이핑·적용 세 걸음이었다. 한 번 누르면 끝나야 하는 종류다.
+   */
+  await page.goto('/category/outer');
+  const all = await page.locator('#main a[href^="/product/"]').count();
+
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+  /*
+   * 라디오는 sr-only 라 라벨이 클릭을 받는다 — 눈에 보이는 것도 칩이고
+   * 사람이 누르는 것도 칩이다. 색·사이즈 칩과 같은 방식이다.
+   */
+  await page.locator('label:has(input[name="price"][value="under-100k"])').click();
+  await page.getByRole('button', { name: '적용' }).click();
+
+  await expect(page).toHaveURL(/price=under-100k/);
+  const left = await page.locator('#main a[href^="/product/"]').count();
+  expect(left).toBeGreaterThan(0);
+  expect(left).toBeLessThan(all);
+
+  // 눌린 칩이 남아 있어야 지금 무엇으로 좁혔는지 알 수 있다
+  await expect(page.getByRole('radio', { name: '10만원 이하' })).toBeChecked();
+  // 구간에서 편 경계를 칸에 채우지 않는다 — 채우면 다음 적용에서 그 값이 이긴다
+  await expect(page.getByLabel('최소 가격')).toHaveValue('');
+  await expect(page.getByLabel('최대 가격')).toHaveValue('');
+});
+
+test('구간을 다 더하면 매대 전체가 된다', async ({ page }) => {
+  /*
+   * 칸 사이가 벌어지면 그 값의 상품은 어느 칩으로도 못 찾고, 겹치면 같은
+   * 상품이 두 칩에 나온다. **core 의 단위 검사는 경계 숫자만 본다** —
+   * 여기서는 진짜 매대를 네 번 세어 합이 맞는지 본다.
+   */
+  const count = async (query: string) => {
+    await page.goto(`/category/outer${query}`);
+    return page.locator('#main a[href^="/product/"]').count();
+  };
+
+  const all = await count('');
+  const parts = [];
+  for (const id of ['under-100k', '100k-200k', '200k-300k', 'over-300k']) {
+    parts.push(await count(`?price=${id}`));
+  }
+
+  expect(parts.reduce((a, b) => a + b, 0)).toBe(all);
+});
+
+test('손으로 친 숫자가 구간을 이긴다', async ({ page }) => {
+  // 눌린 칩과 다른 범위가 걸려 있으면 화면이 거짓말을 한다
+  await page.goto('/category/outer?price=under-100k&minPrice=300000');
+
+  /*
+   * 여기서 summary 를 누르면 안 된다. 조건이 걸려 있으면 좁혀 보기는 이미
+   * 펼쳐진 채로 오므로, 누르는 것은 **접는 것**이 된다 — 그러면 칩이 사라져
+   * "못 찾았다" 로 진다. 실제로 그렇게 한 번 졌다.
+   */
+  await expect(page.getByRole('radio', { name: '10만원 이하' })).not.toBeChecked();
+  await expect(page.getByRole('radio', { name: '전체' })).toBeChecked();
+  await expect(page.getByLabel('최소 가격')).toHaveValue('300000');
+});

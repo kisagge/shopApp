@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { catalogQuerySchema } from '@shop/contract';
-import { emptyResultReason, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
+import { resolvePriceRange, emptyResultReason, normalizeSearchTerm, MIN_SEARCH_LENGTH } from '@shop/core';
 import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
 import { getPopularSearches } from '~/lib/queries/catalog/suggest';
 import { ProductGrid } from '~/components/product-grid';
@@ -33,6 +33,8 @@ export async function generateMetadata({
 export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {
   const raw = await searchParams;
   const parsed = catalogQuerySchema.parse(raw);
+  // 손으로 친 숫자와 구간 프리셋 중 어느 쪽이 이기는지는 core 가 정한다
+  const price = resolvePriceRange(parsed);
   const term = parsed.q ? normalizeSearchTerm(parsed.q) : null;
 
   // 검색어가 있으면 인기 검색어를 묻지 않는다 — 보여 줄 자리가 없다
@@ -44,8 +46,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
     ? await searchProducts({
         q: term,
         sort: parsed.sort,
-        minPrice: parsed.minPrice,
-        maxPrice: parsed.maxPrice,
+        minPrice: price.min ?? undefined,
+        maxPrice: price.max ?? undefined,
         color: parsed.color,
         size: parsed.size,
         brands: parsed.brand,
@@ -106,6 +108,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             sort={parsed.sort}
             minPrice={parsed.minPrice}
             maxPrice={parsed.maxPrice}
+            priceBucket={price.bucket}
             query={term}
             total={page?.total ?? null}
             {...(facets ? { facets } : {})}
@@ -122,8 +125,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
                   EMPTY_RESULT_KEY[
                     emptyResultReason({
                       hasQuery: true,
-                      hasPriceRange:
-                        parsed.minPrice !== undefined || parsed.maxPrice !== undefined,
+                      hasPriceRange: price.min !== null || price.max !== null,
                       hasCategory: false,
                     })
                   ],

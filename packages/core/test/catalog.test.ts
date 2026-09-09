@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeSearchTerm, normalizePriceRange, emptyResultReason,
   isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH, sellingPriceOf,
+  PRICE_BUCKET, resolvePriceRange,
 } from '../src/catalog';
 
 describe('검색어 정규화', () => {
@@ -150,5 +151,47 @@ describe('파는 가격', () => {
   it('무료 상품이라도 0 을 정가로 되돌리지 않는다', () => {
     // ?? 가 아니라 || 를 쓰면 0원이 정가로 뒤집힌다.
     expect(sellingPriceOf({ listPrice: 10_000, salePrice: 0 })).toBe(0);
+  });
+});
+
+describe('가격 구간 프리셋', () => {
+  it('구간이 매대를 빠짐없이 덮는다', () => {
+    /*
+     * 칸 사이가 벌어지면 그 값의 상품은 어느 칩으로도 못 찾는다.
+     * 겹치면 같은 상품이 두 칩에 나온다. 둘 다 사용자는 이유를 모른다.
+     */
+    for (const [i, bucket] of PRICE_BUCKET.entries()) {
+      const next = PRICE_BUCKET[i + 1];
+      if (next === undefined) {
+        expect(bucket.max, '마지막 칸은 위가 열려 있어야 한다').toBeNull();
+        continue;
+      }
+      expect(bucket.max, `${bucket.id} 는 끝이 있어야 한다`).not.toBeNull();
+      expect(next.min).toBe(bucket.max! + 1);
+    }
+    expect(PRICE_BUCKET[0]?.min, '첫 칸은 아래가 열려 있어야 한다').toBeNull();
+  });
+
+  it('손으로 친 숫자가 프리셋을 이긴다', () => {
+    // 눌린 칩과 다른 범위가 걸려 있으면 화면이 거짓말을 한다
+    const r = resolvePriceRange({ minPrice: 50_000, price: 'over-300k' });
+    expect(r).toEqual({ min: 50_000, max: null, bucket: null });
+  });
+
+  it('프리셋만 있으면 그 범위를 편다', () => {
+    expect(resolvePriceRange({ price: '100k-200k' })).toEqual({
+      min: 100_000,
+      max: 199_999,
+      bucket: '100k-200k',
+    });
+  });
+
+  it('모르는 이름은 없는 것과 같다', () => {
+    // 주소는 사용자가 고칠 수 있다. 오류 화면을 띄울 일이 아니다.
+    expect(resolvePriceRange({ price: '공짜' })).toEqual({ min: null, max: null, bucket: null });
+  });
+
+  it('아무것도 없으면 범위도 없다', () => {
+    expect(resolvePriceRange({})).toEqual({ min: null, max: null, bucket: null });
   });
 });

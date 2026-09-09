@@ -1,9 +1,10 @@
 import {
-  PRODUCT_SORT, FACET_KEYS, hasFacets, EMPTY_FACETS,
+  PRODUCT_SORT, FACET_KEYS, hasFacets, EMPTY_FACETS, PRICE_BUCKET,
   type ProductSort, type Facets, type FacetKey,
 } from '@shop/core';
+import { formatMoneyCompact } from '@shop/i18n';
 import type { MessageKey } from '@shop/i18n';
-import { getT } from '~/lib/i18n/server';
+import { getT, getLocale } from '~/lib/i18n/server';
 import type { BrandOption } from '~/lib/queries/catalog/search';
 
 /**
@@ -44,6 +45,7 @@ export async function CatalogControls({
   selected = { color: [], size: [] },
   brands = [],
   selectedBrands = [],
+  priceBucket = null,
 }: {
   /** 폼이 되돌아갈 경로 */
   action: string;
@@ -64,11 +66,21 @@ export async function CatalogControls({
    */
   brands?: readonly BrandOption[];
   selectedBrands?: readonly string[];
+  /**
+   * 눌린 가격 구간. 손으로 숫자를 친 경우에는 null 이다 —
+   * 어느 쪽이 이기는지는 core 의 resolvePriceRange 가 정한다.
+   *
+   * **minPrice·maxPrice 에는 사람이 친 값이 온다.** 구간에서 편 경계를
+   * 되돌려 주면 안 된다 — 199,999 같은 속값이 칸에 채워지고, 다음에 적용을
+   * 누르면 그 값이 구간을 이겨 화면이 제 꼬리를 문다.
+   */
+  priceBucket?: string | null;
 }) {
-  const t = await getT();
+  const [t, locale] = await Promise.all([getT(), getLocale()]);
   const activeCount =
     (minPrice !== undefined ? 1 : 0) +
     (maxPrice !== undefined ? 1 : 0) +
+    (priceBucket === null ? 0 : 1) +
     selectedBrands.length +
     FACET_KEYS.reduce((n, key) => n + selected[key].length, 0);
   const filtered = activeCount > 0;
@@ -180,7 +192,61 @@ export async function CatalogControls({
           )}
 
           <fieldset className="flex flex-wrap items-end gap-2 border-0 p-0">
-            <legend className="sr-only">{t('catalog.priceRange')}</legend>
+            <legend className="float-left mr-3 text-[11px] text-[var(--fg-muted)]">
+              {t('catalog.priceRange')}
+            </legend>
+
+            {/*
+              **자주 하는 일을 한 번으로.** 숫자 두 칸만 두면 "10만원 아래로
+              보고 싶다" 는 흔한 일이 칸 찾기·타이핑·적용 세 걸음이었다.
+
+              라디오라 하나만 고를 수 있다. 구간이 서로 겹치지 않으므로
+              여럿을 고르는 것이 뜻이 없고, 겹치지 않는다는 것은 core 의
+              검사가 지킨다.
+            */}
+            <div className="flex w-full flex-wrap items-center gap-2">
+              <label className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
+                <input
+                  type="radio"
+                  name="price"
+                  value=""
+                  defaultChecked={priceBucket === null}
+                  className="sr-only"
+                />
+                {t('catalog.priceAny')}
+              </label>
+              {PRICE_BUCKET.map((bucket, i) => {
+                /*
+                 * 칸의 끝은 99,999 처럼 하나 모자란 값이다. 그 숫자를 그대로
+                 * 보여 주면 읽는 사람이 셈을 하게 되므로, 이웃 칸이 시작하는
+                 * 둥근 값으로 말한다 — `10만원 이하`.
+                 */
+                const edge = PRICE_BUCKET[i + 1]?.min ?? null;
+                const money = (won: number) => formatMoneyCompact(locale, won);
+                const label =
+                  bucket.min === null
+                    ? t('catalog.priceUnder', { max: money(edge!) })
+                    : edge === null
+                      ? t('catalog.priceOver', { min: money(bucket.min) })
+                      : t('catalog.priceBetween', { min: money(bucket.min), max: money(edge) });
+
+                return (
+                  <label
+                    key={bucket.id}
+                    className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                  >
+                    <input
+                      type="radio"
+                      name="price"
+                      value={bucket.id}
+                      defaultChecked={priceBucket === bucket.id}
+                      className="sr-only"
+                    />
+                    {label}
+                  </label>
+                );
+              })}
+            </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="minPrice" className="text-[11px] text-[var(--fg-muted)]">
                 {t('catalog.minPrice')}

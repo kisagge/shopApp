@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  PRODUCT_SORT, MAX_SEARCH_LENGTH, normalizeFacetValues,
+  PRODUCT_SORT, MAX_SEARCH_LENGTH, normalizeFacetValues, isPriceBucketId,
 } from '@shop/core';
 
 /**
@@ -70,6 +70,21 @@ export const catalogQuerySchema = z.object({
   sort: z.enum(PRODUCT_SORT).catch('recommended'),
   minPrice: priceBound,
   maxPrice: priceBound,
+  /**
+   * 가격 구간 프리셋. `?price=100k-200k`.
+   *
+   * **손으로 친 숫자가 이긴다.** 둘 다 오면 minPrice/maxPrice 를 따른다 —
+   * 빈 칸은 이제 "안 정했다" 로 들어오므로, 숫자가 있다는 것은 사람이
+   * 그 값을 직접 넣었다는 뜻이다. 어느 쪽이 이기는지는 화면이 아니라
+   * 여기서 한 번 정한다.
+   *
+   * 모르는 이름은 없는 것과 같다 — 주소는 사용자가 고칠 수 있다.
+   */
+  price: z
+    .string()
+    .refine(isPriceBucketId)
+    .optional()
+    .catch(undefined),
   /** 커서 페이지네이션. 마지막으로 본 상품 id */
   cursor: z.string().optional(),
   /**

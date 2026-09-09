@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
-import { emptyResultReason } from '@shop/core';
+import { resolvePriceRange, emptyResultReason } from '@shop/core';
 import { getBrandBySlug } from '~/lib/queries/catalog/brands';
 import { searchProducts, getFacets } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
@@ -36,6 +36,8 @@ export default async function BrandPage({ params, searchParams }: Params) {
   const { slug } = await params;
   const raw = await searchParams;
   const query = catalogQuerySchema.parse(raw);
+  // 손으로 친 숫자와 구간 프리셋 중 어느 쪽이 이기는지는 core 가 정한다
+  const price = resolvePriceRange(query);
 
   const [brand, t] = await Promise.all([getBrandBySlug(slug), getT()]);
   // 정지된 가맹점의 브랜드는 조회가 주지 않는다 — 목록에서만 빼면 뒷문이 된다
@@ -45,8 +47,8 @@ export default async function BrandPage({ params, searchParams }: Params) {
     searchProducts({
       brandSlug: slug,
       sort: query.sort,
-      minPrice: query.minPrice,
-      maxPrice: query.maxPrice,
+      minPrice: price.min ?? undefined,
+      maxPrice: price.max ?? undefined,
       color: query.color,
       size: query.size,
       cursor: query.cursor,
@@ -77,6 +79,7 @@ export default async function BrandPage({ params, searchParams }: Params) {
           sort={query.sort}
           minPrice={query.minPrice}
           maxPrice={query.maxPrice}
+          priceBucket={price.bucket}
           total={page.total}
           facets={facets}
           selected={{ color: query.color, size: query.size }}
@@ -92,7 +95,7 @@ export default async function BrandPage({ params, searchParams }: Params) {
                 EMPTY_RESULT_KEY[
                   emptyResultReason({
                     hasQuery: false,
-                    hasPriceRange: query.minPrice !== undefined || query.maxPrice !== undefined,
+                    hasPriceRange: price.min !== null || price.max !== null,
                     hasCategory: true,
                   })
                 ],
