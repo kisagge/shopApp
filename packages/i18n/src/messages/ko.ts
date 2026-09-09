@@ -88,6 +88,7 @@ export const ko = {
   'catalog.noLimit': '제한 없음',
   'catalog.resetPrice': '가격 초기화',
   'catalog.filters': '상품 좁혀 보기',
+  'catalog.brand': '브랜드',
   'catalog.color': '색상',
   'catalog.size': '사이즈',
   'catalog.resetFilters': '조건 초기화',

@@ -14,6 +14,8 @@ export interface CatalogFilter {
   readonly q?: string | undefined;
   readonly categorySlug?: string | undefined;
   readonly brandSlug?: string | undefined;
+  /** 브랜드 화면이 아닌 곳에서 브랜드로 좁힐 때. brandSlug 와 함께 쓰지 않는다. */
+  readonly brands?: readonly string[] | undefined;
   readonly color?: readonly string[] | undefined;
   readonly size?: readonly string[] | undefined;
   readonly sort?: ProductSort | undefined;
@@ -95,6 +97,7 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
   const { rows, total } = await (term === null ? cachedCatalogPage : catalogPage)({
     categoryIds,
     brandSlug: filter.brandSlug ?? null,
+    brands: [...(filter.brands ?? [])],
     color: [...(filter.color ?? [])],
     size: [...(filter.size ?? [])],
     min: range.min, max: range.max, term,
@@ -116,6 +119,7 @@ export async function searchProducts(filter: CatalogFilter): Promise<CatalogPage
 interface CatalogQuery {
   readonly categoryIds: string[] | null;
   readonly brandSlug: string | null;
+  readonly brands: string[];
   readonly color: string[];
   readonly size: string[];
   readonly min: number | null;
@@ -142,7 +146,14 @@ async function catalogPage(q: CatalogQuery) {
   };
 
   if (q.categoryIds) where.categoryId = { in: q.categoryIds };
+  /*
+   * 브랜드는 두 가지 방식으로 온다. 브랜드 화면은 주소로 하나를 고정하고,
+   * 다른 화면은 좁혀 보기로 여럿을 고른다. **둘을 겹쳐 쓰지 않는다** —
+   * 브랜드 화면 안에서 또 브랜드를 고르는 것은 뜻이 없고, 겹치면 어느
+   * 쪽이 이기는지 화면마다 달라진다.
+   */
   if (q.brandSlug) where.brand = { ...sellableBrand(), slug: q.brandSlug };
+  else if (q.brands.length > 0) where.brand = { ...sellableBrand(), slug: { in: q.brands } };
 
   /*
    * **색상과 사이즈는 같은 변형에서 만나야 한다.**
@@ -254,6 +265,56 @@ const facetRows = cachedRead(
   },
   { key: ['facets'], tags: [TAG.catalog], revalidate: TTL.catalog },
 );
+
+export interface BrandOption {
+  readonly slug: string;
+  readonly name: string;
+}
+
+/**
+ * 이 매대에 실제로 물건이 있는 브랜드.
+ *
+ * **고를 수 있는 것만 보여 준다** — 색·사이즈와 같은 규칙이다. 카테고리에
+ * 없는 브랜드를 띄우면 누른 사람은 빈 화면을 만나고, 그것이 이 기능에서
+ * 가장 나쁜 상태다.
+ *
+ * 브랜드가 아니라 **상품** 쪽에서 센다. 브랜드 테이블을 훑고 상품 유무를
+ * 따로 묻는 것보다, 지금 보이는 상품들의 브랜드를 접는 편이 조건이 하나로
+ * 유지된다.
+ */
+const brandRows = cachedRead(
+  async (categoryIds: string[] | null, term: string | null) => {
+    const where: Prisma.ProductWhereInput = { ...onDisplay(), brand: sellableBrand() };
+    if (categoryIds) where.categoryId = { in: categoryIds };
+    if (term) where.searchText = { contains: term.toLowerCase() };
+
+    const rows = await prisma.product.findMany({
+      where,
+      select: { brand: { select: { slug: true, name: true } } },
+      distinct: ['brandId'],
+      orderBy: { brand: { name: 'asc' } },
+    });
+    return rows.map((r) => r.brand);
+  },
+  { key: ['brand-facets'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
+export async function getBrandOptions(filter: {
+  categorySlug?: string | undefined;
+  q?: string | undefined;
+}): Promise<BrandOption[]> {
+  const categoryIds = filter.categorySlug ? await categoryIdsFor(filter.categorySlug) : null;
+  if (filter.categorySlug && (categoryIds === null || categoryIds.length === 0)) return [];
+
+  const term = filter.q ? normalizeSearchTerm(filter.q) : null;
+  const brands = await brandRows(categoryIds, term);
+
+  /*
+   * 하나뿐이면 축으로 두지 않는다. 고를 것이 하나인 좁혀 보기는 누르나 마나
+   * 같은 목록이라, 자리만 차지하고 고르는 일을 늘린다.
+   */
+  return brands.length > 1 ? brands : [];
+}
 
 export async function getFacets(filter: {
   categorySlug?: string | undefined;

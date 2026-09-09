@@ -4,6 +4,7 @@ import {
 } from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 import { getT } from '~/lib/i18n/server';
+import type { BrandOption } from '~/lib/queries/catalog/search';
 
 /**
  * 정렬 이름은 core 가 아니라 여기서 고른다.
@@ -41,6 +42,8 @@ export async function CatalogControls({
   total,
   facets = EMPTY_FACETS,
   selected = { color: [], size: [] },
+  brands = [],
+  selectedBrands = [],
 }: {
   /** 폼이 되돌아갈 경로 */
   action: string;
@@ -53,11 +56,20 @@ export async function CatalogControls({
   /** 지금 범위에서 고를 수 있는 값. 없으면 이 자리를 그리지 않는다. */
   facets?: Facets;
   selected?: Readonly<Record<FacetKey, readonly string[]>>;
+  /**
+   * 고를 수 있는 브랜드. 비어 있으면 이 축을 그리지 않는다.
+   *
+   * **브랜드 화면에서는 주지 않는다** — 거기서는 브랜드가 이미 주소로
+   * 정해져 있어서, 그 안에서 또 고르는 것은 뜻이 없다.
+   */
+  brands?: readonly BrandOption[];
+  selectedBrands?: readonly string[];
 }) {
   const t = await getT();
   const activeCount =
     (minPrice !== undefined ? 1 : 0) +
     (maxPrice !== undefined ? 1 : 0) +
+    selectedBrands.length +
     FACET_KEYS.reduce((n, key) => n + selected[key].length, 0);
   const filtered = activeCount > 0;
 
@@ -106,6 +118,33 @@ export async function CatalogControls({
             낭독기가 그대로 읽는다 — 눈에만 보이는 버튼으로 만들면 그것을
             다시 만들어야 한다.
           */}
+          {/*
+            브랜드를 색·사이즈보다 위에 둔다. 옷을 고를 때 먼저 좁히는 것이
+            보통 만든 곳이고, 색과 사이즈는 그 안에서 고르는 값이다.
+          */}
+          {brands.length > 0 && (
+            <fieldset className="flex flex-wrap items-center gap-2 border-0 p-0">
+              <legend className="float-left mr-3 text-[11px] text-[var(--fg-muted)]">
+                {t('catalog.brand')}
+              </legend>
+              {brands.map((brand) => (
+                <label
+                  key={brand.slug}
+                  className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                >
+                  <input
+                    type="checkbox"
+                    name="brand"
+                    value={brand.slug}
+                    defaultChecked={selectedBrands.includes(brand.slug)}
+                    className="sr-only"
+                  />
+                  {brand.name}
+                </label>
+              ))}
+            </fieldset>
+          )}
+
           {hasFacets(facets) && (
             <div className="flex w-full flex-col gap-3">
               {FACET_KEYS.filter((key) => facets[key].length > 0).map((key) => (

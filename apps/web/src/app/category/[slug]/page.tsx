@@ -5,7 +5,7 @@ import { catalogQuerySchema } from '@shop/contract';
 import { emptyResultReason } from '@shop/core';
 import { categoryName } from '@shop/i18n';
 import { getCategoryWithChildren } from '~/lib/queries/catalog/products';
-import { searchProducts, getFacets } from '~/lib/queries/catalog/search';
+import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CatalogControls } from '~/components/catalog-controls';
@@ -37,7 +37,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   const raw = await searchParams;
   const query = catalogQuerySchema.parse(raw);
 
-  const [category, page, facets] = await Promise.all([
+  const [category, page, facets, brands] = await Promise.all([
     getCategoryWithChildren(slug),
     searchProducts({
       categorySlug: slug,
@@ -46,10 +46,12 @@ export default async function CategoryPage({ params, searchParams }: Params) {
       maxPrice: query.maxPrice,
       color: query.color,
       size: query.size,
+      brands: query.brand,
       cursor: query.cursor,
     }),
     // 고를 수 있는 값은 이 카테고리 안에 실제로 있는 것만
     getFacets({ categorySlug: slug }),
+    getBrandOptions({ categorySlug: slug }),
   ]);
   if (!category) notFound();
 
@@ -127,6 +129,8 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           total={page.total}
           facets={facets}
           selected={{ color: query.color, size: query.size }}
+          brands={brands}
+          selectedBrands={query.brand}
         />
       </div>
 

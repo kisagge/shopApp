@@ -193,3 +193,95 @@ test('칩을 전부 눌러도 조건이 사라지지 않는다', async ({ page }
   await expect(page.getByRole('checkbox', { name: 'M', exact: true })).toBeChecked();
   expect(await page.locator('input[name="size"]:checked').count()).toBe(count);
 });
+
+test('카테고리 안에서 브랜드로 좁힌다', async ({ page }) => {
+  /*
+   * 브랜드 화면(/brand/[slug])은 있었지만, **카테고리 안에서 브랜드를 고르는
+   * 길은 없었다.** 아우터를 보다가 한 브랜드만 보려면 브랜드 화면으로 나갔다가
+   * 거기서 다시 아우터를 찾아야 했다.
+   */
+  await page.goto('/category/outer');
+  const all = await page.locator('#main a[href^="/product/"]').count();
+  expect(all).toBeGreaterThan(1);
+
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+  const chips = page.locator('label:has(input[name="brand"])');
+  expect(await chips.count(), '아우터에는 브랜드가 둘 이상 있어야 이 명세가 성립한다')
+    .toBeGreaterThan(1);
+
+  const picked = (await chips.first().textContent())!.trim();
+  await chips.first().click();
+  await page.getByRole('button', { name: '적용' }).click();
+
+  await expect(page).toHaveURL(/brand=/);
+  const left = await page.locator('#main a[href^="/product/"]').count();
+  expect(left).toBeGreaterThan(0);
+  expect(left).toBeLessThan(all);
+
+  /*
+   * **남은 카드가 전부 그 브랜드여야 한다.** 개수만 보면 엉뚱한 이유로
+   * 줄어도 통과한다. 카드마다 첫 줄이 브랜드다.
+   */
+  const brands = await page
+    .getByRole('region', { name: '상품 목록' })
+    .locator('li[data-product-id]')
+    .evaluateAll((cards) => cards.map((c) => c.querySelector('p')?.textContent?.trim() ?? ''));
+
+  expect(brands.length).toBe(left);
+  expect(brands.every((b) => b === picked)).toBe(true);
+});
+
+test('브랜드 화면에는 브랜드 축이 없다', async ({ page }) => {
+  // 이미 주소로 정해진 것을 그 안에서 또 고르는 것은 뜻이 없다
+  await page.goto('/brand/studio-noon');
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+  await expect(page.locator('input[name="brand"]')).toHaveCount(0);
+});
+
+test('고를 수 있는 브랜드는 그 매대에 물건이 있는 것뿐이다', async ({ page }) => {
+  /*
+   * 없는 브랜드를 띄우면 누른 사람은 빈 화면을 만난다 — 색·사이즈에 걸어 둔
+   * 규칙과 같다.
+   */
+  const shown = async (path: string) => {
+    await page.goto(path);
+    await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+    return page
+      .locator('input[name="brand"]')
+      .evaluateAll((els) => els.map((e) => (e as HTMLInputElement).value));
+  };
+
+  /*
+   * **좁은 매대와 넓은 매대를 견준다.** 큰 카테고리끼리 견주면 넷 다 물건이
+   * 있어 목록이 같게 나오고, 그러면 이 검사가 아무것도 안 지킨다 — 실제로
+   * 아우터와 슈즈로 썼다가 그랬다.
+   */
+  const wide = await shown('/category/outer');
+  const narrow = await shown('/category/outer-jacket');
+
+  expect(narrow.length).toBeGreaterThan(0);
+  expect(narrow.length).toBeLessThan(wide.length);
+  // 좁은 쪽의 브랜드는 넓은 쪽에도 다 있어야 한다
+  expect(narrow.every((slug) => wide.includes(slug))).toBe(true);
+});
+
+test('가격을 비워 둔 채 적용해도 매대가 남는다', async ({ page }) => {
+  /*
+   * **여기가 통째로 무너져 있었다.** 가격 칸은 비어 있는 채로 폼과 함께
+   * 넘어가는데, 빈 문자열이 0 으로 바뀌어 `maxPrice=0` 이 됐다. 그러면
+   * 0원 이하인 상품만 남아 매대가 빈다 — 색 하나 고르고 적용을 누르는
+   * 가장 흔한 동선이 정확히 이 자리였다.
+   *
+   * 단위 검사는 계약이 빈 칸을 어떻게 읽는지 본다. 여기서는 **사람이 하는
+   * 그대로** 눌러 본다 — 폼이 무엇을 보내는지까지 함께 걸리는 자리다.
+   */
+  await page.goto('/category/outer');
+  const before = await page.locator('#main a[href^="/product/"]').count();
+  expect(before).toBeGreaterThan(1);
+
+  await page.locator('summary', { hasText: '상품 좁혀 보기' }).click();
+  await page.getByRole('button', { name: '적용' }).click();
+
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+  expect(await page.locator('#main a[href^="/product/"]').count()).toBe(before);
+});

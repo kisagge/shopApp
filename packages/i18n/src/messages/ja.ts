@@ -78,6 +78,7 @@ export const ja: Dictionary = {
   'catalog.showMore': 'もっと見る',
   'catalog.noLimit': '制限なし',
   'catalog.filters': '絞り込み',
+  'catalog.brand': 'ブランド',
   'catalog.color': 'カラー',
   'catalog.size': 'サイズ',
   'catalog.resetFilters': '条件をリセット',

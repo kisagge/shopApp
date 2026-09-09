@@ -82,6 +82,7 @@ export const en: Dictionary = {
   'catalog.showMore': 'Show more products',
   'catalog.noLimit': 'No limit',
   'catalog.filters': 'Narrow down',
+  'catalog.brand': 'Brand',
   'catalog.color': 'Colour',
   'catalog.size': 'Size',
   'catalog.resetFilters': 'Clear filters',
