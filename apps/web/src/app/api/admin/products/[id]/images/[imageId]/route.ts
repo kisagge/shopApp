@@ -10,7 +10,9 @@ import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
 
-const altSchema = z.object({ alt: z.string().trim().min(1, '대체 텍스트를 입력해 주세요').max(200) });
+const altSchema = z.object({
+  alt: z.string().trim().min(1, 'valid.altTextRequired').max(200, 'valid.tooLongChars'),
+});
 
 function fail(error: unknown): NextResponse | null {
   if (error instanceof ImageError) {

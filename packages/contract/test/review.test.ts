@@ -2,12 +2,16 @@ import { describe, it, expect } from 'vitest';
 import { reportReviewSchema } from '../src/review';
 
 describe('리뷰 신고', () => {
-  it('사유가 잘못되면 한국어로 말한다', () => {
-    // Zod 기본 메시지는 영어로 나온다. 사용자에게 그대로 보이면 안 된다.
+  it('사유가 잘못되면 사전 열쇠로 말한다', () => {
+    /*
+     * 계약은 **문장이 아니라 열쇠**를 담는다. 번역은 응답을 만드는 서버가
+     * 요청의 언어로 한다. 예전에는 여기에 한국어가 박혀 있었는데, 그러면
+     * 영어·일본어로 보는 운영자에게도 한국어가 나간다.
+     */
     const result = reportReviewSchema.safeParse({ reason: 'WHATEVER' });
 
     expect(result.success).toBe(false);
-    if (!result.success) expect(result.error.issues[0]!.message).toBe('신고 사유를 골라 주세요');
+    if (!result.success) expect(result.error.issues[0]!.message).toBe('valid.reportReasonRequired');
   });
 
   it('설명은 없어도 된다', () => {

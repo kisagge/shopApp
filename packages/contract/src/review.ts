@@ -71,7 +71,7 @@ export const reviewListQuerySchema = z.object({
  * 매번 읽어야 처리 순서를 정할 수 있다. 설명은 선택이다.
  */
 export const reportReviewSchema = z.object({
-  reason: z.enum(REPORT_REASON, { error: '신고 사유를 골라 주세요' }),
+  reason: z.enum(REPORT_REASON, { error: 'valid.reportReasonRequired' }),
   detail: z
     .string()
     .trim()
