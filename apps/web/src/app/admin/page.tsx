@@ -45,7 +45,15 @@ export default async function AdminDashboard({
         <section aria-labelledby="kpi-title">
           <h2 id="kpi-title" className="sr-only">{d.rangeLabel} 주요 지표</h2>
           <ul className="grid grid-cols-2 gap-4 xl:grid-cols-4">
-            <Kpi label={`${d.rangeLabel} 매출`} value={`${format(d.period.revenue)}원`} />
+            {/*
+              총매출만 두면 실제로 남은 돈보다 커 보이고, 순매출만 두면 그
+              숫자가 왜 그런지 알 수 없다. 환불을 가운데 두어 대조되게 한다.
+            */}
+            <Kpi
+              label={`${d.rangeLabel} 순매출`}
+              value={`${format(d.period.netRevenue)}원`}
+              note={`총 ${format(d.period.revenue)}원 · 환불 ${format(d.period.refunded)}원`}
+            />
             <Kpi label={`${d.rangeLabel} 주문`} value={`${d.period.orderCount}건`} />
             <Kpi label="객단가" value={`${format(d.period.averageOrderValue)}원`} />
             {d.funnel ? (
@@ -69,7 +77,7 @@ export default async function AdminDashboard({
               <div className="flex flex-col gap-1">
                 <h2 id="chart-title" className="text-base font-semibold">매출 추이</h2>
                 <p className="text-xs text-[var(--fg-muted)]">
-                  {d.rangeLabel} · 결제 완료 이후 상태 · 취소·환불 제외
+                  {d.rangeLabel} · 결제한 날에 더하고 환불한 날에 뺀다
                 </p>
               </div>
               <p className="flex items-baseline gap-2">

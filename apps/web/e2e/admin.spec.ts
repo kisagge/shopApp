@@ -10,6 +10,19 @@ test('대시보드가 열린다', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '대시보드', level: 1 })).toBeVisible();
 });
 
+/**
+ * 총매출만 두면 실제로 남은 돈보다 커 보이고, 순매출만 두면 그 숫자가 왜
+ * 그런지 알 수 없다. 셋이 함께 있어야 대조가 된다.
+ */
+test('매출은 총·환불·순 셋을 함께 보여 준다', async ({ page }) => {
+  await page.goto('/admin');
+
+  const kpi = page.getByRole('listitem').filter({ hasText: '순매출' });
+  await expect(kpi).toContainText('순매출');
+  await expect(kpi).toContainText('총');
+  await expect(kpi).toContainText('환불');
+});
+
 test('기간을 바꾸면 라벨도 따라간다', async ({ page }) => {
   await page.goto('/admin?range=90d');
 

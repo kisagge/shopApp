@@ -49,7 +49,7 @@ export async function refundOrder(
     where: { orderNo },
     select: {
       id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
-      pointsUsed: true, payable: true, usedCouponId: true,
+      pointsUsed: true, payable: true, usedCouponId: true, canceledAt: true,
       items: { select: { id: true, variantId: true, quantity: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
     },
@@ -109,6 +109,7 @@ export async function refundOrder(
     idempotencyKey: `refund-${order.orderNo}`,
   });
 
+  const now = new Date();
   const refunded = order.payable;
   let stockRestored = 0;
   let pointsReturned = 0;
@@ -117,7 +118,16 @@ export async function refundOrder(
     // 조건부 UPDATE — 그 사이 다른 요청이 먼저 환불했으면 0건이 나온다
     const { count } = await tx.order.updateMany({
       where: { id: order.id, status: order.status },
-      data: { status: 'REFUNDED' },
+      /*
+       * `canceledAt` 은 **돈이 나간 시각**이다. 결제 취소에서만 찍고 있었는데,
+       * 반품으로 들어온 환불(RETURNED → REFUNDED)은 취소를 거치지 않아 이 칸이
+       * 비어 있었다. 정산도 대시보드도 이 시각으로 환불을 세므로, 비어 있으면
+       * 반품 환불이 어디에서도 빠지지 않는다 — 돌려준 돈이 장부에는 남는다.
+       *
+       * 취소 뒤 환불(CANCELLED → REFUNDED)이면 취소 시각을 덮어쓰지 않는다.
+       * 그 주문의 돈은 취소 때 이미 멈췄고, 두 번 빼면 안 된다.
+       */
+      data: { status: 'REFUNDED', ...(order.canceledAt === null ? { canceledAt: now } : {}) },
     });
     if (count === 0) throw new RefundError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
@@ -167,7 +177,7 @@ export async function refundOrder(
       data: {
         status: 'CANCELED',
         refundedAmount: order.payment!.refundedAmount + refunded,
-        canceledAt: new Date(),
+        canceledAt: now,
       },
     });
 

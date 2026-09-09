@@ -2,17 +2,38 @@ import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
   funnelFromCounts, won, FUNNEL_STEP, rangeStart, DASHBOARD_RANGE_LABEL,
+  netRevenue, REFUND_STATUS,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 
-/** 매출로 잡는 주문 상태 — 결제가 성립한 것부터 */
-const REVENUE_STATUSES: readonly OrderStatus[] = [
-  'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CONFIRMED',
-];
+/**
+ * 매출은 **돈이 오간 시각**으로 센다 — 자세한 까닭은 `@shop/core` 의 revenue.ts.
+ *
+ * 들어온 돈은 결제 시각(`paidAt`), 나간 돈은 환불 시각(`canceledAt`) 에 잡는다.
+ * 상태로 거르지 않는다 — 상태는 나중에 바뀌고, 바뀌면 **이미 지나간 날의
+ * 숫자가 달라진다.** 실제로 그랬다: 오늘 반품을 접수하면 그 주문을 산 날의
+ * 매출이 줄고, 접수를 철회하면 도로 늘었다. 어제 본 차트와 오늘 본 차트가
+ * 다르면 그 차트로는 아무것도 정할 수 없다.
+ */
+
+/** 결제가 성립한 주문 — 돈이 들어온 시각이 있는 것 */
+const paidIn = (from: Date) => ({ paidAt: { gte: from } });
+
+/** 돈이 되돌아간 주문 — 결제된 적 있고, 이 기간에 환불된 것 */
+const refundedIn = (from: Date) => ({
+  status: { in: [...REFUND_STATUS] },
+  paidAt: { not: null },
+  canceledAt: { gte: from },
+});
 
 export interface DashboardKpi {
+  /** 들어온 돈 */
   readonly revenue: Won;
+  /** 이 기간에 되돌아간 돈. 지난 기간에 판 것이 지금 환불되면 여기 잡힌다. */
+  readonly refunded: Won;
+  /** 남은 돈 */
+  readonly netRevenue: Won;
   readonly orderCount: number;
   readonly averageOrderValue: Won;
 }
@@ -74,36 +95,44 @@ export async function getDashboard(
    */
   const since = rangeStart(range, now);
 
-  const orderWhere = (from: Date) => ({
-    status: { in: [...REVENUE_STATUSES] },
-    placedAt: { gte: from },
-    ...(scope ? { items: { some: { merchantId: scope } } } : {}),
-  });
+  const mine = scope ? { items: { some: { merchantId: scope } } } : {};
+  const soldWhere = { ...paidIn(since), ...mine };
+  const backWhere = { ...refundedIn(since), ...mine };
 
-  const [todayAgg, todayItems, todo, topRows, recent, daily, funnel] = await Promise.all([
-    prisma.order.aggregate({
-      where: orderWhere(since),
-      _count: { _all: true },
-      _sum: { payable: true },
-    }),
-    // 가맹점 매출은 자기 줄의 합계다
-    scope
-      ? prisma.orderItem.aggregate({
-          where: { merchantId: scope, order: orderWhere(since) },
-          _sum: { subtotal: true },
-        })
-      : Promise.resolve(null),
-    loadTodo(scope),
-    loadTopProducts(scope, since),
-    loadRecentOrders(scope),
-    loadDailyRevenue(scope, since),
-    scope === null ? loadFunnel(since) : Promise.resolve(null),
-  ]);
+  const [soldAgg, soldItems, backAgg, backItems, todo, topRows, recent, daily, funnel] =
+    await Promise.all([
+      prisma.order.aggregate({
+        where: soldWhere,
+        _count: { _all: true },
+        _sum: { payable: true },
+      }),
+      // 가맹점 매출은 자기 줄의 합계다 — 다른 가맹점 금액까지 더하면 남의 매출이 샌다
+      scope
+        ? prisma.orderItem.aggregate({
+            where: { merchantId: scope, order: soldWhere },
+            _sum: { subtotal: true },
+          })
+        : Promise.resolve(null),
+      prisma.order.aggregate({ where: backWhere, _sum: { payable: true } }),
+      scope
+        ? prisma.orderItem.aggregate({
+            where: { merchantId: scope, order: backWhere },
+            _sum: { subtotal: true },
+          })
+        : Promise.resolve(null),
+      loadTodo(scope),
+      loadTopProducts(scope, since),
+      loadRecentOrders(scope),
+      loadDailyRevenue(scope, since),
+      scope === null ? loadFunnel(since) : Promise.resolve(null),
+    ]);
 
-  const revenue = won(
-    scope ? (todayItems?._sum.subtotal ?? 0) : (todayAgg._sum.payable ?? 0),
+  const totals = netRevenue(
+    scope ? (soldItems?._sum.subtotal ?? 0) : (soldAgg._sum.payable ?? 0),
+    scope ? (backItems?._sum.subtotal ?? 0) : (backAgg._sum.payable ?? 0),
   );
-  const orderCount = todayAgg._count._all;
+  const revenue = totals.gross;
+  const orderCount = soldAgg._count._all;
 
   return {
     scope,
@@ -112,6 +141,8 @@ export async function getDashboard(
       range === '1d' ? '오늘' : `최근 ${DASHBOARD_RANGE_LABEL[range]}`,
     period: {
       revenue,
+      refunded: totals.refunded,
+      netRevenue: totals.net,
       orderCount,
       averageOrderValue: won(orderCount === 0 ? 0 : Math.floor(revenue / orderCount)),
     },
@@ -145,7 +176,7 @@ async function loadTopProducts(scope: string | null, since: Date): Promise<TopPr
     by: ['productName', 'brandName'],
     where: {
       ...(scope ? { merchantId: scope } : {}),
-      order: { status: { in: [...REVENUE_STATUSES] }, placedAt: { gte: since } },
+      order: { ...paidIn(since), NOT: { status: { in: [...REFUND_STATUS] } } },
     },
     _sum: { quantity: true, subtotal: true },
     orderBy: { _sum: { subtotal: 'desc' } },
@@ -188,24 +219,41 @@ async function loadRecentOrders(scope: string | null): Promise<RecentOrder[]> {
 }
 
 async function loadDailyRevenue(scope: string | null, since: Date): Promise<DailyRevenue[]> {
-  // groupBy 로는 날짜 단위 집계가 안 되므로 raw 를 쓴다.
-  // KST 로 변환해 자르지 않으면 한국 시간 오전 9시 전 주문이 전날에 붙는다.
+  /*
+   * groupBy 로는 날짜 단위 집계가 안 되므로 raw 를 쓴다.
+   * KST 로 변환해 자르지 않으면 한국 시간 오전 9시 전 주문이 전날에 붙는다.
+   *
+   * **결제한 날에 더하고, 환불한 날에 뺀다.** 예전에는 `placedAt` 으로 묶고
+   * 지금 상태로 걸러서, 오늘 들어온 반품 접수 하나가 지난주 막대를 깎았다.
+   * 두 사건을 한 번의 질의로 합치려고 UNION ALL 로 부호를 뒤집어 더한다.
+   */
   const rows = scope
     ? await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
-        select to_char((o."placedAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
-               sum(i.subtotal)::bigint as revenue
-        from orders o join order_items i on i."orderId" = o.id
-        where i."merchantId" = ${scope}
-          and o.status = any(${REVENUE_STATUSES}::"OrderStatus"[])
-          and o."placedAt" >= ${since}
-        group by 1 order by 1`
+        select date, sum(amount)::bigint as revenue from (
+          select to_char((o."paidAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+                 i.subtotal as amount
+          from orders o join order_items i on i."orderId" = o.id
+          where i."merchantId" = ${scope} and o."paidAt" >= ${since}
+          union all
+          select to_char((o."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+                 -i.subtotal as amount
+          from orders o join order_items i on i."orderId" = o.id
+          where i."merchantId" = ${scope}
+            and o.status = any(${REFUND_STATUS}::"OrderStatus"[])
+            and o."paidAt" is not null and o."canceledAt" >= ${since}
+        ) t group by 1 order by 1`
     : await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
-        select to_char((o."placedAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
-               sum(o.payable)::bigint as revenue
-        from orders o
-        where o.status = any(${REVENUE_STATUSES}::"OrderStatus"[])
-          and o."placedAt" >= ${since}
-        group by 1 order by 1`;
+        select date, sum(amount)::bigint as revenue from (
+          select to_char((o."paidAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+                 o.payable as amount
+          from orders o where o."paidAt" >= ${since}
+          union all
+          select to_char((o."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+                 -o.payable as amount
+          from orders o
+          where o.status = any(${REFUND_STATUS}::"OrderStatus"[])
+            and o."paidAt" is not null and o."canceledAt" >= ${since}
+        ) t group by 1 order by 1`;
 
   return rows.map((r) => ({ date: r.date, revenue: Number(r.revenue) }));
 }

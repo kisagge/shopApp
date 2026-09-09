@@ -64,12 +64,23 @@ describe('초안 계산', () => {
     expect(where.order.confirmedAt.lt.toISOString()).toBe('2026-08-31T15:00:00.000Z');
   });
 
-  it('환불은 결제된 적 있는 주문만 센다', async () => {
+  /**
+   * 정산 매출로 잡는 것은 구매확정된 주문뿐이다. 확정 전에 취소된 주문은
+   * 정산에 실린 적이 없으므로, 그것을 빼면 가맹점이 **다른 주문으로 번 돈에서**
+   * 받은 적 없는 금액만큼 깎인다. 전에는 `paidAt` 만 봐서 실제로 그랬다.
+   */
+  it('환불은 정산에 실린 적 있는 주문만 뺀다', async () => {
     await previewSettlements(admin, '2026-08');
     const where = db.orderItem.groupBy.mock.calls[1]?.[0].where;
-    // 결제 전 취소는 돈이 오간 적이 없어 차감할 것이 없다
-    expect(where.order.paidAt).toEqual({ not: null });
+    expect(where.order.confirmedAt, '지급된 적 없는 주문을 빼면 안 된다').toEqual({ not: null });
     expect(where.order.status).toEqual({ in: ['CANCELLED', 'REFUNDED'] });
+  });
+
+  it('매출과 차감이 같은 상태를 세지 않는다 — 같은 돈을 더하고 빼게 된다', async () => {
+    await previewSettlements(admin, '2026-08');
+    const sale = db.orderItem.groupBy.mock.calls[0]?.[0].where.order.status;
+    const refund = db.orderItem.groupBy.mock.calls[1]?.[0].where.order.status;
+    expect(refund.in).not.toContain(sale);
   });
 
   it('가맹점은 자기 것만 본다', async () => {

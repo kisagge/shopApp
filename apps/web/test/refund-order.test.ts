@@ -38,7 +38,7 @@ const gateway = {
 const order = (over: Record<string, unknown> = {}) => ({
   id: 'o-1', orderNo: '20260904-1234567', status: 'RETURNED',
   userId: 'u-c', browserSessionId: 's-1',
-  pointsUsed: 3_000, payable: 68_000, usedCouponId: 'uc-1',
+  pointsUsed: 3_000, payable: 68_000, usedCouponId: 'uc-1', canceledAt: null,
   items: [
     { id: 'i-1', variantId: 'v-1', quantity: 2 },
     { id: 'i-2', variantId: 'v-2', quantity: 1 },
@@ -213,5 +213,31 @@ describe('기록', () => {
         from: 'RETURNED', to: 'REFUNDED', actor: 'u-admin', note: '파손 반품',
       }),
     });
+  });
+});
+
+/**
+ * 정산은 **주문의 `canceledAt` 이 그 기간 안에 있는가**로 환불을 차감한다
+ * (`close-settlement.ts`). 환불하면서 그 시각을 남기지 않으면, 반품된 물건
+ * 값이 가맹점에게 그대로 지급된다 — 돈이 한쪽으로만 흐른다.
+ */
+describe('환불 시각', () => {
+  it('반품 환불은 주문에 환불 시각을 남긴다 — 정산이 이것으로 차감한다', async () => {
+    await refundOrder('20260904-1234567', admin, '반품 완료', gateway);
+
+    const [args] = tx.order.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
+    expect(args.data['status']).toBe('REFUNDED');
+    expect(args.data['canceledAt'], '환불 시각이 없으면 정산이 차감하지 못한다').toBeInstanceOf(Date);
+  });
+
+  /** 취소는 그때 이미 돈을 멈췄다. 환불 시각으로 덮으면 다른 기간에서 또 빠진다. */
+  it('취소 뒤 환불은 취소 시각을 덮어쓰지 않는다', async () => {
+    const canceledAt = new Date('2026-08-30T01:00:00Z');
+    db.order.findFirst.mockResolvedValue(order({ status: 'CANCELLED', canceledAt }));
+
+    await refundOrder('20260904-1234567', admin, '취소 환불', gateway);
+
+    const [args] = tx.order.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
+    expect(args.data).not.toHaveProperty('canceledAt');
   });
 });

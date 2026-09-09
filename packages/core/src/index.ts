@@ -2,6 +2,7 @@ export * from './money';
 export * from './shipping';
 export * from './cart';
 export * from './order-state';
+export * from './revenue';
 export * from './authz';
 export * from './merchant-application';
 export * from './product-publish';

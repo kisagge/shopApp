@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  won, type Actor, type Won, type SettlementStatus,
+  won, REFUND_STATUS, SETTLEMENT_SALE_STATUS,
+  type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 
 /**
@@ -56,19 +57,30 @@ export async function previewSettlements(
       by: ['merchantId'],
       where: {
         merchantId: { not: null },
-        order: { status: 'CONFIRMED', confirmedAt: { gte: period.start, lt: period.end } },
+        order: { status: SETTLEMENT_SALE_STATUS, confirmedAt: { gte: period.start, lt: period.end } },
       },
       _sum: { subtotal: true },
       _count: { _all: true },
     }),
+    /*
+     * 빼는 것은 **이미 지급한 적 있는 돈뿐이다.**
+     *
+     * 전에는 `paidAt` 만 봤다. 그런데 정산 매출로 잡는 것은 구매확정된 주문뿐이고
+     * (위 블록), 결제만 되고 확정 전에 취소된 주문은 정산에 실린 적이 없다.
+     * 그것을 빼면 가맹점이 **다른 주문으로 번 돈에서** 받은 적 없는 금액만큼
+     * 깎인다. 그래서 확정된 적이 있는지(`confirmedAt`)로 바꿨다.
+     *
+     * 지금 상태 기계에서 구매확정은 종착이라 이 조건은 사실상 아무것도 고르지
+     * 않는다. 지우지 않는 이유는 `deductibleFromSettlement` 의 주석에 있다 —
+     * 확정 뒤 환불을 허용하는 날 규칙이 저절로 맞아야 한다.
+     */
     prisma.orderItem.groupBy({
       by: ['merchantId'],
       where: {
         merchantId: { not: null },
         order: {
-          status: { in: ['CANCELLED', 'REFUNDED'] },
-          // 결제가 된 적 있는 주문만 — 결제 전 취소는 돈이 오간 적이 없다
-          paidAt: { not: null },
+          status: { in: [...REFUND_STATUS] },
+          confirmedAt: { not: null },
           canceledAt: { gte: period.start, lt: period.end },
         },
       },
