@@ -129,7 +129,13 @@ export default async function CategoryPage({ params, searchParams }: Params) {
           minPrice={query.minPrice}
           maxPrice={query.maxPrice}
           priceBucket={price.bucket}
-          total={page.total}
+          /*
+           * **개수는 제목이 이미 말한다.** 바로 위에 "아우터 상품 13개" 가
+           * 있는데 좁혀 보기 옆에 "총 13개" 를 또 두면, 읽는 사람은 두 수가
+           * 다른 것을 세는 줄 알고 견주게 된다. 브랜드·검색 화면은 제목에
+           * 개수가 없어서 그쪽에서는 이 자리가 유일한 답이다.
+           */
+          total={null}
           facets={facets}
           selected={{ color: query.color, size: query.size }}
           brands={brands}

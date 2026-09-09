@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Carousel } from '../src/components/carousel';
@@ -180,5 +180,60 @@ describe('배너가 없을 때', () => {
   it('아무것도 그리지 않는다', () => {
     const { container } = render(<Carousel slides={[]} label="기획전 배너" />);
     expect(container.firstChild).toBeNull();
+  });
+});
+
+describe('손가락으로 밀기', () => {
+  /**
+   * 폰에서 아무리 밀어도 안 넘어갔다. 화살표만 두었기 때문인데, 손으로
+   * 만지는 화면에서 배너를 미는 것은 배우지 않아도 하는 동작이다.
+   */
+  const track = () => screen.getByLabelText(/좌우 화살표 키/);
+
+  const swipe = (from: [number, number], to: [number, number]) => {
+    const [x1, y1] = from;
+    const [x2, y2] = to;
+    fireEvent.touchStart(track(), { touches: [{ clientX: x1, clientY: y1 }] });
+    fireEvent.touchEnd(track(), { changedTouches: [{ clientX: x2, clientY: y2 }] });
+  };
+
+  it('왼쪽으로 밀면 다음 장으로 간다', () => {
+    render(<Carousel slides={slides} label="배너" intervalMs={0} />);
+    expect(screen.getByText('첫 배너 링크')).toBeVisible();
+
+    swipe([300, 100], [120, 108]);
+    expect(screen.getByText('둘 배너 링크')).toBeVisible();
+  });
+
+  it('오른쪽으로 밀면 앞 장으로 돈다', () => {
+    render(<Carousel slides={slides} label="배너" intervalMs={0} />);
+    swipe([120, 100], [300, 96]);
+    // 첫 장에서 뒤로 밀면 마지막으로 — 화살표와 같은 규칙이다
+    expect(screen.getByText('셋 배너 링크')).toBeVisible();
+  });
+
+  it('세로로 민 것은 화면을 굴린 것이라 넘기지 않는다', () => {
+    /*
+     * 여기가 이 기능에서 가장 중요한 자리다. 목록을 내리려던 사람이 엉뚱한
+     * 배너를 보게 되면, 손가락을 어디에 둬야 할지 알 수 없게 된다.
+     */
+    render(<Carousel slides={slides} label="배너" intervalMs={0} />);
+    swipe([200, 400], [160, 120]);
+    expect(screen.getByText('첫 배너 링크')).toBeVisible();
+  });
+
+  it('살짝 스친 것은 넘기지 않는다', () => {
+    // 배너를 누르려다 손이 조금 밀린 것까지 넘김으로 읽으면 안 된다
+    render(<Carousel slides={slides} label="배너" intervalMs={0} />);
+    swipe([200, 100], [180, 100]);
+    expect(screen.getByText('첫 배너 링크')).toBeVisible();
+  });
+
+  it('배너가 하나뿐이면 밀어도 아무 일이 없다', () => {
+    render(<Carousel slides={[slides[0]!]} label="배너" intervalMs={0} />);
+    const only = screen.getByText('첫 배너 링크').closest('div')!.parentElement!;
+    fireEvent.touchStart(only, { touches: [{ clientX: 300, clientY: 100 }] });
+    fireEvent.touchEnd(only, { changedTouches: [{ clientX: 100, clientY: 100 }] });
+    expect(screen.getByText('첫 배너 링크')).toBeVisible();
   });
 });

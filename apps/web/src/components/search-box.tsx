@@ -151,7 +151,14 @@ export function SearchBox({
   const menu = variant === 'menu';
 
   return (
-    <div ref={rootRef} className={menu ? 'relative flex flex-1 gap-2' : 'relative'}>
+    /*
+     * **min-w-0 이 있어야 줄어든다.** flex 자식은 기본이 min-width:auto 라
+     * 안쪽 최소 폭보다 좁아지지 못한다. 그대로 두었더니 좁은 화면에서 이
+     * 상자가 폼 밖으로 20px 밀려 나가, 검색 단추가 화면 오른쪽으로 잘렸다.
+     * 데스크톱 브라우저 375px 에서는 안 나고 실제 기기(411px)에서 났다 —
+     * 안쪽 최소 폭이 글꼴에 따라 달라지기 때문이다.
+     */
+    <div ref={rootRef} className={menu ? 'relative flex min-w-0 flex-1 gap-2' : 'relative'}>
       <label htmlFor={id} className="sr-only">
         {t('nav.searchLabel')}
       </label>

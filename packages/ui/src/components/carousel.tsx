@@ -32,7 +32,19 @@ export interface CarouselProps {
  * 4. **포커스나 마우스가 올라가면 멈춘다.** 읽는 중에 넘어가지 않도록.
  * 5. **슬라이드 변경을 사용자가 눌렀을 때만 알린다.** 자동 전환까지 읽으면
  *    스크린리더가 끝없이 떠든다.
+ * 6. **손가락으로 밀어도 넘어간다.** 화살표만 두었더니 폰에서 아무리 밀어도
+ *    안 넘어갔다 — 손으로 만지는 화면에서 배너를 미는 것은 배우지 않아도
+ *    하는 동작이다. 다만 세로로 미는 것은 **화면을 굴리는 것**이므로,
+ *    가로로 더 많이 움직였을 때만 넘긴다.
  */
+/**
+ * 이만큼은 밀어야 넘긴다.
+ *
+ * 너무 작으면 배너를 누르려다 손이 조금 밀린 것까지 넘김으로 읽고, 너무
+ * 크면 밀었는데 안 넘어간다. 손가락 하나 너비쯤이 그 사이다.
+ */
+const SWIPE_MIN = 48;
+
 export function Carousel({ slides, label, intervalMs = 6000, className }: CarouselProps) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(true);
@@ -40,6 +52,8 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
   const [reduceMotion, setReduceMotion] = useState(false);
   const hoveredRef = useRef(false);
   const focusedRef = useRef(false);
+  /** 손가락이 닿기 시작한 자리. 떼는 순간과 견주려고 들고 있는다. */
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
   const baseId = useId();
 
   const count = slides.length;
@@ -76,6 +90,32 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
     return () => window.clearInterval(timer);
   }, [autoAdvance, count, intervalMs]);
 
+  /**
+   * 넘길 만큼 밀었는가.
+   *
+   * **세로로 더 많이 움직였으면 화면을 굴린 것이다.** 그때 배너를 넘기면
+   * 목록을 내리려던 사람이 엉뚱한 배너를 보게 된다. 가로가 더 크고, 그
+   * 가로도 손이 떨린 정도(SWIPE_MIN)를 넘겼을 때만 넘긴다.
+   */
+  function onTouchStart(event: React.TouchEvent<HTMLDivElement>) {
+    const touch = event.touches[0];
+    touchRef.current = touch ? { x: touch.clientX, y: touch.clientY } : null;
+  }
+
+  function onTouchEnd(event: React.TouchEvent<HTMLDivElement>) {
+    const start = touchRef.current;
+    touchRef.current = null;
+    const touch = event.changedTouches[0];
+    if (!start || !touch) return;
+
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < SWIPE_MIN || Math.abs(dx) <= Math.abs(dy)) return;
+
+    // 왼쪽으로 밀면 다음 장. 종이를 넘기는 방향과 같다.
+    goTo(index + (dx < 0 ? 1 : -1), true);
+  }
+
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === 'ArrowLeft') {
       event.preventDefault();
@@ -105,8 +145,14 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
         role="group"
         tabIndex={single ? -1 : 0}
         onKeyDown={single ? undefined : onKeyDown}
+        {...(single ? {} : { onTouchStart, onTouchEnd })}
         aria-label={single ? undefined : '좌우 화살표 키로 배너를 넘길 수 있습니다'}
-        className="relative overflow-hidden rounded-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+        /*
+         * touch-pan-y 는 "세로로 굴리는 것은 브라우저가, 가로는 우리가"
+         * 라는 말이다. 이걸 안 붙이면 가로로 미는 동안 브라우저가 제
+         * 몸짓(뒤로 가기 같은 것)을 먼저 집어 간다.
+         */
+        className="relative touch-pan-y overflow-hidden rounded-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
       >
         {slides.map((slide, i) => {
           const current = i === index;
