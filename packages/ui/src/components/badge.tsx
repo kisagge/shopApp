@@ -3,7 +3,13 @@ import type { HTMLAttributes } from 'react';
 import { cn } from '../lib/cn';
 
 const badge = cva(
-  'inline-flex items-center rounded-xs px-2 text-[11px] font-semibold',
+  /*
+   * **줄바꿈되지 않는다.** 뱃지는 높이가 정해진 알약이라 글자가 두 줄이 되면
+   * 상자 밖으로 삐져나온다 — 운영 화면의 표가 좁아지자 '판매중' 이 37px 이
+   * 되어 24px 상자를 넘쳤고, 주문 표에서는 '환불완료' 가 45px 이었다.
+   * 줄이는 것은 표가 할 일이고, 뱃지는 자기 낱말을 지킨다.
+   */
+  'inline-flex shrink-0 items-center whitespace-nowrap rounded-xs px-2 text-[11px] font-semibold',
   {
     variants: {
       tone: {

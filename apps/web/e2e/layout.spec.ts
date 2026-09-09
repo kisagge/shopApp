@@ -34,6 +34,13 @@ layoutTests(test, expect, [
   ['로그인', '/login'],
   ['회원가입', '/signup'],
   ['고객센터', '/support'],
+  ['고객센터 문의하기', '/support/ask'],
+  ['공지', '/support/notice'],
+  ['비밀번호 찾기', '/forgot-password'],
+  // 열쇠 없이 열면 "다시 요청하세요" 상태가 뜬다. 그 상태도 화면이다.
+  ['비밀번호 재설정', '/reset-password'],
+  ['결제 실패', '/checkout/fail'],
+  ['입점 신청', '/merchant/apply'],
   ['상품 비교', '/compare?slugs=oversized-wool-coat,single-chesterfield-coat'],
   // 실기기에서 검색 버튼이 잘렸던 자리다. 닫힌 채로는 보이지 않는다.
   ['사이드바 열림', '/', openMenu],

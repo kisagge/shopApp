@@ -162,8 +162,8 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 | **백 로직** | `packages/*/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 매출 인식, 권한 정책, 이벤트 퍼널, 입력 검증, enum 정합성 |
 
 ```
-core 718 · web 1,940 · contract 208 · ui 101 · auth 38 · i18n 37 · db 28
-e2e 334 (Playwright, 32 파일)
+core 718 · web 1,943 · contract 208 · ui 101 · auth 38 · i18n 37 · db 28
+e2e 410 (Playwright, 33 파일)
 ```
 
 ```bash

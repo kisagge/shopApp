@@ -49,7 +49,12 @@ export default async function TrafficPage() {
             </p>
           </div>
 
-          <ul className="grid grid-cols-2 gap-3 md:grid-cols-5">
+          {/*
+            **다섯 칸은 넓은 화면에서만.** 768px 에서 다섯으로 나누면 타일이
+            75px 이 되고, 그 안의 숫자(0.002 같은 것)가 잘렸다. 값이 잘리는
+            지표판은 없는 것만 못하다.
+          */}
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {vitals.map((v) => (
               <li
                 key={v.metric}

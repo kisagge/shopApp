@@ -22,7 +22,16 @@ export function CouponTable({
   onGrant: (coupon: CouponRow) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
+    /*
+      **relative 가 있어야 낭독기 전용 글자가 새어 나가지 않는다.**
+
+      마지막 열 머리('동작')는 눈에는 안 보이고 낭독기만 읽는 sr-only 다.
+      그런데 sr-only 는 absolute 라 기준점이 없으면 화면 전체를 기준으로 잡고,
+      **가로로 미는 상자 안에 있으면 그 상자를 빠져나가** 문서를 늘린다 —
+      표는 안에서 잘 스크롤되는데 페이지가 1008px 이 되어 통째로 옆으로
+      밀렸다. 눈으로는 표 말고 아무것도 안 보이니 원인을 찾기 어렵다.
+    */
+    <div className="relative overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
       <table className="w-full min-w-[860px] border-collapse text-[13px]">
         <caption className="sr-only">발행한 쿠폰 목록</caption>
         <thead>

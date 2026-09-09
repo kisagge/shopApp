@@ -188,8 +188,19 @@ export default async function AdminOrdersPage({
                   : '주문이 없습니다.'}
             </p>
           ) : (
-            <table>
-              <caption className="sr-only">주문 목록</caption>
+            <div className="relative overflow-x-auto">
+              {/*
+                **표는 자기 안에서 민다.** 주문번호·상품명·금액이 한 줄에 들어가서
+                태블릿 폭에서는 표가 화면보다 넓어지는데, 그대로 두면 페이지
+                전체가 옆으로 밀린다 — 표를 보려던 사람이 헤더와 사이드바까지
+                끌고 다니게 된다.
+
+                `relative` 는 안의 sr-only 설명 때문이다. sr-only 는 absolute 라
+                기준점이 없으면 스크롤 상자를 빠져나가 문서를 늘린다 —
+                쿠폰 표에서 같은 것에 당했다.
+              */}
+              <table className="w-full">
+                <caption className="sr-only">주문 목록</caption>
               <thead>
                 <tr className="border-b border-[var(--border)]">
                   <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">주문번호</th>
@@ -225,7 +236,8 @@ export default async function AdminOrdersPage({
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           )}
         </div>
         <div className="mt-5">

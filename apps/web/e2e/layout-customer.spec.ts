@@ -15,4 +15,10 @@ layoutTests(test, expect, [
   ['포인트', '/mypage/points'],
   ['찜', '/mypage/wishlist'],
   ['알림', '/mypage/notifications'],
+  ['문의', '/mypage/inquiries'],
+  ['내 리뷰', '/mypage/reviews'],
+  ['재입고 알림', '/mypage/restock'],
+  ['탈퇴', '/mypage/close'],
+  // 담긴 것이 없으면 빈 화면이지만, 빈 화면도 무너질 수 있다
+  ['결제', '/checkout'],
 ]);

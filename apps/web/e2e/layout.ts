@@ -21,6 +21,19 @@ import { ready } from './state';
 /** 재는 폭. 좁은 쪽이 늘 먼저 무너진다. */
 export const WIDTHS = [320, 375, 768, 1280] as const;
 
+/**
+ * 운영 화면이 재는 폭.
+ *
+ * **운영 콘솔은 폰 화면을 위한 것이 아니다.** 표가 열 개 남짓한 칸을 가지고
+ * 주문번호·금액·상태를 한 줄에 늘어놓는데, 그것을 320px 에 밀어 넣으면 읽을
+ * 수 있는 표가 아니라 글자 기둥이 된다. 재 보니 320·375 에서 열여섯 장이 다
+ * 걸렸고, 그 열여섯을 "고치는" 일은 화면을 나쁘게 만드는 쪽이었다.
+ *
+ * 태블릿(768)은 다르다. 운영자가 실제로 그 폭에서 열어 볼 수 있고, 재 보니
+ * 고칠 값어치가 있는 결함이 실제로 둘 있었다.
+ */
+export const ADMIN_WIDTHS = [768, 1280] as const;
+
 export interface LayoutProblem {
   readonly kind: string;
   readonly detail: string;
@@ -103,8 +116,9 @@ export function layoutTests(
   test: TestType<any, any>,
   expect: (actual: unknown, message?: string) => { toEqual(expected: unknown): void },
   pages: ReadonlyArray<readonly [label: string, path: string, open?: (page: Page) => Promise<void>]>,
+  widths: readonly number[] = WIDTHS,
 ): void {
-  for (const width of WIDTHS) {
+  for (const width of widths) {
     for (const [label, path, open] of pages) {
       test(`${label} — ${width}px 에서 자리가 무너지지 않는다`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });

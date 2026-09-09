@@ -68,7 +68,7 @@ export default defineConfig({
     {
       name: 'admin',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.admin },
-      testMatch: /(admin|slug-history|a11y-admin)\.spec\.ts/,
+      testMatch: /(admin|slug-history|a11y-admin|layout-admin)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
