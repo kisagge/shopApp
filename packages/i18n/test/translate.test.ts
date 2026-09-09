@@ -82,9 +82,24 @@ describe('카테고리 이름', () => {
 });
 
 describe('모든 언어가 실제로 다르게 나온다', () => {
+  /**
+   * 열쇠 하나를 골라 박아 두면 **그 열쇠만 살아 있게 된다.** 실제로 그랬다 —
+   * `cart.checkout` 은 화면 어디서도 안 쓰는데 이 검사 때문에 사전에 남아
+   * 있었고, 안 쓰는 열쇠를 잡는 검사에서도 쓰이는 것으로 보였다.
+   *
+   * 그래서 **한국어 사전에서 문자열 열쇠를 훑어** 본다. 사전이 통째로 복사본이면
+   * 여기서 걸린다.
+   */
   it('사전이 복사본이 아니다', () => {
-    const rendered = LOCALES.map((l) => createTranslator(l)('cart.checkout'));
-    expect(new Set(rendered).size).toBe(LOCALES.length);
+    const plain = messageKeys().filter((key) => typeof ko[key] === 'string');
+    expect(plain.length).toBeGreaterThan(100);
+
+    const sameEverywhere = plain.filter(
+      (key) => new Set(LOCALES.map((l) => createTranslator(l)(key))).size === 1,
+    );
+
+    // 브랜드명처럼 일부러 같은 것이 있다. 그것이 절반을 넘지는 않는다.
+    expect(sameEverywhere.length).toBeLessThan(plain.length / 2);
   });
 });
 
