@@ -31,23 +31,35 @@ export async function SiteHeader() {
           <Link href="/" className="text-[var(--fg)] no-underline">PLAIN</Link>
         </p>
 
-        <nav aria-label={t('nav.categories')} className="hidden flex-1 md:block">
-          <ul className="flex">
+        {/*
+          **min-w-0 이 있어야 줄어든다.** flex 자식은 기본이 min-width:auto 라
+          내용보다 좁아지지 않는다. 그래서 갈래가 많거나 오른쪽 계정 묶음이
+          길어지면(로그인하면 480px 이 된다) 헤더가 화면보다 넓어지고,
+          **페이지 전체가 가로로 스크롤됐다** — 768px 에서 945px 이었다.
+          줄어들 수 있게 하고, 그래도 모자라면 갈래 줄만 가로로 민다.
+        */}
+        <nav aria-label={t('nav.categories')} className="hidden min-w-0 flex-1 md:block">
+          <ul className="flex overflow-x-auto">
             {categories.map((c) => (
-              <li key={c.slug}>
+              /*
+                줄어들 수 있게 열어 두면 이번엔 **글자가 줄바꿈된다** — 좁아진
+                상자 안에서 '액세서리' 가 두 줄이 됐다. 줄은 밀되 낱말은 안
+                줄어들게 둔다. 주문 목록 탭이 같은 처방을 쓴다.
+              */
+              <li key={c.slug} className="shrink-0">
                 <Link
                   href={`/category/${c.slug}`}
-                  className="inline-flex h-11 items-center px-4 text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+                  className="inline-flex h-11 items-center whitespace-nowrap px-4 text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
                   {t.category(c.slug, c.name)}
                 </Link>
               </li>
             ))}
             {/* 기획전은 갈래가 아니라 편집이라 카테고리 뒤에 따로 둔다 */}
-            <li>
+            <li className="shrink-0">
               <Link
                 href="/collections"
-                className="inline-flex h-11 items-center px-4 text-sm font-medium text-[var(--fg)] no-underline"
+                className="inline-flex h-11 items-center whitespace-nowrap px-4 text-sm font-medium text-[var(--fg)] no-underline"
               >
                 {t('collection.heading')}
               </Link>

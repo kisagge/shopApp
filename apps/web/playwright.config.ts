@@ -56,13 +56,13 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|image-priority|bundle-budget|web-vitals|sitemap)\.spec\.ts/,
+        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap)\.spec\.ts/,
     },
     {
       name: 'customer',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.customer },
       testMatch:
-        /(customer|review-helpful|notifications|order-idempotency|a11y-account)\.spec\.ts/,
+        /(customer|review-helpful|notifications|order-idempotency|a11y-account|layout-customer)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
