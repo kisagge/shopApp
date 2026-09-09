@@ -716,6 +716,28 @@ model Order {
 
   @@index([userId, placedAt])
   @@index([status, placedAt])
+
+  /// 아래 넷은 **돈을 세는 질의의 축**이다.
+  ///
+  /// 매출은 주문한 시각이 아니라 **돈이 오간 시각**에 잡는다(core 의 revenue.ts).
+  /// 그렇게 바꾸면서 질의는 `paidAt`·`canceledAt`·`confirmedAt` 으로 옮겼는데
+  /// 인덱스는 `placedAt` 축에 그대로 두었다. 30만 행으로 재 보니 대시보드 매출과
+  /// 정산 매출이 **테이블을 통째로 훑고**(6,858 buffers) 있었다.
+  ///
+  /// 넣은 뒤: 총매출 6,858 → 264, 환불 3,553 → 271, 정산 매출 6,858 → 1,106,
+  /// 구매확정 배치 4,222 → 20 buffers. 마지막 것이 가장 큰데, 인덱스가 정렬까지
+  /// 주어서 top-N 정렬이 통째로 사라진다.
+  ///
+  /// **쓰기가 그만큼 비싸진다.** 주문 한 건마다 유지할 btree 가 넷 늘어난다.
+  /// 그래도 두는 이유는, 이 넷이 운영진이 하루에도 몇 번씩 여는 화면과 매일 도는
+  /// 배치가 쓰는 축이고, 주문 쓰기는 사람이 결제를 누르는 속도로만 일어나기
+  /// 때문이다.
+  ///
+  /// 축이 또 옮겨 가면 `apps/web/test/order-index.test.ts` 가 잡는다.
+  @@index([paidAt])
+  @@index([status, canceledAt])
+  @@index([status, confirmedAt])
+  @@index([status, deliveredAt])
   @@map("orders")
 }
 
