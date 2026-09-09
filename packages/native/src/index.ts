@@ -64,6 +64,18 @@ interface CapacitorBridge {
         event: 'appUrlOpen',
         handler: (data: { url: string }) => void,
       ): ListenerHandle | Promise<ListenerHandle>;
+      /**
+       * 안드로이드 뒤로 가기.
+       *
+       * **여기에 귀를 붙이는 순간 기본 동작이 사라진다.** 아무도 안 듣고
+       * 있으면 Capacitor 가 알아서 웹뷰 히스토리를 되돌리거나 앱을 닫는데,
+       * 리스너가 하나라도 있으면 그 판단이 통째로 우리 몫이 된다.
+       */
+      addListener(
+        event: 'backButton',
+        handler: (data: { canGoBack: boolean }) => void,
+      ): ListenerHandle | Promise<ListenerHandle>;
+      exitApp(): Promise<void> | void;
     };
     Share?: {
       share(options: { title?: string; text?: string; url?: string }): Promise<unknown>;
@@ -182,6 +194,45 @@ export function onAppUrlOpen(handler: (path: string) => void): () => void {
     stopped = true;
     void handle?.remove();
   };
+}
+
+/**
+ * 안드로이드 뒤로 가기를 받는다.
+ *
+ * **귀를 붙이면 기본 동작이 사라진다.** 그래서 되돌릴 곳이 있으면 우리가
+ * 되돌려 줘야 한다 — 안 그러면 앱 안에서 뒤로 가기가 아무 일도 안 한다.
+ *
+ * 셸 밖에서는 아무 일도 하지 않는다. 안드로이드에만 있는 단추다.
+ */
+export function onBackButton(handler: (canGoBack: boolean) => void): () => void {
+  const plugin = bridge()?.Plugins?.App;
+  if (!plugin) return () => undefined;
+
+  let handle: ListenerHandle | null = null;
+  let stopped = false;
+
+  void (async () => {
+    const opened = await plugin.addListener('backButton', ({ canGoBack }) => {
+      handler(canGoBack === true);
+    });
+    if (stopped) void opened.remove();
+    else handle = opened;
+  })();
+
+  return () => {
+    stopped = true;
+    void handle?.remove();
+  };
+}
+
+/**
+ * 앱을 닫는다.
+ *
+ * 안드로이드에만 뜻이 있다 — iOS 는 앱이 스스로 닫는 것을 허용하지 않고,
+ * 애초에 뒤로 가기 단추도 없다.
+ */
+export function exitApp(): void {
+  void bridge()?.Plugins?.App?.exitApp();
 }
 
 /** 'ios' | 'android' | 'web'. 셸 밖에서는 'web'. */

@@ -23,6 +23,7 @@ export const en: Dictionary = {
 
   'nav.skipToContent': 'Skip to content',
   'nav.menu': 'Menu',
+  'nav.exitHint': 'Press back again to exit.',
   'nav.categories': 'Main categories',
   'nav.categoriesPlain': 'Categories',
   'nav.categoriesFooter': 'Categories (footer)',

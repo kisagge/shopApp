@@ -26,6 +26,7 @@ export const ko = {
   // ── 헤더·푸터 ────────────────────────────────────────────
   'nav.skipToContent': '본문 바로가기',
   'nav.menu': '메뉴',
+  'nav.exitHint': '한 번 더 누르면 종료됩니다.',
   'nav.categories': '주요 카테고리',
   'nav.categoriesPlain': '카테고리',
   'nav.categoriesFooter': '카테고리 (푸터)',

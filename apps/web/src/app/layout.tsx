@@ -8,6 +8,7 @@ import { CartSync } from '~/components/cart-sync';
 import { NativeSession } from '~/components/native-session';
 import { NativeSplash } from '~/components/native-splash';
 import { NativeDeepLink } from '~/components/native-deep-link';
+import { NativeBackButton } from '~/components/native-back-button';
 import { ServiceWorker } from '~/components/service-worker';
 import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
@@ -126,6 +127,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <NativeSession />
             <NativeSplash />
             <NativeDeepLink />
+            <NativeBackButton />
             <ServiceWorker />
           </Providers>
         </LocaleProvider>

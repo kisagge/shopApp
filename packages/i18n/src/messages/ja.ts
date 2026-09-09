@@ -19,6 +19,7 @@ export const ja: Dictionary = {
 
   'nav.skipToContent': '本文へスキップ',
   'nav.menu': 'メニュー',
+  'nav.exitHint': 'もう一度押すと終了します。',
   'nav.categories': '主なカテゴリー',
   'nav.categoriesPlain': 'カテゴリー',
   'nav.categoriesFooter': 'カテゴリー (フッター)',
