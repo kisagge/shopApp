@@ -5,15 +5,25 @@ import { format, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin/orders';
+import { ORDER_STATUS } from '@shop/core';
 import { isOrderStatus } from '~/lib/queries/mypage';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '주문 관리' };
 export const dynamic = 'force-dynamic';
 
-const FILTERS: readonly OrderStatus[] = [
-  'PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'RETURN_REQUESTED', 'CANCELLED',
-];
+/**
+ * 걸러 볼 상태.
+ *
+ * **손으로 적지 않는다.** 일곱 개를 적어 두었더니 구매확정·반품완료·환불완료가
+ * 빠져 있었다 — 운영자에게 그 셋은 정산과 대사가 걸린 자리인데 "전체" 에서
+ * 눈으로 찾아야 했다. 상태가 하나 늘면 여기도 함께 늘어야 하는데, 그걸
+ * 기억에 맡기면 언젠가 어긋난다.
+ *
+ * 손님 화면은 넷을 "취소·반품" 한 칸으로 묶는다. 여기서는 묶지 않는다 —
+ * 운영자에게 반품접수와 환불완료는 **서로 다른 할 일**이다.
+ */
+const FILTERS: readonly OrderStatus[] = ORDER_STATUS;
 
 export default async function AdminOrdersPage({
   searchParams,

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ORDER_STATUS, ORDER_STATUS_LABEL } from '@shop/core';
 import { ready } from './state';
 
 /** 운영자가 보는 화면 */
@@ -254,4 +255,26 @@ test('쿠폰 대상도 같은 창구를 쓴다', async ({ page }) => {
 
   // 찾은 것이 하나라도 떠야 대상 지정을 할 수 있다. 결과는 체크박스로 나온다.
   await expect(page.getByRole('checkbox', { name: /코트/ }).first()).toBeVisible();
+});
+
+test('주문 관리에서 모든 상태를 걸러 볼 수 있다', async ({ page }) => {
+  /*
+   * **일곱 개만 적어 두었더니 셋이 빠져 있었다.** 구매확정·반품완료·환불완료
+   * 는 운영자에게 정산과 대사가 걸린 자리인데, 탭이 없어 "전체" 에서 눈으로
+   * 찾아야 했다.
+   *
+   * 목록을 여기 다시 적지 않는다. **core 가 아는 상태를 그대로 받아** 화면에
+   * 그 이름이 다 있는지 본다 — 상태가 하나 늘면 이 명세가 먼저 진다.
+   */
+  await page.goto('/admin/orders');
+
+  const tabs = page.getByRole('navigation', { name: '주문 상태 필터' });
+  await expect(tabs).toBeVisible();
+
+  const labels = await tabs.locator('a').evaluateAll((els) =>
+    els.map((e) => e.textContent?.trim() ?? ''),
+  );
+
+  const missing = ORDER_STATUS.filter((s) => !labels.includes(ORDER_STATUS_LABEL[s]));
+  expect(missing, '이 상태들은 탭이 없어 전체에서 눈으로 찾아야 한다').toEqual([]);
 });
