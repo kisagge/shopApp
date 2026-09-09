@@ -54,7 +54,7 @@ export type UpdateCouponInput = z.infer<typeof updateCouponSchema>;
 
 /** 코드로 직접 받기 */
 export const claimCouponSchema = z.object({
-  code: z.string().trim().min(1, 'valid.couponCodeRequired').max(30),
+  code: z.string().trim().min(1, 'valid.couponCodeRequired').max(30, 'valid.tooLongChars'),
 });
 
 /** 어드민이 여러 사용자에게 지급 */
