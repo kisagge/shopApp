@@ -9,6 +9,10 @@
  * 네이티브 쪽 플러그인 등록은 apps/mobile 이 맡는다 — 거기에만 의존성이 있다.
  */
 
+interface ListenerHandle {
+  remove(): unknown;
+}
+
 interface CapacitorBridge {
   isNativePlatform?: () => boolean;
   getPlatform?: () => string;
@@ -50,10 +54,16 @@ interface CapacitorBridge {
      * 여기뿐이라, 그 값을 받아 화면을 옮긴다.
      */
     App?: {
+      /**
+       * **약속을 돌려준다고 믿으면 안 된다.** 네이티브 다리는 핸들을 그냥
+       * 돌려주고, 웹 구현은 약속으로 감싸 준다. `.then()` 을 직접 부르면
+       * 앞의 경우에 터지는데 — 실제로 그렇게 앱이 오류 화면으로 떨어졌다.
+       * 브라우저에서는 이 코드가 아예 안 돌아서 아무도 못 봤다.
+       */
       addListener(
         event: 'appUrlOpen',
         handler: (data: { url: string }) => void,
-      ): Promise<{ remove(): Promise<void> }>;
+      ): ListenerHandle | Promise<ListenerHandle>;
     };
     Share?: {
       share(options: { title?: string; text?: string; url?: string }): Promise<unknown>;
@@ -144,9 +154,16 @@ export function onAppUrlOpen(handler: (path: string) => void): () => void {
   const plugin = bridge()?.Plugins?.App;
   if (!plugin || typeof window === 'undefined') return () => undefined;
 
-  let remove: (() => Promise<void>) | null = null;
-  void plugin
-    .addListener('appUrlOpen', ({ url }) => {
+  let handle: ListenerHandle | null = null;
+  let stopped = false;
+
+  void (async () => {
+    /*
+     * **await 로 받는다.** 이 자리는 핸들이 그대로 오기도 하고 약속으로
+     * 감싸여 오기도 하는데, await 는 둘 다 받는다. 처음에 .then() 을
+     * 직접 불렀다가 앱이 오류 화면으로 떨어졌다.
+     */
+    const opened = await plugin.addListener('appUrlOpen', ({ url }) => {
       try {
         const incoming = new URL(url);
         if (incoming.origin !== window.location.origin) return;
@@ -154,13 +171,16 @@ export function onAppUrlOpen(handler: (path: string) => void): () => void {
       } catch {
         // 주소로 읽히지 않는 것은 우리 것이 아니다
       }
-    })
-    .then((handle) => {
-      remove = () => handle.remove();
     });
 
+    // 붙기 전에 화면이 떠났으면 바로 뗀다. 남겨 두면 죽은 화면이 듣는다.
+    if (stopped) void opened.remove();
+    else handle = opened;
+  })();
+
   return () => {
-    void remove?.();
+    stopped = true;
+    void handle?.remove();
   };
 }
 

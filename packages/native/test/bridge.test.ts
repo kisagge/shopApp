@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   isNativeShell, nativePlatform, hydrateSessionToken, sessionToken,
   saveSessionToken, clearSessionToken, resetSessionTokenForTest, nativeGoogleIdToken,
+  onAppUrlOpen,
 } from '../src/index';
 
 /** 셸이 웹뷰에 주입해 주는 것을 흉내 낸다 */
@@ -171,5 +172,76 @@ describe('네이티브 구글 로그인', () => {
     installSocial({ idToken: null }, { login: vi.fn(() => Promise.reject(new Error('취소'))) });
 
     await expect(nativeGoogleIdToken(ids)).rejects.toThrow('취소');
+  });
+});
+
+describe('링크로 앱이 열렸을 때', () => {
+  /**
+   * **핸들이 그대로 오기도 하고 약속으로 감싸여 오기도 한다.**
+   *
+   * 실제로 Capacitor 8 의 네이티브 다리는 핸들을 그냥 돌려준다. 거기에
+   * `.then()` 을 부르면 터지는데, 브라우저에서는 이 코드가 아예 안 돌아서
+   * 아무도 못 봤다 — 앱을 폰에 올리고 나서야 오류 화면으로 드러났다.
+   */
+  const cases = [
+    ['핸들을 그대로 돌려주는 다리', (h: unknown) => h],
+    ['약속으로 감싸 주는 다리', (h: unknown) => Promise.resolve(h)],
+  ] as const;
+
+  it.each(cases)('%s 에서도 터지지 않는다', async (_name, wrap) => {
+    const remove = vi.fn();
+    let fire: ((data: { url: string }) => void) | null = null;
+    installBridge({
+      Plugins: {
+        App: {
+          addListener: vi.fn((_e: string, handler: (d: { url: string }) => void) => {
+            fire = handler;
+            return wrap({ remove });
+          }),
+        },
+      },
+    });
+
+    const seen: string[] = [];
+    const stop = onAppUrlOpen((path) => seen.push(path));
+    await Promise.resolve();
+
+    // 같은 출처여야 넘어간다 — jsdom 이 쓰는 주소를 그대로 쓴다
+    fire!({ url: `${window.location.origin}/product/wool-coat?x=1#reviews` });
+    expect(seen).toEqual(['/product/wool-coat?x=1#reviews']);
+
+    stop();
+    await Promise.resolve();
+    expect(remove).toHaveBeenCalled();
+  });
+
+  it('다른 출처의 주소는 넘기지 않는다', async () => {
+    /*
+     * 웹뷰에는 주소창이 없다. 밖에서 준 주소를 그대로 열면 사용자는 자기가
+     * 어디에 있는지 알 수 없다.
+     */
+    let fire: ((data: { url: string }) => void) | null = null;
+    installBridge({
+      Plugins: {
+        App: {
+          addListener: vi.fn((_e: string, handler: (d: { url: string }) => void) => {
+            fire = handler;
+            return { remove: vi.fn() };
+          }),
+        },
+      },
+    });
+
+    const seen: string[] = [];
+    onAppUrlOpen((path) => seen.push(path));
+    await Promise.resolve();
+
+    fire!({ url: 'https://남의사이트.example/product/x' });
+    fire!({ url: '주소가 아님' });
+    expect(seen).toEqual([]);
+  });
+
+  it('셸 밖에서는 아무 일도 하지 않는다', () => {
+    expect(() => onAppUrlOpen(() => undefined)()).not.toThrow();
   });
 });
