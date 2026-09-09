@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './render';
 import userEvent from '@testing-library/user-event';
 
 const native = vi.hoisted(() => ({ nativeShare: vi.fn<(o: unknown) => Promise<boolean>>() }));

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from './render';
 import { describe, it, expect, vi } from 'vitest';
 import { ratingBreakdown, sizeFitSummary } from '@shop/core';
-import { createTranslator } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn<(...a: any[]) => any>() }) }));
 

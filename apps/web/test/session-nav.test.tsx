@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const session = vi.hoisted(() => {

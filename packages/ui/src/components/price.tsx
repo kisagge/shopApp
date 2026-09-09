@@ -1,11 +1,11 @@
 import type { Won } from '@shop/core';
 import {
-  createTranslator,
   moneyParts,
   formatMoney,
   DEFAULT_LOCALE,
   type Locale,
 } from '@shop/i18n';
+import { uiText } from '../lib/ui-text';
 import { cn } from '../lib/cn';
 import { VisuallyHidden } from './visually-hidden';
 
@@ -45,7 +45,7 @@ export function Price({
   locale = DEFAULT_LOCALE,
 }: PriceProps) {
   const s = SIZE[size];
-  const t = createTranslator(locale);
+
   const money = moneyParts(locale, amount);
   const hasDiscount = listPrice !== undefined && discountPercent !== undefined && discountPercent > 0;
 
@@ -59,14 +59,14 @@ export function Price({
     <p data-price={amount} className={cn('flex flex-col gap-0.5', className)}>
       {hasDiscount && (
         <span className={cn('tnum text-n-500', s.strike)}>
-          <VisuallyHidden>{t('price.listPrice')} </VisuallyHidden>
+          <VisuallyHidden>{uiText(locale, 'price.listPrice')} </VisuallyHidden>
           <s>{formatMoney(locale, listPrice)}</s>
         </span>
       )}
       <span className="flex items-baseline gap-1.5">
         {hasDiscount && (
           <span className={cn('tnum font-semibold text-accent', s.current)}>
-            {discountPercent}%<VisuallyHidden> {t('price.discount')}</VisuallyHidden>
+            {discountPercent}%<VisuallyHidden> {uiText(locale, 'price.discount')}</VisuallyHidden>
           </span>
         )}
         <span className={cn('tnum font-semibold text-[var(--fg)]', s.current)}>

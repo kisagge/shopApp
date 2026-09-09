@@ -3,7 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 vi.mock('@shop/db', () => ({ prisma: { user: { findUnique: vi.fn() } } }));
 
 const { verifyEmailMail, resetPasswordMail } = await import('../src/mail');
-const { LOCALES, createTranslator } = await import('@shop/i18n');
+const { LOCALES } = await import('@shop/i18n');
+const { createTranslator } = await import('@shop/i18n/all');
 
 /**
  * 인증 메일 문안.

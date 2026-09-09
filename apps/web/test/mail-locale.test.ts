@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { LOCALES, createTranslator } from '@shop/i18n';
+import { LOCALES } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 import { restockMail, inquiryAnswerMail } from '~/lib/mail/notices';
 import { localeOf } from '~/lib/mail/recipient';
 

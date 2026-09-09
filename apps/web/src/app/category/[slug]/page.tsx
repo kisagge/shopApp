@@ -3,14 +3,13 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
 import { resolvePriceRange, emptyResultReason } from '@shop/core';
-import { categoryName } from '@shop/i18n';
 import { getCategoryWithChildren } from '~/lib/queries/catalog/products';
 import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
-import { getLocale, getT } from '~/lib/i18n/server';
+import { getT } from '~/lib/i18n/server';
 import { EMPTY_RESULT_KEY } from '~/lib/i18n/empty-result';
 
 export const dynamic = 'force-dynamic';
@@ -22,13 +21,9 @@ interface Params {
 
 export async function generateMetadata({ params }: Pick<Params, 'params'>): Promise<Metadata> {
   const { slug } = await params;
-  const [category, locale, t] = await Promise.all([
-    getCategoryWithChildren(slug),
-    getLocale(),
-    getT(),
-  ]);
+  const [category, t] = await Promise.all([getCategoryWithChildren(slug), getT()]);
   return {
-    title: category ? categoryName(locale, category.slug, category.name) : t('nav.categoriesPlain'),
+    title: category ? t.category(category.slug, category.name) : t('nav.categoriesPlain'),
   };
 }
 
@@ -57,9 +52,9 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   ]);
   if (!category) notFound();
 
-  const [locale, t] = await Promise.all([getLocale(), getT()]);
+  const t = await getT();
   const products = page.items;
-  const title = categoryName(locale, category.slug, category.name);
+  const title = t.category(category.slug, category.name);
 
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
@@ -75,7 +70,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
               <li aria-hidden="true" className="text-[11px] text-n-300">/</li>
               <li>
                 <Link href={`/category/${category.parent.slug}`} className="text-xs text-[var(--fg-muted)]">
-                  {categoryName(locale, category.parent.slug, category.parent.name)}
+                  {t.category(category.parent.slug, category.parent.name)}
                 </Link>
               </li>
             </>
@@ -114,7 +109,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
             {category.children.map((c) => (
               <li key={c.slug} className="shrink-0">
                 <Link href={`/category/${c.slug}`} className="inline-flex h-12 items-center whitespace-nowrap px-4 text-sm text-[var(--fg-muted)]">
-                  {categoryName(locale, c.slug, c.name)}
+                  {t.category(c.slug, c.name)}
                 </Link>
               </li>
             ))}

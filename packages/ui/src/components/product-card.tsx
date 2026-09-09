@@ -1,6 +1,7 @@
 import type { ComponentType, ReactNode } from 'react';
 import type { Won } from '@shop/core';
-import { createTranslator, DEFAULT_LOCALE, type Locale } from '@shop/i18n';
+import { DEFAULT_LOCALE, type Locale } from '@shop/i18n';
+import { uiText } from '../lib/ui-text';
 import { cn } from '../lib/cn';
 import { Badge } from './badge';
 import { Price } from './price';
@@ -127,7 +128,7 @@ export function ProductCard({
 }: ProductCardProps) {
   const Link = linkComponent ?? DefaultLink;
   const Image = imageComponent ?? DefaultImage;
-  const t = createTranslator(locale);
+
   return (
     <article className={cn('relative flex flex-col gap-2.5', className)}>
       {wishlistButton && (
@@ -169,7 +170,7 @@ export function ProductCard({
           )}
           {soldOut && (
             <span className="absolute inset-0 flex items-center justify-center bg-[var(--bg)]/70 text-sm font-medium text-[var(--fg-secondary)]">
-              {t('catalog.soldOut')}
+              {uiText(locale, 'catalog.soldOut')}
             </span>
           )}
         </div>
@@ -199,7 +200,7 @@ export function ProductCard({
               <span className="tnum">{rating.toFixed(1)}</span>
               <span aria-hidden="true">·</span>
               <span>
-                {t('product.reviewCount', { count: reviewCount })}
+                {uiText(locale, 'product.reviewCount', { count: reviewCount })}
               </span>
             </p>
           )}

@@ -1,8 +1,9 @@
 import 'server-only';
 import { escapeHtml, mailShell, mailButton, type MailMessage } from '@shop/core';
 import {
-  createTranslator, formatMoney, formatDateTime, isLocale, DEFAULT_LOCALE, type Locale,
+  formatMoney, formatDateTime, isLocale, DEFAULT_LOCALE, type Locale,
 } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
 

@@ -1,6 +1,7 @@
 import 'server-only';
 import { escapeHtml, mailShell, mailButton, type MailMessage } from '@shop/core';
-import { createTranslator, type Locale } from '@shop/i18n';
+import type { Locale } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 
 /**
  * 재입고 · 문의 답변 문안.

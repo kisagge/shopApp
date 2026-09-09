@@ -1,16 +1,15 @@
 import Link from 'next/link';
-import { categoryName } from '@shop/i18n';
 import { getTopCategories } from '~/lib/queries/catalog/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';
 import { CartBadge } from './cart-badge';
 import { SearchBox } from './search-box';
 import { NotificationBell } from './notification-bell';
-import { getLocale, getT } from '~/lib/i18n/server';
+import { getT } from '~/lib/i18n/server';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
 export async function SiteHeader() {
-  const [categories, locale, t] = await Promise.all([getTopCategories(), getLocale(), getT()]);
+  const [categories, t] = await Promise.all([getTopCategories(), getT()]);
 
   /*
    * sticky + safe-t 는 웹뷰 때문이다.
@@ -39,7 +38,7 @@ export async function SiteHeader() {
                   href={`/category/${c.slug}`}
                   className="inline-flex h-11 items-center px-4 text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
-                  {categoryName(locale, c.slug, c.name)}
+                  {t.category(c.slug, c.name)}
                 </Link>
               </li>
             ))}

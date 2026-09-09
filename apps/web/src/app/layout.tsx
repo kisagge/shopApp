@@ -14,7 +14,7 @@ import { SiteHeader } from '~/components/site-header';
 import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
-import { getLocale, getT } from '~/lib/i18n/server';
+import { getDictionary, getLocale, getT } from '~/lib/i18n/server';
 import { LocaleProvider } from '~/lib/i18n/client';
 
 /**
@@ -97,7 +97,7 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [locale, t] = await Promise.all([getLocale(), getT()]);
+  const [locale, t, dict] = await Promise.all([getLocale(), getT(), getDictionary()]);
 
   return (
     /* lang 이 틀리면 낭독기가 한국어를 영어 발음으로 읽는다 */
@@ -109,7 +109,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {t('nav.skipToContent')}
         </a>
-        <LocaleProvider locale={locale}>
+        <LocaleProvider locale={locale} dict={dict}>
           <Providers>
             <div className="flex min-h-dvh flex-col">
               <SiteHeader />

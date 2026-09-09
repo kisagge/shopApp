@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { createTranslator, messageKeys, LOCALES } from '@shop/i18n';
+import { LOCALES } from '@shop/i18n';
+import { createTranslator, messageKeys } from '@shop/i18n/all';
 
 /**
  * 계약의 검증 문구가 실제로 있는 사전 열쇠인지 지킨다.

@@ -1,6 +1,7 @@
 import { prisma } from '@shop/db';
 import { escapeHtml, mailShell, mailButton, type MailMessage } from '@shop/core';
-import { createTranslator, isLocale, resolveLocale, type Locale } from '@shop/i18n';
+import { isLocale, resolveLocale, type Locale } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 
 /**
  * 인증 메일 문안.

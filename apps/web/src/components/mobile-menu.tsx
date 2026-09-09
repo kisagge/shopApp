@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { categoryName } from '@shop/i18n';
 import { SessionNav } from './session-nav';
 import { SearchBox } from './search-box';
-import { useLocale, useT } from '~/lib/i18n/client';
+import { useT } from '~/lib/i18n/client';
 
 type Category = { slug: string; name: string };
 
@@ -30,7 +29,6 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
-  const locale = useLocale();
   const t = useT();
 
   /**
@@ -101,7 +99,7 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
                   href={`/category/${c.slug}`}
                   className="flex h-12 items-center text-sm text-[var(--fg)] no-underline"
                 >
-                  {categoryName(locale, c.slug, c.name)}
+                  {t.category(c.slug, c.name)}
                 </Link>
               </li>
             ))}

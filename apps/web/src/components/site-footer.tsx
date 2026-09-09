@@ -1,11 +1,10 @@
 import Link from 'next/link';
-import { categoryName } from '@shop/i18n';
 import { getTopCategories } from '~/lib/queries/catalog/products';
-import { getLocale, getT } from '~/lib/i18n/server';
+import { getT } from '~/lib/i18n/server';
 import { LocaleSwitcher } from './locale-switcher';
 
 export async function SiteFooter() {
-  const [categories, locale, t] = await Promise.all([getTopCategories(), getLocale(), getT()]);
+  const [categories, t] = await Promise.all([getTopCategories(), getT()]);
 
   return (
     <footer className="safe-b mt-20 border-t border-[var(--border)] bg-[var(--surface)]">
@@ -23,7 +22,7 @@ export async function SiteFooter() {
                   href={`/category/${c.slug}`}
                   className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
-                  {categoryName(locale, c.slug, c.name)}
+                  {t.category(c.slug, c.name)}
                 </Link>
               </li>
             ))}

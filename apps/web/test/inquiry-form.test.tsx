@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { render, screen } from './render';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTranslator } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 
 const refresh = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));

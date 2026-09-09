@@ -4,7 +4,8 @@ import {
   ORDER_STATUS_LABEL, RETURN_TYPE_LABEL, RETURN_REASON_LABEL,
   CLOSURE_EFFECT, CLOSURE_BLOCK,
 } from '@shop/core';
-import { LOCALES, createTranslator, messageKeys } from '@shop/i18n';
+import { LOCALES } from '@shop/i18n';
+import { createTranslator, messageKeys } from '@shop/i18n/all';
 import { ORDER_STATUS_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY } from '~/lib/i18n/enum-labels';
 import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
 

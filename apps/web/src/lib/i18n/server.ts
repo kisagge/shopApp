@@ -2,13 +2,14 @@ import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { unstable_rethrow } from 'next/navigation';
 import {
-  createTranslator,
   resolveLocale,
   DEFAULT_LOCALE,
   LOCALE_COOKIE,
+  type Dictionary,
   type Locale,
   type Translator,
 } from '@shop/i18n';
+import { createTranslator, DICTIONARIES } from '@shop/i18n/all';
 
 /**
  * 이번 요청의 언어.
@@ -54,3 +55,14 @@ export const getLocale = cache(async (): Promise<Locale> => {
 
 /** 이번 요청의 문구 사전 */
 export const getT = cache(async (): Promise<Translator> => createTranslator(await getLocale()));
+
+/**
+ * 이번 요청의 사전.
+ *
+ * **화면으로 사전을 내려보내는 유일한 문**이다. 브라우저 코드가 사전을
+ * import 하면 번들러는 셋을 다 넣는다 — 고르는 일이 실행 시각인데 import 는
+ * 빌드 시각이기 때문이다. 실제로 그랬고, 한국어 화면 하나가 영어·일본어까지
+ * 받았다. 여기서 골라 `LocaleProvider` 의 prop 으로 넘기면 고른 한 벌만
+ * RSC 페이로드를 타고 간다.
+ */
+export const getDictionary = cache(async (): Promise<Dictionary> => DICTIONARIES[await getLocale()]);

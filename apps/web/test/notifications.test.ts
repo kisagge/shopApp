@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { createTranslator } from '@shop/i18n';
+import { createTranslator } from '@shop/i18n/all';
 import { notificationText } from '~/lib/i18n/notification';
 
 const db = vi.hoisted(() => ({

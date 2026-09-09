@@ -20,11 +20,5 @@ export {
   formatDate,
   formatDateTime,
 } from './format';
-export {
-  createTranslator,
-  categoryName,
-  messageKeys,
-  FALLBACK_TRANSLATOR,
-  type Translator,
-} from './translate';
+export { translatorFor, type Translator } from './translate';
 export type { MessageKey, Dictionary } from './messages/ko';

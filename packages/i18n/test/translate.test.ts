@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTranslator, categoryName, messageKeys } from '../src/translate';
+import { createTranslator, messageKeys } from '../src/all';
 import { ko } from '../src/messages/ko';
 import { en } from '../src/messages/en';
 import { ja } from '../src/messages/ja';
@@ -71,13 +71,13 @@ describe('문구 만들기', () => {
 
 describe('카테고리 이름', () => {
   it('아는 카테고리는 그 언어로 부른다', () => {
-    expect(categoryName('en', 'outer', '아우터')).toBe('Outerwear');
-    expect(categoryName('ja', 'knit', '니트')).toBe('ニット');
-    expect(categoryName('ko', 'outer', '아우터')).toBe('아우터');
+    expect(createTranslator('en').category('outer', '아우터')).toBe('Outerwear');
+    expect(createTranslator('ja').category('knit', '니트')).toBe('ニット');
+    expect(createTranslator('ko').category('outer', '아우터')).toBe('아우터');
   });
 
   it('모르는 카테고리는 DB 이름을 그대로 쓴다 — 열쇠를 화면에 내보내지 않는다', () => {
-    expect(categoryName('en', 'brand-new', '신상 코너')).toBe('신상 코너');
+    expect(createTranslator('en').category('brand-new', '신상 코너')).toBe('신상 코너');
   });
 });
 
