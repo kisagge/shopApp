@@ -1,7 +1,6 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
-import { getSessionUser } from '@shop/auth/session';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -42,7 +41,7 @@ export default async function CheckoutSuccessPage({
     redirect('/checkout/fail?code=INVALID_CALLBACK');
   }
 
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect(`/login?next=${encodeURIComponent('/order/' + orderNo)}`);
 
   try {

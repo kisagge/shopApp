@@ -1,7 +1,6 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
-import { getSessionUser } from '@shop/auth/session';
 import { getDefaultAddress } from '~/lib/queries/orders';
 import { CheckoutForm } from '~/components/checkout-form';
 import { getT } from '~/lib/i18n/server';
@@ -13,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 export default async function CheckoutPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   // 주문 조회·취소·환불이 전부 계정에 묶여 있어 비회원 주문은 지원하지 않는다
   if (!user) redirect('/login?next=/checkout');
 

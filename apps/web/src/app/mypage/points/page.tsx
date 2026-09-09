@@ -1,9 +1,8 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { EXPIRY_NOTICE_DAYS, isPointReason } from '@shop/core';
-import { getSessionUser } from '@shop/auth/session';
 import { getPointHistory, getMyPageSummary, getExpiringPoints } from '~/lib/queries/mypage';
 import { formatDate, formatNumber } from '@shop/i18n';
 import { POINT_REASON_KEY } from '~/lib/i18n/enum-labels';
@@ -18,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 
 export default async function PointsPage() {
-  const session = await getSessionUser(await headers());
+  const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/points');
 
   const [summary, history, expiring, locale, t] = await Promise.all([

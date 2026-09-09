@@ -1,9 +1,8 @@
 import Image from 'next/image';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { getSessionUser } from '@shop/auth/session';
 import { getReviewableItems } from '~/lib/queries/reviews';
 import { ReviewForm } from './review-form';
 import { getT } from '~/lib/i18n/server';
@@ -17,7 +16,7 @@ export const dynamic = 'force-dynamic';
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
 export default async function WriteReviewsPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/reviews');
 
   const [items, t] = await Promise.all([getReviewableItems(user.id), getT()]);

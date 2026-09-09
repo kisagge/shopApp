@@ -1,10 +1,9 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { MERCHANT_STATUS_LABEL } from '@shop/core';
 import type { MerchantStatusInput } from '@shop/contract';
-import { getSessionUser } from '@shop/auth/session';
 import { getMyApplication } from '~/lib/merchant/apply';
 import { MerchantApplyForm } from '~/components/merchant-apply-form';
 import { getT } from '~/lib/i18n/server';
@@ -20,7 +19,7 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', {
 });
 
 export default async function MerchantApplyPage() {
-  const session = await getSessionUser(await headers());
+  const session = await getViewer();
   if (!session) redirect('/login?next=/merchant/apply');
 
   const [application, t] = await Promise.all([getMyApplication(session.id), getT()]);

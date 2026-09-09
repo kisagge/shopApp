@@ -1,6 +1,5 @@
-import { headers } from 'next/headers';
 import { ProductCard } from '@shop/ui';
-import { getSessionUser } from '@shop/auth/session';
+import { getViewer } from '~/lib/viewer';
 import { getLocale } from '~/lib/i18n/server';
 import type { ProductListItem } from '~/lib/queries/catalog/shelf';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
@@ -81,7 +80,7 @@ export async function ProductGrid({
    */
   compare?: boolean;
 }) {
-  const [viewer, locale] = await Promise.all([getSessionUser(await headers()), getLocale()]);
+  const [viewer, locale] = await Promise.all([getViewer(), getLocale()]);
   const wishlisted = viewer
     ? await getWishlistedIds(viewer.id, products.map((p) => p.id))
     : new Set<string>();

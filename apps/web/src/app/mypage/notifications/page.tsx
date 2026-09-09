@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { formatDateTime } from '@shop/i18n';
-import { getSessionUser } from '@shop/auth/session';
 import { getMyNotifications } from '~/lib/queries/notifications';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
@@ -17,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NotificationsPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/notifications');
 
   const [items, locale, t] = await Promise.all([

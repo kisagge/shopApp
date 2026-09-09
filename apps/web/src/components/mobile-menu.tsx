@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { SessionNav } from './session-nav';
+import { SessionNav, type NavUser } from './session-nav';
 import { SearchBox } from './search-box';
 import { useT } from '~/lib/i18n/client';
 
@@ -25,7 +25,14 @@ const PANEL_ID = 'mobile-menu-panel';
  * 대신 역할과 상태를 직접 말하는 버튼으로 간다. 자바스크립트가 없을 때의
  * 길은 푸터가 맡는다 — 카테고리 목록이 모든 페이지 아래에 있다.
  */
-export function MobileMenu({ categories }: { categories: Category[] }) {
+export function MobileMenu({
+  categories,
+  user,
+}: {
+  categories: Category[];
+  /** 서버가 알아본 사람. 메뉴는 쓰지 않고 SessionNav 로 흘려 보낸다. */
+  user: NavUser | null;
+}) {
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const pathname = usePathname();
@@ -116,7 +123,7 @@ export function MobileMenu({ categories }: { categories: Category[] }) {
         </nav>
 
         <div className="border-t border-[var(--border)] pt-3">
-          <SessionNav variant="menu" />
+          <SessionNav user={user} variant="menu" />
         </div>
       </div>
     </div>

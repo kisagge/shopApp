@@ -1,9 +1,8 @@
 import Image from 'next/image';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { getSessionUser } from '@shop/auth/session';
 import { getWishlist } from '~/lib/wishlist/wishlist';
 import { WishlistButton } from '~/components/wishlist-button';
 import { AppLink } from '~/components/app-link';
@@ -20,7 +19,7 @@ export const dynamic = 'force-dynamic';
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
 export default async function WishlistPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/wishlist');
 
   const [items, locale, t] = await Promise.all([getWishlist(user.id), getLocale(), getT()]);

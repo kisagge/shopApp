@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
+import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
-import { getSessionUser } from '@shop/auth/session';
 import { SIGNUP_POINTS } from '@shop/core';
 import { googleEnabled, googleNativeClientIds } from '@shop/auth';
 import { SignUpForm } from '~/components/signup-form';
@@ -16,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SignUpPage() {
   // 이미 로그인한 사람에게 가입 화면을 보여 줄 이유가 없다
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (user) redirect('/');
 
   const [locale, t] = await Promise.all([getLocale(), getT()]);

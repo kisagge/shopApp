@@ -1,16 +1,29 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { authClient, signOutEverywhere } from '@shop/auth/client';
+import { isNativeShell } from '@shop/native';
 import type { Translator } from '@shop/i18n';
 import { useT } from '~/lib/i18n/client';
 
 /**
  * 헤더의 로그인 상태 영역.
  *
- * 서버에서 세션을 읽어 넘길 수도 있지만, 그러면 헤더를 쓰는 모든 페이지가
- * 동적 렌더링으로 묶인다. 이 조각만 클라이언트에서 세션을 읽는다.
+ * **세션은 서버가 넘겨 준다.** 예전에는 이 조각이 `authClient.useSession()` 으로
+ * 직접 물었고, 그 이유가 "서버에서 읽으면 헤더를 쓰는 모든 페이지가 동적
+ * 렌더링으로 묶인다" 였다. 그 사이 화면이 늘어 **124개 라우트가 전부 이미
+ * 동적**이 되었다 — 이유는 사라지고 값만 남았다. better-auth 클라이언트가
+ * 모든 화면에 gzip 12KB 씩 따라오고 있었다.
+ *
+ * 서버가 주면 **깜빡임도 사라진다.** 예전에는 첫 그림에서 자리만 잡아 두고
+ * 세션이 오면 다시 그렸다.
+ *
+ * ── 네이티브 셸만의 예외 ────────────────────────────────────────
+ * 웹뷰는 앱을 다시 띄울 때 쿠키를 잃는 경우가 있고, 그때 서버는 세션을 보지
+ * 못한다. 앱은 그 대비로 토큰을 따로 들고 있다(Bearer). 그 경로를 위해
+ * **앱에서만** 클라이언트 세션을 한 번 더 물어 본다 — `import()` 로 부르므로
+ * 브라우저는 이 코드를 받지 않는다.
  */
 /**
  * 'header' 는 헤더 한 줄에 들어가는 가로 배치,
@@ -24,17 +37,25 @@ function roleLabel(t: Translator, role: string): string {
   return t('role.merchant');
 }
 
-export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
-  const { data, isPending } = authClient.useSession();
+export interface NavUser {
+  readonly id: string;
+  readonly name: string;
+  readonly role: string;
+}
+
+export function SessionNav({
+  user,
+  variant = 'header',
+}: {
+  user: NavUser | null;
+  variant?: Variant;
+}) {
   const router = useRouter();
   const t = useT();
 
   const menu = variant === 'menu';
-
-  if (isPending) {
-    // 레이아웃이 흔들리지 않게 자리만 잡아 둔다
-    return <span aria-hidden="true" className={menu ? 'block h-12' : 'inline-block h-5 w-24'} />;
-  }
+  const native = useNativeSession(user);
+  const data = user ?? native;
 
   if (!data) {
     return (
@@ -51,7 +72,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
     );
   }
 
-  const role = (data.user as { role?: string }).role;
+  const role = data.role;
   /*
    * 운영진·가맹점은 **콘솔로 가는 길이 화면에 있어야 한다.** 주소를 외워
    * 쳐야만 들어갈 수 있으면 없는 것과 같다. 권한 검사는 /admin 이 다시
@@ -64,7 +85,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
     return (
       <>
         <p className="flex h-9 items-center gap-1.5 text-sm text-[var(--fg-secondary)]">
-          {data.user.name}
+          {data.name}
           {role && role !== 'CUSTOMER' && (
             <span className="rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
               {roleLabel(t, role)}
@@ -84,9 +105,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
         )}
         <button
           type="button"
-          onClick={() => {
-            void signOutEverywhere().then(() => router.refresh());
-          }}
+          onClick={() => void signOut(router)}
           className="flex h-12 w-full items-center text-left text-sm text-[var(--fg-muted)]"
         >
           {t('nav.logout')}
@@ -104,7 +123,7 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
         {t('nav.mypage')}
       </Link>
       <span className="hidden text-xs text-[var(--fg-secondary)] sm:inline">
-        {data.user.name}
+        {data.name}
       </span>
       {/* 이름은 자리가 모자라면 감추지만 이 문은 남긴다 */}
       {staff && (
@@ -118,13 +137,48 @@ export function SessionNav({ variant = 'header' }: { variant?: Variant } = {}) {
       )}
       <button
         type="button"
-        onClick={() => {
-          void signOutEverywhere().then(() => router.refresh());
-        }}
+        onClick={() => void signOut(router)}
         className="shrink-0 text-xs text-[var(--fg-muted)] underline underline-offset-2"
       >
         {t('nav.logout')}
       </button>
     </span>
   );
+}
+
+/** 로그아웃은 사람이 누른 순간이다. 그때 받아도 늦지 않다. */
+async function signOut(router: ReturnType<typeof useRouter>): Promise<void> {
+  const { signOutEverywhere } = await import('@shop/auth/client');
+  await signOutEverywhere();
+  router.refresh();
+}
+
+/**
+ * 앱에서 쿠키가 날아갔을 때만 도는 보정.
+ *
+ * 서버가 이미 알아봤으면 아무것도 하지 않는다. 브라우저에서는
+ * `isNativeShell()` 이 false 라 `import()` 자체가 일어나지 않는다.
+ */
+function useNativeSession(known: NavUser | null): NavUser | null {
+  const [user, setUser] = useState<NavUser | null>(null);
+
+  useEffect(() => {
+    if (known !== null || !isNativeShell()) return;
+
+    let alive = true;
+    void (async () => {
+      const { authClient } = await import('@shop/auth/client');
+      const { data } = await authClient.getSession();
+      const session = data?.user as { id?: string; name?: string; role?: string } | undefined;
+      if (alive && session?.id) {
+        setUser({ id: session.id, name: session.name ?? '', role: session.role ?? 'CUSTOMER' });
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [known]);
+
+  return user;
 }

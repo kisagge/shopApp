@@ -1,40 +1,31 @@
 // @vitest-environment jsdom
 import { render, screen } from './render';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
-const session = vi.hoisted(() => {
-  const state: { data: unknown; isPending: boolean } = { data: null, isPending: false };
-  return state;
-});
-vi.mock('@shop/auth/client', () => ({
-  authClient: { useSession: () => session },
-  signOutEverywhere: vi.fn(),
-}));
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+
+/** 브라우저에서는 네이티브 보정이 돌지 않는다 */
+vi.mock('@shop/native', () => ({ isNativeShell: () => false }));
 
 const { SessionNav } = await import('~/components/session-nav');
 
-const signedIn = (role: string) => {
-  session.data = { user: { name: '장이든', role } };
-  session.isPending = false;
-};
+/**
+ * **세션은 서버가 넘겨 준다.** 예전에는 이 검사가 `authClient.useSession()` 을
+ * 갈아 끼웠는데, 그건 화면이 세션을 직접 묻던 시절의 모양이다.
+ */
+const signedIn = (role: string) => <SessionNav user={{ id: 'u1', name: '장이든', role }} />;
+const signedOut = <SessionNav user={null} />;
 
 const door = () => screen.queryByRole('link', { name: /페이지$/ });
 
-beforeEach(() => {
-  session.data = null;
-  session.isPending = false;
-});
-
 describe('운영 화면으로 가는 문', () => {
   it('손님에게는 없다', () => {
-    signedIn('CUSTOMER');
-    render(<SessionNav />);
+    render(signedIn('CUSTOMER'));
     expect(screen.queryByRole('link', { name: '관리자 페이지' })).toBeNull();
   });
 
   it('로그인하지 않았으면 없다', () => {
-    render(<SessionNav />);
+    render(signedOut);
     expect(door()).toBeNull();
   });
 
@@ -44,8 +35,7 @@ describe('운영 화면으로 가는 문', () => {
     ['MERCHANT', '가맹점 페이지'],
   ] as const) {
     it(`${role} 에게는 있다 — 주소를 외워 치게 하지 않는다`, () => {
-      signedIn(role);
-      render(<SessionNav />);
+      render(signedIn(role));
 
       const link = screen.getByRole('link', { name: label });
       expect(link).toHaveAttribute('href', '/admin');
@@ -53,8 +43,7 @@ describe('운영 화면으로 가는 문', () => {
   }
 
   it('모바일 메뉴에서도 같은 문을 낸다 — 좁은 화면이 이등 시민이 아니다', () => {
-    signedIn('ADMIN');
-    render(<SessionNav variant="menu" />);
+    render(<SessionNav user={{ id: 'u1', name: '장이든', role: 'ADMIN' }} variant="menu" />);
 
     expect(screen.getByRole('link', { name: '관리자 페이지' })).toHaveAttribute('href', '/admin');
   });

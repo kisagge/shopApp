@@ -2,7 +2,6 @@
 
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signOutEverywhere } from '@shop/auth/client';
 import { CLOSURE_CONFIRM_PHRASE, type ClosureBlock } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
@@ -56,6 +55,8 @@ export function CloseAccountForm() {
        * 세션 행을 지워도 Better Auth 의 쿠키 캐시(5분)는 DB 를 다시 보지
        * 않는다. 로그아웃까지 해야 지금 바로 끊긴다.
        */
+      // 인증 SDK 는 이 순간에만 필요하다. 화면 조각에 얹지 않는다.
+      const { signOutEverywhere } = await import('@shop/auth/client');
       await signOutEverywhere();
       router.replace('/account/closed');
       router.refresh();

@@ -1,5 +1,5 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
@@ -7,7 +7,6 @@ import {
   orderFilterStatuses, isOrderFilterGroup, ORDER_FILTER_TAB, type OrderStatus,
 } from '@shop/core';
 import { formatMoney } from '@shop/i18n';
-import { getSessionUser } from '@shop/auth/session';
 import { getMyOrders } from '~/lib/queries/mypage';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -31,7 +30,7 @@ export default async function MyOrdersPage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const session = await getSessionUser(await headers());
+  const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/orders');
 
   const { status } = await searchParams;

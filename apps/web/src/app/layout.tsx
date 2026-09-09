@@ -15,6 +15,7 @@ import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
 import { getDictionary, getLocale, getT } from '~/lib/i18n/server';
+import { getViewer } from '~/lib/viewer';
 import { LocaleProvider } from '~/lib/i18n/client';
 import { CompareTray } from '~/components/compare-tray';
 
@@ -98,7 +99,9 @@ export const viewport: Viewport = {
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [locale, t, dict] = await Promise.all([getLocale(), getT(), getDictionary()]);
+  const [locale, t, dict, viewer] = await Promise.all([
+    getLocale(), getT(), getDictionary(), getViewer(),
+  ]);
 
   return (
     /* lang 이 틀리면 낭독기가 한국어를 영어 발음으로 읽는다 */
@@ -125,7 +128,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {/* 실사용자 성능. 같은 파이프라인으로 나간다. */}
             <WebVitalsReporter />
             {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
-            <CartSync />
+            <CartSync userId={viewer?.id ?? null} />
             {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
             <NativeSession />
             <NativeSplash />

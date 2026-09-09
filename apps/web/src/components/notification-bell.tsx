@@ -1,7 +1,6 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
+import { getViewer } from '~/lib/viewer';
 import { formatUnread } from '@shop/core';
-import { getSessionUser } from '@shop/auth/session';
 import { countUnread } from '~/lib/queries/notifications';
 import { getT } from '~/lib/i18n/server';
 
@@ -16,7 +15,7 @@ import { getT } from '~/lib/i18n/server';
  * 로그인하지 않았으면 아무것도 그리지 않는다.
  */
 export async function NotificationBell() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) return null;
 
   const [unread, t] = await Promise.all([countUnread(user.id), getT()]);

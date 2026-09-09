@@ -1,9 +1,8 @@
 import Link from 'next/link';
-import { headers } from 'next/headers';
+import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { prisma } from '@shop/db';
-import { getSessionUser } from '@shop/auth/session';
 import { Badge } from '@shop/ui';
 import { RestockRow } from '~/components/restock-row';
 import { getT } from '~/lib/i18n/server';
@@ -44,7 +43,7 @@ async function load(userId: string) {
 }
 
 export default async function RestockPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/restock');
   const t = await getT();
 

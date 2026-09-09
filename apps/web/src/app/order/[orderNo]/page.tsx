@@ -1,9 +1,8 @@
-import { headers } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
-import { getSessionUser } from '@shop/auth/session';
 import {
   isCancellableByCustomer, canRequestReturn,
   type ReturnType, type ReturnReason, type ReturnStatus,
@@ -24,7 +23,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function OrderPage({ params }: { params: Promise<{ orderNo: string }> }) {
   const { orderNo } = await params;
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login');
 
   const [order, locale, t] = await Promise.all([

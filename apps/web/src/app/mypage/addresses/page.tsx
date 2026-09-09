@@ -1,7 +1,6 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
-import { getSessionUser } from '@shop/auth/session';
 import { listAddresses } from '~/lib/addresses/manage-address';
 import { AddressBook } from '~/components/address-book';
 import { getT } from '~/lib/i18n/server';
@@ -13,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 export default async function AddressesPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/addresses');
   const t = await getT();
 

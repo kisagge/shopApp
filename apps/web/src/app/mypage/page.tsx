@@ -1,12 +1,11 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, GRADE_REWARD_PERCENT,
 } from '@shop/core';
-import { getSessionUser } from '@shop/auth/session';
 import { getMyPageSummary, getMyOrders, TRACKED_STATUSES } from '~/lib/queries/mypage';
 import { formatDate, formatMoney, formatPercent } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -20,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 export default async function MyPage() {
-  const session = await getSessionUser(await headers());
+  const session = await getViewer();
   if (!session) redirect('/login?next=/mypage');
 
   const [summary, recent, locale, t] = await Promise.all([

@@ -1,9 +1,8 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
+import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { formatDateTime } from '@shop/i18n';
-import { getSessionUser } from '@shop/auth/session';
 import { getMyInquiries } from '~/lib/queries/inquiries';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
@@ -16,7 +15,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function MyInquiriesPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/inquiries');
 
   const [page, locale, t] = await Promise.all([

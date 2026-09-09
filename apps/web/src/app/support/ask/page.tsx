@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
-import { headers } from 'next/headers';
-import { getSessionUser } from '@shop/auth/session';
 import { getT } from '~/lib/i18n/server';
 import { SupportAskForm } from '~/components/support-ask-form';
 import { NO_INDEX } from '~/lib/no-index';
@@ -13,7 +12,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AskPage() {
-  const [t, viewer] = await Promise.all([getT(), getSessionUser(await headers())]);
+  const [t, viewer] = await Promise.all([getT(), getViewer()]);
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 pb-24 md:px-10">

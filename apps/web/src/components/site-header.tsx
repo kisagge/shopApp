@@ -6,10 +6,11 @@ import { CartBadge } from './cart-badge';
 import { SearchBox } from './search-box';
 import { NotificationBell } from './notification-bell';
 import { getT } from '~/lib/i18n/server';
+import { getViewer } from '~/lib/viewer';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
 export async function SiteHeader() {
-  const [categories, t] = await Promise.all([getTopCategories(), getT()]);
+  const [categories, t, viewer] = await Promise.all([getTopCategories(), getT(), getViewer()]);
 
   /*
    * sticky + safe-t 는 웹뷰 때문이다.
@@ -24,7 +25,7 @@ export async function SiteHeader() {
     <header className="safe-t relative sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
       <div className="mx-auto flex h-13 w-full max-w-[1280px] items-center gap-3 px-4 md:h-19 md:gap-6 md:px-10">
         {/* 좁은 화면에서 카테고리·검색·계정으로 가는 유일한 통로 */}
-        <MobileMenu categories={categories} />
+        <MobileMenu categories={categories} user={viewer} />
 
         <p className="font-serif text-[21px] font-medium tracking-[0.18em] md:text-[25px]">
           <Link href="/" className="text-[var(--fg)] no-underline">PLAIN</Link>
@@ -60,7 +61,7 @@ export async function SiteHeader() {
             <SearchBox id="site-search" />
           </form>
           <span className="hidden md:inline-flex md:items-center">
-            <SessionNav />
+            <SessionNav user={viewer} />
           </span>
           {/* 좁은 화면에서도 남긴다 — 알림은 놓치면 뜻이 없다 */}
           <NotificationBell />

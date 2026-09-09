@@ -1,8 +1,7 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { prisma } from '@shop/db';
-import { getSessionUser } from '@shop/auth/session';
 import { CouponWallet } from '~/components/coupon-wallet';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -48,7 +47,7 @@ async function loadWallet(userId: string) {
 }
 
 export default async function CouponsPage() {
-  const user = await getSessionUser(await headers());
+  const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/coupons');
   const t = await getT();
 

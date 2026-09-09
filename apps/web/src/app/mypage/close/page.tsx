@@ -1,9 +1,8 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { CLOSURE_EFFECT } from '@shop/core';
-import { getSessionUser } from '@shop/auth/session';
 import { inspectClosure } from '~/lib/account/close-account';
 import { CloseAccountForm } from '~/components/close-account-form';
 import type { MessageKey } from '@shop/i18n';
@@ -17,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export const dynamic = 'force-dynamic';
 
 export default async function CloseAccountPage() {
-  const session = await getSessionUser(await headers());
+  const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/close');
 
   /*
