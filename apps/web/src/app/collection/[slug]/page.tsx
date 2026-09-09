@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { getCollection, getCollectionSlugMovedTo } from '~/lib/queries/catalog/collections';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
-import { CollectionHero } from '~/components/collection-hero';
+import { CollectionHero, COLLECTION_HERO_SIZES } from '~/components/collection-hero';
 import { getT } from '~/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +51,7 @@ export default async function CollectionPage({ params }: Params) {
           blurDataUrl={collection.blurDataUrl}
           imageCredit={collection.imageCredit}
           tone={collection.tone}
-          sizes="100vw"
+          sizes={COLLECTION_HERO_SIZES}
           priority
           headingLevel={1}
         />

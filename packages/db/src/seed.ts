@@ -565,6 +565,32 @@ async function main(): Promise<void> {
       },
     });
 
+    /*
+     * **자리표시 사진 한 장.** 사진이 아예 없으면 카드에 <img> 가 안
+     * 그려지고, 그러면 "받아 오는 사진이 자리보다 크지 않은가" 같은 검사가
+     * 볼 것이 없어 CI 에서 아무 일도 하지 않는다 — 상품 격자는 이 매대에서
+     * 사진이 가장 많이 쓰이는 자리인데 그랬다.
+     *
+     * 진짜 사진은 seed:photos 가 나중에 덮는다. 그쪽은 "저장소에 올라간
+     * 것(http)" 만 사진으로 치므로 이 한 장이 길을 막지 않는다.
+     */
+    await prisma.productImage.upsert({
+      where: { id: `seedimg${product.id}` },
+      update: {},
+      create: {
+        id: `seedimg${product.id}`,
+        productId: product.id,
+        url: '/seed/product.png',
+        /*
+         * 카드는 `imageUrl && imageAlt` 일 때만 사진을 그린다 — 빈 글자를
+         * 넣었더니 사진이 있는데도 자리표시 색만 나왔다. 진짜 사진이
+         * 받는 것과 같은 말을 적는다.
+         */
+        alt: `${brand.name} ${p.name}`,
+        sortOrder: 0,
+      },
+    });
+
     const colorGroup = await prisma.productOptionGroup.upsert({
       where: { productId_name: { productId: product.id, name: '색상' } },
       update: { sortOrder: 0 },

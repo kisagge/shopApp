@@ -1,6 +1,31 @@
 import Image from 'next/image';
 import { isBlurDataUrl } from '@shop/core';
 
+/**
+ * 이 사진이 실제로 차지하는 폭.
+ *
+ * **부르는 쪽마다 따로 적고 있었다.** 셋이 같은 컨테이너 안에 있는데 각자
+ * `50vw` · `100vw` 를 적어 두어서, 본문이 1280px 에서 멈춘다는 사실을
+ * 아무도 반영하지 않았다 — 1512px 화면에서 592px 자리에 1920px 짜리를
+ * 받아 왔다(1.6배). 여기 한 벌만 두면 갈라질 수가 없다.
+ *
+ * 여백(px-4 md:px-10)과 칸 사이(gap-4)를 뺀다. **모자라게 적으면 브라우저가
+ * 작은 사진을 골라 흐릿해지므로** 조금 넉넉하게 적는다 — 틀리는 방향은
+ * 한쪽뿐이다.
+ */
+export const COLLECTION_CARD_SIZES = [
+  '(min-width: 1280px) 600px',
+  '(min-width: 768px) calc(50vw - 48px)',
+  'calc(100vw - 32px)',
+].join(', ');
+
+/** 한 칸을 통째로 쓰는 자리(기획전 상세의 머리) */
+export const COLLECTION_HERO_SIZES = [
+  '(min-width: 1280px) 1200px',
+  '(min-width: 768px) calc(100vw - 80px)',
+  'calc(100vw - 32px)',
+].join(', ');
+
 const TONE_CLASS: Record<string, string> = {
   sand: 'bg-ph-sand', stone: 'bg-ph-stone', clay: 'bg-ph-clay',
   olive: 'bg-ph-olive', mist: 'bg-ph-mist',

@@ -223,7 +223,9 @@ async function main(): Promise<void> {
     select: {
       id: true, slug: true, name: true,
       brand: { select: { name: true } },
-      _count: { select: { images: true } },
+      // 자리표시(앱 안의 /seed/…)는 사진으로 치지 않는다 — 그것을 사진으로
+      // 읽으면 진짜 사진이 영영 올라가지 않는다. 바깥에 올라간 것만 진짜다.
+      images: { where: { url: { startsWith: 'http' } }, select: { id: true } },
     },
   });
 
@@ -232,8 +234,8 @@ async function main(): Promise<void> {
   let created = 0;
 
   for (const product of products) {
-    if (product._count.images > 0) {
-      console.log(`건너뜀 ${product.name} — 이미 ${product._count.images}장`);
+    if (product.images.length > 0) {
+      console.log(`건너뜀 ${product.name} — 이미 ${product.images.length}장`);
       continue;
     }
 

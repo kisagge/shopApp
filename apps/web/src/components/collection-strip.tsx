@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import type { CollectionCard } from '~/lib/queries/catalog/collections';
-import { CollectionHero } from './collection-hero';
+import { CollectionHero, COLLECTION_CARD_SIZES } from './collection-hero';
 import { getT } from '~/lib/i18n/server';
+
 
 /** 홈의 기획전 줄. 배너가 데려갈 곳이 카테고리뿐이던 자리를 메운다. */
 export async function CollectionStrip({
@@ -41,7 +42,7 @@ export async function CollectionStrip({
                 imageCredit={c.imageCredit}
                 tone={c.tone}
                 // md 부터 두 칸이다. 그 아래로는 한 칸.
-                sizes="(min-width: 768px) 50vw, 100vw" 
+                sizes={COLLECTION_CARD_SIZES} 
               />
             </Link>
           </li>

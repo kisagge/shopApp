@@ -26,6 +26,7 @@ const OUT = join(HERE, '..', 'public', 'seed');
 const FILES = [
   { name: 'collection.png', width: 1200, height: 800, tone: 'clay', variant: 0 },
   { name: 'banner.png', width: 1600, height: 900, tone: 'sand', variant: 1 },
+  { name: 'product.png', width: 800, height: 1000, tone: 'stone', variant: 2 },
 ];
 
 mkdirSync(OUT, { recursive: true });

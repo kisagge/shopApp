@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { getLiveCollections } from '~/lib/queries/catalog/collections';
-import { CollectionHero } from '~/components/collection-hero';
+import { CollectionHero, COLLECTION_CARD_SIZES } from '~/components/collection-hero';
 import { getT } from '~/lib/i18n/server';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +47,7 @@ export default async function CollectionsPage() {
                   blurDataUrl={c.blurDataUrl}
                   imageCredit={c.imageCredit}
                   tone={c.tone}
-                  sizes="(min-width: 768px) 50vw, 100vw" 
+                  sizes={COLLECTION_CARD_SIZES} 
                 />
               </Link>
             </li>
