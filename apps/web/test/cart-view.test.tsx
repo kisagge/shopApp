@@ -225,3 +225,34 @@ describe('장바구니 — 줄을 지운 뒤 초점', () => {
     expect(document.activeElement).toBe(document.body);
   });
 });
+
+/**
+ * 견적에 코드를 보내지 않으면 서버가 가장 많이 깎이는 쿠폰을 붙인다.
+ * 그러면 장바구니에 보이는 값이 곧 지금 사면 낼 값이 된다 — 다만 **왜
+ * 싸졌는지**를 함께 말해야 한다.
+ */
+describe('자동으로 붙은 쿠폰', () => {
+  it('할인액과 쿠폰 이름을 함께 보여 준다', () => {
+    useCartStore.setState({ items: [item()] });
+    useCartQuote.mockReturnValue(
+      ok(quote({
+        couponDiscount: 30_000,
+        couponName: '가을 아우터 20%',
+        couponCode: 'AUTUMN20',
+        payable: 183_000,
+      })),
+    );
+    render(<CartView />);
+
+    expect(screen.getByText(/가을 아우터 20%/)).toBeInTheDocument();
+    expect(screen.getByText('-30,000원')).toBeInTheDocument();
+  });
+
+  it('붙은 쿠폰이 없으면 그 줄을 그리지 않는다 — 0원짜리 줄은 읽는 사람만 헷갈린다', () => {
+    useCartStore.setState({ items: [item()] });
+    useCartQuote.mockReturnValue(ok(quote()));
+    render(<CartView />);
+
+    expect(screen.queryByText(/쿠폰 할인/)).toBeNull();
+  });
+});

@@ -333,6 +333,14 @@ function Summary({
             {row(t('cart.subtotal'), money(q.listTotal))}
             {q.productDiscount > 0 &&
               row(t('cart.productDiscount'), `-${money(q.productDiscount)}`, 'accent')}
+            {/*
+              **장바구니에도 쿠폰이 붙는다.** 견적에 코드를 보내지 않으면 서버가
+              가장 많이 깎이는 것을 붙이므로, 여기 보이는 값이 곧 지금 사면 낼
+              값이다. 어느 쿠폰인지 이름을 함께 적는다 — 이름 없이 금액만
+              줄어들면 사람은 왜 싸졌는지 모른 채 결제로 넘어간다.
+              바꾸는 것은 주문서에서 한다. 장바구니는 담는 자리지 고르는
+              자리가 아니다.
+            */}
             {q.couponDiscount > 0 &&
               row(
                 q.couponName
