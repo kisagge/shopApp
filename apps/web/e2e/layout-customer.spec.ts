@@ -1,5 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { layoutTests } from './layout';
+import { layoutTests, layoutProblems, WIDTHS } from './layout';
+import { STATE_FILE } from './state';
+import { addFirstProductToCart } from './state';
+
+/*
+ * 주문 상세를 재려면 주문을 하나 만들어야 하고, 그러려면 장바구니를 쥔다.
+ * **서버 장바구니는 계정에 하나뿐이라** 남과 나눠 쓰면 한쪽이 비우는 순간
+ * 다른 쪽이 사라진다. 자기 손님을 따로 둔다.
+ */
+test.use({ storageState: STATE_FILE.cartLayout });
+test.describe.configure({ mode: 'serial' });
 
 /**
  * 로그인해야 보이는 화면의 자리.
@@ -22,3 +32,55 @@ layoutTests(test, expect, [
   // 담긴 것이 없으면 빈 화면이지만, 빈 화면도 무너질 수 있다
   ['결제', '/checkout'],
 ]);
+
+/**
+ * 주문 상세는 **돈이 줄줄이 적히는 화면**이다 — 상품·수량·할인·배송비·결제수단이
+ * 한 표에 들어간다.
+ *
+ * **자기 자료를 스스로 만든다.** 처음에는 주문 목록에서 첫 줄을 눌러 들어가게
+ * 했는데, 시드가 심는 주문은 리뷰어 계정 것이고 이 계정 것은 앞선 검사가
+ * 우연히 남긴 것이었다 — 새로 시드한 DB 에서는 목록이 비어 30초를 기다리다
+ * 졌다. 우연한 자료에 기대는 검사는 언젠가 진다.
+ *
+ * **끝나면 되돌린다.** 진짜 DB 를 건드리므로 흔적을 남기면 재고가 마른다.
+ * 폭마다 다시 만들지 않고 한 번 만들어 넷을 다 잰다.
+ */
+test('주문 상세는 어느 폭에서도 자리가 무너지지 않는다', async ({ page }) => {
+  const variantId = await addFirstProductToCart(page);
+  test.skip(variantId === null, '재고 있는 조합이 없어 담지 못했다');
+
+  const addresses = await page.request.get('/api/addresses');
+  const { addresses: list } = (await addresses.json()) as { addresses: { id: string }[] };
+  expect(list[0]?.id, '배송지가 하나는 있어야 한다').toBeTruthy();
+
+  const created = await page.request.post('/api/orders', {
+    data: {
+      lines: [{ variantId, quantity: 1 }],
+      addressId: list[0]!.id,
+      paymentMethod: 'CARD' as const,
+      agreedToTerms: true as const,
+      idempotencyKey: `layout-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+    },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const { orderNo } = (await created.json()) as { orderNo: string };
+
+  try {
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto(`/order/${orderNo}`, { waitUntil: 'domcontentloaded' });
+
+      const problems = await layoutProblems(page);
+
+      expect(
+        problems,
+        `주문 상세 ${width}px 에서 자리가 어긋났다.\n` +
+          problems.map((p) => `  · ${p.kind}: ${p.detail}`).join('\n'),
+      ).toEqual([]);
+    }
+  } finally {
+    await page.request.post(`/api/orders/${orderNo}/cancel`, {
+      data: { reason: '검사가 만든 주문을 되돌립니다' },
+    });
+  }
+});

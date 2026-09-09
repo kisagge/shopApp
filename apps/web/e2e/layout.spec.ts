@@ -41,6 +41,14 @@ layoutTests(test, expect, [
   ['비밀번호 재설정', '/reset-password'],
   ['결제 실패', '/checkout/fail'],
   ['입점 신청', '/merchant/apply'],
+  /*
+   * 동적 경로도 재야 한다. 주소를 지어낼 수는 없지만 **시드가 심어 둔 것은
+   * 안다** — 접근성 훑기가 쓰는 방법과 같다. 브랜드·기획전·공지 상세는
+   * 목록과 마크업이 달라서 목록만 재면 한 번도 안 본 화면이 된다.
+   */
+  ['브랜드', '/brand/studio-noon'],
+  ['기획전', '/collection/winter-outer'],
+  ['공지 상세', '/support/notice/seed-notice-hours'],
   ['상품 비교', '/compare?slugs=oversized-wool-coat,single-chesterfield-coat'],
   // 실기기에서 검색 버튼이 잘렸던 자리다. 닫힌 채로는 보이지 않는다.
   ['사이드바 열림', '/', openMenu],

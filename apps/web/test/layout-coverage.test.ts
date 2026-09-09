@@ -26,7 +26,24 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   '/offline':
     '서비스워커가 네트워크가 끊겼을 때만 꺼내는 화면이라 주소로 열어도 그 상태가 아니다.',
   '/account/closed': '탈퇴 직후에만 뜻이 있는 안내 한 장이다. 상자에 담긴 글자가 없다.',
-  '/admin/products/[id]': '동적 경로는 주소를 지어낼 수 없다. 목록(/admin/products)이 같은 표를 쓴다.',
+};
+
+/**
+ * 동적 경로는 주소를 지어낼 수 없다. 대신 훑기가 **어떻게 그 화면에 닿는지**를
+ * 여기 적는다 — 시드가 심어 둔 주소를 그대로 쓰거나, 목록에서 눌러 들어간다.
+ *
+ * 처음에는 동적 경로를 통째로 건너뛰었다. 그런데 거기에 주문 상세가 있었다 —
+ * 상품·수량·할인·배송비가 한 표에 들어가는, 이 앱에서 표가 가장 빽빽한 화면이다.
+ */
+const DYNAMIC: Readonly<Record<string, string>> = {
+  '/product/[slug]': '시드 상품 주소를 그대로 연다',
+  '/category/[slug]': '시드 카테고리 주소를 그대로 연다',
+  '/brand/[slug]': '시드 브랜드 주소를 그대로 연다',
+  '/collection/[slug]': '시드 기획전 주소를 그대로 연다',
+  '/support/notice/[id]': '시드 공지 주소를 그대로 연다',
+  '/order/[orderNo]': '주문 목록에서 첫 줄을 눌러 들어간다',
+  '/admin/orders/[orderNo]': '운영 주문 표에서 첫 줄을 눌러 들어간다',
+  '/admin/products/[id]': '운영 상품 표에서 첫 줄을 눌러 들어간다',
 };
 
 function routes(dir: string, prefix = ''): string[] {
@@ -57,7 +74,6 @@ describe('자리 훑기의 범위', () => {
     expect(swept().size).toBeGreaterThan(20);
   });
 
-  /** 동적 경로는 주소를 지어낼 수 없다. 접근성 훑기와 같은 이유로 뺀다. */
   it('정적 경로는 훑거나, 왜 안 훑는지 적혀 있다', () => {
     const covered = swept();
     const missing = all
@@ -71,12 +87,25 @@ describe('자리 훑기의 범위', () => {
     ).toEqual([]);
   });
 
-  it('빼 둔 화면이 전부 실제로 있다 — 목록만 남고 화면이 사라지면 안 된다', () => {
-    const known = new Set(all);
-    expect(Object.keys(EXCLUDED).filter((r) => !known.has(r))).toEqual([]);
+  /** 동적 경로도 누가 재는지 적혀 있어야 한다. 통째로 건너뛰면 주문 상세가 샌다. */
+  it('동적 경로도 어떻게 닿는지 적혀 있다', () => {
+    const missing = all.filter((r) => r.includes('[')).filter((r) => !(r in DYNAMIC));
+
+    expect(
+      missing,
+      '이 화면들은 동적 경로라 주소를 지어낼 수 없다.\n' +
+        '훑기가 어떻게 닿는지(시드 주소·목록에서 누르기) DYNAMIC 에 적는다.',
+    ).toEqual([]);
   });
 
-  it('빼 둔 이유가 이름만 적힌 것이 아니다', () => {
+  it('빼 둔 화면과 동적 경로가 전부 실제로 있다 — 목록만 남고 화면이 사라지면 안 된다', () => {
+    const known = new Set(all);
+    expect([...Object.keys(EXCLUDED), ...Object.keys(DYNAMIC)].filter((r) => !known.has(r)))
+      .toEqual([]);
+  });
+
+  it('적어 둔 이유가 이름만 있는 것이 아니다', () => {
     expect(Object.entries(EXCLUDED).filter(([, why]) => why.trim().length < 20)).toEqual([]);
+    expect(Object.entries(DYNAMIC).filter(([, how]) => how.trim().length < 10)).toEqual([]);
   });
 });
