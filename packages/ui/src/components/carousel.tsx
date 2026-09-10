@@ -79,6 +79,24 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
 
   const autoAdvance = !single && playing && !reduceMotion && intervalMs > 0;
 
+  /*
+   * **사용자가 넘기면 시계를 다시 시작한다.**
+   *
+   * 예전에는 이 시계가 붙은 뒤로 혼자 6초마다 울렸고, 사용자가 밀거나 화살표를
+   * 눌러도 그대로였다. 그래서 다음 울림 직전에 사람이 넘기면 **0.1초 만에 또
+   * 넘어갔다.**
+   *
+   * 배너가 둘일 때 이것이 특히 고약하다. 밀어서 2번을 보고, 곧바로 화살표를
+   * 누르면 — 그 사이 시계가 1번으로 돌려놓은 뒤라 — 다시 2번이 되어 **누르기
+   * 전과 같은 화면**이 된다. 누른 사람 눈에는 버튼이 안 먹은 것으로 보이고,
+   * 잠시 기다렸다 누르면 그때는 멀쩡히 움직인다. 실제로 그렇게 신고됐다.
+   *
+   * `index` 를 의존성에 넣으면 화면이 바뀔 때마다 시계가 새로 걸린다. 사람이
+   * 넘겼든 시계가 넘겼든, **마지막으로 바뀐 때부터** 온전히 6초를 센다.
+   *
+   * 마우스나 포커스로 멈추는 것은 손으로 만지는 화면에는 없다 —
+   * mouseenter 가 안 오기 때문이다. 그쪽에서는 이 되감기가 유일한 방어다.
+   */
   useEffect(() => {
     if (!autoAdvance) return;
     const timer = window.setInterval(() => {
@@ -88,7 +106,7 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
       setIndex((i) => (i + 1) % count);
     }, intervalMs);
     return () => window.clearInterval(timer);
-  }, [autoAdvance, count, intervalMs]);
+  }, [autoAdvance, count, intervalMs, index]);
 
   /**
    * 넘길 만큼 밀었는가.

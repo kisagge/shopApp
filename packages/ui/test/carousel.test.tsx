@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Carousel } from '../src/components/carousel';
@@ -229,11 +229,57 @@ describe('손가락으로 밀기', () => {
     expect(screen.getByText('첫 배너 링크')).toBeVisible();
   });
 
+  it('민 뒤 곧바로 화살표를 눌러도 이어서 넘어간다', async () => {
+    const user = userEvent.setup();
+    render(<Carousel slides={slides} label="기획전 배너" />);
+    swipe([300, 100], [100, 105]);
+    await user.click(screen.getByRole('button', { name: /다음 배너/ }));
+    expect(screen.getAllByRole('link')[0]?.textContent).toBe('셋 배너 링크');
+  });
+
   it('배너가 하나뿐이면 밀어도 아무 일이 없다', () => {
     render(<Carousel slides={[slides[0]!]} label="배너" intervalMs={0} />);
     const only = screen.getByText('첫 배너 링크').closest('div')!.parentElement!;
     fireEvent.touchStart(only, { touches: [{ clientX: 300, clientY: 100 }] });
     fireEvent.touchEnd(only, { changedTouches: [{ clientX: 100, clientY: 100 }] });
     expect(screen.getByText('첫 배너 링크')).toBeVisible();
+  });
+});
+
+/**
+ * 사용자가 넘긴 직후에 시계가 끼어들지 않는다.
+ *
+ * **신고된 증상은 "밀고 나서 곧바로 화살표를 누르면 안 움직인다" 였다.**
+ * 버튼은 멀쩡했다 — 자동 넘김 시계가 사용자의 조작과 무관하게 6초마다
+ * 울리고 있었고, 울리기 직전에 사람이 넘기면 곧바로 한 장 더 넘어갔다.
+ * 배너가 둘이면 한 바퀴 돌아 **누르기 전과 같은 화면**이 된다.
+ */
+describe('사용자가 넘긴 직후의 자동 넘김', () => {
+  it('사용자가 넘기면 자동 넘김 시계도 다시 시작한다', () => {
+    vi.useFakeTimers();
+    try {
+      render(<Carousel slides={slides} label="기획전 배너" intervalMs={6000} />);
+
+      // 울리기 직전까지 간다
+      act(() => { vi.advanceTimersByTime(5900); });
+      expect(screen.getAllByRole('link')[0]?.textContent).toBe('첫 배너 링크');
+
+      // 그 자리에서 사람이 직접 넘긴다
+      act(() => { screen.getByRole('button', { name: /다음 배너/ }).click(); });
+      expect(screen.getAllByRole('link')[0]?.textContent).toBe('둘 배너 링크');
+
+      // 방금 넘겼으니 0.1초 만에 또 넘어가면 안 된다
+      act(() => { vi.advanceTimersByTime(100); });
+      expect(
+        screen.getAllByRole('link')[0]?.textContent,
+        '사용자가 넘긴 지 0.1초 만에 저절로 또 넘어갔다',
+      ).toBe('둘 배너 링크');
+
+      // 온전히 6초가 지나면 그때 넘어간다
+      act(() => { vi.advanceTimersByTime(6000); });
+      expect(screen.getAllByRole('link')[0]?.textContent).toBe('셋 배너 링크');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
