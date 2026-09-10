@@ -7,6 +7,9 @@ import { useCompare } from '~/stores/compare';
 import { CompareToggle } from '~/components/compare-toggle';
 import { CompareTray } from '~/components/compare-tray';
 
+const path = vi.hoisted(() => ({ now: '/category/outer-coat' }));
+vi.mock('next/navigation', () => ({ usePathname: () => path.now }));
+
 vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>{children}</a>
@@ -17,7 +20,10 @@ vi.mock('next/link', () => ({
 
 const coat = (n: number) => ({ slug: `coat-${n}`, categorySlug: 'outer-coat', name: `코트 ${n}` });
 
-beforeEach(() => useCompare.setState({ items: [] }));
+beforeEach(() => {
+  useCompare.setState({ items: [] });
+  path.now = '/category/outer-coat';
+});
 
 describe('비교 담기', () => {
   it('체크박스다 — 눌러 보지 않아도 담겼는지 보인다', async () => {
@@ -110,6 +116,54 @@ describe('비교함 띠', () => {
     useCompare.setState({ items: [coat(1)] });
     render(<CompareTray />);
 
+    expect(screen.getByRole('complementary', { name: '비교함' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * 사는 흐름에서는 비교함을 띄우지 않는다.
+ *
+ * **폰에서 주문을 못 하고 있었다.** 장바구니의 `주문하기` 막대는 z-index 가
+ * 없고 비교함은 z-40 이라, 비교함에 뭔가 담아 둔 사람에게는 띠가 버튼을
+ * 통째로 덮었다 — 버튼 한가운데를 짚으면 비교함의 '빼기' 가 잡혔다.
+ * 결제 화면에서는 그 131px 이 키보드 위 공간까지 먹어, 받는 사람 칸과의
+ * 여유가 1px 이었다.
+ */
+describe('사는 흐름에서는 비교함이 없다', () => {
+  const 담기 = () => useCompare.setState({ items: [coat(1), coat(2)] });
+
+  it('장바구니에서는 그리지 않는다', () => {
+    담기();
+    path.now = '/cart';
+    render(<CompareTray />);
+    expect(screen.queryByRole('complementary', { name: '비교함' })).toBeNull();
+  });
+
+  it('결제 화면에서도 그리지 않는다', () => {
+    담기();
+    path.now = '/checkout';
+    render(<CompareTray />);
+    expect(screen.queryByRole('complementary', { name: '비교함' })).toBeNull();
+  });
+
+  it('결제 아래 화면에서도 그리지 않는다 — /checkout/fail 같은 곳', () => {
+    담기();
+    path.now = '/checkout/fail';
+    render(<CompareTray />);
+    expect(screen.queryByRole('complementary', { name: '비교함' })).toBeNull();
+  });
+
+  it('고르는 화면에서는 그대로 뜬다 — 숨기는 것이 번지면 안 된다', () => {
+    담기();
+    path.now = '/category/outer-coat';
+    render(<CompareTray />);
+    expect(screen.getByRole('complementary', { name: '비교함' })).toBeInTheDocument();
+  });
+
+  it('이름이 비슷한 다른 화면까지 숨기지 않는다', () => {
+    담기();
+    path.now = '/cartoon';
+    render(<CompareTray />);
     expect(screen.getByRole('complementary', { name: '비교함' })).toBeInTheDocument();
   });
 });

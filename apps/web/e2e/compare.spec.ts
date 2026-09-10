@@ -85,3 +85,62 @@ test('다른 줄이 위에, 같은 줄이 아래에 묶인다', async ({ page })
   expect(sameAt, '같은 줄 묶음이 없다 — 두 코트는 몇 줄이 같아야 한다').toBeGreaterThan(0);
   expect(priceAt).toBeLessThan(sameAt);
 });
+
+/**
+ * 비교함이 주문 버튼을 덮고 있었다.
+ *
+ * **폰에서 주문을 못 했다.** 장바구니의 `주문하기` 막대는 z-index 가 없고
+ * 비교함은 z-40 이라, 비교함에 뭔가 담아 둔 사람에게는 띠가 버튼을 통째로
+ * 덮었다 — 실기기에서 버튼 한가운데를 짚으니 비교함의 '빼기' 가 잡혔다.
+ *
+ * 좁은 화면에서만 드러난다. md 위로는 장바구니 막대가 흐름 안으로 돌아가
+ * 겹칠 일이 없다.
+ */
+test.describe('좁은 화면의 아래쪽 막대', () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test('비교함이 주문 버튼을 덮지 않는다', async ({ page }) => {
+    // 비교함에 둘을 담는다
+    await page.goto(COAT);
+    await ready(page);
+    const boxes = page.getByRole('checkbox', { name: /코트/ });
+    await boxes.nth(0).check();
+    await boxes.nth(1).check();
+
+    // 같은 손님이 장바구니에도 하나 담는다
+    await page.getByRole('link', { name: /코트/ }).first().click();
+    await page.waitForURL(/\/product\//);
+    for (const group of await page.getByRole('radiogroup').all()) {
+      const pick = group.getByRole('radio').filter({ hasNot: page.locator('[aria-disabled="true"]') });
+      await pick.first().click();
+    }
+    await page.getByRole('button', { name: '장바구니 담기' }).click();
+
+    await page.goto('/cart');
+    const order = page.getByRole('button', { name: /주문하기/ });
+
+    /*
+     * **먼저 보이는지부터 본다.** 되돌려 보니 비교함이 덮은 버튼은
+     * 아예 보이지 않는 것으로 판정된다 — 그 단계에서 이미 걸린다.
+     */
+    await expect(order, '비교함이 덮어 버튼이 보이지 않는다').toBeVisible();
+
+    /*
+     * **보이는 것만으로는 모자라다.** 반쯤 덮여도 보이기는 한다.
+     * 버튼 한가운데에 실제로 무엇이 있는지 묻는다.
+     */
+    const box = (await order.boundingBox())!;
+    const onTop = await page.evaluate(
+      ({ x, y }) => {
+        const el = document.elementFromPoint(x, y);
+        return el?.closest('[aria-label="비교함"]') ? '비교함' : (el?.tagName ?? '없음');
+      },
+      { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+    );
+    expect(onTop, '주문 버튼 위에 비교함이 덮여 있다').not.toBe('비교함');
+
+    // 그리고 실제로 눌려서 결제로 간다
+    await order.click();
+    await expect(page).toHaveURL(/\/checkout/);
+  });
+});

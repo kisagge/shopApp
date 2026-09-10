@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { MIN_COMPARE } from '@shop/core';
 import { useCompare } from '~/stores/compare';
 import { useT } from '~/lib/i18n/client';
@@ -13,14 +14,30 @@ import { AppLink } from './app-link';
  *
  * 하나만 담았을 때도 **사라지지 않고 남는다.** 담은 것이 보이지 않으면
  * 사람은 자기가 눌렀는지조차 확신하지 못한다. 대신 견주기 단추를 잠근다.
+ *
+ * **사는 흐름에서는 뜨지 않는다.** 장바구니와 결제 화면에는 이 앱이 쓰는
+ * 아래쪽 조작 막대가 이미 있다. 폰에서 재 보니 비교함(z-40)이 장바구니의
+ * `주문하기` 막대(z 없음)를 **통째로 덮고 있었다** — 버튼 한가운데를 짚으면
+ * 비교함의 '빼기' 가 잡혔다. 비교함에 뭔가 담아 둔 사람은 폰에서 주문을
+ * 할 수 없었다는 뜻이다.
+ *
+ * 겹침을 z-index 로 푸는 대신 **띄우지 않는다.** 견주는 일과 사는 일은 다른
+ * 단계고, 결제 화면에서는 131px 짜리 띠가 키보드 위 공간까지 먹는다 —
+ * 실기기에서 재니 받는 사람 칸과의 여유가 1px 이었다.
  */
+
+/** 이 아래에서는 비교함을 띄우지 않는다. 저마다 아래쪽 조작 막대가 있다. */
+const BUYING = ['/cart', '/checkout'];
+
 export function CompareTray() {
   const items = useCompare((s) => s.items);
   const remove = useCompare((s) => s.remove);
   const clear = useCompare((s) => s.clear);
+  const pathname = usePathname();
   const t = useT();
 
   if (items.length === 0) return null;
+  if (BUYING.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   const enough = items.length >= MIN_COMPARE;
   const href = `/compare?slugs=${items.map((i) => i.slug).join(',')}` as const;
