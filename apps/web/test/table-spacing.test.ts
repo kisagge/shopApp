@@ -28,6 +28,21 @@ function walk(dir: string): string[] {
 const TABLE = /<table([^>]*)>([\s\S]{0,1200}?)<\/thead>/g;
 
 describe('표의 칸 사이 여백', () => {
+  /*
+   * **훑기가 헛돌면 아래가 전부 통과한다.** 두 검사 모두 "어긋난 것이 없다"
+   * 를 말하는데, 훑어서 아무것도 못 찾아도 어긋난 것은 없다. 뿌리를 빈
+   * 폴더로 바꿔 돌려 보니 실제로 둘 다 통과했다 — 표가 열넷 있는 저장소에서.
+   */
+  it('찾는 것이 있다 — 표를 못 찾으면 아래가 전부 통과한다', () => {
+    const files = walk(SRC);
+    expect(files.length, '.tsx 를 하나도 못 찾았다').toBeGreaterThan(100);
+
+    const tables = files.flatMap((file) => [
+      ...readFileSync(file, 'utf8').matchAll(/<table[^>]*>/g),
+    ]);
+    expect(tables.length, '표를 하나도 못 찾았다').toBeGreaterThan(10);
+  });
+
   it('모든 표가 칸 사이를 벌린다', () => {
     const offenders: string[] = [];
 

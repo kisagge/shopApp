@@ -20,6 +20,10 @@ import { join, dirname, resolve } from 'node:path';
  * **번들은 하나도 안 갈렸다** — Turbopack 이 한 layout 이 참조하는 클라이언트
  * 모듈들을 한 청크로 합쳤고, 셋이 같은 청크 목록을 받았다. 그래서 이 검사는
  * 소스가 아니라 **빌드 결과**를 본다. 빌드가 없으면 소스 검사로 내려간다.
+ *
+ * 그래서 **CI 는 빌드를 검사보다 먼저 돌려야 한다.** 한동안 반대였고, 그동안
+ * 아래 첫 검사는 한 번도 돌지 않았다 — `test/ci-order.test.ts` 가 그 순서를
+ * 지킨다.
  */
 
 const ROOT = resolve(import.meta.dirname, '../../..');

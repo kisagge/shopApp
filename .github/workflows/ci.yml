@@ -101,11 +101,13 @@ jobs:
       - name: 타입체크
         run: pnpm turbo run typecheck
 
-      - name: 테스트
-        run: pnpm turbo run test
-
+      # 빌드가 먼저다 — client-dictionary 검사가 .next/static/chunks 를 본다.
+      # 검사를 먼저 돌리면 그 검사는 조용히 건너뛴다. test/ci-order.test.ts 참고.
       - name: 빌드
         run: pnpm turbo run build
+
+      - name: 테스트
+        run: pnpm turbo run test
 
       # E2E 는 브라우저와 DB 가 있어야 돈다. 단위 테스트가 다 끝난 뒤에
       # 돌려서, 빠르고 값싼 검사가 먼저 걸리게 한다.

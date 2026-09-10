@@ -80,11 +80,17 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
       .filter((f) => f.endsWith('.ts'))
       .map((f) => readFileSync(join(dir, f), 'utf8'))
       .join('\n');
+    /*
+     * **훑기가 헛돌면 이 검사가 통과한다.** 폴더를 빈 곳으로 바꿔 돌려 보니
+     * `missing` 이 비어 그대로 통과했다. 훑은 것이 있는지 먼저 못 박는다.
+     */
+    const found: string[] = [];
     const missing: string[] = [];
 
     for (const m of src.matchAll(/export async function (\w+)\s*\(([\s\S]*?)\)[^{]*\{/g)) {
       const [, name, args] = m;
       if (!args?.includes('Actor')) continue;
+      found.push(name!);
       const at = (m.index ?? 0) + m[0].length;
       const body = src.slice(at, at + 800);
       // 공용 가드(assertAdminQuery)든 직접 확인이든, 무엇이든 보아야 한다
@@ -92,6 +98,7 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
       if (!guarded) missing.push(name!);
     }
 
+    expect(found.length, 'Actor 를 받는 어드민 조회를 하나도 못 찾았다').toBeGreaterThan(5);
     expect(missing).toEqual([]);
   });
 });

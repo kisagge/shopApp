@@ -49,7 +49,12 @@ pnpm --filter @shop/auth run seed
 echo "▸ audit"
 node tooling/audit.mjs
 
-for step in lint typecheck test build e2e; do
+# **빌드가 검사보다 먼저다.** client-dictionary 검사는 소스가 아니라 빌드
+# 결과(.next/static/chunks)를 본다 — 소스만 보면 Turbopack 이 청크를 합치는
+# 것을 못 보기 때문이다. 위에서 .next 를 지우므로, 검사를 먼저 돌리면 그
+# 검사는 건너뛴다. 실제로 그렇게 한 번도 안 돌고 있었다. 순서는 ci.yml 과
+# 함께 test/ci-order.test.ts 가 지킨다.
+for step in lint typecheck build test e2e; do
   echo "▸ $step"
   pnpm turbo run "$step"
 done
