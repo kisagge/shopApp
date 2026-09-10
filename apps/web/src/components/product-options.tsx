@@ -131,6 +131,14 @@ export function ProductOptions({
           variant="secondary"
           className="flex-1"
           aria-disabled={!canAdd}
+          /*
+           * 옆의 구매하기는 못 누를 때 이름 자체가 '옵션을 선택하세요' 로
+           * 바뀌는데 이쪽은 안 바뀌었다. 낭독기에는 "장바구니 담기, 사용
+           * 불가" 만 들리고 왜인지는 어디에도 없었다. 이름은 그대로 두고
+           * 이유만 덧붙인다 — 담는 버튼과 가는 버튼을 이름으로 구분해야
+           * 하기 때문이다.
+           */
+          aria-describedby={canAdd ? undefined : 'add-blocked'}
           onClick={() => {
             if (!canAdd || !selected) return;
             add(
@@ -165,6 +173,12 @@ export function ProductOptions({
           {canAdd ? t('product.buyNow') : t('opt.selectFirst')}
         </Button>
       </div>
+
+      {!canAdd && (
+        <p id="add-blocked" className="sr-only">
+          {t('opt.selectFirst')}
+        </p>
+      )}
 
       {/* 담긴 결과를 시각적으로만 알리면 스크린리더 사용자가 모른다 */}
       <p role="status" aria-live="polite" className="text-center text-xs text-success">

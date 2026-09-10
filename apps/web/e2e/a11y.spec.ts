@@ -62,13 +62,38 @@ test('캐러셀 화살표가 본문 위에 겹치지 않는다', async ({ page }
   }
 });
 
-test('본문 바로가기가 첫 탭에 잡힌다', async ({ page }) => {
-  await page.goto('/');
-  await page.keyboard.press('Tab');
+/**
+ * 건너뛰기 링크는 **눌러 봐야** 안다.
+ *
+ * 예전에는 첫 탭에 잡히는지만 봤다. 그래서 이런 상태를 놓쳤다 — 링크를
+ * 누르면 주소만 `#main` 으로 바뀌고 **초점은 body 로 사라졌다.** Chrome 은
+ * 다음 Tab 을 본문에서 이어 주므로 눈으로는 되는 것처럼 보이는데, 초점이
+ * 없으니 낭독기는 본문에 왔다고 말하지 않는다. 대상에 `tabIndex={-1}` 이
+ * 없어서였다.
+ *
+ * 머리글은 화면마다 같으니 대표로 몇 장만 본다.
+ */
+for (const path of ['/', '/cart', '/support']) {
+  test(`${path} 에서 본문 바로가기가 정말 본문으로 데려간다`, async ({ page }) => {
+    await page.goto(path);
+    await page.keyboard.press('Tab');
 
-  const focused = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
-  expect(focused).toBe('본문 바로가기');
-});
+    const first = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
+    expect(first, '첫 탭에 건너뛰기 링크가 잡혀야 한다').toBe('본문 바로가기');
+
+    await page.keyboard.press('Enter');
+
+    // 주소만 바뀌고 초점이 안 옮겨 가면 여기서 진다
+    await expect
+      .poll(() => page.evaluate(() => document.activeElement?.id ?? ''))
+      .toBe('main');
+
+    // 그리고 그다음 Tab 은 본문 안에서 이어져야 한다
+    await page.keyboard.press('Tab');
+    const inMain = await page.evaluate(() => !!document.activeElement?.closest('main'));
+    expect(inMain, '건너뛴 뒤 다음 탭이 본문 밖으로 나갔다').toBe(true);
+  });
+}
 
 test('모든 이미지에 대체 텍스트가 있다', async ({ page }) => {
   await page.goto('/', MARKUP_ONLY);

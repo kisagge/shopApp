@@ -2,7 +2,7 @@
 
 import { useState, useMemo, type FormEvent } from 'react';
 import { Badge, Button, Field } from '@shop/ui';
-import { MIN_POINTS_USE, PAYMENT_METHOD_CODE } from '@shop/core';
+import { MIN_POINTS_USE, PAYMENT_METHOD_CODE, orderBlocker } from '@shop/core';
 import type { PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { OrderItems } from '~/components/checkout/order-items';
@@ -106,9 +106,19 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
 
   const q = quote.data;
   const broken = (q?.lines ?? []).filter((l) => l.issue !== null);
-  const canOrder =
-    !!defaultAddress && agreed && !pending && !!q && q.payable >= 0 && broken.length === 0
-    && (q.lines.length > 0);
+  /*
+   * **무엇이 막는지 고르는 규칙은 core 에 있다.** 조건이 다섯이라 낭독기에
+   * "결제하기, 사용 불가" 만 들려서는 무엇을 손대야 할지 알 수 없다.
+   * 견적이 아직 안 왔거나 보내는 중인 것은 사용자가 손댈 일이 아니라
+   * 이유로 말하지 않는다 — 그때는 버튼 이름이 이미 '보내는 중' 이다.
+   */
+  const blocker = orderBlocker({
+    lineCount: q?.lines.length ?? 0,
+    brokenCount: broken.length,
+    hasAddress: !!defaultAddress,
+    agreed,
+  });
+  const canOrder = blocker === null && !pending && !!q && q.payable >= 0;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -306,7 +316,19 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
         </p>
       )}
 
-      <Button type="submit" block aria-disabled={!canOrder}>
+      {/* 이유가 있으면 버튼이 그것을 가리킨다 — 눈으로도 보이고 낭독기도 읽는다 */}
+      {blocker && (
+        <p id="order-blocked" className="text-center text-xs text-[var(--fg-muted)]">
+          {t(`checkout.blocked.${blocker}`)}
+        </p>
+      )}
+
+      <Button
+        type="submit"
+        block
+        aria-disabled={!canOrder}
+        aria-describedby={blocker ? 'order-blocked' : undefined}
+      >
         {pending
           ? t('checkout.submitting')
           : q

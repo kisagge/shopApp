@@ -117,7 +117,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Providers>
             <div className="flex min-h-dvh flex-col">
               <SiteHeader />
-              <main id="main" className="flex-1">
+              {/*
+                * tabIndex 가 없으면 건너뛰기 링크가 주소만 바꾸고 **초점은
+                * body 로 사라진다.** Chrome 은 다음 Tab 을 본문에서 이어 주지만
+                * 초점이 없으니 낭독기는 본문에 왔다고 말하지 않고, 그 이어주기가
+                * 없는 브라우저에서는 링크가 아무 일도 하지 않는다.
+                */}
+              <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
                 {children}
               </main>
               <SiteFooter />
