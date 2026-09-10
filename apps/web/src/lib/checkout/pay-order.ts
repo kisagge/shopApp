@@ -31,6 +31,16 @@ export interface PayOrderInput {
   readonly method: PaymentMethodInput;
   /** 결제창 제목 */
   readonly orderName: string;
+  /**
+   * **결제창을 열기 직전에만** 부른다.
+   *
+   * 장바구니를 비우는 자리다. 창이 뜨면 이 페이지를 떠나므로 뒤에서 비울
+   * 기회가 없어 먼저 비워야 한다. 그런데 창을 안 여는 길에서까지 먼저
+   * 비우면, 결제가 도는 1.5초 동안 결제 화면이 **"주문할 상품이 없습니다"**
+   * 로 바뀐다 — 실제로 기기에서 그렇게 보였다. 그래서 갈래를 아는 이 함수가
+   * 필요한 때에만 부른다.
+   */
+  readonly beforeWindow?: (() => void) | undefined;
 }
 
 export async function payOrder(input: PayOrderInput): Promise<PayResult> {
@@ -42,6 +52,7 @@ export async function payOrder(input: PayOrderInput): Promise<PayResult> {
    * 주문이 결제 완료가 된다.** 그래서 화면이 이 수단을 아예 감춘다.
    */
   if (input.mode === 'window' && clientKey && input.method !== 'EASY_PAY') {
+    input.beforeWindow?.();
     try {
       await openPaymentWindow({
         clientKey,

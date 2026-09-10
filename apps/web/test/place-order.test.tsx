@@ -323,3 +323,81 @@ describe('결제창은 서버가 내려 준 결론을 따른다', () => {
     vi.unstubAllEnvs();
   });
 });
+
+/**
+ * **결제가 도는 동안 화면이 빈 장바구니로 바뀌면 안 된다.**
+ *
+ * 주문에 들어간 것을 장바구니에서 빼야 하는데, 그것을 결제 앞에 두면 결제가
+ * 도는 1.5초 동안 결제 화면이 "주문할 상품이 없습니다" 가 된다 — 기기에서
+ * 실제로 그렇게 보였다. 결제창을 여는 길에서만 먼저 비운다. 그때는 브라우저가
+ * 토스로 떠나 버려 뒤에서 비울 기회가 없기 때문이다.
+ */
+describe('장바구니를 언제 비우는가', () => {
+  const cart = () => useCartStore.getState().items.map((i) => i.variantId);
+
+  it('결제창 없이 갈 때는 승인이 끝난 뒤에 비운다', async () => {
+    useCartStore.setState({ items: [item('v1'), item('v2')] });
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+
+    let releaseConfirm!: () => void;
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }))
+      .mockReturnValueOnce(
+        new Promise((r) => { releaseConfirm = () => r(ok({})); }),
+      );
+
+    let running!: Promise<unknown>;
+    await act(async () => { running = result.current.place(input([item('v1')])); });
+
+    // 승인이 아직 안 끝났다 — 이 순간 화면은 아직 주문할 것을 들고 있어야 한다
+    expect(cart()).toContain('v1');
+
+    await act(async () => { releaseConfirm(); await running; });
+    expect(cart()).not.toContain('v1');
+    // 주문에 안 들어간 것은 그대로 남는다
+    expect(cart()).toContain('v2');
+  });
+
+  it('결제창을 열 때는 먼저 비운다 — 창이 뜨면 이 페이지를 떠난다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', 'test_ck_abcdefghijklmnopqrstuvwx');
+    useCartStore.setState({ items: [item('v1')] });
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+
+    let openedWith: string[] = [];
+    openPaymentWindow.mockImplementationOnce(() => {
+      // 창을 여는 시점에 장바구니가 이미 비어 있어야 한다
+      openedWith = cart();
+      return Promise.resolve(undefined);
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(openedWith).not.toContain('v1');
+    vi.unstubAllEnvs();
+  });
+
+  /**
+   * 주소가 바뀌기까지 0.6~1초가 더 걸린다. 그 사이 버튼이 다시 눌리는 모습으로
+   * 돌아가면 아무 일도 안 일어난 것처럼 보이고, 실제로 한 번 더 눌린다.
+   */
+  it('승인이 끝나도 화면이 바뀔 때까지 잠금을 풀지 않는다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    happyPath();
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(true);
+    expect(push).toHaveBeenCalledWith('/order/20260909-0000001');
+  });
+
+  it('실패해서 이 화면에 남을 때는 잠금을 푼다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }))
+      .mockResolvedValueOnce(fail({ message: '승인 실패' }));
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(false);
+  });
+});
+

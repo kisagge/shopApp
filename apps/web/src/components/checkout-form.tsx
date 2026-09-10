@@ -126,6 +126,14 @@ export function CheckoutForm({
     agreed,
   });
   const canOrder = blocker === null && !pending && !!q && q.payable >= 0;
+  /*
+   * 보내는 중에는 이유를 말하지 않는다 — 위 주석의 뜻이 그것인데, 정작 아래
+   * 렌더는 이유가 있으면 늘 세우고 있었다. 결제가 끝나 장바구니를 비우는
+   * 순간 이유가 `empty` 로 바뀌어, 결제를 누른 사람에게 **"주문할 상품이
+   * 없습니다"** 라고 말했다. 지금 손댈 일이 없는 사람에게 손댈 곳을 알려
+   * 주는 셈이다.
+   */
+  const shownBlocker = pending ? null : blocker;
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -154,7 +162,18 @@ export function CheckoutForm({
     if (refetchQuote) void quote.refetch();
   }
 
-  if (selected.length === 0) {
+  /*
+   * **주문이 도는 중에는 빈 상태를 세우지 않는다.**
+   *
+   * 결제가 끝나면 주문에 들어간 것을 장바구니에서 빼는데, 그 순간 이 화면이
+   * "주문할 상품이 없습니다" 로 바뀐다. 주소가 주문 화면으로 바뀌기까지는
+   * 0.6~1초가 더 걸리므로, 결제를 누른 사람은 그 사이 **장바구니가 비었다는
+   * 말**을 보게 된다. 기기에서 실제로 그렇게 보였다.
+   *
+   * 빈 장바구니로 이 화면에 들어온 사람에게는 그대로 이 문구가 필요하다.
+   * 가르는 것은 "지금 주문이 도는 중인가" 하나다.
+   */
+  if (selected.length === 0 && !pending) {
     return (
       <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
         {t('checkout.nothing')}
@@ -324,9 +343,9 @@ export function CheckoutForm({
       )}
 
       {/* 이유가 있으면 버튼이 그것을 가리킨다 — 눈으로도 보이고 낭독기도 읽는다 */}
-      {blocker && (
+      {shownBlocker && (
         <p id="order-blocked" className="text-center text-xs text-[var(--fg-muted)]">
-          {t(`checkout.blocked.${blocker}`)}
+          {t(`checkout.blocked.${shownBlocker}`)}
         </p>
       )}
 
@@ -334,7 +353,7 @@ export function CheckoutForm({
         type="submit"
         block
         aria-disabled={!canOrder}
-        aria-describedby={blocker ? 'order-blocked' : undefined}
+        aria-describedby={shownBlocker ? 'order-blocked' : undefined}
       >
         {pending
           ? t('checkout.submitting')

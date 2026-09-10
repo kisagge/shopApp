@@ -124,31 +124,49 @@ export function usePlaceOrder(mode: PaymentMode) {
      * /checkout/success 에서 서버가 한다 — 이 함수 뒤는 실행되지 않는다.
      */
     setPending(true);
-    // 창이 뜨면 이 페이지를 떠나므로 뒤에서 지울 기회가 없다. 먼저 뺀다.
-    clear(input.items);
     const paid = await payOrder({
       mode,
       orderNo: order.orderNo,
       payable: order.payable,
       method: input.method,
       orderName: orderNameOf(input.items, t),
+      // 창이 뜨면 이 페이지를 떠나므로 그때는 먼저 비워야 한다
+      beforeWindow: () => clear(input.items),
     });
-    setPending(false);
 
     if (paid.kind === 'window') return { refetchQuote: false };
 
+    /*
+     * **주문이 만들어졌으면 비운다 — 승인 성공 여부와 무관하다.**
+     * 승인만 실패한 것은 주문이 없는 것이 아니다. 남겨 두면 같은 것을 다시
+     * 담아 두 번 주문하게 되고, 두 주문이 재고를 각각 물게 된다.
+     *
+     * **비우는 시점만 뒤로 옮겼다.** 결제 앞에 두면 결제가 도는 1.5초 동안
+     * 이 화면이 "주문할 상품이 없습니다" 로 바뀐다 — 기기에서 그렇게 보였다.
+     * 창을 여는 길만 예외다(`beforeWindow`). 그때는 페이지를 떠나 버린다.
+     */
+    clear(input.items);
+
     if (paid.kind === 'windowFailed') {
       // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있다.
+      setPending(false);
       router.push(`/order/${order.orderNo}?payment=failed`);
       return { refetchQuote: false };
     }
 
     if (paid.kind === 'confirmFailed') {
       // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 걸 수 있다.
+      setPending(false);
       setError(`${paid.message ?? t('checkout.approveFailed')} ${t('checkout.retryFromOrders')}`);
       router.push(`/order/${order.orderNo}?payment=failed`);
       return { refetchQuote: false };
     }
+
+    /*
+     * `pending` 은 그대로 둔다. 여기서 풀면 주소가 바뀌기까지 남은 0.6~1초
+     * 동안 결제 버튼이 다시 눌리는 모습으로 돌아간다 — 아무 일도 안 일어난
+     * 것처럼 보인다. 이 화면은 곧 사라지므로 잠긴 채로 두는 것이 맞다.
+     */
 
     router.push(`/order/${order.orderNo}`);
     return { refetchQuote: false };
