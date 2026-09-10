@@ -45,7 +45,21 @@ export type Translator = {
 /** 사전 한 벌로 번역기를 만든다. 고르는 일은 이미 끝나 있다. */
 export function translatorFor(locale: Locale, dict: Dictionary): Translator {
   const loose = dict as Record<string, Message | undefined>;
-  const t = (key: MessageKey, vars?: Vars): string => formatMessage(locale, dict[key], vars);
+  /**
+   * **없는 열쇠에 화면을 걸지 않는다.**
+   *
+   * 예전에는 `dict[key]` 가 undefined 면 형태를 고르다가 TypeError 를
+   * 던졌다 — 열쇠 하나가 빠지면 그 화면이 통째로 죽는다. 타입이 막아 주니
+   * 일어날 수 없다고 보았는데, 브라우저로는 **사전의 일부만** 내려보내게
+   * 되면서 그 전제가 사라졌다.
+   *
+   * 빠진 열쇠는 이름을 그대로 보여 준다. 보기 좋지는 않지만 **화면은 산다**,
+   * 그리고 눈에 띄어서 고칠 수 있다. 흰 화면은 둘 다 못 한다.
+   */
+  const t = (key: MessageKey, vars?: Vars): string => {
+    const message = loose[key];
+    return message === undefined ? key : formatMessage(locale, message, vars);
+  };
   return Object.assign(t, {
     locale,
     has: (key: string): boolean => loose[key] !== undefined,

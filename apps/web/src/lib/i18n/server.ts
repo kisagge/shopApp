@@ -10,6 +10,7 @@ import {
   type Translator,
 } from '@shop/i18n';
 import { createTranslator, DICTIONARIES } from '@shop/i18n/all';
+import { CLIENT_MESSAGE_GROUPS } from './client-groups.generated';
 
 /**
  * 이번 요청의 언어.
@@ -65,4 +66,31 @@ export const getT = cache(async (): Promise<Translator> => createTranslator(awai
  * 받았다. 여기서 골라 `LocaleProvider` 의 prop 으로 넘기면 고른 한 벌만
  * RSC 페이로드를 타고 간다.
  */
-export const getDictionary = cache(async (): Promise<Dictionary> => DICTIONARIES[await getLocale()]);
+export const getDictionary = cache(
+  async (): Promise<Dictionary> => forClient(DICTIONARIES[await getLocale()]),
+);
+
+/**
+ * 브라우저가 쓰는 갈래만 남긴다.
+ *
+ * 고른 한 벌 안에도 **화면 코드가 한 번도 안 읽는 말**이 있다 — 메일 본문,
+ * 배치 알림, 결제 실패 코드 같은 서버 전용 문구다. 문서를 압축한 35.4KB 중
+ * 사전이 13.2KB 였고, 그중 2.2KB 가 그런 것들이었다. 앱은 켤 때마다 문서를
+ * 통째로 받으므로 그 값을 매번 치른다.
+ *
+ * **갈래째 남긴다.** 화면 코드는 열쇠를 이름으로 조립하는 자리가 있어
+ * (`keysOf` · `t.category` · 계약의 `valid.*`), 열쇠 하나하나로 자르면
+ * 조립한 열쇠가 없어 화면이 터질 수 있다. 조립은 전부 한 갈래 안에서
+ * 일어나므로 갈래를 통째로 넣으면 그 위험이 사라진다.
+ *
+ * 목록은 소스에서 뽑아 `client-groups.generated.ts` 에 적어 두고,
+ * `test/client-groups.test.ts` 가 낡으면 CI 에서 막는다.
+ */
+function forClient(dict: Dictionary): Dictionary {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(dict))
+    if (CLIENT_GROUPS.has(key.slice(0, key.indexOf('.')))) out[key] = value;
+  return out as Dictionary;
+}
+
+const CLIENT_GROUPS = new Set(CLIENT_MESSAGE_GROUPS);

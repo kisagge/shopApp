@@ -28,7 +28,8 @@
     "mobile:ios": "pnpm --filter @shop/mobile run ios",
     "mobile:android": "pnpm --filter @shop/mobile run android",
     "ci:local": "bash tooling/ci-local.sh",
-    "audit:ci": "node tooling/audit.mjs"
+    "audit:ci": "node tooling/audit.mjs",
+    "i18n:groups": "node tooling/gen-client-groups.mjs"
   },
   "devDependencies": {
     "turbo": "2.10.12",

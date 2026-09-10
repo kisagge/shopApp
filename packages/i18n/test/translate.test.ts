@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createTranslator, messageKeys } from '../src/all';
+import { translatorFor } from '../src/translate';
 import { ko } from '../src/messages/ko';
 import { en } from '../src/messages/en';
 import { ja } from '../src/messages/ja';
@@ -113,5 +114,22 @@ describe('숫자 넣기', () => {
     // "1 items" 가 나간다
     expect(createTranslator('en')('catalog.totalCount', { count: 1 })).toBe('1 item');
     expect(createTranslator('en')('catalog.totalCount', { count: 2000 })).toBe('2,000 items');
+  });
+});
+
+describe('사전에 없는 열쇠', () => {
+  /**
+   * 브라우저에는 사전의 **일부만** 내려보낸다(서버가 갈래로 자른다).
+   * 그래서 없는 열쇠가 실제로 생길 수 있다. 예전에는 그 자리에서
+   * TypeError 가 나 화면이 통째로 죽었다.
+   */
+  it('터지지 않고 열쇠 이름을 보여 준다', () => {
+    const t = translatorFor('ko', { 'nav.home': '홈' } as never);
+    expect(t('없는.열쇠' as never)).toBe('없는.열쇠');
+  });
+
+  it('있는 열쇠는 그대로 번역한다', () => {
+    const t = translatorFor('ko', { 'nav.home': '홈' } as never);
+    expect(t('nav.home')).toBe('홈');
   });
 });
