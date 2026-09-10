@@ -131,3 +131,57 @@ describe('개발 중 주소를 줄 때', () => {
     expect(source).toContain("cleartext: serverUrl.startsWith('http://')");
   });
 });
+
+/**
+ * 망이 바뀐 것을 웹뷰가 알아채는가.
+ *
+ * **비행기 모드로 완전히 끊어 놓고 실기기에서 재 봤더니**, 웹뷰 안에서는
+ * `navigator.onLine` 이 그대로 `true` 였고 online/offline 이벤트가 한 개도
+ * 오지 않았다. 안드로이드 웹뷰의 망 감지기는 ACCESS_NETWORK_STATE 가
+ * 있어야 도는데 그것이 빠져 있었다.
+ *
+ * 이게 없으면 **오프라인 화면이 걸어 둔 자동 복구가 죽는다.**
+ * `www/index.html` 은 "연결이 돌아오면 스스로 들어간다" 며 online 을
+ * 듣고 있는데 그 이벤트가 영영 안 온다. 끊긴 채로 단추를 눌렀을 때
+ * 흔들어 주는 갈래도 `navigator.onLine === false` 를 보므로 함께 죽는다.
+ * 화면에는 아무 표시도 없어서, 죽어 있다는 것을 아무도 모른다.
+ *
+ * 한 번은 더 나쁘게 나왔다 — 와이파이에서 LTE 로 넘어간 뒤 웹뷰만
+ * 이름을 못 풀었고 앱을 다시 띄울 때까지 그대로였다.
+ */
+describe('웹뷰가 망 변화를 알아챌 수 있는가', () => {
+  const manifest = () =>
+    read(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'));
+
+  it('ACCESS_NETWORK_STATE 를 요구한다', () => {
+    expect(manifest()).toContain('android.permission.ACCESS_NETWORK_STATE');
+  });
+
+  /**
+   * 권한을 넣는 이유가 **오프라인 화면의 자동 복구**이므로, 그 화면이
+   * 여전히 그 이벤트에 기대고 있는지도 함께 본다. 한쪽만 남으면 권한은
+   * 쓸데없는 것이 되고, 반대면 복구가 다시 죽는다.
+   */
+  it('오프라인 화면이 그 이벤트로 스스로 돌아온다', () => {
+    const offline = read(join(ROOT, 'apps', 'mobile', 'www', 'index.html'));
+    expect(offline).toMatch(/addEventListener\(\s*'online'/);
+    expect(offline).toContain('navigator.onLine');
+  });
+
+  /**
+   * 위치나 기기 식별자까지 딸려 들어가지 않는지 본다. 권한은 한 번 늘면
+   * 아무도 다시 안 줄인다.
+   */
+  it('연결 상태 말고 다른 것을 읽지 않는다', () => {
+    const text = manifest();
+    for (const 넘치는것 of [
+      'ACCESS_FINE_LOCATION',
+      'ACCESS_COARSE_LOCATION',
+      'READ_PHONE_STATE',
+      'ACCESS_WIFI_STATE',
+    ]) {
+      expect(text, 넘치는것).not.toContain(넘치는것);
+    }
+  });
+});
+

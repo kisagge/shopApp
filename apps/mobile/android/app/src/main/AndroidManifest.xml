@@ -58,4 +58,24 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!--
+      WebView 가 망이 바뀐 것을 알아채려면 이것이 있어야 한다.
+
+      **없으면 감지기가 통째로 죽는다.** 비행기 모드로 완전히 끊어 놓고
+      재 봤더니 WebView 안에서는 navigator.onLine 이 그대로 true 였고
+      online/offline 이벤트가 **한 개도** 오지 않았다. 그러면 오프라인
+      화면(www/index.html)이 "연결이 돌아오면 스스로 들어간다" 며 걸어 둔
+      online 청취가 영원히 안 울린다 — 사용자가 단추를 눌러야만 한다.
+      끊긴 채로 눌렀을 때 흔들어 주는 것도 navigator.onLine === false 를
+      보는데, 그 값이 false 가 되는 일이 없으니 그 갈래도 죽어 있다.
+
+      한 번은 더 나쁘게 나왔다. 와이파이에서 LTE 로 넘어간 뒤 셸에서는
+      이름이 풀리는데 WebView 만 ERR_NAME_NOT_RESOLVED 를 냈고, 앱을
+      다시 띄울 때까지 그대로였다. 망이 바뀐 것을 모르니 옛 경로의 DNS 와
+      소켓을 그대로 쓰는 것이다.
+
+      위치도 기기 식별자도 읽지 않는다. 연결 상태만 본다.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>
