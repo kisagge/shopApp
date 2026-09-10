@@ -212,6 +212,50 @@
   .data-table :is(th, td):first-child { padding-inline-start: 0; }
   .data-table :is(th, td):last-child { padding-inline-end: 0; }
 
+  /*
+   * 이동 중이라는 띠.
+   *
+   * 누른 링크 안에 그려지지만 `fixed` 라 링크의 칸을 차지하지 않는다 —
+   * 글자 링크 안에 들어가도 줄이 밀리지 않는다. 헤더(z-20)보다 위에 둔다.
+   *
+   * **위쪽을 안전영역만큼 내린다.** 앱의 웹뷰는 viewport-fit=cover 라
+   * 상태바 아래까지 올라와 있다. 0 에 두면 띠가 시계와 배터리 뒤에 깔려
+   * 안 보인다 — 헤더가 .safe-t 를 쓰는 것과 같은 이유다. 브라우저에서는
+   * 이 값이 0 이라 달라지는 것이 없다.
+   *
+   * 움직임을 줄이라고 한 사용자에게는 흐르지 않고 **가만히 있는 띠**를
+   * 보여 준다. 알리는 일은 그대로 하면서 흔들리지만 않게 한다.
+   */
+  .nav-progress {
+    position: fixed;
+    inset-block-start: env(safe-area-inset-top, 0px);
+    inset-inline: 0;
+    z-index: 60;
+    block-size: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--brand) 40%,
+      var(--brand) 60%,
+      transparent 100%
+    );
+    background-size: 250% 100%;
+    animation: nav-progress-slide 1.1s ease-in-out infinite;
+  }
+
+  @keyframes nav-progress-slide {
+    from { background-position: 120% 0; }
+    to { background-position: -20% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .nav-progress {
+      animation: none;
+      background: var(--brand);
+      opacity: 0.7;
+    }
+  }
+
   /* Capacitor 웹뷰: OS 상태바·홈 인디케이터가 레이아웃 위에 그려진다 */
   .safe-t { padding-top: env(safe-area-inset-top, 0px); }
   .safe-b { padding-bottom: env(safe-area-inset-bottom, 0px); }

@@ -11,6 +11,8 @@ vi.mock('next/link', () => ({
   default: ({ href, children, ...rest }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...rest}>{children}</a>
   ),
+  // AppLink 가 이 훅을 쓴다 — 흉내 낼 때 빠뜨리면 링크를 그리는 순간 터진다
+  useLinkStatus: () => ({ pending: false }),
 }));
 
 const coat = (n: number) => ({ slug: `coat-${n}`, categorySlug: 'outer-coat', name: `코트 ${n}` });

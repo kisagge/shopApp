@@ -10,6 +10,8 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
   ),
+  // AppLink 가 이 훅을 쓴다 — 흉내 낼 때 빠뜨리면 링크를 그리는 순간 터진다
+  useLinkStatus: () => ({ pending: false }),
 }));
 
 const { CartView } = await import('~/components/cart-view');
