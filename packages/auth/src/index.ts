@@ -1,6 +1,8 @@
 import { betterAuth } from 'better-auth';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import { bearer } from 'better-auth/plugins';
+import { getCookies } from 'better-auth/cookies';
+import type { BetterAuthOptions } from 'better-auth';
 import { SIGNUP_POINTS, rewardExpiresAt } from '@shop/core';
 import { verifyEmailMail, resetPasswordMail, localeForUser } from './mail';
 import { resolveLocale } from '@shop/i18n/locale';
@@ -107,7 +109,7 @@ export const googleEnabled = (): boolean =>
 
 export const rateLimitEnabled = (): boolean => process.env.AUTH_RATE_LIMIT !== 'off';
 
-export const auth = betterAuth({
+const options = {
   database: prismaAdapter(prisma, { provider: 'postgresql' }),
 
   secret: process.env.BETTER_AUTH_SECRET,
@@ -305,7 +307,21 @@ export const auth = betterAuth({
   advanced: {
     database: { generateId: false }, // Prisma 의 cuid() 를 쓴다
   },
-});
+} satisfies BetterAuthOptions;
+
+export const auth = betterAuth(options);
+
+/**
+ * 세션 쿠키의 이름과 속성.
+ *
+ * **직접 적지 않는다.** 이름은 배포 여부에 따라 `__Secure-` 가 붙고 속성도
+ * 설정에 딸려 바뀐다. 손으로 흉내 내면 어느 날 조용히 어긋나므로, 같은
+ * 설정으로 라이브러리에게 묻는다.
+ *
+ * 네이티브 셸이 들고 있던 토큰을 쿠키로 되돌릴 때 쓴다 —
+ * `apps/web/src/app/api/native/session/route.ts` 참고.
+ */
+export const sessionCookie = getCookies(options).sessionToken;
 
 export type Auth = typeof auth;
 export type Session = Auth['$Infer']['Session'];

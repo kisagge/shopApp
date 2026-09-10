@@ -121,8 +121,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <WebVitalsReporter />
             {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
             <CartSync userId={viewer?.id ?? null} />
-            {/* 네이티브 셸에서만 — 저장해 둔 세션 토큰을 올린다 */}
-            <NativeSession />
+            {/* 네이티브 셸에서만 — 저장해 둔 토큰으로 서버 세션까지 되살린다 */}
+            <NativeSession signedIn={viewer !== null} />
             <NativeSplash />
             <NativeDeepLink />
             <NativeBackButton />
