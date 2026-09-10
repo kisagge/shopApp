@@ -34,6 +34,47 @@ async function rename(request: APIRequestContext, id: string, slug: string): Pro
   expect(response.ok(), await response.text()).toBe(true);
 }
 
+/**
+ * ── 이 검사는 드물게 진다. 쫓아간 기록을 남긴다 ──────────────────
+ *
+ * **증상은 두 번 다 같았다.** 이름을 바꾼 뒤 옛 주소로 들어갔는데 새 주소로
+ * 넘어가지 않고 **옛 주소가 200 으로 그대로 열렸다.**
+ *
+ *     Expected substring: "/product/suede-trucker-blouson-e2e"
+ *     Received string:    "http://localhost:3100/product/suede-trucker-blouson"
+ *
+ * 믿을 수 있는 전체 실행 약 28회 중 2회다. 혼자 돌리면 안 진다 —
+ * 단독 반복 12회, 격리 실험 65회가 전부 정상이었다.
+ *
+ * ── 재 보고 접은 가설들 (다시 파지 말 것) ──────────────────────
+ *
+ * 1. **미리 그려진 화면이 남아 있다** → 아니다.
+ *    `/product/[slug]` 는 `dynamic = 'force-dynamic'` 이라 화면 캐시가 없다.
+ *
+ * 2. **무효화가 늦다** → 아니다.
+ *    `getProductBySlug` 의 캐시를 채워 두고 이름을 바꾼 뒤 기다림을
+ *    0·200·1000ms 로 바꿔 가며 8회씩, **24/24 정상**.
+ *    `bust()` 는 이미 `revalidateTag(tag, { expire: 0 })` 로 즉시 만료시킨다.
+ *
+ * 3. **무효화 직전에 시작된 렌더가 옛 값을 다시 써 넣는다** → 재현 못 했다.
+ *    옛 주소와 무거운 화면을 **잡음 40갈래(4,600요청)** 로 두드리면서
+ *    25회 이름을 바꿔 봤다. **25/25 정상**. 한가한 서버에서 6갈래로 재도
+ *    10/10 정상이었다.
+ *
+ * 4. **서비스 워커가 넘김을 삼킨다** → 아니다.
+ *    `public/sw.js` 는 아무것도 캐시하지 않는다. 워커가 잡은 채로/아닌 채로
+ *    각 3회 돌려 **6/6 정상**, 주소도 제대로 바뀐다.
+ *
+ * 5. **다른 검사가 같은 상품을 건드린다** → 아니다.
+ *    e2e 전체에서 이 상품을 부르는 것도, 상품 창구를 치는 것도 이 파일뿐이다
+ *    (`test/e2e-fixture-isolation.test.ts` 가 그것을 지킨다).
+ *
+ * ── 다음에 또 나오면 ──────────────────────────────────────────
+ *
+ * `retain-on-failure` 로 남은 `trace.zip` 을 먼저 열 것. 그 이동이 서버까지
+ * 갔는지, 갔다면 서버가 무엇을 돌려줬는지가 거기 있다. **추측으로 고치지
+ * 말 것** — 위 다섯을 다시 파는 데 하루가 든다.
+ */
 test('이름을 바꿔도 옛 주소가 새 주소로 넘어간다', async ({ page, request }) => {
   const found = await request.get(`/api/admin/products/search?q=${encodeURIComponent(SEARCH)}`);
   expect(found.ok()).toBe(true);
