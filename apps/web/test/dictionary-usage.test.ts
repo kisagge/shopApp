@@ -63,8 +63,22 @@ const alivePrefixes = [
 /** 쓰지 않지만 남겨 두는 열쇠와 그 이유. 이름만 적는 것은 목록으로 돌아가는 것이다. */
 const EXEMPT: Readonly<Record<string, string>> = {};
 
-const used = (key: string): boolean =>
-  source.includes(`'${key}'`) || source.includes(`"${key}"`) || source.includes(`\`${key}\``);
+/**
+ * 따옴표 안의 글자를 **한 번에 모아 둔다.**
+ *
+ * 예전에는 열쇠마다 원본 전체를 `includes` 로 세 번씩 훑었다. 열쇠가 500개
+ * 넘고 원본이 50만 자니 한 번 판정하는 데 수백 MB 를 훑는 셈이었고, 한가할
+ * 때 0.3초로 끝나던 것이 CI 처럼 부하가 걸리면 **5초 상한을 넘겨 졌다.**
+ * 세는 방법은 그대로다 — 따옴표째 찾는다. 훑는 횟수만 500번에서 한 번으로
+ * 줄인다.
+ */
+const quoted = new Set<string>();
+for (const m of source.matchAll(/'([^'\\\n]*)'|"([^"\\\n]*)"|`([^`\\\n$]*)`/g)) {
+  const literal = m[1] ?? m[2] ?? m[3];
+  if (literal) quoted.add(literal);
+}
+
+const used = (key: string): boolean => quoted.has(key);
 
 describe('사전 열쇠', () => {
   const keys = messageKeys();
@@ -73,6 +87,7 @@ describe('사전 열쇠', () => {
     expect(keys.length).toBeGreaterThan(500);
     expect(source.length).toBeGreaterThan(500_000);
     expect(alivePrefixes.length).toBeGreaterThan(5);
+    expect(quoted.size, '따옴표 안의 글자를 하나도 못 모았다').toBeGreaterThan(1_000);
   });
 
   it('부르는 곳이 없는 열쇠가 없다', () => {

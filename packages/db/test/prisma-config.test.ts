@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 /**
  * 배포에서만 드러나는 설정 실수를 여기서 잡는다.
@@ -16,6 +16,20 @@ async function loadConfig(env: Record<string, string>) {
 }
 
 const DB = 'postgresql://u:p@localhost:5432/db';
+
+/**
+ * **처음 한 번의 import 값을 검사 밖에서 치른다.**
+ *
+ * 이 파일의 검사는 전부 1ms 인데 첫 번째만 260ms 였다 — 그 차이가 전부
+ * `import('../prisma.config')` 를 처음 불러오는 값이다. 그게 검사 안에 있으면
+ * 5초 상한을 그 값과 나눠 쓰게 되고, CI 처럼 부하가 걸리면 **첫 검사만
+ * 시간 초과로 진다.** 실제로 그렇게 졌다. 재는 것은 설정의 내용이지
+ * 모듈을 처음 읽는 속도가 아니다.
+ */
+beforeAll(async () => {
+  await loadConfig({ DATABASE_URL: DB });
+  vi.unstubAllEnvs();
+});
 
 beforeEach(() => vi.unstubAllEnvs());
 afterEach(() => vi.unstubAllEnvs());
