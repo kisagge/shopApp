@@ -703,6 +703,8 @@ export const en: Dictionary = {
   'checkout.pointsAll': 'Use all',
   'checkout.method': 'Payment method',
   'checkout.tossOn': 'Pressing pay opens the Toss payment window. It runs on a test key, so nothing is actually charged.',
+  'checkout.unavailable.heading': 'Checkout is unavailable right now.',
+  'checkout.unavailable.body': 'Payment is not ready, so orders cannot be taken. Please try again shortly.',
   'checkout.tossOff': 'No payment key is configured, so the order completes without a payment window. Nothing is actually charged.',
   'checkout.total': 'Total',
   'checkout.finalTotal': 'Amount to pay',

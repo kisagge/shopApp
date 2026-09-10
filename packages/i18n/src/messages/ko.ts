@@ -731,6 +731,8 @@ export const ko = {
   'checkout.pointsAll': '전액사용',
   'checkout.method': '결제 수단',
   'checkout.tossOn': '결제하기를 누르면 토스 결제창이 열립니다. 테스트 키로 연결돼 있어 실제 청구는 발생하지 않습니다.',
+  'checkout.unavailable.heading': '지금은 주문할 수 없습니다.',
+  'checkout.unavailable.body': '결제 준비가 끝나지 않아 주문을 받을 수 없습니다. 잠시 뒤에 다시 시도해 주세요.',
   'checkout.tossOff': '결제 키가 설정되지 않아 결제창 없이 주문이 완료됩니다. 실제 결제는 발생하지 않습니다.',
   'checkout.total': '결제 금액',
   'checkout.finalTotal': '최종 결제 금액',

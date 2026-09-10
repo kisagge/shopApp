@@ -1,5 +1,7 @@
 import 'server-only';
-import type { PaymentGateway } from '@shop/core';
+import type { PaymentGateway, PaymentModeResult } from '@shop/core';
+import { paymentMode, PAYMENT_BLOCK_MESSAGE } from '@shop/core';
+import { isUsableClientKey } from './client';
 import { createTossGateway } from './toss';
 import { createMockGateway } from './mock';
 
@@ -44,39 +46,40 @@ function mockDemanded(): boolean {
   return process.env.PAYMENT_GATEWAY === 'mock';
 }
 
+/**
+ * 이 배포가 결제를 어떻게 치르는가 — **결론을 내는 유일한 자리**.
+ *
+ * 판단 자체는 `@shop/core` 의 `paymentMode` 가 한다. 여기는 환경변수를
+ * 읽어서 넘기기만 한다 — 정책은 core, 실행은 앱.
+ *
+ * 브라우저도 이 결론을 쓴다. 결제 화면이 서버에서 이것을 계산해 폼에
+ * 내려 준다(`apps/web/src/app/checkout/page.tsx`). 브라우저가 키를 다시
+ * 보고 스스로 정하는 일은 없다 — 그렇게 갈렸다가 배포에서 확정이 터졌다.
+ */
+export function serverPaymentMode(): PaymentModeResult {
+  return paymentMode({
+    hasSecretKey: isUsableSecretKey(process.env.TOSS_SECRET_KEY),
+    hasClientKey: isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY']),
+    liveDeployment: isLiveDeployment(),
+    mockDemanded: mockDemanded(),
+    demoPayment: process.env.DEMO_PAYMENT === '1',
+    production: process.env.NODE_ENV === 'production',
+  });
+}
+
 export function getPaymentGateway(): PaymentGateway {
   if (cached) return cached;
 
+  const decided = serverPaymentMode();
+  /*
+   * 여기까지 왔는데 막혀 있으면 설정이 잘못된 것이다. 결제 화면이 미리
+   * 막으므로 사람이 이 길로 오지는 않는다 — 그래도 던진다. 조용히 Mock 으로
+   * 도는 것보다 500 이 낫고, 무엇보다 이유가 로그에 남는다.
+   */
+  if (decided.mode === 'blocked') throw new Error(PAYMENT_BLOCK_MESSAGE[decided.reason]);
+
   const secretKey = process.env.TOSS_SECRET_KEY;
-
-  if (mockDemanded()) {
-    if (isLiveDeployment()) {
-      throw new Error(
-        'PAYMENT_GATEWAY=mock 은 운영 배포에서 쓸 수 없습니다. ' +
-          '켜져 있으면 결제 없이 주문이 확정됩니다.',
-      );
-    }
-    if (isUsableSecretKey(secretKey)) {
-      /*
-       * 진짜 키가 있는데 Mock 을 요구하는 것은 둘 중 하나다 — 실수로 켜 뒀거나,
-       * 실수로 진짜 키를 넣었거나. 어느 쪽이든 조용히 넘어가면 안 된다.
-       */
-      throw new Error(
-        '실제 결제 키가 있는데 PAYMENT_GATEWAY=mock 이 켜져 있습니다. 둘 중 하나가 잘못됐습니다.',
-      );
-    }
-    cached = createMockGateway();
-    return cached;
-  }
-
-  if (!isUsableSecretKey(secretKey)) {
-    // 프로덕션에서 키를 빼먹었는데 조용히 Mock 으로 도는 게 최악이다
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error(
-        'TOSS_SECRET_KEY 가 없거나 형식이 올바르지 않습니다. 프로덕션에서는 Mock 을 쓸 수 없습니다. ' +
-          '검사에서 Mock 이 필요하면 PAYMENT_GATEWAY=mock 을 대놓고 켭니다.',
-      );
-    }
+  if (decided.mode === 'mock') {
     if (secretKey) {
       console.warn(
         '[payment] TOSS_SECRET_KEY 형식이 올바르지 않아 Mock 게이트웨이를 씁니다. ' +
@@ -87,6 +90,8 @@ export function getPaymentGateway(): PaymentGateway {
     return cached;
   }
 
+  // mode 가 window 라는 것은 이 키가 형식까지 통과했다는 뜻이다
+  if (!secretKey) throw new Error(PAYMENT_BLOCK_MESSAGE.NO_SECRET_KEY);
   cached = createTossGateway(secretKey);
   return cached;
 }

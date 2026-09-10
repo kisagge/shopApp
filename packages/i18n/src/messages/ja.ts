@@ -699,6 +699,8 @@ export const ja: Dictionary = {
   'checkout.pointsAll': '全額利用',
   'checkout.method': 'お支払い方法',
   'checkout.tossOn': '「お支払い」を押すと Toss の決済画面が開きます。テストキーで接続しているため実際の請求は発生しません。',
+  'checkout.unavailable.heading': '現在ご注文いただけません。',
+  'checkout.unavailable.body': '決済の準備が整っていないためご注文を受け付けられません。しばらくしてからもう一度お試しください。',
   'checkout.tossOff': '決済キーが設定されていないため、決済画面なしで注文が完了します。実際の決済は発生しません。',
   'checkout.total': 'お支払い金額',
   'checkout.finalTotal': '最終お支払い金額',

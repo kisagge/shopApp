@@ -3,11 +3,12 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CreateOrderResponse, OrderError, PaymentMethodInput } from '@shop/contract';
+import type { PaymentMode } from '@shop/core';
 import type { CartItem } from '~/stores/cart';
 import { useCartStore } from '~/stores/cart';
 import { track } from '~/lib/analytics/client';
 import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
-import { openPaymentWindow, isUsableClientKey } from '~/lib/payments/client';
+import { openPaymentWindow } from '~/lib/payments/client';
 import { useT } from '~/lib/i18n/client';
 
 /**
@@ -49,7 +50,7 @@ export interface PlaceOrderInput {
  * 받아 다시 보냈을 때 서버가 같은 시도인 줄 알아본다. 매번 새로 만들면
  * 열쇠가 있어도 없는 것과 같다.
  */
-export function usePlaceOrder() {
+export function usePlaceOrder(mode: PaymentMode) {
   const t = useT();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -109,15 +110,17 @@ export function usePlaceOrder() {
     /**
      * 결제창.
      *
-     * 클라이언트 키가 있으면 실제 토스 결제창을 띄운다. 창이 성공하면
-     * 토스가 /checkout/success 로 **리다이렉트**하고 승인은 거기서 서버가
-     * 한다 — 이 함수 뒤의 코드는 실행되지 않는다.
+     * `mode` 는 **서버가 정해서 내려 준 결론**이다(`serverPaymentMode`).
+     * 예전에는 여기서 클라이언트 키를 직접 보고 정했는데, 서버는 시크릿 키를
+     * 보고 정하고 있었다. 배포에 두 키가 다 없자 브라우저는 "Mock 으로 간다",
+     * 서버는 "프로덕션에서 Mock 은 못 쓴다" 로 갈렸다 — **주문은 만들어지고
+     * 확정만 500** 이 났다. 그래서 판단을 브라우저에서 걷어냈다.
      *
-     * 키가 없으면 Mock 으로 간다. 로컬에서 키 없이도 주문 흐름 전체를
-     * 볼 수 있어야 한다. 서버 쪽 승인 흐름(금액 검증·멱등·상태 전이)은 같다.
+     * 창이 성공하면 토스가 /checkout/success 로 **리다이렉트**하고 승인은
+     * 거기서 서버가 한다 — 이 함수 뒤의 코드는 실행되지 않는다.
      */
     const clientKey = process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'];
-    if (isUsableClientKey(clientKey) && input.method !== 'EASY_PAY') {
+    if (mode === 'window' && clientKey && input.method !== 'EASY_PAY') {
       // 주문에 들어간 항목은 결제창을 열기 전에 장바구니에서 뺀다.
       // 창이 뜨면 이 페이지는 떠나므로 뒤에서 지울 기회가 없다.
       clear(input.items);

@@ -18,6 +18,7 @@ export * from './event-rollup';
 export * from './order-number';
 export * from './order-draft';
 export * from './payment';
+export * from './payment-mode';
 export * from './grade';
 export * from './restock';
 export * from './point-expiry';

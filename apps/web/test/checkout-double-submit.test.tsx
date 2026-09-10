@@ -55,7 +55,7 @@ const orderCalls = () =>
 
 async function ready() {
   const user = userEvent.setup();
-  render(<CheckoutForm defaultAddress={address} />);
+  render(<CheckoutForm defaultAddress={address} paymentMode="mock" />);
   await user.click(screen.getByRole('checkbox'));
   return user;
 }
@@ -89,7 +89,7 @@ describe('결제 버튼을 두 번 눌러도', () => {
 
   it('약관에 동의하기 전에는 눌러도 보내지 않는다', async () => {
     const user = userEvent.setup();
-    render(<CheckoutForm defaultAddress={address} />);
+    render(<CheckoutForm defaultAddress={address} paymentMode="mock" />);
 
     await user.click(screen.getByRole('button', { name: /289,000|주문/ }));
 

@@ -15,7 +15,7 @@ import { useCartStore } from '~/stores/cart';
 import { track } from '~/lib/analytics/client';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
-import { isUsableClientKey } from '~/lib/payments/client';
+import type { PaymentMode } from '@shop/core';
 
 interface SavedAddress {
   id: string; label: string | null; recipient: string; phone: string;
@@ -34,7 +34,14 @@ interface SavedAddress {
  * 서로를 가려서, 돈이 걸린 자리를 고칠 때마다 250줄짜리 JSX 를 헤치고
  * 들어가야 했다.
  */
-export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddress: SavedAddress | null }) {
+export function CheckoutForm({
+  defaultAddress: initialAddress,
+  paymentMode,
+}: {
+  defaultAddress: SavedAddress | null;
+  /** 서버가 정한 결제 방식. 브라우저는 다시 정하지 않는다 — place-order.ts 주석 참고 */
+  paymentMode: PaymentMode;
+}) {
   const t = useT();
   const locale = useLocale();
   const money = (amount: number) => formatMoney(locale, amount);
@@ -62,7 +69,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
    * 주문은 결제 완료가 되는, 가장 나쁜 종류의 불일치다.
    * 그래서 실제 결제창을 쓸 때는 아예 보여 주지 않는다.
    */
-  const realGateway = isUsableClientKey(process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY']);
+  const realGateway = paymentMode === 'window';
   const methods = useMemo(
     () => (realGateway ? PAYMENT_METHOD_CODE.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD_CODE),
     [realGateway],
@@ -90,7 +97,7 @@ export function CheckoutForm({ defaultAddress: initialAddress }: { defaultAddres
    * 브라우저가 다른 곳으로 떠날 수 있는 흐름이라, 화면 사이에 끼워 두면
    * 어디서 끝나는지 읽을 수 없다.
    */
-  const { place, pending, error } = usePlaceOrder();
+  const { place, pending, error } = usePlaceOrder(paymentMode);
 
   /*
    * **고른 적이 없으면 서버가 가장 나은 것을 붙인다.** 화면은 무엇이 붙었는지

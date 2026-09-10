@@ -114,6 +114,45 @@ describe('Mock 스위치가 운영으로 새지 않는다', () => {
     expect(getPaymentGateway().provider).toBe('mock');
   });
 
+  /**
+   * **데모 배포.**
+   *
+   * 이 저장소는 포트폴리오라 사업자번호가 없고, 그러니 실제 PG 계약도 없다.
+   * 그렇다고 배포에서 결제를 막아 두면 주문 흐름을 아무도 끝까지 볼 수 없다.
+   * 그래서 "돈이 오가지 않는 데모" 라고 **대놓고 선언**하면 운영 배포에서도
+   * Mock 을 쓴다. 스위치를 둘로 나눠 실수로 켜지는 일이 없게 한다.
+   */
+  it('데모라고 선언하면 운영 배포에서도 Mock 을 쓴다', () => {
+    env({
+      PAYMENT_GATEWAY: 'mock',
+      DEMO_PAYMENT: '1',
+      VERCEL_ENV: 'production',
+      TOSS_SECRET_KEY: '',
+    });
+    expect(getPaymentGateway().provider).toBe('mock');
+  });
+
+  it('데모 선언만 있고 요구가 없으면 아무것도 열리지 않는다', () => {
+    // 스위치 하나만으로 열리면 둘로 나눈 뜻이 없다
+    env({
+      PAYMENT_GATEWAY: undefined,
+      DEMO_PAYMENT: '1',
+      NODE_ENV: 'production',
+      TOSS_SECRET_KEY: '',
+    });
+    expect(() => getPaymentGateway()).toThrow(/TOSS_SECRET_KEY/);
+  });
+
+  it('데모라도 진짜 키가 있으면 던진다', () => {
+    env({
+      PAYMENT_GATEWAY: 'mock',
+      DEMO_PAYMENT: '1',
+      VERCEL_ENV: 'production',
+      TOSS_SECRET_KEY: 'live_sk_abcdefghijklmnopqrstuvwxyz',
+    });
+    expect(() => getPaymentGateway()).toThrow(/둘 중 하나가 잘못됐습니다/);
+  });
+
   it('켜지 않으면 프로덕션 빌드는 여전히 던진다', () => {
     // 스위치를 더했다고 기본이 느슨해지면 안 된다
     env({ PAYMENT_GATEWAY: undefined, NODE_ENV: 'production', TOSS_SECRET_KEY: '' });
@@ -137,7 +176,41 @@ describe('Mock 스위치가 운영으로 새지 않는다', () => {
 
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) {
-      expect(readFileSync(file, 'utf8'), file).not.toContain('PAYMENT_GATEWAY');
+      const text = readFileSync(file, 'utf8');
+      expect(text, file).not.toContain('PAYMENT_GATEWAY');
+      expect(text, file).not.toContain('DEMO_PAYMENT');
     }
+  });
+});
+
+/**
+ * **결제 방식은 서버가 한 번 정하고 끝이다.**
+ *
+ * 예전에는 브라우저가 클라이언트 키를, 서버가 시크릿 키를 각자 보고 정했다.
+ * 배포에 두 키가 다 없자 브라우저는 "Mock 으로 간다" 며 주문을 만들었고
+ * 서버는 "프로덕션에서 Mock 은 못 쓴다" 며 던졌다 — **주문만 만들어지고
+ * 확정이 500** 이 났다(20260910-7063897 이 입금대기로 남았다). 확정 창구는
+ * 없는 주문번호에도 500 을 냈다. 주문을 찾기도 전에 터진 것이다.
+ *
+ * 갈림을 없앤 방식은 하나다. 브라우저에서 판단을 걷어내는 것. 그러니 여기서
+ * 지키는 것은 **브라우저 코드가 키를 보고 방식을 정하지 않는다**는 것이다.
+ * 값을 읽는 것(결제창에 넘길 키)과 방식을 정하는 것은 다르다.
+ */
+describe('결제 방식을 정하는 자리는 하나다', () => {
+  const browserFiles = ['src/components/checkout-form.tsx', 'src/lib/checkout/place-order.ts'];
+
+  it.each(browserFiles)('%s 가 키로 방식을 가르지 않는다', async (file) => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const text = readFileSync(join(process.cwd(), file), 'utf8');
+    expect(text).not.toContain('isUsableClientKey');
+  });
+
+  it('결제 화면이 서버 결론을 계산해 폼에 내려 준다', async () => {
+    const { readFileSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const page = readFileSync(join(process.cwd(), 'src/app/checkout/page.tsx'), 'utf8');
+    expect(page).toContain('serverPaymentMode');
+    expect(page).toContain('paymentMode={');
   });
 });
