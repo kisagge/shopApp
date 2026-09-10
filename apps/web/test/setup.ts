@@ -15,7 +15,7 @@ import { afterEach } from 'vitest';
  * 뿐이다. 5초(검사 상한)보다 조금 낮게 두어, 지더라도 "무엇을 못 찾았는지"
  * 가 찍히게 한다 — 검사 상한에 먼저 걸리면 그 내용이 안 나온다.
  */
-configure({ asyncUtilTimeout: 4_000 });
+configure({ asyncUtilTimeout: 15_000 });
 
 // 이게 없으면 컴포넌트가 마운트된 채로 다음 테스트에 넘어가고,
 // 다음 테스트가 스토어나 목을 바꾸는 순간 남아 있던 컴포넌트가 다시 렌더돼

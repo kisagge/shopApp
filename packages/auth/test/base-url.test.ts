@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
 
 /**
  * 배포 주소 해석은 auth 인스턴스를 만들 때 한 번 평가된다.
@@ -12,6 +12,21 @@ async function load(env: Record<string, string | undefined>) {
   }
   return import('../src/index');
 }
+
+/**
+ * **처음 한 번의 import 값을 검사 밖에서 치른다.**
+ *
+ * 이 파일도 첫 검사만 660ms 고 나머지는 6ms 다 — 그 차이가 전부 `@shop/auth`
+ * 를 처음 불러오는 값이다. 검사 안에 두면 부하가 걸릴 때 첫 검사만 시간
+ * 초과로 진다. `resetModules` 는 등록부만 비우고 변환 결과는 남으므로,
+ * 미리 한 번 읽어 두면 뒤의 `load()` 들이 값을 안 치른다.
+ */
+beforeAll(async () => {
+  await load({});
+  vi.unstubAllEnvs();
+  // 이 준비는 재는 대상이 아니다. 훅의 기본 상한 10초로는 부하가 걸린
+  // CI 에서 모자랐다 — 실제로 그렇게 졌다.
+}, 60_000);
 
 beforeEach(() => {
   vi.stubEnv('BETTER_AUTH_SECRET', 'test-secret-value-32-chars-long!!');

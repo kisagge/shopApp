@@ -29,7 +29,8 @@ const DB = 'postgresql://u:p@localhost:5432/db';
 beforeAll(async () => {
   await loadConfig({ DATABASE_URL: DB });
   vi.unstubAllEnvs();
-});
+  // 이 준비는 재는 대상이 아니다. 훅의 기본 상한 10초는 느린 기계에서 모자란다.
+}, 60_000);
 
 beforeEach(() => vi.unstubAllEnvs());
 afterEach(() => vi.unstubAllEnvs());

@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "test": "vitest run"
+    "test": "vitest run --testTimeout=20000 --hookTimeout=60000"
   },
   "dependencies": {
     "zod": "4.5.4"

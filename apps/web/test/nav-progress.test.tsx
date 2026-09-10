@@ -30,20 +30,38 @@ const { AppLink } = await import('~/components/app-link');
 describe('이동 중 표시', () => {
   it('가만히 있을 때는 아무것도 그리지 않는다', () => {
     linkStatus.pending = false;
-    const { container } = render(<AppLink href="/product/x">코트</AppLink>);
-    expect(container.querySelector('.nav-progress')).toBeNull();
+    render(<AppLink href="/product/x">코트</AppLink>);
+    expect(document.querySelector('.nav-progress')).toBeNull();
   });
 
   it('이동이 진행 중이면 띠가 뜬다', () => {
     linkStatus.pending = true;
+    render(<AppLink href="/product/x">코트</AppLink>);
+    expect(document.querySelector('.nav-progress')).not.toBeNull();
+  });
+
+  /**
+   * **링크 안에 두면 자리가 어긋난다.**
+   *
+   * `position: fixed` 는 조상에 `transform` 이나 `backdrop-filter` 가 있으면
+   * 화면이 아니라 그 조상을 기준으로 삼는다. 비교함 띠가 `backdrop-blur` 를
+   * 쓰는데, 그 안의 '견주어보기' 를 누르자 띠가 화면 맨 위가 아니라
+   * **비교함을 가로질러** 그려졌다. 링크가 어디에 살든 같아야 한다.
+   */
+  it('링크 안이 아니라 body 에 그린다 — 조상이 자리를 가로채지 못하게', () => {
+    linkStatus.pending = true;
     const { container } = render(<AppLink href="/product/x">코트</AppLink>);
-    expect(container.querySelector('.nav-progress')).not.toBeNull();
+
+    expect(container.querySelector('.nav-progress'), '링크 안에 있으면 안 된다').toBeNull();
+    const bar = document.querySelector('.nav-progress');
+    expect(bar).not.toBeNull();
+    expect(bar?.parentElement).toBe(document.body);
   });
 
   it('띠는 낭독기에 읽히지 않는다 — 경로 알림이 이미 말한다', () => {
     linkStatus.pending = true;
-    const { container } = render(<AppLink href="/product/x">코트</AppLink>);
-    expect(container.querySelector('.nav-progress')).toHaveAttribute('aria-hidden', 'true');
+    render(<AppLink href="/product/x">코트</AppLink>);
+    expect(document.querySelector('.nav-progress')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('링크의 글자는 그대로다 — 띠가 이름에 섞이지 않는다', () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 
 /**
  * 건드린 키만 되돌린다.
@@ -23,6 +23,21 @@ beforeEach(() => {
 afterEach(restore);
 
 const load = async () => (await import('../src/index')).googleEnabled;
+
+/**
+ * **처음 한 번의 import 값을 검사 밖에서 치른다.**
+ *
+ * 이 파일의 검사는 전부 0ms 인데 첫 번째만 660ms 였다 — 그 차이가 전부
+ * `@shop/auth` 를 처음 불러오는 값이다(better-auth 와 어댑터가 딸려 온다).
+ * 그게 검사 안에 있으면 상한을 그 값과 나눠 쓰게 되고, CI 처럼 부하가
+ * 걸리면 **첫 검사만 시간 초과로 진다.** 실제로 그렇게 졌다.
+ * 재는 것은 설정의 판단이지 모듈을 처음 읽는 속도가 아니다.
+ */
+beforeAll(async () => {
+  await load();
+  // 이 준비는 재는 대상이 아니다. 느린 기계에서도 끝나도록 넉넉히 준다 —
+  // 훅의 기본 상한 10초로는 부하가 걸린 CI 에서 모자랐다.
+}, 60_000);
 
 describe('구글 로그인 켜짐 여부', () => {
   it('키가 없으면 꺼져 있다', async () => {

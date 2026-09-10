@@ -1,5 +1,6 @@
 'use client';
 
+import { createPortal } from 'react-dom';
 import { useLinkStatus } from 'next/link';
 
 /**
@@ -17,19 +18,28 @@ import { useLinkStatus } from 'next/link';
  * 그래서 **경로가 아니라 누름에 붙인다.** `useLinkStatus` 는 그 링크의
  * 이동이 진행 중인지만 말해 주므로 상태 코드와 아무 상관이 없다.
  *
- * 띠는 링크 안에 있지만 `fixed` 라 링크의 칸을 차지하지 않는다 — 글자
- * 링크든 카드든 배치가 흔들리지 않는다.
+ * ── 왜 body 로 옮겨 그리는가 ──────────────────────────────────
+ * 처음에는 링크 안에 그대로 두고 `position: fixed` 로 화면 맨 위에 붙였다.
+ * **그 전제가 틀렸다.** 조상에 `transform` 이나 `backdrop-filter` 가 있으면
+ * fixed 의 기준이 화면이 아니라 **그 조상**이 된다. 비교함 띠(`backdrop-blur`)
+ * 안의 '견주어보기' 를 누르자 띠가 화면 위가 아니라 **비교함을 가로질러**
+ * 그려졌다 — 앱에서 그렇게 신고됐다.
+ *
+ * 링크가 어디에 살든 결과가 같아야 하므로 body 에 옮겨 그린다. 그러면
+ * 조상이 무엇이든 기준이 화면이다.
  */
 export function NavProgress() {
   const { pending } = useLinkStatus();
-  if (!pending) return null;
+  // 서버 렌더에는 body 가 없다. pending 도 늘 false 라 여기까지 오지 않는다.
+  if (!pending || typeof document === 'undefined') return null;
 
-  return (
+  return createPortal(
     <span
       // 화면이 바뀐 것은 Next 의 경로 알림이 이미 읽어 준다. 여기서 또
       // 말하면 이동할 때마다 두 번 들린다.
       aria-hidden="true"
       className="nav-progress"
-    />
+    />,
+    document.body,
   );
 }
