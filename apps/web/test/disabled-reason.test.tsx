@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from './render';
+import { render, screen, waitFor } from './render';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -49,6 +49,7 @@ vi.mock('~/components/address-picker', () => ({ AddressPicker: () => null }));
 
 const { CheckoutForm } = await import('~/components/checkout-form');
 const { ProductOptions } = await import('~/components/product-options');
+const { CancelOrderButton } = await import('~/components/cancel-order-button');
 
 const address = {
   id: 'a-1', label: '집', recipient: '장병윤', phone: '010-2345-6789',
@@ -121,3 +122,36 @@ const product = {
     { id: 'v-2', label: '30', price: 71_200, stock: 3, optionValueIds: ['ov-2'] },
   ],
 } as never;
+
+/**
+ * 다른 동작이 진행 중이라 잠긴 **옆 버튼**도 이유를 말한다.
+ *
+ * 보내는 중인 버튼은 이름이 '취소하는 중' 으로 바뀌어 스스로 설명한다.
+ * 그 옆의 '돌아가기' 는 이름이 그대로라, 낭독기에는 "돌아가기, 사용 불가"
+ * 만 들리고 왜인지는 어디에도 없었다.
+ */
+describe('진행 중이라 잠긴 옆 버튼', () => {
+  it('보내는 동안 돌아가기가 왜 잠겼는지 말한다', async () => {
+    const user = userEvent.setup();
+    // 응답을 붙잡아 둬서 '보내는 중' 상태를 만든다
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    render(<CancelOrderButton orderNo="A-1" />);
+
+    await user.click(screen.getByRole('button', { name: /주문 취소/ }));
+    await user.click(screen.getByRole('button', { name: /주문 취소/ }));
+
+    const back = screen.getByRole('button', { name: '돌아가기' });
+    await waitFor(() => expect(back).toHaveAttribute('aria-disabled', 'true'));
+    expect(announced(back)).toContain('처리가 끝난 뒤에 누를 수 있습니다');
+  });
+
+  it('가만히 있을 때는 이유를 붙이지 않는다 — 늘 붙어 있으면 뜻이 없다', async () => {
+    const user = userEvent.setup();
+    render(<CancelOrderButton orderNo="A-1" />);
+    await user.click(screen.getByRole('button', { name: /주문 취소/ }));
+
+    const back = screen.getByRole('button', { name: '돌아가기' });
+    expect(back).toHaveAttribute('aria-disabled', 'false');
+    expect(announced(back)).toBe('돌아가기');
+  });
+});

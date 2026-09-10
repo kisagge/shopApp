@@ -11,6 +11,7 @@ export const ja: Dictionary = {
   'common.cancel': 'キャンセル',
   'common.close': '閉じる',
   'common.loading': '読み込み中',
+  'common.busyWait': '処理が終わってから押せます',
   'common.retry': '再試行',
 
   'nav.skipToContent': '本文へスキップ',

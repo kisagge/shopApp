@@ -75,13 +75,30 @@ export function CancelOrderButton({ orderNo }: { orderNo: string }) {
         </p>
       )}
       <div className="flex gap-2">
-        <Button variant="secondary" block onClick={() => setConfirming(false)} aria-disabled={pending}>
+        {/*
+          **왜 못 누르는지 말한다.** 취소를 보내는 동안 이 버튼도 잠기는데,
+          옆의 버튼은 이름이 '취소 중…' 으로 바뀌어 스스로 설명하는 반면
+          이쪽은 '돌아가기' 그대로다. 낭독기에는 "돌아가기, 사용 불가" 만
+          들리고 왜인지는 어디에도 없었다.
+        */}
+        <Button
+          variant="secondary"
+          block
+          onClick={() => setConfirming(false)}
+          aria-disabled={pending}
+          aria-describedby={pending ? 'cancel-busy' : undefined}
+        >
           {t('cancel.back')}
         </Button>
         <Button variant="accent" block onClick={() => cancel()} aria-disabled={pending}>
           {pending ? t('cancel.pending') : t('cancel.button')}
         </Button>
       </div>
+      {pending && (
+        <p id="cancel-busy" className="sr-only">
+          {t('common.busyWait')}
+        </p>
+      )}
     </div>
   );
 }

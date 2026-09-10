@@ -15,6 +15,7 @@ export const en: Dictionary = {
   'common.cancel': 'Cancel',
   'common.close': 'Close',
   'common.loading': 'Loading',
+  'common.busyWait': 'Available once the current action finishes',
   'common.retry': 'Try again',
 
   'nav.skipToContent': 'Skip to content',

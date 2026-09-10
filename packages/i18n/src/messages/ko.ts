@@ -17,6 +17,7 @@ export const ko = {
   'common.cancel': '취소',
   'common.close': '닫기',
   'common.loading': '불러오는 중',
+  'common.busyWait': '처리가 끝난 뒤에 누를 수 있습니다',
   'common.retry': '다시 시도',
 
   // ── 헤더·푸터 ────────────────────────────────────────────
