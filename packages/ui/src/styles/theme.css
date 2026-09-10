@@ -237,6 +237,42 @@
   .data-table :is(th, td):last-child { padding-inline-end: 0; }
 
   /*
+   * 누른 그 자리의 표시.
+   *
+   * 링크 글자 옆에 붙는 작은 점이다. 화면 맨 위의 띠와 역할이 다르다 —
+   * 그쪽은 "무언가 가는 중", 이쪽은 "방금 누른 이것". 리뷰 정렬처럼
+   * 화면 일부만 바뀌는 자리에서 그 구분이 필요하다.
+   *
+   * **자리를 미리 잡지 않는다.** 뜨고 지는 동안 글자가 밀리면 누른 탭이
+   * 흔들린다. inline-block 에 고정 폭을 주고 왼쪽 여백만 둔다.
+   *
+   * 움직임을 줄이라고 한 사용자에게는 돌지 않고 **가만히 있는 점**이다.
+   */
+  .link-busy {
+    display: inline-block;
+    inline-size: 0.7em;
+    block-size: 0.7em;
+    margin-inline-start: 0.4em;
+    vertical-align: -0.05em;
+    border: 2px solid color-mix(in oklab, currentColor 30%, transparent);
+    border-block-start-color: currentColor;
+    border-radius: 50%;
+    animation: link-busy-spin 0.7s linear infinite;
+  }
+
+  @keyframes link-busy-spin {
+    to { transform: rotate(1turn); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .link-busy {
+      animation: none;
+      border-color: currentColor;
+      opacity: 0.5;
+    }
+  }
+
+  /*
    * 이동 중이라는 띠.
    *
    * 누른 링크 안에 그려지지만 `fixed` 라 링크의 칸을 차지하지 않는다 —

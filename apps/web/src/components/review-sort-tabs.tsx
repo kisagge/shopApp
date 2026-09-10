@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { REVIEW_SORT, type ReviewSort } from '@shop/contract';
 import { getT } from '~/lib/i18n/server';
 import { REVIEW_SORT_KEY } from '~/lib/i18n/review-sort';
+import { LinkBusy } from './link-busy';
+import { NavProgress } from './nav-progress';
 
 /**
  * 리뷰 정렬.
@@ -12,6 +14,11 @@ import { REVIEW_SORT_KEY } from '~/lib/i18n/review-sort';
  * 정렬을 바꾸면 화면 맨 위로 올라가 버리므로 **리뷰 자리로 돌아오게**
  * 조각 식별자를 붙인다. 상품 상세는 길어서, 위로 튕기면 방금 무엇을 눌렀는지
  * 알 수 없다.
+ *
+ * **누르면 그 자리에서 표시가 뜬다.** 서버가 리뷰를 다시 그리는 동안 화면은
+ * 옛 목록을 그대로 보여 준다 — 폰에서 재 보니 누르고 2초가 넘도록 아무 변화가
+ * 없었다. 누른 사람은 안 눌린 줄 안다. Suspense 뼈대로는 안 되는 이유는
+ * `LinkBusy` 주석에 적었다.
  */
 export async function ReviewSortTabs({
   sort,
@@ -46,6 +53,8 @@ export async function ReviewSortTabs({
                 }`}
               >
                 {t(REVIEW_SORT_KEY[value])}
+                <LinkBusy />
+                <NavProgress />
               </Link>
             </li>
           );
