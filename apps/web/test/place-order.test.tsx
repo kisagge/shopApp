@@ -189,8 +189,15 @@ describe('실패했을 때', () => {
     await act(async () => { await result.current.place(input([item('v1')])); });
 
     expect(result.current.error).toContain('승인 실패');
-    // 주문은 만들어졌다. 주문 화면으로 보내야 다시 시도할 수 있다.
-    expect(push).toHaveBeenCalledWith('/order/20260909-0000001');
+    /*
+     * 주문은 만들어졌다. 주문 화면으로 보내되 **실패했다고 함께 알린다.**
+     *
+     * 예전에는 표시 없이 보냈다. 그러면 그 화면은 갓 접수된 주문과 결제가
+     * 깨진 주문을 구분할 수 없어 "주문이 접수되었습니다" 만 띄웠고, 화면에
+     * 있는 조작은 취소뿐이었다 — 배포에서 주문 20260910-7063897 이 그렇게
+     * 갇혔다. 여기서 이 표시를 빼면 그 화면이 다시 눈을 감는다.
+     */
+    expect(push).toHaveBeenCalledWith('/order/20260909-0000001?payment=failed');
   });
 
   it('앞선 오류는 다시 보낼 때 지운다 — 성공했는데 빨간 글씨가 남으면 안 된다', async () => {

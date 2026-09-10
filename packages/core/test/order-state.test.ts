@@ -3,7 +3,7 @@ import {
   orderFilterStatuses, ORDER_FILTER_GROUP, ORDER_FILTER_TAB,
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
-  statusBeforeReturn,
+  statusBeforeReturn, isRepayable,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -198,4 +198,41 @@ describe('반품을 반려했을 때 돌아갈 자리', () => {
   it('확정됐던 주문을 배송중으로 되돌리지 않는다', () => {
     expect(statusBeforeReturn({ confirmedAt: at, deliveredAt: at })).not.toBe('SHIPPED');
   });
+});
+
+/**
+ * 결제를 다시 걸 수 있는 주문인가.
+ *
+ * 배포에서 승인이 500 으로 실패하자 주문 20260910-7063897 이 PENDING 으로
+ * 갇혔다. 화면은 "주문 내역에서 다시 시도할 수 있습니다" 라고 말했는데
+ * 그 화면에는 취소 단추밖에 없었다.
+ */
+describe('다시 결제할 수 있는가', () => {
+  it('승인이 안 된 결제대기 주문은 다시 걸 수 있다', () => {
+    expect(isRepayable('PENDING', 'READY')).toBe(true);
+  });
+
+  it('결제 행이 아직 없어도 다시 걸 수 있다', () => {
+    expect(isRepayable('PENDING', null)).toBe(true);
+  });
+
+  it.each(['ABORTED', 'FAILED'] as const)('%s 도 다시 걸 수 있다', (s) => {
+    expect(isRepayable('PENDING', s)).toBe(true);
+  });
+
+  /**
+   * **여기가 이 함수의 요점이다.** PENDING 하나로 판단하면 가상계좌 주문에도
+   * "다시 결제하기" 가 붙는다. 누르면 이미 받은 계좌를 버리고 새로 발급하게
+   * 되고, 그 사이 옛 계좌로 넣은 돈은 갈 곳이 없어진다.
+   */
+  it('입금을 기다리는 가상계좌 주문은 다시 걸 수 없다', () => {
+    expect(isRepayable('PENDING', 'WAITING_FOR_DEPOSIT')).toBe(false);
+  });
+
+  it.each(['PAID', 'PREPARING', 'SHIPPED', 'CANCELLED', 'REFUNDED'] as const)(
+    '%s 주문에는 붙지 않는다',
+    (status) => {
+      expect(isRepayable(status, 'DONE')).toBe(false);
+    },
+  );
 });

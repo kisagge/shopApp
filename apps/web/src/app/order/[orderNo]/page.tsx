@@ -4,11 +4,14 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
-  isCancellableByCustomer, canRequestReturn,
+  isCancellableByCustomer, canRequestReturn, isRepayable,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
+import { RepayButton } from '~/components/repay-button';
+import { serverPaymentMode } from '~/lib/payments';
+import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { getOrderForUser } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
@@ -21,17 +24,42 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = 'force-dynamic';
 
-export default async function OrderPage({ params }: { params: Promise<{ orderNo: string }> }) {
+export default async function OrderPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ orderNo: string }>;
+  /** 결제가 깨진 채 넘어왔는지 — place-order 가 `?payment=failed` 로 알려 준다 */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const { orderNo } = await params;
   const user = await getViewer();
   if (!user) redirect('/login');
 
-  const [order, locale, t] = await Promise.all([
+  const [order, locale, t, query] = await Promise.all([
     getOrderForUser(orderNo, user.id),
     getLocale(),
     getT(),
+    searchParams,
   ]);
   if (!order) notFound();
+
+  /*
+   * **결제를 다시 걸 수 있는 주문인가.**
+   *
+   * 판정은 `@shop/core` 의 `isRepayable` 이 한다 — 주문 상태만으로는 못
+   * 가른다. 결제대기는 "승인이 안 된 것" 과 "가상계좌를 받아 입금을 기다리는
+   * 것" 을 함께 가리키는데, 뒤엣것에 다시 걸면 이미 받은 계좌가 버려진다.
+   *
+   * 결제 방식은 서버가 정해서 내려 준다(`serverPaymentMode`) — 브라우저가
+   * 스스로 정하다 서버와 갈려서 승인이 500 이 났던 적이 있다.
+   */
+  const repayable = isRepayable(order.status, order.payment?.status ?? null);
+  const decided = repayable ? serverPaymentMode() : null;
+  /** 결제를 걸 수 있는 방식. 막혀 있으면 단추를 세우지 않는다 — 눌러도 될 일이 없다 */
+  const repayMode = decided && decided.mode !== 'blocked' ? decided.mode : null;
+  /** 결제 화면에서 실패해 넘어왔는가. 갓 접수된 주문과 구분해야 한다 */
+  const paymentFailed = query['payment'] === 'failed';
 
   const money = (amount: number) => formatMoney(locale, amount);
 
@@ -47,8 +75,15 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
    * 그래서 문구가 상태를 따라가야 한다 — 배송중인 주문에 "결제가 확인되면
    * 배송 준비를 시작합니다" 라고 적혀 있으면 무슨 말인지 알 수 없다.
    */
-  const headline =
-    order.status === 'PENDING'
+  const headline = repayable
+    ? /*
+       * **결제가 안 끝난 주문에 "접수되었습니다" 라고 쓰면 안 된다.**
+       * 아래에 "결제가 완료되지 않았습니다" 를 붙여 놓고 큰 제목은 접수됐다고
+       * 말하면 둘 중 무엇을 믿어야 할지 알 수 없다. 화면을 못 보는 사람에게는
+       * 더 나쁘다 — Next 의 경로 알림이 이 제목을 그대로 읽어 준다.
+       */
+      t('order.unpaidHeading')
+    : order.status === 'PENDING'
       ? t('order.placedHeading')
       : order.status === 'CANCELLED' || order.status === 'REFUNDED'
         ? t('order.closedHeading')
@@ -83,11 +118,14 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
       <div className="flex flex-col items-center gap-4 py-12 text-center">
+        {/* 결제가 안 끝났는데 체크 표시를 띄우면 끝난 줄 안다 */}
         <span
           aria-hidden="true"
-          className="flex h-16 w-16 items-center justify-center rounded-full bg-n-900 text-2xl text-n-0"
+          className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl ${
+            repayable ? 'bg-accent-soft text-accent-hover' : 'bg-n-900 text-n-0'
+          }`}
         >
-          ✓
+          {repayable ? '!' : '✓'}
         </span>
         <h1 className="font-serif text-2xl font-medium tracking-tight">{headline}</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
@@ -103,6 +141,25 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
           <span className="text-xs text-[var(--fg-muted)]">{t('order.number')}</span>
           <span className="tnum text-xs font-semibold">{order.orderNo}</span>
         </p>
+
+        {/*
+          **결제가 안 끝났다는 것을 화면이 말한다.**
+
+          예전에는 이 화면이 갓 접수된 주문과 결제가 깨진 주문을 구분하지
+          않고 똑같이 "주문이 접수되었습니다" 를 띄웠다. 그래서 사람은 결제가
+          된 줄 알았고, 실제로는 재고만 물고 있는 주문이 남았다.
+
+          `role="alert"` 은 결제 화면에서 실패해 막 넘어온 경우에만 쓴다 —
+          나중에 주문 내역에서 다시 들어온 사람에게는 새로 난 일이 아니다.
+        */}
+        {repayable && (
+          <p
+            {...(paymentFailed ? { role: 'alert' as const } : { role: 'status' as const })}
+            className="max-w-[420px] rounded-sm border border-accent bg-accent-soft px-4 py-3 text-[13px] leading-relaxed text-accent-hover"
+          >
+            {paymentFailed ? t('repay.failedNotice') : t('repay.pendingNotice')}
+          </p>
+        )}
       </div>
 
       {order.shipment && (
@@ -249,6 +306,16 @@ export default async function OrderPage({ params }: { params: Promise<{ orderNo:
       )}
 
       <div className="mt-10 flex flex-col gap-3">
+        {/* 다시 걸기가 취소보다 앞에 선다 — 여기 온 사람이 하려던 일이다 */}
+        {repayMode && (
+          <RepayButton
+            orderNo={order.orderNo}
+            payable={order.payable}
+            method={order.payment?.method ?? 'CARD'}
+            orderName={orderNameOf(order.items, t)}
+            paymentMode={repayMode}
+          />
+        )}
         {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}

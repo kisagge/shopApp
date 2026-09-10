@@ -1,3 +1,5 @@
+import type { PaymentStatusCode } from './payment';
+
 /**
  * 주문 상태 전이. 어떤 상태에서 어디로 갈 수 있는지를 한곳에 모아 두면
  * 어드민 액션·웹훅·배치가 각자 판단해서 어긋나는 일을 막을 수 있다.
@@ -97,6 +99,31 @@ export const isTerminal = (status: OrderStatus): boolean => TRANSITIONS[status].
 /** 고객이 스스로 취소할 수 있는 구간 — 출고 전까지 */
 export const isCancellableByCustomer = (status: OrderStatus): boolean =>
   status === 'PENDING' || status === 'PAID';
+
+/**
+ * 결제를 다시 걸 수 있는 주문인가.
+ *
+ * **이 함수가 생긴 이유는 사람이 갇혔기 때문이다.** 승인이 실패하면 주문은
+ * 만들어진 채 PENDING 으로 남는데, 그때 화면은 "주문 내역에서 다시 시도할
+ * 수 있습니다" 라고 말하면서 정작 다시 걸 길을 주지 않았다. 실제로 배포에서
+ * 주문 20260910-7063897 이 그렇게 갇혔고, 할 수 있는 것은 취소뿐이었다.
+ *
+ * **주문 상태만으로는 못 정한다.** PENDING 은 두 가지를 함께 가리킨다 —
+ * 승인이 안 된 것과, 가상계좌를 받아 입금을 기다리는 것. 뒤엣것에 "다시
+ * 결제하기" 를 주면 이미 받은 계좌를 버리고 새로 발급하게 되고, 그 사이에
+ * 옛 계좌로 넣은 돈은 갈 곳이 없어진다. 그래서 결제 상태를 함께 본다.
+ *
+ * `null` 은 결제 행이 아직 없는 경우다 — 그것도 다시 걸어야 할 자리다.
+ */
+export const isRepayable = (
+  status: OrderStatus,
+  paymentStatus: PaymentStatusCode | null,
+): boolean => {
+  if (status !== 'PENDING') return false;
+  if (paymentStatus === null) return true;
+  // 입금을 기다리는 중이면 할 일은 송금이지 재결제가 아니다
+  return paymentStatus === 'READY' || paymentStatus === 'ABORTED' || paymentStatus === 'FAILED';
+};
 
 /** 재고를 붙잡고 있는 상태. 재고 복원 판단에 쓴다. */
 export const holdsInventory = (status: OrderStatus): boolean =>

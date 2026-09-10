@@ -4,11 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { CreateOrderResponse, OrderError, PaymentMethodInput } from '@shop/contract';
 import type { PaymentMode } from '@shop/core';
+import { payOrder, orderNameOf } from './pay-order';
 import type { CartItem } from '~/stores/cart';
 import { useCartStore } from '~/stores/cart';
 import { track } from '~/lib/analytics/client';
-import { getSessionId, getAnonymousId } from '~/lib/analytics/session';
-import { openPaymentWindow } from '~/lib/payments/client';
+import { getSessionId } from '~/lib/analytics/session';
 import { useT } from '~/lib/i18n/client';
 
 /**
@@ -108,7 +108,7 @@ export function usePlaceOrder(mode: PaymentMode) {
     track('add_payment_info', { method: input.method });
 
     /**
-     * 결제창.
+     * 결제.
      *
      * `mode` 는 **서버가 정해서 내려 준 결론**이다(`serverPaymentMode`).
      * 예전에는 여기서 클라이언트 키를 직접 보고 정했는데, 서버는 시크릿 키를
@@ -116,47 +116,38 @@ export function usePlaceOrder(mode: PaymentMode) {
      * 서버는 "프로덕션에서 Mock 은 못 쓴다" 로 갈렸다 — **주문은 만들어지고
      * 확정만 500** 이 났다. 그래서 판단을 브라우저에서 걷어냈다.
      *
-     * 창이 성공하면 토스가 /checkout/success 로 **리다이렉트**하고 승인은
-     * 거기서 서버가 한다 — 이 함수 뒤의 코드는 실행되지 않는다.
+     * **결제를 거는 방법은 `payOrder` 한 군데에만 있다.** 결제 대기 주문에
+     * 다시 걸 때(`repay-button.tsx`)와 같은 함수를 쓴다 — 여기와 거기에
+     * 따로 적으면 Mock 열쇠 규칙이 조용히 어긋난다.
+     *
+     * 결제창이 열리면 브라우저는 토스로 떠나고, 승인은 돌아온 뒤
+     * /checkout/success 에서 서버가 한다 — 이 함수 뒤는 실행되지 않는다.
      */
-    const clientKey = process.env['NEXT_PUBLIC_TOSS_CLIENT_KEY'];
-    if (mode === 'window' && clientKey && input.method !== 'EASY_PAY') {
-      // 주문에 들어간 항목은 결제창을 열기 전에 장바구니에서 뺀다.
-      // 창이 뜨면 이 페이지는 떠나므로 뒤에서 지울 기회가 없다.
-      clear(input.items);
-      try {
-        await openPaymentWindow({
-          clientKey,
-          customerKey: getAnonymousId(),
-          orderNo: order.orderNo,
-          orderName: orderName(input.items, t),
-          amount: order.payable,
-          method: input.method,
-          origin: window.location.origin,
-        });
-      } catch {
-        // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있으므로
-        // 주문 화면에서 다시 시도할 수 있다.
-        router.push(`/order/${order.orderNo}?payment=failed`);
-      }
-      return { refetchQuote: false };
-    }
-
     setPending(true);
-    const mockKey = `${input.method === 'VIRTUAL_ACCOUNT' ? 'mock_va' : 'mock'}_${order.orderNo}`;
-    const confirmRes = await fetch(`/api/orders/${order.orderNo}/confirm`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ paymentKey: mockKey, amount: order.payable }),
+    // 창이 뜨면 이 페이지를 떠나므로 뒤에서 지울 기회가 없다. 먼저 뺀다.
+    clear(input.items);
+    const paid = await payOrder({
+      mode,
+      orderNo: order.orderNo,
+      payable: order.payable,
+      method: input.method,
+      orderName: orderNameOf(input.items, t),
     });
     setPending(false);
 
-    clear(input.items);
+    if (paid.kind === 'window') return { refetchQuote: false };
 
-    if (!confirmRes.ok) {
-      // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 시도할 수 있다.
-      const body = (await confirmRes.json()) as { message?: string };
-      setError(`${body.message ?? t('checkout.approveFailed')} ${t('checkout.retryFromOrders')}`);
+    if (paid.kind === 'windowFailed') {
+      // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있다.
+      router.push(`/order/${order.orderNo}?payment=failed`);
+      return { refetchQuote: false };
+    }
+
+    if (paid.kind === 'confirmFailed') {
+      // 주문은 만들어졌지만 결제가 실패했다. 주문 화면에서 다시 걸 수 있다.
+      setError(`${paid.message ?? t('checkout.approveFailed')} ${t('checkout.retryFromOrders')}`);
+      router.push(`/order/${order.orderNo}?payment=failed`);
+      return { refetchQuote: false };
     }
 
     router.push(`/order/${order.orderNo}`);
@@ -171,9 +162,3 @@ export function usePlaceOrder(mode: PaymentMode) {
   return { place, pending, error };
 }
 
-/** 결제창 제목. 여럿이면 첫 상품에 "외 n건" 을 붙인다. */
-function orderName(items: readonly CartItem[], t: ReturnType<typeof useT>): string {
-  const first = items[0]?.productName ?? t('checkout.orderFallbackName');
-  if (items.length === 1) return first;
-  return `${first} ${t('order.moreItems', { count: items.length - 1 })}`;
-}

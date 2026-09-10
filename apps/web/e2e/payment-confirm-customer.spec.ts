@@ -114,3 +114,82 @@ test('가상계좌는 결제완료가 아니라 입금대기다', async ({ page 
 
   await undo(page, orderNoOf(page.url()));
 });
+
+/**
+ * **승인이 실패하면 사람이 빠져나올 수 있는가.**
+ *
+ * 배포에서 승인이 500 을 냈고, 주문 20260910-7063897 이 결제대기로 갇혔다.
+ * 결제 화면은 "주문 내역에서 다시 시도할 수 있습니다" 라고 말했는데 그
+ * 화면에는 취소 단추밖에 없었다. 안내가 가리키는 곳에 아무것도 없었던 것이다.
+ *
+ * 그래서 여기서 승인을 **한 번만** 깨뜨려 그 막다른 길을 그대로 재현하고,
+ * 사람이 쓰는 길로 빠져나오는지 본다. 단위 검사로는 이걸 못 본다 — 갇히는
+ * 것은 서버가 아니라 화면이고, 화면에 무엇이 있느냐의 문제다.
+ */
+test('승인이 실패해도 주문 화면에서 다시 결제할 수 있다', async ({ page }) => {
+  await toCheckout(page);
+
+  // 첫 승인만 깨뜨린다. 다시 걸 때는 진짜 승인이 돌아야 한다.
+  await page.route('**/api/orders/*/confirm', async (route) => {
+    await route.fulfill({
+      status: 402,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 'PAYMENT_FAILED', message: '카드사에서 거절했습니다' }),
+    });
+  }, { times: 1 });
+
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  const orderNo = orderNoOf(page.url());
+
+  // 실패한 채로 왔다는 것이 주소에 남아야 화면이 그것을 말할 수 있다
+  expect(page.url()).toContain('payment=failed');
+
+  /*
+   * **갓 접수된 주문과 결제가 깨진 주문은 다른 화면이어야 한다.** 예전에는
+   * 둘 다 "주문이 접수되었습니다" 만 띄웠고, 그래서 사람은 결제가 된 줄 알았다.
+   *
+   * 큰 제목까지 함께 본다. 처음 이 검사를 쓸 때는 안내만 봤는데, 그때 Next 의
+   * 경로 알림이 제목을 그대로 읽어 "주문이 접수되었습니다" 라고 말하고 있었다
+   * — 화면을 못 보는 사람에게는 그것이 이 화면의 전부다.
+   */
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('결제가 완료되지 않았습니다');
+  await expect(page.getByText('아래에서 다시 결제하거나')).toBeVisible();
+  await expect(page.getByText('결제완료')).toHaveCount(0);
+
+  // 여기가 없어서 갇혔다
+  const again = page.getByRole('button', { name: '다시 결제하기' });
+  await expect(again).toBeVisible();
+
+  await again.click();
+  await expect(page.getByText('결제완료').first()).toBeVisible({ timeout: 30_000 });
+
+  await undo(page, orderNo);
+});
+
+/**
+ * 가상계좌 주문에는 붙지 않는다.
+ *
+ * 계좌를 이미 받아 입금을 기다리는 주문에 "다시 결제하기" 를 주면, 누르는
+ * 순간 그 계좌가 버려지고 새로 발급된다 — 옛 계좌로 넣은 돈이 갈 곳을 잃는다.
+ * 결제대기라는 상태 하나만 보고 단추를 달면 정확히 그렇게 된다.
+ */
+test('입금을 기다리는 가상계좌 주문에는 다시 결제하기가 없다', async ({ page }) => {
+  await toCheckout(page);
+
+  await page.getByRole('radio', { name: '가상계좌' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  const orderNo = orderNoOf(page.url());
+
+  await expect(page.getByText('입금대기').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: '다시 결제하기' })).toHaveCount(0);
+  // 할 일은 송금이지 재결제가 아니다 — 취소는 그대로 열려 있어야 한다
+  await expect(page.getByRole('button', { name: '주문 취소' })).toBeVisible();
+
+  await undo(page, orderNo);
+});
+
