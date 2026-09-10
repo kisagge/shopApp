@@ -35,6 +35,19 @@ rm -rf packages/db/src/generated apps/web/.next .turbo
 
 cleanup() {
   docker exec "$CONTAINER" psql -U shop -d postgres -c "drop database if exists $DB_NAME;" >/dev/null 2>&1 || true
+
+  # **빌드 산출물도 함께 치운다.**
+  #
+  # 이 스크립트는 일회용 DB 로 빌드한다. 그런데 .next 를 남겨 두면 다음에
+  # `playwright test` 를 바로 돌릴 때 그 캐시를 다시 쓴다 — 개발 DB 를 보고
+  # 있는 줄 알면서 화면에는 일회용 DB 의 값이 뜬다.
+  #
+  # 실제로 겪었다. 상품 화면이 리뷰 7개(평점 4.6)인 DB 를 보면서 "리뷰 6"
+  # 평점 4.0 을 그렸고, 목록은 비어 있었다. 검사가 지는데 DB 를 아무리 봐도
+  # 멀쩡해서 원인을 한참 찾았다.
+  #
+  # DB 를 지우는 것과 같은 이유다 — 이 스크립트가 만든 것은 이 스크립트가 치운다.
+  rm -rf apps/web/.next
 }
 trap cleanup EXIT
 

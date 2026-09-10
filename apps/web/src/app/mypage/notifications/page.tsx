@@ -35,7 +35,9 @@ export default async function NotificationsPage() {
             {t('nav.mypage')}
           </Link>
         </nav>
-        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{t('notif.heading')}</h1>
+        <h1 id="notif-heading" className="text-xl font-semibold tracking-tight md:text-2xl">
+          {t('notif.heading')}
+        </h1>
       </header>
 
       {/*
@@ -45,13 +47,18 @@ export default async function NotificationsPage() {
       */}
       {hadUnread && <MarkNotificationsRead />}
 
+      {/*
+        목록에 이름을 준다. 없으면 보조 기술이 "목록, 항목 3개" 라고만 읽어
+        주고 무엇의 목록인지는 말하지 않는다. 제목이 이미 있으므로 문구를
+        새로 만들지 않고 그것을 가리킨다.
+      */}
       {items.length === 0 ? (
         <div className="flex flex-col items-center gap-2 py-24 text-center">
           <p className="text-[15px] font-medium">{t('notif.empty')}</p>
           <p className="text-[13px] text-[var(--fg-muted)]">{t('notif.emptyHint')}</p>
         </div>
       ) : (
-        <ul className="flex flex-col">
+        <ul aria-labelledby="notif-heading" className="flex flex-col">
           {items.map((n) => {
             const text = notificationText(t, n.kind, n.params);
             const when = (
