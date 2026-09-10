@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { TrackedLink as Link } from './tracked-link';
 import { useRouter } from 'next/navigation';
 import { isNativeShell } from '@shop/native';
 import type { Translator } from '@shop/i18n';

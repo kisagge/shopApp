@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import { getWishlist } from '~/lib/wishlist/wishlist';
 import { WishlistButton } from '~/components/wishlist-button';
 import { AppLink } from '~/components/app-link';

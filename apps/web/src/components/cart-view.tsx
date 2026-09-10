@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo } from 'react';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import Image from 'next/image';
 import { Badge, Button, Price } from '@shop/ui';
 import { won, isBlurDataUrl } from '@shop/core';

@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
 import { resolvePriceRange, emptyResultReason } from '@shop/core';

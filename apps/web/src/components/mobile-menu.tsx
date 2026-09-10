@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import { TrackedLink as Link } from './tracked-link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { SessionNav, type NavUser } from './session-nav';

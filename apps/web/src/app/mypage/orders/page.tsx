@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getViewer } from '~/lib/viewer';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {

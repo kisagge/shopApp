@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { TrackedLink as Link } from './tracked-link';
 import { getTopCategories } from '~/lib/queries/catalog/products';
 import { SessionNav } from './session-nav';
 import { MobileMenu } from './mobile-menu';

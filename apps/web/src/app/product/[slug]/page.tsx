@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';

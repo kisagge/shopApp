@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import { formatDateTime } from '@shop/i18n';
 import { getMyInquiries } from '~/lib/queries/inquiries';
 import { getLocale, getT } from '~/lib/i18n/server';

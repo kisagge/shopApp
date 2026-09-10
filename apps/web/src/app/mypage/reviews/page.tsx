@@ -2,7 +2,7 @@ import Image from 'next/image';
 import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import { getReviewableItems } from '~/lib/queries/reviews';
 import { ReviewForm } from './review-form';
 import { getT } from '~/lib/i18n/server';

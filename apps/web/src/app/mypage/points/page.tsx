@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getViewer } from '~/lib/viewer';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { EXPIRY_NOTICE_DAYS, isPointReason } from '@shop/core';
 import { getPointHistory, getMyPageSummary, getExpiringPoints } from '~/lib/queries/mypage';
