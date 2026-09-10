@@ -56,8 +56,32 @@
   --color-ph-olive: oklch(0.880 0.022 120);
   --color-ph-mist:  oklch(0.910 0.010 190);
 
-  /* ── 타이포 ─────────────────────────────────────── */
-  --font-sans: var(--font-plex-kr), 'IBM Plex Sans KR', 'Apple SD Gothic Neo', system-ui, sans-serif;
+  /*
+   * ── 타이포 ───────────────────────────────────────
+   *
+   * **본문 한글은 기기의 글꼴을 쓴다.**
+   *
+   * 예전에는 IBM Plex Sans KR 을 웹폰트로 받았다. 조각을 잘 나눠 받도록
+   * 손봐 뒀는데도(preload 끄기, 굵기 셋으로 줄이기) 그 대가가 컸다 —
+   * 한글 웹폰트는 굵기 하나가 **unicode-range 조각 94개**라 굵기 셋이면
+   * `@font-face` 선언이 283개고, 그 선언들이 든 스타일 파일은 **그리기를
+   * 막는다.**
+   *
+   * 폰에서 재 보니 첫바이트가 176ms 인데 **첫 그림이 3,236ms** 였다.
+   * 같은 요청을 빈 내용으로 바꿔 보니 FCP 중앙값이 **856ms → 376ms** 였다.
+   * 파일은 브로틀리로 20KB 뿐이라 바이트 문제가 아니고, 선언 자체가
+   * 값이다 — 선언을 3분의 1로 줄인 경우도 392ms 로 거의 같았다.
+   *
+   * 그래서 본문은 기기 글꼴에 맡긴다. 갤럭시는 One UI 산돌고딕, 아이폰은
+   * 애플 SD 산돌고딕이 나온다 — 둘 다 그 기기 사용자에게 가장 익숙한
+   * 한글 서체고, 받을 것이 없으니 늦지도 않는다.
+   *
+   * **세리프(Hahmlet)는 남긴다.** 워드마크와 큰 제목에만 쓰이고, 이 가게의
+   * 인상을 지고 있는 것이 그쪽이다. 굵기 하나라 선언도 92개뿐이다.
+   */
+  --font-sans:
+    'Apple SD Gothic Neo', 'Pretendard', -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Noto Sans KR', 'Malgun Gothic', system-ui, sans-serif;
   --font-serif: var(--font-hahmlet), 'Hahmlet', 'Apple SD Gothic Neo', Georgia, serif;
 
   /* ── 라운드: 8px 위로는 올리지 않는다 ──────────────── */

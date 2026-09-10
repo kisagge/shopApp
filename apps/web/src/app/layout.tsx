@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { LOCALE_TAG, OG_LOCALE } from '@shop/i18n';
-import { Hahmlet, IBM_Plex_Sans_KR } from 'next/font/google';
+import { Hahmlet } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
 import { WebVitalsReporter } from '~/components/web-vitals-reporter';
@@ -20,40 +20,26 @@ import { LocaleProvider } from '~/lib/i18n/client';
 import { CompareTray } from '~/components/compare-tray';
 
 /**
- * 굵기는 **실제로 쓰는 것만** 부른다.
+ * **웹폰트는 세리프 하나뿐이다.**
  *
- * 한글 글꼴은 글자가 많아 수백 개 조각으로 쪼개져 오고, 굵기마다 그 조각
- * 전부에 @font-face 선언이 하나씩 붙는다. 그래서 굵기 하나가 곧 CSS 수십
- * KB 다 — 다섯 굵기를 부르던 본문 글꼴의 선언만 232KB 였고, 그 CSS 는 글자가
- * 그려지기 전에 받아야 한다.
+ * 본문 한글은 기기의 글꼴을 쓴다 — 이유와 측정값은
+ * `packages/ui/src/styles/theme.css` 의 --font-sans 에 적었다. 요약하면,
+ * 한글 웹폰트는 굵기 하나가 unicode-range 조각 94개라 굵기 셋이면
+ * `@font-face` 선언이 283개고, 그 선언들이 든 스타일이 **그리기를 막아**
+ * 폰에서 첫 그림이 3.2초였다.
  *
- * 세어 보니 300(light)은 **한 곳도 쓰지 않았고**, 700(bold)은 배지 두 곳뿐이라
- * 600 으로 맞췄다. 세리프는 워드마크와 큰 제목에만 쓰는데 전부 500 이었다.
+ * 세리프는 남긴다. 워드마크와 큰 제목에만 쓰이고 이 가게의 인상을 지고
+ * 있는 것이 그쪽이며, 굵기가 하나라 값이 3분의 1이다.
  *
- * 굵기를 새로 쓰려면 여기 한 줄을 더해야 한다. 그 한 줄이 수십 KB 라는 것을
- * 알고 더하는 편이 낫다.
- *
- * **미리 받지 않는다(preload: false).** 굵기를 줄여도 조각 수는 그대로였다.
- * 재 보니 매대 한 화면이 글꼴 파일 208개 1,833KB 를 받고 있었는데, 그 화면이
- * 실제로 쓰는 것은 **35개 334KB** 였다 — 나머지 173개는 화면에 없는 글자의
- * 조각이다.
- *
- * 미리 받기를 켜 두면 `<link rel=preload>` 155줄이 그 전부를 가장 높은
- * 우선순위로 끌어온다. 사진과 스크립트가 그 뒤에 줄을 선다. 끄면 브라우저가
- * @font-face 의 unicode-range 를 보고 **필요한 조각만** 가져간다.
+ * **미리 받지 않는다(preload: false).** 미리 받기를 켜 두면
+ * `<link rel=preload>` 가 조각 전부를 가장 높은 우선순위로 끌어오고
+ * 사진과 스크립트가 그 뒤에 줄을 선다. 끄면 브라우저가 unicode-range 를
+ * 보고 **필요한 조각만** 가져간다.
  *
  * 글자가 안 보이는 시간은 생기지 않는다 — display: 'swap' 이라 대체 글꼴로
  * 먼저 그리고, next/font 가 크기를 맞춘 대체본을 만들어 두므로 바뀔 때
  * 레이아웃도 튀지 않는다.
  */
-const sans = IBM_Plex_Sans_KR({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-plex-kr',
-  display: 'swap',
-  preload: false,
-});
-
 const serif = Hahmlet({
   subsets: ['latin'],
   weight: ['500'],
@@ -105,7 +91,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     /* lang 이 틀리면 낭독기가 한국어를 영어 발음으로 읽는다 */
-    <html lang={LOCALE_TAG[locale]} className={`${sans.variable} ${serif.variable}`}>
+    <html lang={LOCALE_TAG[locale]} className={serif.variable}>
       <body>
         <a
           href="#main"
