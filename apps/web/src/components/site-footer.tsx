@@ -14,12 +14,27 @@ export async function SiteFooter() {
           그 버튼은 자바스크립트가 있어야 열린다. 여기 목록은 서버가 그린
           평범한 링크라서, 스크립트가 없거나 실패해도 카테고리로 갈 수 있다.
         */}
+        {/*
+          **푸터 링크는 미리 받지 않는다.**
+
+          이 앱의 화면은 거의 다 `force-dynamic` 이라, 미리받기 한 번이 곧
+          서버 렌더 한 번이다. 푸터는 모든 화면에 붙어 있으니 짧은 화면에서는
+          늘 시야에 들어오고, 그때마다 링크 수만큼 함수가 깨어난다.
+
+          기기에서 주문을 재다가 봤다. 결제 버튼을 누르고 주문이 도는 1초
+          남짓 동안 고객센터·입점문의를 미리 받고 있었다 — 결제하러 온 사람이
+          그때 누를 일이 거의 없는 화면들이고, 하필 사람이 기다리는 그 순간에
+          대역폭과 함수를 나눠 쓴다.
+
+          누르면 그때 가면 된다. 머리의 매대 메뉴는 사정이 다르므로 그대로 둔다.
+        */}
         <nav aria-label={t('nav.categoriesFooter')}>
           <ul className="flex flex-wrap gap-x-6 gap-y-2">
             {categories.map((c) => (
               <li key={c.slug}>
                 <Link
                   href={`/category/${c.slug}`}
+                  prefetch={false}
                   className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
                 >
                   {t.category(c.slug, c.name)}
@@ -36,12 +51,14 @@ export async function SiteFooter() {
         <p className="mt-6 flex flex-wrap gap-x-6">
           <Link
             href="/support"
+            prefetch={false}
             className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
           >
             {t('support.heading')}
           </Link>
           <Link
             href="/merchant/apply"
+            prefetch={false}
             className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
           >
             {t('nav.merchantApply')}
