@@ -16,6 +16,15 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/*
+ * 미루는 자리를 가로챈다. 기본은 예전과 똑같이 **그 자리에서** 돌려서
+ * 나머지 검사들이 실제로 일어난 일을 보게 하고, 미루는 검사에서만
+ * 붙잡아 둔다.
+ */
+const deferred: (() => Promise<void>)[] = [];
+const afterResponse = vi.hoisted(() => vi.fn<(w: () => Promise<void>) => any>((w) => w()));
+vi.mock('~/lib/api/after-response', () => ({ afterResponse }));
+
 const { confirmPayment, ConfirmError } = await import('~/lib/orders/confirm-payment');
 
 const user = { id: 'u-1' };
@@ -203,3 +212,55 @@ describe('퍼널을 이어 붙인다', () => {
     expect(recordServerEvent.mock.calls[0]![0].sessionId).toBe('order-20260831-1234567');
   });
 });
+
+/**
+ * 승인 뒤에 붙는 일이 **응답 앞을 막지 않는가.**
+ *
+ * 매출 기록도 안내 메일도 실패한다고 승인된 결제를 되돌리지 않는다. 그런데
+ * 둘 다 `await` 로 응답 앞에 서 있었다. 이 배포는 DB 왕복 하나가 141ms 라
+ * (질의 내용과 무관하게 고정이었다) 확정 창구 1.3초 중 0.7초가 승인 뒤
+ * 몫이었다 — 사용자가 기다릴 이유가 없는 0.7초다.
+ *
+ * 다른 검사들은 `afterResponse` 가 그 자리에서 돌려 주므로 미루기 전과
+ * 똑같이 통과한다. **정말 미뤄지는지는 여기서만 확인된다.**
+ */
+describe('승인 뒤에 붙는 일은 응답을 막지 않는다', () => {
+  beforeEach(() => {
+    deferred.length = 0;
+    afterResponse.mockImplementation((w) => { deferred.push(w); });
+  });
+
+  it('매출 기록을 기다리지 않고 결과를 돌려준다', async () => {
+    const r = await confirmPayment(
+      { orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 },
+      user,
+      gateway(),
+    );
+
+    expect(r.orderNo).toBe('20260831-1234567');
+    // 응답은 나왔는데 매출 기록은 아직이다 — 그게 미뤘다는 뜻이다
+    expect(recordServerEvent).not.toHaveBeenCalled();
+    expect(deferred).toHaveLength(1);
+
+    await deferred[0]!();
+    expect(recordServerEvent).toHaveBeenCalledOnce();
+  });
+
+  /**
+   * **한 줄에 꿰면 안 된다.** 매출 기록이 던지면 뒤의 안내 메일이 통째로
+   * 안 나간다 — 서로 아무 상관이 없는 일이다. 미루면서 하나로 묶었다가
+   * 그렇게 엮이면, 미룬 것이 새 고장을 만든 셈이 된다.
+   */
+  it('매출 기록이 실패해도 미룬 일 전체가 무너지지 않는다', async () => {
+    recordServerEvent.mockRejectedValueOnce(new Error('이벤트 저장 실패'));
+
+    await confirmPayment(
+      { orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 },
+      user,
+      gateway(),
+    );
+    // 던지지 않고 끝까지 간다 — 메일 단계가 살아 있다는 뜻이다
+    await expect(deferred[0]!()).resolves.toBeUndefined();
+  });
+});
+

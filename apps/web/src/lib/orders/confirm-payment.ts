@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { afterResponse } from '~/lib/api/after-response';
 import { sendOrderMail, orderLocale, shipToLine } from '~/lib/orders/notify';
 import {
   assertPaymentAmount, isPaidStatus, transition, won,
@@ -130,56 +131,80 @@ export async function confirmPayment(
     throw error;
   }
 
-  if (paid) {
-    // purchase 는 결제가 실제로 성립한 순간에만 기록한다.
-    // 주문 생성 시점에 기록하면 결제되지 않은 주문까지 매출로 잡힌다.
-    await recordServerEvent({
-      name: 'purchase',
-      occurredAt: result.approvedAt ?? new Date(),
-      // 조회·담기와 **같은 세션**으로 찍어야 퍼널이 이어진다.
-      // 주문 세션을 못 받았을 때만 주문번호로 대신한다(그 건은 퍼널에서 빠진다).
-      sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
-      anonymousId: order.browserSessionId ?? `order-${order.orderNo}`,
-      userId: user.id,
-      path: '/checkout',
-      productId: null, variantId: null,
-      orderId: order.orderNo,
-      merchantId: null,
-      value: order.payable,
-      quantity: order.items.reduce((sum, i) => sum + i.quantity, 0),
-      props: { provider: gateway.provider, method: result.method },
-    });
-  }
-
-  /*
-   * 안내 메일.
+  /**
+   * 승인 뒤에 붙는 일 — **응답을 막지 않는다.**
    *
-   * **결제가 성립한 뒤에 보낸다.** 주문을 만들 때 보내면 결제 화면에서
-   * 떠난 사람에게도 "주문이 완료되었습니다" 가 간다 — 실제로 그런 주문이
-   * 재고를 물고 있었던 것을 앞서 봤다.
+   * 매출 기록도 안내 메일도 실패한다고 승인된 결제를 되돌리지 않는다.
+   * 그런데 둘 다 `await` 로 응답 앞에 서 있었고, 이 배포는 DB 왕복 하나가
+   * 141ms 다. 확정 창구 1.3초 중 승인 뒤 몫이 0.7초였다 — 사용자가 기다릴
+   * 이유가 없는 0.7초다.
    *
-   * 가상계좌는 아직 입금 전이라 다른 말을 보낸다. 이때 계좌번호를 메일로
-   * 주지 않으면 **화면을 닫는 순간 어디로 넣을지 알 길이 없어진다.**
-   *
-   * 던지지 않는다. 여기서 실패한다고 승인된 결제를 되돌릴 수는 없다.
+   * `afterResponse` 는 요청 안에서는 응답 뒤로 미루고, 요청 밖(단위 검사)
+   * 에서는 그 자리에서 돌린다. 그래서 아래 일들이 검사에서 사라지지 않는다.
    */
-  await sendOrderMail(paid ? 'paid' : 'pending', {
-    to: order.user.email,
-    buyerName: order.user.name,
-    orderNo: order.orderNo,
-    locale: orderLocale(order.locale),
-    items: order.items,
-    payable: order.payable,
-    shipTo: shipToLine(order),
-    ...(result.virtualAccount
-      ? {
-          virtualAccount: {
-            bank: result.virtualAccount.bank,
-            accountNumber: result.virtualAccount.accountNumber,
-            dueDate: result.virtualAccount.dueDate ?? null,
-          },
-        }
-      : {}),
+  await afterResponse(async () => {
+    /*
+     * **한 줄에 꿰지 않는다.** 매출 기록이 던지면 뒤의 안내 메일이 통째로
+     * 안 나간다 — 이 둘은 서로 아무 상관이 없는 일이다. 응답 뒤로 미루면서
+     * 하나로 묶었다가 그렇게 엮이면, 미룬 것이 새 고장을 만든 셈이 된다.
+     */
+    if (paid) {
+      try {
+        // purchase 는 결제가 실제로 성립한 순간에만 기록한다.
+        // 주문 생성 시점에 기록하면 결제되지 않은 주문까지 매출로 잡힌다.
+        await recordServerEvent({
+          name: 'purchase',
+          occurredAt: result.approvedAt ?? new Date(),
+          // 조회·담기와 **같은 세션**으로 찍어야 퍼널이 이어진다.
+          // 주문 세션을 못 받았을 때만 주문번호로 대신한다(그 건은 퍼널에서 빠진다).
+          sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
+          anonymousId: order.browserSessionId ?? `order-${order.orderNo}`,
+          userId: user.id,
+          path: '/checkout',
+          productId: null, variantId: null,
+          orderId: order.orderNo,
+          merchantId: null,
+          value: order.payable,
+          quantity: order.items.reduce((sum, i) => sum + i.quantity, 0),
+          props: { provider: gateway.provider, method: result.method },
+        });
+      } catch (error) {
+        console.error('[payment] 매출 기록 실패 — 결제는 성립했다', {
+          orderNo: order.orderNo,
+        }, error);
+      }
+    }
+
+    /*
+     * 안내 메일.
+     *
+     * **결제가 성립한 뒤에 보낸다.** 주문을 만들 때 보내면 결제 화면에서
+     * 떠난 사람에게도 "주문이 완료되었습니다" 가 간다 — 실제로 그런 주문이
+     * 재고를 물고 있었던 것을 앞서 봤다.
+     *
+     * 가상계좌는 아직 입금 전이라 다른 말을 보낸다. 이때 계좌번호를 메일로
+     * 주지 않으면 **화면을 닫는 순간 어디로 넣을지 알 길이 없어진다.**
+     *
+     * 던지지 않는다. 여기서 실패한다고 승인된 결제를 되돌릴 수는 없다.
+     */
+    await sendOrderMail(paid ? 'paid' : 'pending', {
+      to: order.user.email,
+      buyerName: order.user.name,
+      orderNo: order.orderNo,
+      locale: orderLocale(order.locale),
+      items: order.items,
+      payable: order.payable,
+      shipTo: shipToLine(order),
+      ...(result.virtualAccount
+        ? {
+            virtualAccount: {
+              bank: result.virtualAccount.bank,
+              accountNumber: result.virtualAccount.accountNumber,
+              dueDate: result.virtualAccount.dueDate ?? null,
+            },
+          }
+        : {}),
+    });
   });
 
   return {

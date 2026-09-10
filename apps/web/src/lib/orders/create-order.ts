@@ -59,18 +59,42 @@ export async function createOrder(
   locale: Locale = DEFAULT_LOCALE,
 ): Promise<CreateOrderResponse> {
   /*
+   * **서로 모르는 조회는 한꺼번에 보낸다.**
+   *
+   * 넷 다 서로의 결과를 쓰지 않는데 하나씩 줄을 서 있었다. 이 배포는 DB
+   * 왕복 하나가 141ms 다(질의 내용과 무관하게 고정이었다 — 값이 아니라
+   * 거리에 묶인 값이다). 줄을 세우면 4×141, 함께 보내면 141 이다.
+   *
+   * **`allSettled` 인 이유는 순서 때문이다.** `all` 은 먼저 깨진 것을
+   * 던지므로, 이미 만든 주문이 있는데 배송지가 지워진 경우 예전에는 그
+   * 주문을 그대로 돌려주던 것이 ADDRESS_NOT_FOUND 로 바뀐다. 함께 보내되
+   * **보는 순서는 그대로** 둔다.
+   *
+   * 스냅샷 조회만 범위가 다르다. 예전에는 견적이 끝난 뒤 살 수 있는 것만
+   * 읽었는데, 그러면 견적을 기다려야 한다. 요청에 담긴 것 전부를 미리 읽고
+   * 나중에 골라 쓴다 — 읽는 행이 조금 늘고 왕복이 하나 준다.
+   */
+  const [alreadyMade, shippingRead, couponRead, detailsRead] = await Promise.allSettled([
+    input.idempotencyKey
+      ? findByIdempotencyKey(input.idempotencyKey, user.id)
+      : Promise.resolve(null),
+    resolveShipping(input, user.id),
+    input.couponCode ? findUsableCouponId(user.id, input.couponCode) : Promise.resolve(null),
+    loadSnapshotDetails(input.lines.map((l) => l.variantId)),
+  ]);
+
+  /*
    * **이미 만든 주문이면 그것을 그대로 돌려준다.**
    *
    * 버튼을 두 번 눌렀거나 응답을 못 받아 다시 보낸 경우다. 여기서 걸러
    * 내지 않으면 재고가 두 번 깎이고, 결제되지 않은 주문이 하나 더 남아
    * 그 재고를 물고 있는다.
    */
-  if (input.idempotencyKey) {
-    const already = await findByIdempotencyKey(input.idempotencyKey, user.id);
-    if (already) return already;
-  }
+  if (alreadyMade.status === 'rejected') throw alreadyMade.reason;
+  if (alreadyMade.value) return alreadyMade.value;
 
-  const shipping = await resolveShipping(input, user.id);
+  if (shippingRead.status === 'rejected') throw shippingRead.reason;
+  const shipping = shippingRead.value;
 
   const quote = await quoteCart(
     {
@@ -99,8 +123,9 @@ export async function createOrder(
     throw new OrderError('COUPON_INVALID');
   }
 
-  // 스냅샷에 필요한 값(가맹점·대표 이미지)은 견적에 없어 따로 읽는다
-  const details = await loadSnapshotDetails(buyable.map((l) => l.variantId));
+  // 스냅샷에 필요한 값(가맹점·대표 이미지)은 견적에 없어 따로 읽는다 — 위에서 함께 읽었다
+  if (detailsRead.status === 'rejected') throw detailsRead.reason;
+  const details = detailsRead.value;
 
   const items: OrderItemDraft[] = buyable.map((l) => {
     const d = details.get(l.variantId);
@@ -118,9 +143,8 @@ export async function createOrder(
     };
   });
 
-  const usedCouponId = input.couponCode
-    ? await findUsableCouponId(user.id, input.couponCode)
-    : null;
+  if (couponRead.status === 'rejected') throw couponRead.reason;
+  const usedCouponId = couponRead.value;
 
   /*
    * 동시에 두 번 들어오면 위의 조회는 둘 다 빈손으로 지나간다. 그때는

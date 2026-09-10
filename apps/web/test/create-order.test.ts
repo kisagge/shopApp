@@ -492,3 +492,71 @@ describe('품절 — 버려진 주문이 물고 있던 것', () => {
     expect(db.order.findMany).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 서로 모르는 조회를 **함께** 보내는가.
+ *
+ * 이 배포는 DB 왕복 하나가 141ms 다 — 질의 내용과 무관하게 고정이었으니
+ * 값이 아니라 거리에 묶인 값이다. 그러면 줄을 세운 횟수가 그대로 시간이
+ * 된다. 예전에는 멱등 확인 · 배송지 · 쿠폰 · 스냅샷 넷이 하나씩 줄을 서
+ * 4×141ms 였다.
+ *
+ * **시간을 재지 않는다.** 느린 기계에서 흔들리는 검사가 된다. 대신
+ * **아직 아무것도 답하지 않았을 때 넷이 다 나갔는지**를 본다. 줄을 세우면
+ * 첫 번째가 답하기 전에는 두 번째가 나갈 수 없으므로 이 검사가 진다.
+ */
+describe('서로 모르는 조회는 함께 나간다', () => {
+  it('첫 응답이 오기 전에 네 조회가 모두 나가 있다', async () => {
+    const started: string[] = [];
+    /** 아무도 풀어 주기 전에는 답하지 않는 조회 */
+    const held = <T,>(name: string, value: T) => {
+      let release!: () => void;
+      const gate = new Promise<void>((r) => { release = r; });
+      const fn = vi.fn(() => { started.push(name); return gate.then(() => value); });
+      return { fn, release };
+    };
+
+    const idem = held('멱등확인', null);
+    const addr = held('배송지', { ...address, id: 'a-1' });
+    const coup = held('쿠폰', null);
+    const snap = held('스냅샷', [
+      { id: 'v-coat-m', product: { brand: { merchantId: 'm-1' }, images: [{ url: '/coat.jpg' }] } },
+    ]);
+    // 쿠폰 조회가 실제로 나가려면 쿠폰이 붙은 요청이어야 한다
+    quoteCart.mockResolvedValue(quote({ couponDiscount: 10_000, couponCode: 'WELCOME' }));
+    db.order.findFirst.mockImplementation(idem.fn);
+    db.address.findFirst.mockImplementation(addr.fn);
+    db.userCoupon.findFirst.mockImplementation(coup.fn);
+    db.productVariant.findMany.mockImplementation(snap.fn);
+
+    const running = createOrder(
+      request({ idempotencyKey: 'idem-1', addressId: 'a-1', address: undefined, couponCode: 'WELCOME' }),
+      user,
+    );
+    // 아무도 답하지 않은 채로 이벤트 루프를 몇 바퀴 돌린다
+    for (let i = 0; i < 10; i++) await Promise.resolve();
+
+    expect(new Set(started)).toEqual(new Set(['멱등확인', '배송지', '쿠폰', '스냅샷']));
+
+    idem.release(); addr.release(); coup.release(); snap.release();
+    await running;
+  });
+
+  /**
+   * 함께 보내면서 **보는 순서**까지 잃으면 안 된다.
+   *
+   * `Promise.all` 은 먼저 깨진 것을 던진다. 그러면 이미 만든 주문이 있는데
+   * 배송지가 지워진 경우, 예전에는 그 주문을 그대로 돌려주던 것이
+   * ADDRESS_NOT_FOUND 로 바뀐다 — 두 번 눌러 놓고 주문을 못 찾는 셈이다.
+   */
+  it('이미 만든 주문이 있으면 배송지가 없어도 그 주문을 돌려준다', async () => {
+    const made = { orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING' };
+    db.order.findFirst.mockResolvedValue(made);
+    db.address.findFirst.mockResolvedValue(null);   // 지워진 배송지
+
+    await expect(
+      createOrder(request({ idempotencyKey: 'idem-1', addressId: 'a-1', address: undefined }), user),
+    ).resolves.toEqual(made);
+  });
+});
+
