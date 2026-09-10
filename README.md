@@ -149,11 +149,11 @@ xcrun simctl install booted /tmp/plain-ios/Build/Products/Debug-iphonesimulator/
 xcrun simctl launch booted test.plain.shop
 ```
 
-**iOS 에서 아직 안 되는 것이 하나 있다.** 가장자리에서 밀어 뒤로 가기가 동작하지
-않는다. 안드로이드의 뒤로 가기 버튼은 `native-back-button.tsx` 가 다루는데, iOS 의
-대응물인 밀기 제스처는 WKWebView 설정이라 웹 쪽에서 손댈 수 없다. 화면 안의
-빵부스러기로는 돌아갈 수 있으니 막다른 길은 아니지만, iOS 사용자가 반사적으로
-하는 동작이 아무 일도 안 한다.
+**뒤로 가기는 플랫폼마다 다른 자리에서 다룬다.** 안드로이드의 뒤로 가기 버튼은
+웹 쪽 `native-back-button.tsx` 가, iOS 의 가장자리 밀기는 `AppDelegate` 가 맡는다.
+밀기는 WKWebView 설정이라 웹에서 손댈 수 없고 Capacitor 가 설정 파일로 열어 두지도
+않아서, 웹뷰가 화면에 올라온 뒤 켠다. 처음에는 이것이 빠져 있어 **iOS 에서 밀어도
+아무 일도 안 했다.**
 
 딥링크를 실제로 검증하려면 `ANDROID_CERT_SHA256` 과 `APPLE_TEAM_ID` 를 채우고
 Xcode 에서 Associated Domains 를 켜야 한다. 자세한 것은 `apps/mobile/README.md`.

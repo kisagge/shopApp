@@ -185,3 +185,32 @@ describe('웹뷰가 망 변화를 알아챌 수 있는가', () => {
   });
 });
 
+/**
+ * iOS 에서 가장자리를 밀어 뒤로 가기.
+ *
+ * **시뮬레이터에서 아무 일도 안 했다.** 상품 상세를 열고 왼쪽 끝에서 밀어도
+ * 화면이 그대로였다. 안드로이드의 뒤로 가기 버튼은 웹 쪽에서 다루는데,
+ * iOS 의 대응물인 밀기 제스처는 WKWebView 설정이라 웹에서 손댈 수 없다.
+ *
+ * Capacitor 는 이것을 설정 파일로 열어 두지 않는다. 그래서 `AppDelegate` 가
+ * 웹뷰가 올라온 뒤 켠다. 한 줄이라 지우기도 쉽고, 지우면 **아무 오류 없이
+ * 조용히 예전으로 돌아간다** — 시뮬레이터를 띄워 밀어 보기 전에는 모른다.
+ * 그래서 여기서 지킨다.
+ */
+describe('iOS 밀기 뒤로가기', () => {
+  const appDelegate = () =>
+    read(join(ROOT, 'apps', 'mobile', 'ios', 'App', 'App', 'AppDelegate.swift'));
+
+  it('웹뷰에 밀기 제스처를 켠다', () => {
+    expect(appDelegate()).toContain('allowsBackForwardNavigationGestures = true');
+  });
+
+  /**
+   * 켜는 자리가 중요하다. 웹뷰는 화면이 올라온 뒤에 생기므로, 실행 직후에
+   * 켜려 하면 아직 없는 것을 만지게 되어 조용히 아무 일도 안 한다.
+   */
+  it('웹뷰가 화면에 올라온 뒤에 켠다', () => {
+    expect(appDelegate()).toContain('capacitorViewDidAppear');
+  });
+});
+
