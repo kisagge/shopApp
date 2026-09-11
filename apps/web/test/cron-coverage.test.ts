@@ -93,3 +93,44 @@ describe('함수 리전', () => {
   });
 });
 
+/**
+ * 문서에 적힌 시각이 실제 주기와 같은가.
+ *
+ * **손으로 적은 표는 조용히 어긋난다.** DEPLOY.md 의 배치 표는 세 가지가
+ * 틀려 있었다 — "두 개가 정의돼 있다" 면서 여섯 개 중 넷만 적혀 있었고,
+ * 정산은 "매달 1일 KST 05:00" 이라고 했는데 실제로는 2일이었다.
+ *
+ * 마지막 것이 특히 조용하다. 크론 표현식은 **UTC 로 읽히는데** 표는 KST 로
+ * 적혀 있어서, 9시간을 더하다 날짜가 넘어가는 것을 사람이 놓치기 쉽다.
+ * 매일 도는 배치는 날짜가 넘어가도 티가 안 나지만, **달에 한 번 도는 정산은
+ * 날짜가 곧 의미**다.
+ *
+ * 그래서 표를 읽지 않고 `vercel.json` 에서 계산해 맞춰 본다.
+ */
+describe('배치 시각이 문서와 같다', () => {
+  /** UTC 크론 표현식을 문서가 쓰는 KST 문장으로 바꾼다 */
+  function kstLabel(schedule: string): string {
+    const [min, hour, dayOfMonth] = schedule.split(/\s+/) as [string, string, string];
+    const shifted = Number(hour) + 9;
+    const kstHour = shifted % 24;
+    const time = `KST ${String(kstHour).padStart(2, '0')}:${String(Number(min)).padStart(2, '0')}`;
+    if (dayOfMonth === '*') return `매일 ${time}`;
+    // 9시간을 더하다 자정을 넘으면 날짜도 하루 넘어간다 — 정산이 그 경우다
+    const day = Number(dayOfMonth) + (shifted >= 24 ? 1 : 0);
+    return `매달 ${day}일 ${time}`;
+  }
+
+  const doc = () => readFileSync(join(process.cwd(), '..', '..', 'docs', 'DEPLOY.md'), 'utf8');
+
+  it.each([...scheduled])('%s 의 시각이 문서에 그대로 적혀 있다', (path, schedule) => {
+    const row = `| \`${path}\` | ${kstLabel(schedule)} |`;
+    expect(doc(), `${path} 은 ${schedule}(UTC) 이라 ${kstLabel(schedule)} 인데 표가 다르다`)
+      .toContain(row);
+  });
+
+  it('표에 적힌 배치 수가 실제와 같다', () => {
+    const rows = doc().match(/\| `\/api\/cron\/[a-z-]+` \|/g) ?? [];
+    expect(rows).toHaveLength(scheduled.size);
+  });
+});
+
