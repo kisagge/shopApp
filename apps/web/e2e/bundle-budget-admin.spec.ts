@@ -11,4 +11,10 @@ import { budgetTests } from './bundle';
  * 파일 이름의 `admin.spec.ts` 로 admin 프로젝트에 잡힌다(playwright.config).
  * 그 짝이 맞는지는 e2e-coverage 검사가 지킨다.
  */
-budgetTests(test, expect, ['/admin', '/admin/merchants', '/admin/orders']);
+/*
+ * **편집기가 든 화면도 잰다.** 공지 편집기는 TipTap 과 ProseMirror 를 쓰는데,
+ * 같은 묶음에 들어가면 공지를 고치러 오지 않은 사람도 그 무게를 치른다.
+ * 열어 볼 때 받아 오게(`next/dynamic`) 해 두었는데, **그렇게 해 뒀다는 말과
+ * 실제로 그런지는 다른 이야기다.**
+ */
+budgetTests(test, expect, ['/admin', '/admin/merchants', '/admin/orders', '/admin/support']);
