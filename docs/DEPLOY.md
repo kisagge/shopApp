@@ -282,6 +282,34 @@ Vercel 은 `CRON_SECRET` 이 설정돼 있으면 `Authorization: Bearer` 로 보
 
 플랜에 따라 크론 개수와 주기에 제한이 있으니 확인할 것.
 
+### 배치를 손으로 돌려 보기
+
+운영에 걸기 전에 **일회용 DB 에 대고** 한 번 돌려 보는 것이 좋다. 개발 DB 를
+쓰면 주문이 구매확정되고 포인트가 지급돼 되돌릴 수 없다.
+
+```bash
+docker exec shop-postgres psql -U shop -d postgres -c 'create database plain_batch_check;'
+export DATABASE_URL=postgresql://shop:shop@localhost:5432/plain_batch_check
+pnpm --filter @shop/db exec prisma migrate deploy && pnpm db:seed
+# 그다음 배치 함수를 직접 부른다(창구는 CRON_SECRET 을 요구한다).
+#   releaseAbandonedHolds(now) · autoConfirmDelivered(now) · expirePoints(now)
+#   reconcilePoints(actor, { fix: true }) · runEventRollup(now)
+#   closeSettlements(actor, previousYearMonth(now))
+# actor 는 크론이 쓰는 것과 같다 — { id: 'system:cron', role: 'SUPER_ADMIN', merchantId: null }
+docker exec shop-postgres psql -U shop -d postgres -c 'drop database plain_batch_check;'
+```
+
+**시드만 넣고 돌리면 대부분 0건이다.** 오래된 주문도, 만료될 포인트도, 접을
+이벤트도 없기 때문이다. 그건 배선만 확인한 것이지 일을 하는지 본 것이 아니다.
+조건을 만들어야 한다 — 예를 들어 주문 하나를 `status='DELIVERED'`,
+`deliveredAt = now() - interval '9 days'`, `rewardPoints = 2890` 으로 두고
+`autoConfirmDelivered` 를 돌리면 확정·적립·원장·만료일까지 한 번에 볼 수 있다.
+
+**정산 행을 직접 조회할 때 기간 경계를 조심한다.** `periodStart` 는 KST
+자정이라 2026년 8월분은 `2026-07-31 15:00 UTC` 다. `>= '2026-08-01'` 로 찾으면
+행이 없는 것처럼 보이고, 배치가 "이미 확정돼 건너뛴다" 고 말하는데 행은 안
+보이는 상태가 된다 — 실제로 그렇게 한참 헤맸다.
+
 ## 6. 배포 후 확인
 
 ```bash
