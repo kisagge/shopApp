@@ -2,10 +2,14 @@ import { notFound } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
-import { resolvePriceRange, emptyResultReason } from '@shop/core';
+import {
+  resolvePriceRange, emptyResultReason,
+  breadcrumbStructuredData, itemListStructuredData,
+} from '@shop/core';
 import { getCategoryWithChildren } from '~/lib/queries/catalog/products';
 import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
+import { absoluteUrl } from '~/lib/urls';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
@@ -56,8 +60,42 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   const products = page.items;
   const title = t.category(category.slug, category.name);
 
+  /*
+   * **이 화면이 무엇을 담고 있는지 말한다.**
+   *
+   * 상품 화면은 `Product` 로 자기를 설명하는데, 그것을 모아 보여 주는 매대는
+   * 아무 말도 하지 않고 있었다 — 검색엔진에는 링크만 잔뜩 있는 문서다.
+   *
+   * 빵부스러기는 **바로 아래 화면에 그리는 것과 같은 순서**로 만든다. 둘이
+   * 다르면 사람이 보는 길과 검색 결과에 찍히는 길이 갈린다.
+   */
+  const jsonLd = [
+    breadcrumbStructuredData([
+      { name: t('nav.home'), url: absoluteUrl('/') },
+      ...(category.parent
+        ? [
+            {
+              name: t.category(category.parent.slug, category.parent.name),
+              url: absoluteUrl(`/category/${category.parent.slug}`),
+            },
+          ]
+        : []),
+      { name: title, url: absoluteUrl(`/category/${category.slug}`) },
+    ]),
+    itemListStructuredData(products.map((p) => absoluteUrl(`/product/${p.slug}`))),
+  ];
+
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
+      {/*
+        상품 화면과 같은 이유로 `<` 를 이스케이프한다 — 상품명·카테고리명은
+        운영자가 입력하는 값이라 </script> 가 들어올 수 있다.
+      */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+
       <nav aria-label={t('nav.breadcrumb')} className="py-5">
         <ol className="flex items-center gap-2">
           <li>

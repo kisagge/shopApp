@@ -1,8 +1,10 @@
 import { notFound, permanentRedirect } from 'next/navigation';
-import Link from 'next/link';
+import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { getCollection, getCollectionSlugMovedTo } from '~/lib/queries/catalog/collections';
 import { ProductGrid } from '~/components/product-grid';
+import { breadcrumbStructuredData, itemListStructuredData } from '@shop/core';
+import { absoluteUrl } from '~/lib/urls';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { CollectionHero, COLLECTION_HERO_SIZES } from '~/components/collection-hero';
 import { getT } from '~/lib/i18n/server';
@@ -39,8 +41,55 @@ export default async function CollectionPage({ params }: Params) {
     notFound();
   }
 
+  /*
+   * 매대와 같은 이유로 담은 것을 말한다 — 기획전은 상품 하나가 아니라
+   * **고른 묶음**이 내용이다. 순서는 화면에 그리는 순서와 같다.
+   */
+  const jsonLd = [
+    breadcrumbStructuredData([
+      { name: t('nav.home'), url: absoluteUrl('/') },
+      { name: t('collection.eyebrow'), url: absoluteUrl('/collections') },
+      { name: collection.title, url: absoluteUrl(`/collection/${collection.slug}`) },
+    ]),
+    itemListStructuredData(collection.items.map((i) => absoluteUrl(`/product/${i.slug}`))),
+  ];
+
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
+      {/* 기획전 제목은 운영자가 입력한다 — `<` 를 이스케이프한다 */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+      />
+
+      {/*
+        **화면에도 같은 길을 그린다.** 위 구조화 데이터가 이동 경로를 주장하는데
+        화면에 없으면, 검색 결과에 찍히는 길과 사람이 보는 길이 갈린다. 기획전은
+        홈 배너로도 들어오므로 목록으로 돌아갈 길이 화면에 있어야 하기도 하다 —
+        매대·상품 상세와 같은 모양으로 둔다.
+      */}
+      <nav aria-label={t('nav.breadcrumb')} className="py-5">
+        <ol className="flex items-center gap-2">
+          <li>
+            <Link href="/" className="text-xs text-[var(--fg-muted)]">
+              {t('nav.home')}
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-[11px] text-n-300">/</li>
+          <li>
+            <Link href="/collections" className="text-xs text-[var(--fg-muted)]">
+              {t('collection.eyebrow')}
+            </Link>
+          </li>
+          <li aria-hidden="true" className="text-[11px] text-n-300">/</li>
+          <li>
+            <span aria-current="page" className="text-xs font-medium text-[var(--fg-secondary)]">
+              {collection.title}
+            </span>
+          </li>
+        </ol>
+      </nav>
+
       <div className="py-6 md:py-8">
         <CollectionHero
           eyebrow={t('collection.eyebrow')}

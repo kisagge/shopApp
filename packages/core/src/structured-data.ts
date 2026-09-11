@@ -88,6 +88,34 @@ export function breadcrumbStructuredData(crumbs: readonly Crumb[]): Record<strin
 }
 
 /**
+ * 목록 화면에 무엇이 담겨 있는지.
+ *
+ * 매대와 기획전은 상품 하나하나가 아니라 **묶음**이 내용이다. 상품 화면은
+ * `Product` 로 자기를 설명하는데, 그것을 모아 보여 주는 화면은 아무 말도 하지
+ * 않고 있었다 — 검색엔진 입장에서는 링크만 잔뜩 있는 문서다.
+ *
+ * **주소만 담는다.** 이름·가격까지 넣으면 목록 화면이 상품 정보를 두 번째로
+ * 주장하게 되고, 그 값이 상품 화면과 어긋나는 순간(캐시 수명이 다르다) 어느
+ * 쪽을 믿을지 알 수 없다. 목록은 "여기에 이것들이 이 순서로 있다" 까지만
+ * 말하고, 상품의 사실은 상품 화면이 말한다.
+ *
+ * 순서는 화면에 보이는 순서와 같아야 한다 — 다르면 목록을 설명하는 것이
+ * 아니라 다른 목록을 지어내는 것이다.
+ */
+export function itemListStructuredData(urls: readonly string[]): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    numberOfItems: urls.length,
+    itemListElement: urls.map((url, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url,
+    })),
+  };
+}
+
+/**
  * 사이트 자체에 대한 설명.
  *
  * 검색창(SearchAction)을 함께 알려 주면 검색 결과에 사이트 내 검색이 붙는

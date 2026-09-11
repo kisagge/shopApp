@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  productStructuredData, breadcrumbStructuredData, siteStructuredData,
+  productStructuredData, breadcrumbStructuredData, siteStructuredData, itemListStructuredData,
   isDisallowedPath, DISALLOWED_PATHS, AVAILABILITY,
 } from '../src/structured-data';
 
@@ -116,5 +116,45 @@ describe('색인에서 빼는 경로', () => {
 
   it('모든 경로가 슬래시로 시작한다', () => {
     for (const path of DISALLOWED_PATHS) expect(path.startsWith('/'), path).toBe(true);
+  });
+});
+
+/**
+ * 목록 화면이 담고 있는 것.
+ *
+ * 매대와 기획전은 상품 하나가 아니라 묶음이 내용인데, 아무 말도 하지 않고
+ * 있었다 — 검색엔진에는 링크만 잔뜩 있는 문서로 보인다.
+ */
+describe('목록 구조화 데이터', () => {
+  const urls = ['https://x.test/product/a', 'https://x.test/product/b'];
+
+  it('화면에 보이는 순서를 그대로 담는다', () => {
+    const data = itemListStructuredData(urls);
+    const items = data['itemListElement'] as { position: number; url: string }[];
+    expect(items.map((i) => [i.position, i.url])).toEqual([
+      [1, urls[0]],
+      [2, urls[1]],
+    ]);
+  });
+
+  it('몇 개인지 함께 말한다', () => {
+    expect(itemListStructuredData(urls)['numberOfItems']).toBe(2);
+  });
+
+  /**
+   * **주소만 담는다.** 이름·가격까지 넣으면 목록이 상품 정보를 두 번째로
+   * 주장하게 되고, 캐시 수명이 달라 어긋나는 순간 어느 쪽을 믿을지 알 수 없다.
+   */
+  it('상품의 사실을 두 번째로 주장하지 않는다', () => {
+    const items = itemListStructuredData(urls)['itemListElement'] as Record<string, unknown>[];
+    for (const item of items) {
+      expect(Object.keys(item).sort()).toEqual(['@type', 'position', 'url']);
+    }
+  });
+
+  it('비어 있어도 모양이 깨지지 않는다', () => {
+    const data = itemListStructuredData([]);
+    expect(data['numberOfItems']).toBe(0);
+    expect(data['itemListElement']).toEqual([]);
   });
 });

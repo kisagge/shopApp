@@ -133,4 +133,32 @@ describe('공개 화면', () => {
       expect(readFileSync(file, 'utf8'), relative(APP, file)).not.toContain('NO_INDEX');
     }
   });
+
+  /**
+   * **목록 화면도 자기가 무엇을 담고 있는지 말한다.**
+   *
+   * 상품 화면은 `Product` 로 자기를 설명하는데, 그것을 모아 보여 주는 매대와
+   * 기획전은 아무 말도 하지 않고 있었다 — 검색엔진에는 링크만 잔뜩 있는
+   * 문서로 보인다.
+   *
+   * 이스케이프도 함께 본다. 카테고리명·기획전 제목은 운영자가 넣는 값이라
+   * 상품명과 똑같이 `</script>` 가 들어올 수 있다. 구조화 데이터를 새로 붙일
+   * 때 이것을 빠뜨리기 쉬워서 같은 자리에서 지킨다.
+   */
+  const LISTING_PAGES = [
+    ['매대', join(APP, 'category', '[slug]', 'page.tsx')],
+    ['기획전', join(APP, 'collection', '[slug]', 'page.tsx')],
+  ] as const;
+
+  it.each(LISTING_PAGES)('%s 화면이 담은 것을 구조화 데이터로 낸다', (_label, file) => {
+    const source = readFileSync(file, 'utf8');
+    expect(source).toContain('application/ld+json');
+    expect(source).toContain('itemListStructuredData');
+    // 목록 화면의 이동 경로도 검색 결과의 주소 줄에 쓰인다
+    expect(source).toContain('breadcrumbStructuredData');
+  });
+
+  it.each(LISTING_PAGES)('%s 화면도 < 를 이스케이프한다', (_label, file) => {
+    expect(readFileSync(file, 'utf8')).toMatch(/replace\(\/<\/g,\s*'\\\\u003c'\)/);
+  });
 });
