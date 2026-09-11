@@ -160,7 +160,16 @@ function Row({
 
   return (
     <tr className="border-b border-[var(--border)]">
-      <th scope="row" className="p-2 text-left align-top text-xs font-normal text-[var(--fg-muted)]">
+      {/*
+        **줄 제목은 접히지 않는다.** 표가 화면보다 넓어 옆으로 스크롤되는데,
+        그때 브라우저는 첫 칸을 가장 좁게 눌러 버린다 — 320·375px 에서 "판매가"
+        가 세 줄, "평점" 이 두 줄로 서 있었다. 열 머리(w-28)와 같은 폭을 주고
+        접히지 못하게 한다. 어차피 다 짧은 말이다.
+      */}
+      <th
+        scope="row"
+        className="w-28 p-2 text-left align-top text-xs font-normal whitespace-nowrap text-[var(--fg-muted)]"
+      >
         {t(`compare.row.${row}` as 'compare.row.price')}
       </th>
       {products.map((p) => {

@@ -46,8 +46,13 @@ export function CouponTable({
       표는 안에서 잘 스크롤되는데 페이지가 1008px 이 되어 통째로 옆으로
       밀렸다. 눈으로는 표 말고 아무것도 안 보이니 원인을 찾기 어렵다.
     */
-    <div className="relative overflow-x-auto rounded-md border border-[var(--border)] bg-[var(--bg)]">
-      <table className="w-full min-w-[860px] border-collapse text-[13px]">
+    <div className="table-scroll relative rounded-md border border-[var(--border)] bg-[var(--bg)]">
+      {/*
+        **폭을 손으로 정하지 않는다.** 860px 으로 못 박아 두었는데 칸 여덟에는
+        모자라서, 768px 에서도 "10,000원" 과 "전체" 가 두 줄로 섰다. 얼마가
+        필요한지는 글자가 안다 — `.table-scroll` 이 내용만큼 넓혀 준다.
+      */}
+      <table className="w-full border-collapse text-[13px]">
         <caption className="sr-only">발행한 쿠폰 목록</caption>
         <thead>
           <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--fg-muted)]">

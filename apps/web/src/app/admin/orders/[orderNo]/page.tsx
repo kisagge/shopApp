@@ -60,7 +60,7 @@ export default async function AdminOrderDetail({
 
   return (
     <>
-      <header className="flex h-17 items-center justify-between gap-6 border-b border-[var(--border)] bg-[var(--bg)] px-8">
+      <header className="flex min-h-17 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 sm:py-0 border-b border-[var(--border)] bg-[var(--bg)] px-4 sm:px-8">
         <div className="flex items-center gap-3.5">
           <Link href="/admin/orders" className="text-sm text-[var(--fg-muted)] no-underline">←</Link>
           <h1 className="text-[19px] font-semibold tracking-tight">주문 상세</h1>

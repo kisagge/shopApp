@@ -21,6 +21,18 @@ const openFirstRow = async (page: Page): Promise<void> => {
  * 손님 화면만 재고 있었다. 운영 화면은 표가 빽빽해서 오히려 더 잘 무너지는데,
  * 매일 열어 보는 사람이 있는 화면이라 무너지면 바로 일이 막힌다.
  */
+/**
+ * 공지 편집기의 링크 줄을 펼친다.
+ *
+ * **눌러야 나오는 것은 그냥 열어서는 없는 것이다.** 이 줄이 375px 에서 라벨과
+ * 단추가 한 자씩 줄바꿈돼 세로로 서 있었는데, 화면을 열기만 하는 검사는 그것을
+ * 한 번도 못 봤다. 접혀 있는 자리가 있으면 펼쳐 놓고 재야 한다.
+ */
+const openLinkRow = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: '링크' }).click();
+  await page.getByRole('textbox', { name: '주소' }).waitFor();
+};
+
 layoutTests(test, expect, [
   ['대시보드', '/admin'],
   ['주문', '/admin/orders'],
@@ -44,4 +56,5 @@ layoutTests(test, expect, [
    */
   ['주문 상세', '/admin/orders', openFirstRow],
   ['상품 상세', '/admin/products', openFirstRow],
+  ['공지 편집기 — 링크 줄', '/admin/support', openLinkRow],
 ], ADMIN_WIDTHS);

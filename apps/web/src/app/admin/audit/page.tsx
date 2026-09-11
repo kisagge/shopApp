@@ -101,7 +101,7 @@ export default async function AdminAuditPage({
 
   return (
     <>
-      <header className="flex h-17 items-center justify-between gap-6 border-b border-[var(--border)] bg-[var(--bg)] px-8">
+      <header className="flex min-h-17 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 sm:py-0 border-b border-[var(--border)] bg-[var(--bg)] px-4 sm:px-8">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">감사 로그</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">운영진의 쓰기 동작 기록</p>

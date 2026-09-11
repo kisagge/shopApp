@@ -104,6 +104,43 @@ export async function layoutProblems(page: Page): Promise<LayoutProblem[]> {
        * 진짜 줄바꿈은 줄 높이만큼 넘친다 — 탭이 61>44 였고 줄 높이는 20px 다.
        * 그 사이를 가르는 자리를 줄 높이의 절반으로 둔다.
        */
+      /*
+       * **짧은 말이 여러 줄로 섰다.**
+       *
+       * 아래 '세로넘침' 은 글자가 **상자 밖으로 나갔을 때**만 잡는다. 그런데
+       * 상자가 넉넉하면 글자는 넘치지 않고 그냥 줄줄이 선다 — 공지 편집기의
+       * 라벨 "주소" 와 단추 "적용" 이 높이 32px 상자 안에서 한 자씩 두 줄로
+       * 서 있었고, 28px 이라 넘치지 않았으니 아무 검사도 못 봤다.
+       *
+       * **높이로 세지 않는다.** 처음에 `scrollHeight` 를 줄 높이와 견줬더니
+       * 여백 넉넉한 링크가 전부 걸렸다 — "Cart" 한 줄이 36px 상자 안에 있으면
+       * 두 줄처럼 보인다. 몇 줄인지는 어림잡을 것 없이 **줄 상자를 세면** 된다.
+       *
+       * **띄어쓰기 없는 짧은 말은 한 줄이 제자리다.** 그것이 두 줄이 됐다면
+       * 상자가 글자보다 좁게 눌린 것이고, 한국어에서는 그 결과가 글자 기둥이다.
+       * 긴 문장은 여러 줄이 정상이므로 짧은 것만 본다.
+       */
+      if (text.length <= 8 && !/\s/.test(text)) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        /*
+         * **줄 상자의 수가 아니라 줄의 수를 센다.** 한 줄이어도 상자가 여럿
+         * 나온다 — 글꼴이 바뀌는 자리에서 쪼개지기 때문이다. "20%" 가 숫자와
+         * 기호에서 서로 다른 글꼴을 타 두 조각으로 왔고, 그것을 두 줄로 읽어
+         * 홈·카테고리가 통째로 걸렸다. 윗변이 같으면 같은 줄이다.
+         */
+        const lines = new Set(
+          [...range.getClientRects()].map((r) => Math.round(r.top)),
+        ).size;
+        range.detach();
+        if (lines > 1) {
+          out.push({
+            kind: '글자기둥',
+            detail: `<${el.tagName.toLowerCase()}> "${text}" 가 ${lines}줄로 섰다`,
+          });
+        }
+      }
+
       const lineHeight = Number.parseFloat(cs.lineHeight) || 16;
       const overflowY = el.scrollHeight - el.clientHeight;
       const scrollsY = cs.overflowY === 'auto' || cs.overflowY === 'scroll';

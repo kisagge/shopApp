@@ -38,7 +38,7 @@ export default async function AdminProductDetailPage({
 
   return (
     <>
-      <header className="flex h-17 items-center gap-3 border-b border-[var(--border)] bg-[var(--bg)] px-8">
+      <header className="flex min-h-17 flex-wrap items-center gap-x-3 gap-y-2 py-3 sm:py-0 border-b border-[var(--border)] bg-[var(--bg)] px-4 sm:px-8">
         <nav aria-label="현재 위치">
           <ol className="flex items-center gap-2 text-[13px] text-[var(--fg-muted)]">
             <li>

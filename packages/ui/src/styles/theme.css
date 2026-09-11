@@ -248,6 +248,19 @@
    */
   .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 
+  /*
+   * **감싸는 것만으로는 부족했다.**
+   *
+   * `.data-table` 은 `width: 100%` 다. 스크롤 상자 안에 넣어도 상자 폭에 딱
+   * 맞춰지니, 표는 넘치는 대신 **칸을 눌러** 맞춘다 — 정산 화면에서
+   * "아뜰리에케이" 가 여섯 줄로 섰다. 한국어로는 우연히 들어가서 안 걸렸고,
+   * 영어로 켜 보니 드러났다.
+   *
+   * 내용만큼은 넓어지라고 바닥을 깔아 준다. 상자가 더 넓으면 `width:100%` 가
+   * 이겨 꽉 차고, 좁으면 이 바닥이 이겨 옆으로 밀린다.
+   */
+  .table-scroll > table { min-width: max-content; }
+
   .data-table { width: 100%; }
   .data-table :is(th, td) { padding-inline: 0.75rem; }
   .data-table :is(th, td):first-child { padding-inline-start: 0; }

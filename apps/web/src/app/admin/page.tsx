@@ -26,7 +26,7 @@ export default async function AdminDashboard({
 
   return (
     <>
-      <header className="flex h-17 items-center justify-between gap-6 border-b border-[var(--border)] bg-[var(--bg)] px-8">
+      <header className="flex min-h-17 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 sm:py-0 border-b border-[var(--border)] bg-[var(--bg)] px-4 sm:px-8">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">대시보드</h1>
           {d.scope && (
@@ -78,16 +78,20 @@ export default async function AdminDashboard({
             aria-labelledby="chart-title"
             className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
-            <div className="mb-2 flex items-start justify-between gap-5">
-              <div className="flex flex-col gap-1">
+            {/*
+              좁은 화면에서는 제목 아래로 접힌다. 한 줄에 밀어 넣으면 "기간
+              합계" 와 금액이 한 자씩 줄바꿈돼 세로로 선다.
+            */}
+            <div className="mb-2 flex flex-wrap items-start justify-between gap-x-5 gap-y-1">
+              <div className="flex min-w-0 flex-col gap-1">
                 <h2 id="chart-title" className="text-base font-semibold">매출 추이</h2>
                 <p className="text-xs text-[var(--fg-muted)]">
                   {d.rangeLabel} · 결제한 날에 더하고 환불한 날에 뺀다
                 </p>
               </div>
-              <p className="flex items-baseline gap-2">
-                <span className="text-xs text-[var(--fg-muted)]">기간 합계</span>
-                <span className="tnum text-lg font-semibold">
+              <p className="flex shrink-0 items-baseline gap-2">
+                <span className="shrink-0 text-xs text-[var(--fg-muted)]">기간 합계</span>
+                <span className="tnum shrink-0 text-lg font-semibold">
                   {format(won(d.dailyRevenue.reduce((s, r) => s + r.revenue, 0)))}원
                 </span>
               </p>
@@ -148,7 +152,13 @@ export default async function AdminDashboard({
           </section>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-2">
+        {/*
+          **격자 칸은 기본으로 자기 내용보다 좁아지지 않는다.** 그래서 안에
+          넓은 표가 들어가면 표가 스크롤되는 대신 칸이 늘어나고, 화면 전체가
+          가로로 밀린다 — 375px 화면에서 454px 이었다. 위 격자가
+          `minmax(0,1fr)` 을 쓰는 것과 같은 이야기다.
+        */}
+        <div className="grid min-w-0 gap-5 [&>*]:min-w-0 xl:grid-cols-2">
           <section
             aria-labelledby="top-title"
             className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"

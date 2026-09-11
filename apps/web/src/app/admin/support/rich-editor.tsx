@@ -66,7 +66,12 @@ function ToolbarButton({
         editor.commands.focus();
       }}
       className={[
-        'h-8 rounded-sm border px-2 text-[12px]',
+        /*
+         * **손가락에 맞는 크기.** 32px 이었는데 이 저장소가 정한 모바일 터치
+         * 타깃은 44px 이다(Button 의 size 주석). 마우스는 32px 을 정확히
+         * 찍지만 엄지는 못 찍는다 — 굵게를 누르려다 기울임이 걸린다.
+         */
+        'h-11 shrink-0 rounded-sm border px-3 text-[13px] sm:h-8 sm:px-2 sm:text-[12px]',
         active
           ? 'border-n-900 bg-n-900 text-n-0'
           : 'border-n-300 bg-[var(--bg)] text-[var(--fg-secondary)]',
@@ -114,9 +119,16 @@ export function RichEditor({
         role: 'textbox',
         'aria-multiline': 'true',
         'aria-labelledby': labelledBy,
+        /*
+         * **16px 아래로 내려가면 iOS 가 화면을 확대한다.** 이 앱은 사람이
+         * 손으로 확대할 수 있어야 해서 `maximumScale` 을 걸지 않았고, 그래서
+         * 초점이 들어가는 순간 webview 가 제 마음대로 당긴다 — 제목 칸(16px)
+         * 에서는 가만히 있다가 본문으로 넘어가면 화면이 툭 커진다.
+         * 좁은 화면에서만 16px 로 둔다. 어차피 폰에서는 13px 이 작기도 하다.
+         */
         class:
           'min-h-52 rounded-b-sm border border-t-0 border-n-300 bg-[var(--bg)] p-2.5 ' +
-          'text-[13px] leading-relaxed outline-none ' +
+          'text-[16px] leading-relaxed outline-none sm:text-[13px] ' +
           // 편집 중에도 결과와 비슷하게 보여야 한다 — 목록이 점 없이 보이면 목록인지 모른다
           '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 ' +
           '[&_h2]:text-[17px] [&_h2]:font-semibold [&_h3]:text-[15px] [&_h3]:font-semibold ' +
@@ -150,7 +162,19 @@ export function RichEditor({
         role="toolbar"
         aria-label="글자 서식"
         aria-controls={labelledBy}
-        className="flex flex-wrap gap-1 rounded-t-sm border border-n-300 bg-[var(--surface)] p-1.5"
+        /*
+         * **폰에서는 한 줄로 두고 옆으로 민다.** 손가락 크기(44px)로 키운 단추
+         * 열둘을 접으면 세 줄 132px 이 되는데, 키보드가 올라온 화면에서 그건
+         * 본문 자리를 통째로 먹는다. 접는 대신 밀어 본다.
+         *
+         * **글을 쓰는 동안 붙어 있어야 한다.** 도구 모음이 위로 흘러가 버리면
+         * 굵게 하나 누르려고 화면을 되감아야 한다. 운영 화면의 머리띠(h-14)
+         * 아래에 선다 — 넓은 화면에는 그 띠가 없으므로 맨 위다.
+         */
+        className={
+          'sticky top-14 z-10 flex gap-1 overflow-x-auto rounded-t-sm border border-n-300 ' +
+          'bg-[var(--surface)] p-1.5 md:top-0 sm:flex-wrap sm:overflow-visible'
+        }
       >
         <ToolbarButton editor={editor} label="굵게" active={editor.isActive('bold')}
           onClick={() => editor.chain().focus().toggleBold().run()} />
@@ -191,8 +215,17 @@ export function RichEditor({
       </div>
 
       {linkOpen && (
+        /*
+         * **좁은 화면에서 이 줄이 무너져 있었다.** 라벨 "주소" 와 단추 "적용"
+         * 이 한 자씩 줄바꿈돼 세로로 섰다 — flex 항목은 기본으로 자기 글자보다
+         * 좁아지지 않는데, 주소 칸이 남는 폭을 다 가져가 버렸기 때문이다.
+         * 줄어들 수 있는 것은 주소 칸 하나뿐이라고 못 박는다(min-w-0).
+         *
+         * 자리 검사가 이것을 못 봤다 — 링크 줄은 눌러야 나오므로 화면을 그냥
+         * 열어서는 없는 것이다. 그래서 layout-admin 이 눌러 보고 재게 했다.
+         */
         <div className="flex items-center gap-2 border-x border-n-300 bg-[var(--surface)] px-1.5 pb-1.5">
-          <label htmlFor={linkId} className="text-[12px] text-[var(--fg-muted)]">
+          <label htmlFor={linkId} className="shrink-0 text-[12px] text-[var(--fg-muted)]">
             주소
           </label>
           <input
@@ -205,15 +238,25 @@ export function RichEditor({
               e.preventDefault();
               applyLink();
             }}
-            placeholder="https://… · 비우면 링크를 뗀다"
-            className="h-8 flex-1 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+            placeholder="https://…"
+            className={
+              // 16px 아래면 iOS 가 확대한다 — 편집 영역과 같은 이유다
+              'h-11 min-w-0 flex-1 rounded-sm border border-n-300 bg-[var(--bg)] px-2 ' +
+              'text-[16px] sm:h-8 sm:text-[12px]'
+            }
           />
           <button
             type="button"
             onClick={applyLink}
-            className="h-8 rounded-sm border border-n-300 px-2.5 text-[12px]"
+            className="h-11 shrink-0 rounded-sm border border-n-300 px-3 text-[13px] sm:h-8 sm:px-2.5 sm:text-[12px]"
           >
-            적용
+            {/*
+              **단추 이름이 무슨 일이 일어날지 말한다.** 예전에는 자리글에
+              "비우면 링크를 뗀다" 고 적어 두었는데, 폰에서는 그 자리글이
+              잘려서 안 보였고 자리글은 글자를 넣는 순간 사라진다 — 정작
+              뗄 때 읽을 수 없는 안내였다.
+            */}
+            {editor.isActive('link') && linkHref.trim().length === 0 ? '링크 떼기' : '적용'}
           </button>
         </div>
       )}
