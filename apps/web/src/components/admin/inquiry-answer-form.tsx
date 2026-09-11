@@ -60,7 +60,7 @@ export function InquiryAnswerForm({
         value={answer}
         onChange={(event) => setAnswer(event.target.value)}
         maxLength={ANSWER_MAX_LENGTH}
-        className="rounded-sm border border-n-300 bg-[var(--bg)] p-3 text-[13px]"
+        className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] p-3 text-[13px]"
       />
       {error && (
         <span role="alert" className="text-[12px] text-accent">

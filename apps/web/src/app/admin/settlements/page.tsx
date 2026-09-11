@@ -66,11 +66,11 @@ export default async function SettlementsPage({
             type="month"
             name="period"
             defaultValue={yearMonth}
-            className="tnum h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+            className="tnum h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
           />
           <button
             type="submit"
-            className="h-10 rounded-sm border border-n-300 px-3 text-[13px] text-[var(--fg)]"
+            className="h-10 rounded-sm border border-[var(--border-strong)] px-3 text-[13px] text-[var(--fg)]"
           >
             조회
           </button>

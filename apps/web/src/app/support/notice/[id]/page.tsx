@@ -51,7 +51,7 @@ export default async function NoticePage({ params }: Params) {
       <p className="pt-12">
         <Link
           href="/support/notice"
-          className="inline-flex h-11 items-center rounded-sm border border-n-300 px-5 text-[13px] text-[var(--fg)] no-underline"
+          className="inline-flex h-11 items-center rounded-sm border border-[var(--border-strong)] px-5 text-[13px] text-[var(--fg)] no-underline"
         >
           {t('support.backToList')}
         </Link>

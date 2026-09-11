@@ -121,7 +121,7 @@ export function ReturnRequestForm({
           {RETURN_TYPE.map((kind) => (
             <label
               key={kind}
-              className="flex flex-1 cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
+              className="flex flex-1 cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-[var(--brand)]"
             >
               <input
                 type="radio"
@@ -142,7 +142,7 @@ export function ReturnRequestForm({
         {reasons.map((r) => (
           <label
             key={r}
-            className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
+            className="flex cursor-pointer items-center gap-2.5 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-[var(--brand)]"
           >
             <input
               type="radio"

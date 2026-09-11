@@ -36,12 +36,12 @@ const button = cva(
           'aria-disabled:bg-[var(--bg-disabled)] aria-disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:hover:bg-[var(--bg-disabled)]',
         secondary:
-          'border border-n-300 bg-[var(--bg)] text-[var(--fg)] hover:bg-[var(--surface)] hover:border-n-500 ' +
+          'border border-[var(--border-strong)] bg-[var(--bg)] text-[var(--fg)] hover:bg-[var(--surface)] hover:border-[var(--fg-muted)] ' +
           'disabled:border-[var(--border)] disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:border-[var(--border)] aria-disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:hover:bg-[var(--bg)] aria-disabled:hover:border-[var(--border)]',
         accent:
-          'bg-accent text-n-0 hover:bg-accent-hover ' +
+          'bg-accent text-[var(--bg)] hover:bg-accent-hover ' +
           'disabled:bg-[var(--bg-disabled)] disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:bg-[var(--bg-disabled)] aria-disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:hover:bg-[var(--bg-disabled)]',
@@ -50,7 +50,7 @@ const button = cva(
           'disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:text-[var(--fg-disabled)] aria-disabled:hover:bg-transparent',
         danger:
-          'border border-n-200 text-accent hover:bg-accent-soft ' +
+          'border border-[var(--border)] text-accent hover:bg-accent-soft ' +
           'disabled:text-[var(--fg-disabled)] ' +
           'aria-disabled:text-[var(--fg-disabled)] aria-disabled:hover:bg-transparent',
       },

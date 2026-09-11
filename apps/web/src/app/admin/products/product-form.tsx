@@ -188,7 +188,7 @@ export function ProductForm({
             onChange={(e) => set('description', e.target.value)}
             rows={4}
             maxLength={4000}
-            className="rounded-sm border border-n-300 bg-[var(--bg)] px-3.5 py-3 text-sm text-[var(--fg)]"
+            className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3.5 py-3 text-sm text-[var(--fg)]"
           />
         </div>
 
@@ -205,7 +205,7 @@ export function ProductForm({
               value={values.brandId}
               onChange={(e) => set('brandId', e.target.value)}
               aria-invalid={errors.brandId ? true : undefined}
-              className="h-12 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
+              className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
             >
               <option value="">선택하세요</option>
               {brands.map((b) => (
@@ -225,7 +225,7 @@ export function ProductForm({
               required
               value={values.categoryId}
               onChange={(e) => set('categoryId', e.target.value)}
-              className="h-12 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
+              className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
             >
               <option value="">선택하세요</option>
               {categories.map((c) => (
@@ -277,7 +277,7 @@ export function ProductForm({
             value={values.status}
             onChange={(e) => set('status', e.target.value as ProductStatusInput)}
             aria-describedby={canPublish ? undefined : `${statusId}-hint`}
-            className="h-12 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm text-[var(--fg)] sm:w-56"
+            className="h-12 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)] sm:w-56"
           >
             {(canPublish ? PRODUCT_STATUS : MERCHANT_SELECTABLE_STATUS).map((s) => (
               <option key={s} value={s}>{PRODUCT_STATUS_LABEL[s]}</option>

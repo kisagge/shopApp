@@ -153,7 +153,7 @@ export default async function TrafficPage() {
                         */}
                         <span
                           aria-hidden="true"
-                          className="block h-1.5 rounded-full bg-n-900"
+                          className="block h-1.5 rounded-full bg-[var(--brand)]"
                           style={{ width: `${Math.round((m.viewItems / peak) * 100)}%`, minWidth: m.viewItems > 0 ? '2px' : '0' }}
                         />
                       </td>

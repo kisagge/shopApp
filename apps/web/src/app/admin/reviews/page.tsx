@@ -105,7 +105,7 @@ export default async function AdminReviewsPage({
               type="search"
               defaultValue={q ?? ''}
               placeholder="예: 오버사이즈 코트"
-              className="h-10 w-72 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 w-72 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             />
           </div>
           <button

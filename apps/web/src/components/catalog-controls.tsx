@@ -116,7 +116,7 @@ export async function CatalogControls({
           </span>
           {t('catalog.filters')}
           {activeCount > 0 && (
-            <span className="tnum rounded-full bg-n-900 px-2 py-0.5 text-[11px] font-normal text-n-0">
+            <span className="tnum rounded-full bg-[var(--brand)] px-2 py-0.5 text-[11px] font-normal text-[var(--bg)]">
               {t('catalog.filterCount', { count: activeCount })}
             </span>
           )}
@@ -142,7 +142,7 @@ export async function CatalogControls({
               {brands.map((brand) => (
                 <label
                   key={brand.slug}
-                  className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                  className="inline-flex cursor-pointer items-center rounded-sm border border-[var(--border-strong)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)] has-[:checked]:text-[var(--bg)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
                 >
                   <input
                     type="checkbox"
@@ -167,7 +167,7 @@ export async function CatalogControls({
                   {facets[key].map((option) => (
                     <label
                       key={option.value}
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border-strong)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)] has-[:checked]:text-[var(--bg)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
                     >
                       <input
                         type="checkbox"
@@ -179,7 +179,7 @@ export async function CatalogControls({
                       {option.swatchHex && (
                         <span
                           aria-hidden="true"
-                          className="size-3 rounded-full border border-n-300"
+                          className="size-3 rounded-full border border-[var(--border-strong)]"
                           style={{ backgroundColor: option.swatchHex }}
                         />
                       )}
@@ -205,7 +205,7 @@ export async function CatalogControls({
               검사가 지킨다.
             */}
             <div className="flex w-full flex-wrap items-center gap-2">
-              <label className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
+              <label className="inline-flex cursor-pointer items-center rounded-sm border border-[var(--border-strong)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)] has-[:checked]:text-[var(--bg)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2">
                 <input
                   type="radio"
                   name="price"
@@ -233,7 +233,7 @@ export async function CatalogControls({
                 return (
                   <label
                     key={bucket.id}
-                    className="inline-flex cursor-pointer items-center rounded-sm border border-n-300 px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900 has-[:checked]:bg-n-900 has-[:checked]:text-n-0 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
+                    className="inline-flex cursor-pointer items-center rounded-sm border border-[var(--border-strong)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)] has-[:checked]:bg-[var(--brand)] has-[:checked]:text-[var(--bg)] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2"
                   >
                     <input
                       type="radio"
@@ -254,7 +254,7 @@ export async function CatalogControls({
               <input
                 id="minPrice" name="minPrice" type="number" inputMode="numeric"
                 min={0} step={1000} defaultValue={minPrice ?? ''} placeholder="0"
-                className="tnum h-10 w-28 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+                className="tnum h-10 w-28 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
               />
             </div>
             <span aria-hidden="true" className="pb-2.5 text-[var(--fg-muted)]">–</span>
@@ -265,7 +265,7 @@ export async function CatalogControls({
               <input
                 id="maxPrice" name="maxPrice" type="number" inputMode="numeric"
                 min={0} step={1000} defaultValue={maxPrice ?? ''} placeholder={t('catalog.noLimit')}
-                className="tnum h-10 w-28 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+                className="tnum h-10 w-28 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
               />
             </div>
           </fieldset>
@@ -289,7 +289,7 @@ export async function CatalogControls({
           </label>
           <select
             id="sort" name="sort" defaultValue={sort}
-            className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+            className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
           >
             {PRODUCT_SORT.map((s) => (
               <option key={s} value={s}>

@@ -76,7 +76,7 @@ export default async function MyPage() {
                 aria-label={t('my.gradeProgress', { grade: t(GRADE_KEY[gp.next]) })}
                 className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-2)]"
               >
-                <span className="block h-full bg-n-900" style={{ width: `${gp.percent}%` }} />
+                <span className="block h-full bg-[var(--brand)]" style={{ width: `${gp.percent}%` }} />
               </div>
             </>
           ) : (

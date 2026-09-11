@@ -204,7 +204,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                 topic: topicRequired(kind) ? (d.topic ?? 'DELIVERY') : null,
               }));
             }}
-            className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+            className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
           >
             {SUPPORT_POST_KIND.map((k) => (
               <option key={k} value={k}>
@@ -223,7 +223,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
               id={`${formId}-topic`}
               value={draft.topic ?? 'DELIVERY'}
               onChange={(e) => setDraft((d) => ({ ...d, topic: e.target.value as InquiryTopic }))}
-              className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
             >
               {INQUIRY_TOPIC.map((topic) => (
                 <option key={topic} value={topic}>
@@ -244,7 +244,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
             onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
             required
             maxLength={SUPPORT_TITLE_MAX_LENGTH}
-            className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+            className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
           />
         </div>
 
@@ -286,7 +286,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
               max={9999}
               value={draft.sortOrder}
               onChange={(e) => setDraft((d) => ({ ...d, sortOrder: Number(e.target.value) }))}
-              className="tnum h-10 w-24 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+              className="tnum h-10 w-24 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
             />
           </div>
         )}
@@ -319,7 +319,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
             <button
               type="button"
               onClick={startNew}
-              className="h-11 rounded-sm border border-n-300 px-4 text-[13px]"
+              className="h-11 rounded-sm border border-[var(--border-strong)] px-4 text-[13px]"
             >
               취소
             </button>
@@ -366,7 +366,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                   <button
                     type="button"
                     onClick={() => startEdit(post)}
-                    className="h-9 rounded-sm border border-n-300 px-3 text-[12px]"
+                    className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px]"
                   >
                     수정
                   </button>
@@ -378,7 +378,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                       void remove(post);
                     }}
                     disabled={pending}
-                    className="h-9 rounded-sm border border-n-300 px-3 text-[12px] text-accent disabled:opacity-40"
+                    className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px] text-accent disabled:opacity-40"
                   >
                     내리기
                   </button>

@@ -89,7 +89,7 @@ export function ProductOptions({
               <p className="text-[11px] text-accent">{t('opt.stockLeft', { count: selected.stock })}</p>
             )}
           </div>
-          <div className="flex items-center rounded-sm border border-n-300 bg-[var(--bg)]">
+          <div className="flex items-center rounded-sm border border-[var(--border-strong)] bg-[var(--bg)]">
             <button
               type="button" aria-label={t('cart.decrease')}
               onClick={() => setQuantity((q) => Math.max(1, q - 1))}
@@ -267,10 +267,10 @@ function OptionGroup({
                 className={[
                   'h-12 w-full rounded-sm border text-sm',
                   !available
-                    ? 'border-n-100 bg-[var(--surface)] text-n-400 line-through'
+                    ? 'border-[var(--border)] bg-[var(--surface)] text-n-400 line-through'
                     : on
-                      ? 'border-n-900 bg-n-900 font-semibold text-n-0'
-                      : 'border-n-300 bg-[var(--bg)] text-[var(--fg)]',
+                      ? 'border-[var(--brand)] bg-[var(--brand)] font-semibold text-[var(--bg)]'
+                      : 'border-[var(--border-strong)] bg-[var(--bg)] text-[var(--fg)]',
                 ].join(' ')}
               >
                 {value.value}

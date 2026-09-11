@@ -71,7 +71,7 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n|dark-contrast)\.spec\.ts/,
+        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n|dark-contrast|theme-flip)\.spec\.ts/,
     },
     {
       name: 'customer',

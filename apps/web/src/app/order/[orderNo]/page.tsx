@@ -122,7 +122,7 @@ export default async function OrderPage({
         <span
           aria-hidden="true"
           className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl ${
-            repayable ? 'bg-accent-soft text-accent-hover' : 'bg-n-900 text-n-0'
+            repayable ? 'bg-accent-soft text-accent-hover' : 'bg-[var(--brand)] text-[var(--bg)]'
           }`}
         >
           {repayable ? '!' : '✓'}
@@ -323,13 +323,13 @@ export default async function OrderPage({
         <div className="flex gap-2">
           <Link
             href="/mypage/orders"
-            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm border border-n-300 text-sm font-medium no-underline"
+            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm border border-[var(--border-strong)] text-sm font-medium no-underline"
           >
             {t('order.heading')}
           </Link>
           <Link
             href="/"
-            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm bg-n-900 text-sm font-medium text-n-0 no-underline"
+            className="inline-flex h-12 flex-1 items-center justify-center rounded-sm bg-[var(--brand)] text-sm font-medium text-[var(--bg)] no-underline"
           >
             {t('order.keepShopping')}
           </Link>

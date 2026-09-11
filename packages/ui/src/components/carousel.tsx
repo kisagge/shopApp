@@ -223,7 +223,7 @@ export function Carousel({ slides, label, intervalMs = 6000, className }: Carous
                     className={cn(
                       'block h-2.5 w-2.5 rounded-full border border-n-900/30 transition-colors',
                       'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]',
-                      i === index ? 'bg-n-900' : 'bg-n-900/15 hover:bg-n-900/35',
+                      i === index ? 'bg-[var(--brand)]' : 'bg-n-900/15 hover:bg-n-900/35',
                     )}
                   />
                 </li>

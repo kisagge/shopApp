@@ -76,7 +76,7 @@ function ToolbarButton({
          */
         'h-11 shrink-0 rounded-sm border px-3 text-[13px] sm:h-8 sm:px-2 sm:text-[12px]',
         /*
-          **눌린 모양도 테마를 탄다.** `bg-n-900` 은 저울의 눈금이라 테마가
+          **눌린 모양도 테마를 탄다.** `bg-[var(--brand)]` 은 저울의 눈금이라 테마가
           바뀌어도 안 바뀐다 — 어두운 화면에서 켜진 단추가 바탕과 같은 검정이
           되어, 눌렀는지 아닌지가 다시 안 보였다.
         */

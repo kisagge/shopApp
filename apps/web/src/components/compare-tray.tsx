@@ -85,7 +85,7 @@ export function CompareTray() {
         {enough ? (
           <AppLink
             href={href}
-            className="flex h-9 items-center rounded-sm bg-n-900 px-4 text-xs font-medium text-n-0 no-underline hover:bg-n-950"
+            className="flex h-9 items-center rounded-sm bg-[var(--brand)] px-4 text-xs font-medium text-[var(--bg)] no-underline hover:bg-n-950"
           >
             {t('compare.go')}
           </AppLink>

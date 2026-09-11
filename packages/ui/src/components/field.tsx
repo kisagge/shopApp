@@ -42,8 +42,8 @@ export function Field({ label, error, hint, className, required, ...props }: Fie
         aria-describedby={describedBy || undefined}
         className={cn(
           'h-12 rounded-sm border bg-[var(--bg)] px-3.5 text-sm text-[var(--fg)]',
-          'placeholder:text-n-400',
-          error ? 'border-accent' : 'border-n-300',
+          'placeholder:text-[var(--fg-muted)]',
+          error ? 'border-accent' : 'border-[var(--border-strong)]',
           className,
         )}
         {...props}

@@ -23,7 +23,7 @@ export function RangeTabs({ current }: { current: DashboardRange }) {
               {active ? (
                 <span
                   aria-current="true"
-                  className="block rounded-sm bg-n-900 px-3 py-1 text-xs font-medium text-n-0"
+                  className="block rounded-sm bg-[var(--brand)] px-3 py-1 text-xs font-medium text-[var(--bg)]"
                 >
                   {label}
                 </span>

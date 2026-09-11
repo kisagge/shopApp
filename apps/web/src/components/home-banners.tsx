@@ -112,7 +112,7 @@ function BannerSlide({ banner, index }: { banner: HomeBanner; index: number }) {
         {banner.ctaLabel && banner.href && (
           <AppLink
             href={banner.href}
-            className="mt-2 inline-flex h-12 w-fit items-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline hover:bg-n-950"
+            className="mt-2 inline-flex h-12 w-fit items-center rounded-sm bg-[var(--brand)] px-7 text-sm font-medium text-[var(--bg)] no-underline hover:bg-n-950"
           >
             {banner.ctaLabel}
           </AppLink>

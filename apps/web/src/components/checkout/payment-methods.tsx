@@ -61,8 +61,8 @@ export function PaymentMethods({
               className={[
                 'h-12 w-full rounded-sm border text-sm',
                 method === m
-                  ? 'border-n-900 bg-n-900 font-medium text-n-0'
-                  : 'border-n-300 bg-[var(--bg)]',
+                  ? 'border-[var(--brand)] bg-[var(--brand)] font-medium text-[var(--bg)]'
+                  : 'border-[var(--border-strong)] bg-[var(--bg)]',
               ].join(' ')}
             >
               {t(METHOD_KEY[m])}

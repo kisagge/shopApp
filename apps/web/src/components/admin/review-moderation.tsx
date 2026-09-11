@@ -59,7 +59,7 @@ export function ReviewModeration({
           type="button"
           onClick={() => void run('restore')}
           disabled={pending !== null}
-          className="h-9 rounded-sm border border-n-300 px-3.5 text-[12px] disabled:opacity-50"
+          className="h-9 rounded-sm border border-[var(--border-strong)] px-3.5 text-[12px] disabled:opacity-50"
         >
           {pending === 'restore' ? '되돌리는 중…' : '되돌리기'}
         </button>
@@ -72,7 +72,7 @@ export function ReviewModeration({
             type="button"
             onClick={() => void run('remove')}
             disabled={pending !== null}
-            className="h-9 rounded-sm bg-accent px-3.5 text-[12px] font-medium text-n-0 disabled:opacity-50"
+            className="h-9 rounded-sm bg-accent px-3.5 text-[12px] font-medium text-[var(--bg)] disabled:opacity-50"
           >
             {pending === 'remove' ? '내리는 중…' : '내린다'}
           </button>
@@ -89,7 +89,7 @@ export function ReviewModeration({
           <button
             type="button"
             onClick={() => setConfirming(true)}
-            className="h-9 rounded-sm border border-n-300 px-3.5 text-[12px]"
+            className="h-9 rounded-sm border border-[var(--border-strong)] px-3.5 text-[12px]"
           >
             글 내리기
           </button>
@@ -98,7 +98,7 @@ export function ReviewModeration({
               type="button"
               onClick={() => void run('dismiss')}
               disabled={pending !== null}
-              className="h-9 rounded-sm border border-n-300 px-3.5 text-[12px] disabled:opacity-50"
+              className="h-9 rounded-sm border border-[var(--border-strong)] px-3.5 text-[12px] disabled:opacity-50"
             >
               {pending === 'dismiss' ? '처리 중…' : '문제없음'}
             </button>

@@ -82,7 +82,7 @@ export function GoogleButton({
       type="button"
       aria-disabled={pending}
       onClick={start}
-      className="flex h-12 w-full items-center justify-center gap-2.5 rounded-sm border border-n-300 bg-[var(--bg)] text-sm font-medium text-[var(--fg)]"
+      className="flex h-12 w-full items-center justify-center gap-2.5 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] text-sm font-medium text-[var(--fg)]"
     >
       {/* 구글 로고는 장식이다 — 이름은 버튼 글자가 준다 */}
       <svg aria-hidden="true" viewBox="0 0 18 18" className="h-[18px] w-[18px]">

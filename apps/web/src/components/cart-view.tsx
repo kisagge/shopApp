@@ -138,7 +138,7 @@ function Check({ on }: { on: boolean }) {
       aria-hidden="true"
       className={[
         'flex h-5 w-5 shrink-0 items-center justify-center rounded-xs text-[11px] font-semibold',
-        on ? 'bg-n-900 text-n-0' : 'border border-n-300',
+        on ? 'bg-[var(--brand)] text-[var(--bg)]' : 'border border-[var(--border-strong)]',
       ].join(' ')}
     >
       {on ? '✓' : ''}
@@ -399,7 +399,7 @@ function EmptyCart({ headingRef }: { headingRef?: React.RefObject<HTMLElement | 
       </p>
       <Link
         href="/"
-        className="inline-flex h-12 items-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline"
+        className="inline-flex h-12 items-center rounded-sm bg-[var(--brand)] px-7 text-sm font-medium text-[var(--bg)] no-underline"
       >
         {t('cart.goShopping')}
       </Link>

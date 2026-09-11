@@ -155,7 +155,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           id={contentId} value={content} onChange={(e) => setContent(e.target.value)}
           rows={5} maxLength={2000} required
           placeholder={t('review.bodyPlaceholder')}
-          className="rounded-sm border border-n-300 bg-[var(--bg)] px-3.5 py-3 text-sm"
+          className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3.5 py-3 text-sm"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
           <span className="tnum">{content.trim().length}</span> {t('review.minLength')}
@@ -190,7 +190,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
             setError(null);
             setImages(picked);
           }}
-          className="text-[13px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-n-300 file:bg-[var(--surface)] file:px-3 file:text-[13px]"
+          className="text-[13px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:text-[13px]"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
           {t('review.photoHint', { max: MAX_IMAGES_PER_REVIEW })}
@@ -214,7 +214,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
                   type="button"
                   onClick={() => setImages((prev) => prev.filter((_, at) => at !== i))}
                   aria-label={t('review.removePhoto', { index: i + 1 })}
-                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-n-900 text-[11px] text-n-0"
+                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--brand)] text-[11px] text-[var(--bg)]"
                 >
                   <span aria-hidden="true">×</span>
                 </button>
@@ -233,7 +233,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
             <label
               key={fit}
               className={`flex h-10 cursor-pointer items-center rounded-sm border px-4 text-[13px] ${
-                sizeFit === fit ? 'border-n-900 bg-n-900 text-n-0' : 'border-n-300'
+                sizeFit === fit ? 'border-[var(--brand)] bg-[var(--brand)] text-[var(--bg)]' : 'border-[var(--border-strong)]'
               }`}
             >
               <input
@@ -258,7 +258,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           <input
             id={heightId} type="number" inputMode="numeric" min={100} max={250}
             value={height} onChange={(e) => setHeight(e.target.value)}
-            className="tnum h-10 w-24 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+            className="tnum h-10 w-24 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
           />
         </div>
         <div className="flex flex-col gap-1.5">
@@ -268,7 +268,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
           <input
             id={weightId} type="number" inputMode="numeric" min={20} max={300}
             value={weight} onChange={(e) => setWeight(e.target.value)}
-            className="tnum h-10 w-24 rounded-sm border border-n-300 bg-[var(--bg)] px-2.5 text-[13px]"
+            className="tnum h-10 w-24 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
           />
         </div>
       </fieldset>

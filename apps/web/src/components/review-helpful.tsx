@@ -77,7 +77,7 @@ export function ReviewHelpful({
         className={`inline-flex h-8 items-center gap-1.5 rounded-full border px-3 text-[11px] disabled:opacity-40 ${
           pressed
             ? 'border-[var(--fg)] font-medium text-[var(--fg)]'
-            : 'border-n-300 text-[var(--fg-secondary)] hover:text-[var(--fg)]'
+            : 'border-[var(--border-strong)] text-[var(--fg-secondary)] hover:text-[var(--fg)]'
         }`}
       >
         {/* 아이콘은 장식이다 — 이름과 상태는 버튼이 말한다 */}

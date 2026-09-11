@@ -169,7 +169,7 @@ export function CouponForm({
           {(['AMOUNT', 'PERCENT'] as const).map((k) => (
             <label
               key={k}
-              className="flex cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-n-900"
+              className="flex cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-[var(--brand)]"
             >
               <input
                 type="radio"
@@ -251,7 +251,7 @@ export function CouponForm({
                     toggleTarget(t);
                   }}
                   aria-label={`${nameOf(t)} 대상에서 빼기`}
-                  className="flex items-center gap-1.5 rounded-full border border-n-900/20 bg-[var(--surface)] px-3 py-1 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+                  className="flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-3 py-1 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
                 >
                   {nameOf(t)}
                   <span aria-hidden="true" className="text-[var(--fg-muted)]">×</span>
@@ -268,7 +268,7 @@ export function CouponForm({
               {brands.map((b) => (
                 <label
                   key={b.id}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)]"
                 >
                   <input
                     type="checkbox"
@@ -287,7 +287,7 @@ export function CouponForm({
               {categories.map((c) => (
                 <label
                   key={c.id}
-                  className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900"
+                  className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)]"
                 >
                   <input
                     type="checkbox"
@@ -332,7 +332,7 @@ export function CouponForm({
             <ul className="flex flex-wrap gap-1.5">
               {productHits.map((p) => (
                 <li key={p.id}>
-                  <label className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-n-900">
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-[var(--border)] px-2.5 py-1.5 text-[12px] has-[:checked]:border-[var(--brand)]">
                     <input
                       type="checkbox"
                       checked={has({ targetType: 'PRODUCT', targetId: p.id })}

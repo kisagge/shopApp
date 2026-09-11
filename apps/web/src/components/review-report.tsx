@@ -117,7 +117,7 @@ export function ReviewReport({
           name="detail"
           rows={2}
           maxLength={500}
-          className="rounded-sm border border-n-300 bg-[var(--bg)] p-2 text-[12px]"
+          className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] p-2 text-[12px]"
         />
       </label>
 

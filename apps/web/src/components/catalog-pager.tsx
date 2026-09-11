@@ -31,7 +31,7 @@ export async function CatalogPager({
     <nav aria-label={t('catalog.showMore')} className="mt-10 flex justify-center">
       <Link
         href={{ pathname: basePath, query }}
-        className="inline-flex h-12 items-center rounded-sm border border-n-300 px-6 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
+        className="inline-flex h-12 items-center rounded-sm border border-[var(--border-strong)] px-6 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
       >
         {t('catalog.showMore')}
       </Link>

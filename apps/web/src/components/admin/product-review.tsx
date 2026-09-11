@@ -60,14 +60,14 @@ export function ProductReview({
           value={reason}
           onChange={(event) => setReason(event.target.value)}
           maxLength={500}
-          className="rounded-sm border border-n-300 bg-[var(--bg)] p-2 text-[12px]"
+          className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] p-2 text-[12px]"
         />
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => void decide(false)}
             disabled={reason.trim().length === 0 || pending !== null}
-            className="h-8 rounded-sm bg-accent px-3 text-[12px] font-medium text-n-0 disabled:opacity-40"
+            className="h-8 rounded-sm bg-accent px-3 text-[12px] font-medium text-[var(--bg)] disabled:opacity-40"
           >
             {pending === 'reject' ? '반려 중…' : '반려'}
           </button>
@@ -101,7 +101,7 @@ export function ProductReview({
       <button
         type="button"
         onClick={() => setRejecting(true)}
-        className="h-8 rounded-sm border border-n-300 px-3 text-[12px]"
+        className="h-8 rounded-sm border border-[var(--border-strong)] px-3 text-[12px]"
       >
         반려
       </button>

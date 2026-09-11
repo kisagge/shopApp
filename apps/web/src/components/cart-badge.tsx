@@ -36,7 +36,7 @@ export function CartBadge() {
       {mounted && count > 0 && (
         <span
           aria-hidden="true"
-          className="tnum ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-n-900 px-1 text-[10px] font-semibold text-n-0"
+          className="tnum ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-semibold text-[var(--bg)]"
         >
           {count}
         </span>

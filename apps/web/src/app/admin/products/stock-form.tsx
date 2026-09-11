@@ -92,7 +92,7 @@ export function StockForm({ productId, variants }: { productId: string; variants
                         ),
                       )
                     }
-                    className="tnum h-10 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-right text-[13px]"
+                    className="tnum h-10 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-right text-[13px]"
                   />
                 </td>
                 <td className="px-3 py-2 text-center">

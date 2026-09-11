@@ -81,7 +81,7 @@ export function RoleForm({
           id={roleId}
           value={next}
           onChange={(e) => setNext(e.target.value as UserRoleInput)}
-          className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+          className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
         >
           {USER_ROLE.map((r) => (
             <option key={r} value={r}>{USER_ROLE_LABEL[r]}</option>
@@ -95,7 +95,7 @@ export function RoleForm({
               id={merchantSelectId}
               value={nextMerchant}
               onChange={(e) => setNextMerchant(e.target.value)}
-              className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+              className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
             >
               <option value="">소속 선택</option>
               {merchants.map((m) => (
@@ -121,7 +121,7 @@ export function RoleForm({
             onChange={(e) => setReason(e.target.value)}
             maxLength={300}
             required
-            className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+            className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
           />
         </>
       )}

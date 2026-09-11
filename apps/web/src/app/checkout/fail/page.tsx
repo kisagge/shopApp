@@ -48,7 +48,7 @@ export default async function CheckoutFailPage({
       <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
         <Link
           href="/checkout"
-          className="rounded-md bg-n-900 px-5 py-2.5 text-[14px] font-medium text-n-0 no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+          className="rounded-md bg-[var(--brand)] px-5 py-2.5 text-[14px] font-medium text-[var(--bg)] no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
         >
           {t('checkout.retry')}
         </Link>

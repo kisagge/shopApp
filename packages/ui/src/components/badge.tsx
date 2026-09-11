@@ -13,13 +13,13 @@ const badge = cva(
   {
     variants: {
       tone: {
-        sale: 'h-6 bg-accent text-n-0',
-        new: 'h-6 bg-n-900 text-n-0',
+        sale: 'h-6 bg-accent text-[var(--bg)]',
+        new: 'h-6 bg-[var(--brand)] text-[var(--bg)]',
         info: 'h-6 bg-info-soft text-info',
         success: 'h-6 bg-success-soft text-success',
-        neutral: 'h-6 bg-n-100 text-n-600',
+        neutral: 'h-6 bg-[var(--surface-2)] text-[var(--fg-secondary)]',
         danger: 'h-6 bg-accent-soft text-accent-hover',
-        outline: 'h-6 border border-n-300 font-medium text-n-600',
+        outline: 'h-6 border border-[var(--border-strong)] font-medium text-[var(--fg-secondary)]',
       },
     },
     defaultVariants: { tone: 'neutral' },

@@ -30,7 +30,7 @@ export default async function NotFound() {
       <div className="mt-1 flex flex-wrap justify-center gap-3">
         <Link
           href="/"
-          className="inline-flex h-11 items-center rounded-sm bg-n-900 px-5 text-sm font-medium text-n-0 no-underline hover:bg-n-950"
+          className="inline-flex h-11 items-center rounded-sm bg-[var(--brand)] px-5 text-sm font-medium text-[var(--bg)] no-underline hover:bg-n-950"
         >
           {t('notFound.home')}
         </Link>

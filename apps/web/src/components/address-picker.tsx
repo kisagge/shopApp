@@ -104,7 +104,7 @@ export function AddressPicker({
         {addresses.map((a) => (
           <label
             key={a.id}
-            className="flex cursor-pointer items-start gap-3 rounded-sm border border-[var(--border)] p-3.5 has-[:checked]:border-n-900"
+            className="flex cursor-pointer items-start gap-3 rounded-sm border border-[var(--border)] p-3.5 has-[:checked]:border-[var(--brand)]"
           >
             <input
               type="radio"

@@ -140,3 +140,138 @@ export async function contrastProblems(page: Page): Promise<ContrastProblem[]> {
     return out;
   });
 }
+
+/**
+ * 이 색이 **테마를 탔는가**.
+ *
+ * 명암비만 재면 못 보는 결함이 있다. `border-n-300` 은 밝은 화면에서 1.5:1
+ * 짜리 **잔잔한 선**인데, 저울의 눈금이라 어두운 화면에서도 같은 값이다 —
+ * 그 자리에서는 12:1 짜리 **흰 선**이 된다. 글자가 아니니 명암비 검사에
+ * 안 걸리고, 자리도 안 무너진다. 그런데 눈에는 제일 먼저 들어온다.
+ *
+ * 값을 견주지 않고 **역할**을 견준다. 같은 선이 한쪽에서는 잔잔하고 다른
+ * 쪽에서는 또렷하면, 그 색은 테마를 안 탄 것이다. 값으로 견주면 일부러 안
+ * 바꾸는 색(브랜드 알약, 사진 위에 뜨는 밝은 알약)까지 전부 걸린다.
+ */
+export interface ThemeFlipProblem {
+  readonly what: string;
+  readonly light: number;
+  readonly dark: number;
+}
+
+/** 한 테마에서 잰 값. 요소 순서로 짝을 맞춘다 — 같은 DOM 이다. */
+async function borderProminence(page: Page): Promise<{ what: string; ratio: number }[]> {
+  return page.evaluate(() => {
+    const ctx = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
+    if (!ctx) return [];
+    const luminance = ([r, g, b]: [number, number, number]) => {
+      const f = (v: number) => {
+        const s = v / 255;
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+      };
+      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
+    };
+    /*
+     * **반투명한 색은 겹쳐 칠해서 읽는다.**
+     *
+     * `border-n-900/12` 같은 색은 `getComputedStyle` 이 알파를 그대로 준다.
+     * 빈 캔버스에 칠하면 검정 위에 얹혀 거의 검정으로 읽히는데, 화면에서는
+     * **밝은 알약 위**에 얹혀 거의 밝게 보인다 — 사진 위에 뜨는 찜 단추가
+     * 밝은 화면 1.24:1, 어두운 화면 13.57:1 로 읽혔다. 둘 다 틀린 값이다.
+     *
+     * 바탕을 먼저 칠하고 그 위에 얹으면 브라우저가 합성해 준다.
+     */
+    const composite = (layers: string[]): [number, number, number] => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 1, 1);
+      for (const layer of layers) {
+        ctx.fillStyle = '#000';
+        ctx.fillStyle = layer;
+        ctx.fillRect(0, 0, 1, 1);
+      }
+      const d = ctx.getImageData(0, 0, 1, 1).data;
+      return [d[0] ?? 0, d[1] ?? 0, d[2] ?? 0];
+    };
+
+    const pageBg = getComputedStyle(document.body).backgroundColor;
+
+    /*
+     * **선은 자기가 얹힌 바닥과 견준다.** 화면 바탕과만 견주면, 자기 배경을
+     * 들고 있는 것들이 엉뚱하게 걸린다 — 사진 위에 뜨는 흰 알약의 옅은 검정
+     * 테두리는 두 테마에서 똑같이 잔잔한데, 화면 바탕과 견주면 "사라졌다" 고
+     * 읽힌다.
+     */
+    const groundLayers = (el: Element): string[] => {
+      const layers: string[] = [pageBg];
+      const chain: Element[] = [];
+      let e: Element | null = el;
+      while (e && e !== document.body) {
+        chain.push(e);
+        e = e.parentElement;
+      }
+      for (const node of chain.reverse()) {
+        const bg = getComputedStyle(node).backgroundColor;
+        if (bg && !bg.includes('rgba(0, 0, 0, 0)')) layers.push(bg);
+      }
+      return layers;
+    };
+
+    const out: { what: string; ratio: number }[] = [];
+    for (const el of document.querySelectorAll('body *')) {
+      const cs = getComputedStyle(el);
+      if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+      const width = Math.max(
+        Number.parseFloat(cs.borderTopWidth),
+        Number.parseFloat(cs.borderBottomWidth),
+        Number.parseFloat(cs.borderLeftWidth),
+      );
+      if (!(width >= 0.5)) continue;
+      const rect = el.getBoundingClientRect();
+      if (rect.width < 8 || rect.height < 8) continue;
+
+      const ground = groundLayers(el);
+      const groundL = luminance(composite(ground));
+      const borderL = luminance(composite([...ground, cs.borderTopColor || cs.borderBottomColor]));
+      const ratio = (Math.max(borderL, groundL) + 0.05) / (Math.min(borderL, groundL) + 0.05);
+      out.push({
+        what: `<${el.tagName.toLowerCase()}> [${(el.className || '').toString().slice(0, 46)}]`,
+        ratio: Math.round(ratio * 100) / 100,
+      });
+    }
+    return out;
+  });
+}
+
+/**
+ * 두 테마에서 재서 역할이 뒤바뀐 선을 찾는다.
+ *
+ * **잔잔함과 또렷함 사이를 건넜을 때만** 센다. 3:1 아래는 나누는 선,
+ * 4.5:1 위는 강조하는 선이다. 그 사이는 어느 쪽으로도 읽히므로 묻지 않는다.
+ */
+export async function themeFlipProblems(page: Page, path: string): Promise<ThemeFlipProblem[]> {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto(path);
+  await page.waitForLoadState('networkidle');
+  const light = await borderProminence(page);
+
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto(path);
+  await page.waitForLoadState('networkidle');
+  const dark = await borderProminence(page);
+
+  const out: ThemeFlipProblem[] = [];
+  const seen = new Set<string>();
+  for (const [i, l] of light.entries()) {
+    const d = dark[i];
+    // 두 번 그린 화면이 다르면(광고·시간 표시 등) 짝이 어긋난다 — 그때는 건너뛴다
+    if (!d || d.what !== l.what) continue;
+    const quiet = 3;
+    const loud = 4.5;
+    const crossed = (l.ratio < quiet && d.ratio > loud) || (d.ratio < quiet && l.ratio > loud);
+    if (!crossed || seen.has(l.what)) continue;
+    seen.add(l.what);
+    out.push({ what: l.what, light: l.ratio, dark: d.ratio });
+  }
+  return out;
+}

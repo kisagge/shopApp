@@ -123,7 +123,7 @@ export default async function AdminAuditPage({
               id="filter-action"
               name="action"
               defaultValue={params.action ?? ''}
-              className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             >
               <option value="">전체</option>
               {page.filters.actions.map((a) => (
@@ -140,7 +140,7 @@ export default async function AdminAuditPage({
               id="filter-target"
               name="targetType"
               defaultValue={params.targetType ?? ''}
-              className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             >
               <option value="">전체</option>
               {page.filters.targetTypes.map((t) => (

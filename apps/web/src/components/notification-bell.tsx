@@ -43,7 +43,7 @@ export async function NotificationBell() {
       {unread > 0 && (
         <span
           aria-hidden="true"
-          className="tnum absolute -top-0.5 -right-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-n-0"
+          className="tnum absolute -top-0.5 -right-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-[var(--bg)]"
         >
           {formatUnread(unread)}
         </span>

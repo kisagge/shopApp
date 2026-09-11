@@ -65,7 +65,7 @@ export function MerchantStatusForm({
           id={statusId}
           value={next}
           onChange={(e) => setNext(e.target.value as MerchantStatusInput)}
-          className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+          className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
         >
           {MERCHANT_STATUS.map((s) => (
             <option key={s} value={s}>{MERCHANT_STATUS_LABEL[s]}</option>
@@ -87,7 +87,7 @@ export function MerchantStatusForm({
             onChange={(e) => setReason(e.target.value)}
             maxLength={300}
             required
-            className="h-9 rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+            className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
           />
         </>
       )}

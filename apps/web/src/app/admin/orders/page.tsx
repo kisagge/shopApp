@@ -131,7 +131,7 @@ export default async function AdminOrdersPage({
               defaultValue={q ?? ''}
               placeholder="20260904-1234567 또는 이름"
               maxLength={60}
-              className="h-10 w-64 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 w-64 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             />
           </div>
 
@@ -141,7 +141,7 @@ export default async function AdminOrdersPage({
             </label>
             <input
               id="order-from" name="from" type="date" defaultValue={from ?? ''}
-              className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             />
           </div>
 
@@ -151,7 +151,7 @@ export default async function AdminOrdersPage({
             </label>
             <input
               id="order-to" name="to" type="date" defaultValue={to ?? ''}
-              className="h-10 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             />
           </div>
 

@@ -88,7 +88,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
                   <li key={word}>
                     <Link
                       href={{ pathname: '/search', query: { q: word } }}
-                      className="inline-flex h-9 items-center rounded-full border border-n-300 px-3.5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
+                      className="inline-flex h-9 items-center rounded-full border border-[var(--border-strong)] px-3.5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
                     >
                       {word}
                     </Link>

@@ -67,7 +67,7 @@ export function CancelOrderButton({ orderNo }: { orderNo: string }) {
         value={reason}
         onChange={(e) => setReason(e.target.value)}
         maxLength={200}
-        className="h-11 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+        className="h-11 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
       />
       {error && (
         <p role="alert" className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">

@@ -194,7 +194,7 @@ export function ImageManager({
                   onChange={(e) => setAlts((prev) => ({ ...prev, [image.id]: e.target.value }))}
                   onBlur={() => saveAlt(image)}
                   maxLength={200}
-                  className="h-9 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-[12px]"
+                  className="h-9 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
                 />
 
                 <div className="flex flex-wrap gap-1.5">
@@ -246,7 +246,7 @@ export function ImageManager({
           type="file"
           accept="image/jpeg,image/png,image/webp,image/avif"
           disabled={!storageConfigured || full}
-          className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-n-300 file:bg-[var(--bg)] file:px-3 file:text-[12px]"
+          className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--bg)] file:px-3 file:text-[12px]"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
           JPEG · PNG · WebP · AVIF, 5MB 이하. 상품당 {MAX_IMAGES_PER_PRODUCT}장까지

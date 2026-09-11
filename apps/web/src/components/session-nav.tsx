@@ -87,7 +87,7 @@ export function SessionNav({
         <p className="flex h-9 items-center gap-1.5 text-sm text-[var(--fg-secondary)]">
           {data.name}
           {role && role !== 'CUSTOMER' && (
-            <span className="rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0">
+            <span className="rounded-xs bg-[var(--brand)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bg)]">
               {roleLabel(t, role)}
             </span>
           )}
@@ -130,7 +130,7 @@ export function SessionNav({
         <Link
           href="/admin"
           aria-label={consoleLabel}
-          className="shrink-0 rounded-xs bg-n-900 px-1.5 py-0.5 text-[10px] font-semibold text-n-0 no-underline hover:bg-n-700"
+          className="shrink-0 rounded-xs bg-[var(--brand)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--bg)] no-underline hover:bg-n-700"
         >
           {roleLabel(t, role)}
         </Link>

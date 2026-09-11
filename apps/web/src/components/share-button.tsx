@@ -73,7 +73,7 @@ export function ShareButton({
         type="button"
         onClick={() => void share()}
         aria-label={t('product.share')}
-        className={`${box} inline-flex items-center justify-center rounded-full border border-n-300 text-[var(--fg-secondary)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2`}
+        className={`${box} inline-flex items-center justify-center rounded-full border border-[var(--border-strong)] text-[var(--fg-secondary)] hover:text-[var(--fg)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2`}
       >
         {/*
           아이콘은 그림일 뿐이라 낭독기에서 숨긴다 — 이름은 aria-label 이 준다.

@@ -338,7 +338,7 @@ function BannerCard({
             <textarea
               id={headlineId} required value={form.headline} rows={2} maxLength={60}
               onChange={(e) => set('headline', e.target.value)}
-              className="rounded-sm border border-n-300 bg-[var(--bg)] px-3.5 py-3 text-sm"
+              className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3.5 py-3 text-sm"
             />
             <p className="text-[11px] text-[var(--fg-muted)]">줄바꿈이 그대로 반영됩니다</p>
           </div>
@@ -365,7 +365,7 @@ function BannerCard({
             <select
               id={toneId} value={form.tone}
               onChange={(e) => set('tone', e.target.value as BannerTone)}
-              className="h-12 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm"
+              className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm"
             >
               {BANNER_TONE.map((t) => (
                 <option key={t} value={t}>{BANNER_TONE_LABEL[t]}</option>
@@ -378,7 +378,7 @@ function BannerCard({
             </label>
             <input id={startId} type="datetime-local" value={form.startsAt}
               onChange={(e) => set('startsAt', e.target.value)}
-              className="h-12 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm" />
+              className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm" />
           </div>
           <div className="flex flex-col gap-2">
             <label htmlFor={endId} className="text-xs font-medium text-[var(--fg-secondary)]">
@@ -386,7 +386,7 @@ function BannerCard({
             </label>
             <input id={endId} type="datetime-local" value={form.endsAt}
               onChange={(e) => set('endsAt', e.target.value)}
-              className="h-12 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm" />
+              className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm" />
           </div>
         </div>
 
@@ -397,7 +397,7 @@ function BannerCard({
             </label>
             <input ref={fileRef} id={fileId} type="file"
               accept="image/jpeg,image/png,image/webp,image/avif"
-              className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-n-300 file:bg-[var(--bg)] file:px-3 file:text-[12px]" />
+              className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--bg)] file:px-3 file:text-[12px]" />
           </div>
           <Button type="button" size="md" variant="secondary" disabled={uploading} onClick={() => upload()}>
             {uploading ? '올리는 중…' : '이미지 교체'}

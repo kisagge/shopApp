@@ -268,7 +268,7 @@ export function SearchBox({
       {showTooShort && (
         <p
           role="status"
-          className={`absolute top-full z-30 mt-1 rounded-sm bg-n-900 px-3 py-2 text-[12px] text-n-0 ${menu ? 'inset-x-0' : 'right-0 left-0 whitespace-nowrap'}`}
+          className={`absolute top-full z-30 mt-1 rounded-sm bg-[var(--brand)] px-3 py-2 text-[12px] text-[var(--bg)] ${menu ? 'inset-x-0' : 'right-0 left-0 whitespace-nowrap'}`}
         >
           {t('search.tooShort', { min: SUGGEST_MIN_LENGTH })}
         </p>

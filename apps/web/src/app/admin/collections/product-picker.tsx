@@ -155,7 +155,7 @@ export function ProductPicker({
               }
             }}
             placeholder="상품명 · 브랜드"
-            className="h-11 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-sm"
+            className="h-11 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm"
           />
         </div>
         <Button type="button" size="md" variant="secondary" disabled={searching} onClick={() => search()}>

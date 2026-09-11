@@ -100,7 +100,7 @@ export function CloseAccountForm() {
           value={phrase}
           onChange={(event) => setPhrase(event.target.value)}
           autoComplete="off"
-          className="h-11 w-full max-w-[240px] rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[14px]"
+          className="h-11 w-full max-w-[240px] rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[14px]"
         />
       </div>
 
@@ -124,7 +124,7 @@ export function CloseAccountForm() {
          * 서버도 같은 문구를 본다(closeAccountSchema).
          */
         disabled={!matched || pending}
-        className="h-12 rounded-sm bg-accent px-5 text-[14px] font-medium text-n-0 disabled:opacity-40"
+        className="h-12 rounded-sm bg-accent px-5 text-[14px] font-medium text-[var(--bg)] disabled:opacity-40"
       >
         {pending ? t('close.pending') : t('close.submit')}
       </button>

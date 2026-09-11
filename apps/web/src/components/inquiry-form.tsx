@@ -64,7 +64,7 @@ export function InquiryForm({ productId }: { productId: string }) {
         rows={3}
         maxLength={INQUIRY_MAX_LENGTH}
         placeholder={t('inq.askPlaceholder')}
-        className="rounded-sm border border-n-300 bg-[var(--bg)] p-3 text-[14px]"
+        className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] p-3 text-[14px]"
       />
 
       <label htmlFor={privateId} className="flex items-center gap-2 text-[13px]">

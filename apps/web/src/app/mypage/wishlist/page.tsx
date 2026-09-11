@@ -48,7 +48,7 @@ export default async function WishlistPage() {
           </p>
           <Link
             href="/"
-            className="mt-2 inline-flex h-11 items-center rounded-sm border border-n-300 px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
+            className="mt-2 inline-flex h-11 items-center rounded-sm border border-[var(--border-strong)] px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]"
           >
             {t('my.wishlistGo')}
           </Link>

@@ -55,11 +55,11 @@ export default async function AdminUsersPage({
             name="q"
             defaultValue={params.q ?? ''}
             placeholder="이름 · 이메일"
-            className="h-10 w-56 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[13px]"
+            className="h-10 w-56 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
           />
           <button
             type="submit"
-            className="h-10 rounded-sm border border-n-300 px-3 text-[13px] text-[var(--fg)]"
+            className="h-10 rounded-sm border border-[var(--border-strong)] px-3 text-[13px] text-[var(--fg)]"
           >
             검색
           </button>

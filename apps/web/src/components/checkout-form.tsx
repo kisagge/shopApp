@@ -325,7 +325,7 @@ export function CheckoutForm({
             aria-hidden="true"
             className={[
               'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-xs text-[11px] font-semibold',
-              agreed ? 'bg-n-900 text-n-0' : 'border border-n-300',
+              agreed ? 'bg-[var(--brand)] text-[var(--bg)]' : 'border border-[var(--border-strong)]',
             ].join(' ')}
           >
             {agreed ? '✓' : ''}

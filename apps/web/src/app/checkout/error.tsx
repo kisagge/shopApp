@@ -55,7 +55,7 @@ export default function CheckoutError({
         {/* 링크를 버튼처럼 쓴다 — 빈 장바구니 화면과 같은 방식이다 */}
         <Link
           href="/mypage/orders"
-          className="inline-flex h-12 items-center justify-center rounded-sm bg-n-900 px-7 text-sm font-medium text-n-0 no-underline"
+          className="inline-flex h-12 items-center justify-center rounded-sm bg-[var(--brand)] px-7 text-sm font-medium text-[var(--bg)] no-underline"
         >
           {t('error.checkoutOrders')}
         </Link>

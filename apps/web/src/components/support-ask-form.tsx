@@ -68,7 +68,7 @@ export function SupportAskForm() {
           id={topicId}
           value={topic}
           onChange={(e) => setTopic(e.target.value as InquiryTopic)}
-          className="h-11 w-full max-w-64 rounded-sm border border-n-300 bg-[var(--bg)] px-3 text-[14px]"
+          className="h-11 w-full max-w-64 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[14px]"
         >
           {INQUIRY_TOPIC.map((value) => (
             <option key={value} value={value}>
@@ -90,7 +90,7 @@ export function SupportAskForm() {
           required
           minLength={5}
           maxLength={INQUIRY_MAX_LENGTH}
-          className="w-full rounded-sm border border-n-300 bg-[var(--bg)] p-3 text-[14px] leading-relaxed"
+          className="w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] p-3 text-[14px] leading-relaxed"
         />
         <p className="tnum text-right text-[11px] text-[var(--fg-muted)]">
           {content.length} / {INQUIRY_MAX_LENGTH}

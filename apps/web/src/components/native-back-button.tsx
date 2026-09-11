@@ -67,7 +67,7 @@ export function NativeBackButton() {
       role="status"
       className="safe-b fixed inset-x-0 bottom-0 z-50 flex justify-center px-4 pb-4"
     >
-      <span className="rounded-full bg-n-900 px-4 py-2.5 text-[13px] text-n-0 shadow-lg">
+      <span className="rounded-full bg-[var(--brand)] px-4 py-2.5 text-[13px] text-[var(--bg)] shadow-lg">
         {t('nav.exitHint')}
       </span>
     </p>
