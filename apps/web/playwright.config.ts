@@ -77,13 +77,13 @@ export default defineConfig({
       name: 'customer',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.customer },
       testMatch:
-        /(customer|review-helpful|notifications|order-idempotency|a11y-account|layout-customer|prefetch-budget|nav-feedback)\.spec\.ts/,
+        /(customer|review-helpful|notifications|order-idempotency|a11y-account|layout-customer|layout-customer-locales|prefetch-budget|nav-feedback)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
       name: 'admin',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.admin },
-      testMatch: /(admin|slug-history|a11y-admin|layout-admin)\.spec\.ts/,
+      testMatch: /(admin|slug-history|a11y-admin|layout-admin|layout-admin-locales)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {
