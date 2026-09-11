@@ -77,11 +77,19 @@ const COLLECTION_WRITERS = [
  */
 const CRON_WRITERS = ['app/api/cron/release-holds/route.ts'] as const;
 
-/** 별점이 목록에 나오므로 리뷰 쓰기도 카탈로그를 턴다 */
+/**
+ * 별점이 목록에 나오므로 리뷰 쓰기도 카탈로그를 턴다.
+ *
+ * **탈퇴도 여기 속한다.** 탈퇴는 그 사람의 리뷰를 지우고 상품의 별점·리뷰 수를
+ * 다시 계산한다. 처음에는 이 목록에 없었고, 그래서 캐시를 안 털고도 아무
+ * 검사에 안 걸렸다 — 손으로 적은 목록은 적히지 않은 것을 보지 못한다.
+ * 아래 '리뷰를 건드리는 창구는 카탈로그를 턴다' 가 그 구멍을 메운다.
+ */
 const REVIEW_WRITERS = [
   'app/api/reviews/route.ts',
   'app/api/reviews/[id]/route.ts',
   'app/api/admin/reviews/[id]/restore/route.ts',
+  'app/api/account/close/route.ts',
 ] as const;
 
 /** 공지·FAQ 를 털어야 하는 쓰기 창구 */
@@ -232,3 +240,74 @@ describe('레이아웃 질의', () => {
     expect(source).toMatch(/getTopCategories = cache\(/);
   });
 });
+
+/**
+ * 리뷰를 건드리는 창구는 **빠짐없이** 카탈로그를 터는가.
+ *
+ * **손으로 적은 목록이 이 버그를 놓쳤다.** 위의 `REVIEW_WRITERS` 는 사람이
+ * 적은 것이라, 거기 없는 창구는 검사가 아예 보지 않는다. 탈퇴가 그랬다 —
+ * 탈퇴는 그 사람의 리뷰를 지우고 상품의 별점·리뷰 수를 다시 계산하는데
+ * 캐시를 안 털었다. DB 는 맞아지고 캐시만 낡아서, 최대 한 시간 동안 **요약은
+ * 지워진 리뷰까지 세고 목록은 안 세는** 상태가 된다. 화면이 "리뷰 6" 이라고
+ * 적어 놓고 글은 다섯 개다.
+ *
+ * 그래서 목록을 적지 않고 **소스에서 찾는다.** 리뷰를 바꾸거나 별점을 다시
+ * 계산하는 모듈을 고르고, 그것을 부르는 창구가 터는지 본다. 새 창구가 생기면
+ * 저절로 걸린다.
+ */
+describe('리뷰를 건드리는 창구는 카탈로그를 턴다', () => {
+  /** 리뷰 행을 바꾸거나 상품 별점을 다시 계산하는가 */
+  const MUTATES = /\b(?:tx|prisma)\.review\.(?:create|update|updateMany|delete|deleteMany)|ratingScore\(/;
+
+  /** 파일을 훑어 조건에 맞는 것을 모은다 */
+  function walk(dir: string, hit: (rel: string, text: string) => void, base = dir): void {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full, hit, base);
+      else if (name.endsWith('.ts')) hit(full.slice(base.length + 1), readFileSync(full, 'utf8'));
+    }
+  }
+
+  /** 리뷰를 바꾸는 lib 모듈 — `~/lib/reviews/write-review` 같은 지정자로 */
+  const mutatingModules: string[] = [];
+  walk(join(SRC, 'lib'), (rel, text) => {
+    if (MUTATES.test(text)) mutatingModules.push(`~/lib/${rel.replace(/\.ts$/, '')}`);
+  });
+
+  /**
+   * 털지 않아도 되는 창구와 그 이유.
+   *
+   * **이유 없이 이름만 적는 것은 목록으로 되돌아가는 것과 같다.** 왜 안 털어도
+   * 되는지가 남아야 다음 사람이 판단할 수 있다.
+   */
+  const EXEMPT: Readonly<Record<string, string>> = {
+    'app/api/reviews/[id]/helpful/route.ts':
+      '도움돼요는 별점에도 리뷰 수에도 영향이 없다. 바뀌는 것은 목록의 도움순 정렬뿐인데 목록은 캐시하지 않는다.',
+  };
+
+  /** 리뷰를 바꾸는 모듈을 부르는 창구들 */
+  const routes: string[] = [];
+  walk(join(SRC, 'app', 'api'), (rel, text) => {
+    if (!rel.endsWith('route.ts')) return;
+    if (mutatingModules.some((m) => text.includes(m))) routes.push(join('app/api', rel));
+  });
+
+  it('리뷰를 바꾸는 모듈과 그것을 부르는 창구를 실제로 찾았다', () => {
+    // 정규식이 헛돌면 목록이 비고, 빈 목록은 무엇을 넣어도 통과한다
+    expect(mutatingModules.length).toBeGreaterThan(1);
+    expect(routes.length).toBeGreaterThan(1);
+  });
+
+  it.each(routes)('%s 가 카탈로그를 턴다', (route) => {
+    if (route in EXEMPT) return;
+    expect(read(route), `${route} 는 리뷰를 바꾸면서 캐시를 그대로 둔다`).toMatch(
+      /revalidate(?:Catalog|Reviews)\(\)/,
+    );
+  });
+
+  it('면제에 적힌 창구가 실제로 있다', () => {
+    // 이름이 바뀌면 면제가 조용히 아무것도 안 막게 된다
+    expect(Object.keys(EXEMPT).filter((k) => !routes.includes(k))).toEqual([]);
+  });
+});
+

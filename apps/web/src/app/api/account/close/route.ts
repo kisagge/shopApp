@@ -3,6 +3,7 @@ import { closeAccountSchema } from '@shop/contract';
 import { auth } from '@shop/auth';
 import { getSessionUser } from '@shop/auth/session';
 import { closeAccount, ClosureError } from '~/lib/account/close-account';
+import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { unauthorized } from '~/lib/api/respond';
 
@@ -26,6 +27,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const result = await closeAccount(user.id, parsed.data);
+
+    /*
+     * **리뷰를 지웠으면 카탈로그를 턴다.**
+     *
+     * 탈퇴는 이 사람의 리뷰를 지우고 상품의 별점·리뷰 수를 다시 계산한다.
+     * DB 는 맞아지는데 캐시는 그대로라, 최대 캐시 수명(1시간)만큼 **요약은
+     * 지워진 리뷰까지 세고 목록은 안 센다** — 화면이 "리뷰 6" 이라고 적어
+     * 놓고 글은 다섯 개인 상태가 된다.
+     *
+     * 리뷰를 쓰고 지우는 다른 창구들은 이미 털고 있었는데, 이 길만 빠져
+     * 있었다. 캐시 검사가 창구 목록을 손으로 들고 있어서 여기를 아예 보지
+     * 않았다 — 그 목록도 함께 고쳤다(test/cache-coverage.test.ts).
+     */
+    if (result.erasedReviews > 0) revalidateReviews();
+
     const response = NextResponse.json({ closed: true, ...result });
     await expireSessionCookie(request, response);
     return response;
