@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
-  format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
+  format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
   PAYMENT_STATUS_LABEL,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
@@ -52,7 +52,7 @@ export default async function AdminOrderDetail({
   const canResolveReturn = hasPermission(actor, 'order:refund');
 
   // 어떤 전이가 가능한지는 상태머신이 정하고, 그중 권한이 있는 것만 보여 준다.
-  const options = nextStatuses(order.status).filter((to) => {
+  const options = adminStatusActions(order.status).filter((to) => {
     if (to === 'CANCELLED') return hasPermission(actor, 'order:cancel');
     if (to === 'REFUNDED' || to === 'RETURNED') return hasPermission(actor, 'order:refund');
     return hasPermission(actor, 'order:fulfill');

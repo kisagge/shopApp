@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   orderFilterStatuses, ORDER_FILTER_GROUP, ORDER_FILTER_TAB,
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
-  isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
+  isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, orderStatusFromItems,
+  adminStatusActions, OrderTransitionError, type OrderStatus,
   statusBeforeReturn, isRepayable, canRegisterShipment,
 } from '../src/order-state';
 
@@ -83,6 +84,48 @@ describe('slowestFulfillmentStatus — 주문 전체 상태는 가장 뒤처진 
 
   it('빈 목록이면 null 이다', () => {
     expect(slowestFulfillmentStatus([])).toBeNull();
+  });
+});
+
+describe('orderStatusFromItems — 갈래로 빠진 상태도 답한다', () => {
+  /*
+   * 이 셋이 없어서 **반품 승인을 받은 주문이 영영 환불되지 않았다.**
+   * 줄만 반품완료가 되고 주문은 반품접수에 남았는데, 반품접수에서 환불로
+   * 가는 길은 없다.
+   */
+  it('모든 줄이 같은 갈래에 도달하면 주문도 그 갈래다', () => {
+    expect(orderStatusFromItems(['RETURNED', 'RETURNED'])).toBe('RETURNED');
+    expect(orderStatusFromItems(['CANCELLED'])).toBe('CANCELLED');
+  });
+
+  it('일부만 빠졌으면 여전히 판단하지 않는다', () => {
+    // 부분 취소는 별도 정책이 필요한 이야기지 여기서 고를 문제가 아니다
+    expect(orderStatusFromItems(['RETURNED', 'SHIPPED'])).toBeNull();
+    expect(orderStatusFromItems(['SHIPPED', 'CANCELLED'])).toBeNull();
+  });
+
+  it('이행 경로는 예전과 똑같이 답한다', () => {
+    expect(orderStatusFromItems(['SHIPPED', 'PREPARING'])).toBe('PREPARING');
+    expect(orderStatusFromItems([])).toBeNull();
+  });
+});
+
+describe('adminStatusActions — 표에 있어도 이 문으로는 못 지나가는 길', () => {
+  /*
+   * 반품접수에서 배송중·배송완료·구매확정으로 가는 길은 반품을 **반려**할 때
+   * 쓰는 것이다. 상태 단추로 지나가면 신청은 접수된 채 남고 주문만 되감긴다.
+   */
+  it('반품접수에서는 반품완료로만 갈 수 있다', () => {
+    expect(adminStatusActions('RETURN_REQUESTED')).toEqual(['RETURNED']);
+    // 표에는 여전히 있다 — 반려가 쓸 길이라 지우면 안 된다
+    expect(nextStatuses('RETURN_REQUESTED')).toContain('SHIPPED');
+  });
+
+  it('나머지 상태는 표 그대로다', () => {
+    for (const status of ORDER_STATUS) {
+      if (status === 'RETURN_REQUESTED') continue;
+      expect(adminStatusActions(status)).toEqual(nextStatuses(status));
+    }
   });
 });
 

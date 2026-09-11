@@ -209,6 +209,65 @@ export function slowestFulfillmentStatus(
 }
 
 /**
+ * 이행 경로에서 갈래로 빠지는 상태들.
+ *
+ * 순위표에 없는 것이 곧 갈래다 — 손으로 적으면 상태가 하나 늘 때 여기만
+ * 빠진다.
+ */
+const BRANCH_STATUS: readonly OrderStatus[] = ORDER_STATUS.filter(
+  (status) => FULFILLMENT_RANK[status] === undefined,
+);
+
+/**
+ * 줄들의 상태로 주문 전체의 상태를 정한다.
+ *
+ * `slowestFulfillmentStatus` 는 **이행 경로만** 답한다. 취소·반품처럼 갈래로
+ * 빠진 상태가 섞이면 null 을 주고 "호출부가 따로 판단하라" 고 말하는데,
+ * **호출부가 판단하지 않았다.** 어드민의 상태 변경은 null 을 받으면 주문을
+ * 그냥 안 옮겼고, 그래서 이런 일이 벌어졌다.
+ *
+ * - 반품 승인 뒤 **반품완료로 바꿀 수 없었다.** 줄만 반품완료가 되고 주문은
+ *   반품접수에 남는다. 그다음 환불은 `반품접수 → 환불완료` 전이가 없어서
+ *   막히므로, **반품 승인을 받은 주문은 영영 환불되지 않았다.**
+ * - 그러면서 화면은 "다른 가맹점 상품이 남아 주문 전체 상태는 아직
+ *   그대로입니다" 라고 말했다. 가맹점이 하나뿐인 주문에도 그렇게 말했다 —
+ *   기다릴 상대가 없는데 기다리라고 한 것이다.
+ *
+ * 그래서 갈래에도 답을 준다. **모든 줄이 같은 갈래에 도달했을 때만** 주문이
+ * 그 갈래로 간다. 일부만 취소·반품된 주문은 여전히 null 이다 — 그건 부분
+ * 취소라는 별도 정책이 필요한 이야기지, 여기서 고를 문제가 아니다.
+ */
+export function orderStatusFromItems(
+  statuses: readonly OrderStatus[],
+): OrderStatus | null {
+  const [first] = statuses;
+  if (first !== undefined && BRANCH_STATUS.includes(first)) {
+    return statuses.every((status) => status === first) ? first : null;
+  }
+  return slowestFulfillmentStatus(statuses);
+}
+
+/**
+ * 어드민의 **상태 변경 단추**로 지날 수 있는 길.
+ *
+ * 전이표에 있어도 **이 문으로 지나가면 안 되는** 길이 있다.
+ * `반품접수 → 배송중·배송완료·구매확정` 이 그렇다. 그 길을 낸 이유는 반품을
+ * **반려**할 때 왔던 자리로 되돌리기 위해서지, 상태 단추로 되감으라는 뜻이
+ * 아니다. 단추로 지나가면 반품 신청은 접수된 채 남고 주문만 배송중으로
+ * 돌아간다 — 그 뒤에 승인해도 반품완료로 갈 길이 없어 **신청이 영영 처리되지
+ * 않는다.**
+ *
+ * `canRegisterShipment` 와 같은 이야기다. **같은 이름의 전이라도 누가 왜
+ * 하느냐가 다르면 다른 문이다.**
+ *
+ * 표에서 걸러 낸다. 손으로 적으면 표가 바뀔 때 여기만 남는다.
+ */
+export const adminStatusActions = (from: OrderStatus): readonly OrderStatus[] =>
+  from === 'RETURN_REQUESTED'
+    ? nextStatuses(from).filter((to) => to === 'RETURNED')
+    : nextStatuses(from);
+
+/**
  * 주문 내역에서 걸러 볼 수 있는 칸.
  *
  * **탭이 열 상태 중 다섯만 덮고 있었다.** 구매확정·취소·반품·환불은 "전체"

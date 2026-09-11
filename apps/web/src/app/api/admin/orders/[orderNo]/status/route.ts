@@ -4,6 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { refundOrder, RefundError } from '~/lib/admin/refund-order';
+import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { revalidateCatalog } from '~/lib/cache';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
@@ -40,12 +41,12 @@ export async function POST(
 
   try {
     /**
-     * 환불만 다른 길로 보낸다.
+     * 환불과 취소는 다른 길로 보낸다.
      *
-     * 화면에서는 같은 상태 선택으로 보이지만, 이것만 돈이 실제로 나간다.
-     * transitionOrder 는 REFUNDED 를 아예 거절하므로 여기서 갈라 주지 않으면
-     * 환불이 되지 않는다 — 조용히 상태만 바뀌던 예전으로 돌아가지 않도록
-     * 일부러 그렇게 막아 뒀다.
+     * 화면에서는 같은 상태 선택으로 보이지만, 이 둘만 주문이 한 일을 되돌린다.
+     * transitionOrder 는 REFUNDED·CANCELLED 를 아예 거절하므로 여기서 갈라
+     * 주지 않으면 되지 않는다 — 조용히 상태만 바뀌던 예전으로 돌아가지
+     * 않도록 일부러 그렇게 막아 뒀다.
      */
     if (parsed.data.to === 'REFUNDED') {
       const refund = await refundOrder(orderNo, actor, parsed.data.note ?? '어드민 환불');
@@ -71,6 +72,32 @@ export async function POST(
       return NextResponse.json(refund);
     }
 
+    /**
+     * 취소는 재고·포인트·쿠폰을 되돌리고 잡힌 돈이 있으면 PG 취소까지
+     * 보낸다. 상태만 바꾸는 길로 가면 그중 아무것도 일어나지 않는다.
+     */
+    if (parsed.data.to === 'CANCELLED') {
+      const cancel = await cancelOrder(orderNo, actor, parsed.data.note ?? '어드민 취소');
+
+      await recordAudit({
+        actor,
+        action: 'order.cancel',
+        targetType: 'order',
+        targetId: orderNo,
+        after: {
+          orderStatus: cancel.status,
+          refunded: cancel.refunded,
+          note: parsed.data.note,
+        },
+        request,
+      });
+
+      // 취소하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
+      revalidateCatalog();
+
+      return NextResponse.json(cancel);
+    }
+
     const result = await transitionOrder(orderNo, parsed.data.to, actor, parsed.data.note);
 
     await recordAudit({
@@ -89,7 +116,11 @@ export async function POST(
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof TransitionError || error instanceof RefundError) {
+    if (
+      error instanceof TransitionError ||
+      error instanceof RefundError ||
+      error instanceof CancelError
+    ) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
     throw error;

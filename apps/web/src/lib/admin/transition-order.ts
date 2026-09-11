@@ -1,8 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canTransition, hasPermission, merchantScope, ORDER_STATUS_LABEL,
-  slowestFulfillmentStatus,
+  adminStatusActions, canTransition, hasPermission, merchantScope, ORDER_STATUS_LABEL,
+  orderStatusFromItems,
   type Actor, type OrderStatus,
 } from '@shop/core';
 import { grantPurchaseReward } from '~/lib/orders/grant-reward';
@@ -66,6 +66,24 @@ export async function transitionOrder(
     );
   }
 
+  /**
+   * 취소도 여기서 할 수 없다 — 같은 이유로, 더 크게 샜다.
+   *
+   * 환불만 막아 두고 취소는 열어 뒀는데, 취소는 **주문 생성이 한 일을 전부
+   * 역순으로 푸는 것**이다. 재고를 되돌리고, 쓴 포인트를 돌려주고, 쿠폰을
+   * 되살리고, 돈이 잡혀 있으면 PG 취소를 보낸다. 여기로 오면 그중 아무것도
+   * 일어나지 않는다 — 줄 상태만 취소로 바뀌고 재고는 영영 잠긴다.
+   *
+   * 취소는 cancelOrder 하나로만 간다.
+   */
+  if (to === 'CANCELLED') {
+    throw new TransitionError(
+      'USE_CANCEL',
+      '취소는 상태 변경이 아니라 취소 처리로 진행해야 합니다.',
+      400,
+    );
+  }
+
   const permission = permissionFor(to);
   if (!hasPermission(actor, permission)) {
     throw new TransitionError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
@@ -95,12 +113,24 @@ export async function transitionOrder(
   // 상태머신이 허용하지 않는 전이는 여기서 막힌다.
   // 줄마다 상태가 다를 수 있으므로 전부 확인한다.
   for (const item of mine) {
-    if (!canTransition(item.status, to)) {
+    if (adminStatusActions(item.status).includes(to)) continue;
+
+    /*
+     * 표에는 있는데 이 문으로는 못 지나가는 길이 있다 — `adminStatusActions`
+     * 주석 참고. 그런 것은 "바꿀 수 없습니다" 가 아니라 **어디로 가야 하는지**
+     * 말해 줘야 한다.
+     */
+    if (canTransition(item.status, to)) {
       throw new TransitionError(
-        'INVALID_TRANSITION',
-        `${ORDER_STATUS_LABEL[item.status]} 상태의 상품은 ${ORDER_STATUS_LABEL[to]}(으)로 바꿀 수 없습니다.`,
+        'USE_RETURN_RESOLVE',
+        '반품접수된 주문은 상태 변경이 아니라 반품 승인·반려로 진행해야 합니다.',
+        400,
       );
     }
+    throw new TransitionError(
+      'INVALID_TRANSITION',
+      `${ORDER_STATUS_LABEL[item.status]} 상태의 상품은 ${ORDER_STATUS_LABEL[to]}(으)로 바꿀 수 없습니다.`,
+    );
   }
 
   let rewarded: { granted: boolean; amount: number } = { granted: false, amount: 0 };
@@ -115,32 +145,34 @@ export async function transitionOrder(
     }
 
     /**
-     * 주문 전체의 상태는 **가장 뒤처진 줄**이 정한다.
+     * 주문 전체의 상태는 **가장 뒤처진 줄**이 정한다. 취소·반품처럼 갈래로
+     * 빠진 상태는 **모든 줄이 그 갈래에 도달했을 때** 주문이 따라간다.
      *
      * 상태머신은 **줄(OrderItem)의 전이**를 지킨다. 그게 실제 업무 사건이기
      * 때문이다. 반면 주문의 상태는 줄들을 요약한 **파생값**이라, 여기에 단일 홉
      * 전이 규칙을 다시 강요하면 안 된다.
      *
-     * 두 번 틀렸다.
+     * 세 번 틀렸다.
      * 1) "모든 줄이 목표 상태와 같은가" 로 봤더니, 한 가맹점이 먼저 출고한
      *    순간 주문이 영영 안 움직였다.
-     * 2) 고친 뒤에도 canTransition(order.status, slowest) 를 걸어 뒀더니,
+     * 2) 고친 뒤에도 canTransition(order.status, derived) 를 걸어 뒀더니,
      *    두 줄이 모두 배송중인데 주문은 결제완료에 머물렀다 —
      *    PAID → SHIPPED 는 한 홉에 갈 수 없기 때문이다.
+     * 3) 이행 경로만 묻고 있어서 **반품완료로는 아예 못 갔다** —
+     *    `orderStatusFromItems` 주석에 자세히 적었다.
      */
     const all = await tx.orderItem.findMany({
       where: { orderId: order.id },
       select: { status: true },
     });
-    const slowest = slowestFulfillmentStatus(all.map((i) => i.status));
-    const moveOrder = slowest !== null && slowest !== order.status;
+    const derived = orderStatusFromItems(all.map((i) => i.status));
+    const moveOrder = derived !== null && derived !== order.status;
 
     if (moveOrder) {
       const timestamps: Record<string, Date> = {};
-      if (slowest === 'SHIPPED') timestamps['shippedAt'] = new Date();
-      if (slowest === 'DELIVERED') timestamps['deliveredAt'] = new Date();
-      if (slowest === 'CONFIRMED') timestamps['confirmedAt'] = new Date();
-      if (slowest === 'CANCELLED') timestamps['canceledAt'] = new Date();
+      if (derived === 'SHIPPED') timestamps['shippedAt'] = new Date();
+      if (derived === 'DELIVERED') timestamps['deliveredAt'] = new Date();
+      if (derived === 'CONFIRMED') timestamps['confirmedAt'] = new Date();
 
       /**
        * 조건부 UPDATE 로 옮긴다.
@@ -151,19 +183,19 @@ export async function transitionOrder(
        */
       const { count: moved } = await tx.order.updateMany({
         where: { id: order.id, status: order.status },
-        data: { status: slowest, ...timestamps },
+        data: { status: derived, ...timestamps },
       });
       if (moved === 0) throw new TransitionError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
       await tx.orderStatusLog.create({
         data: {
-          orderId: order.id, from: order.status, to: slowest,
+          orderId: order.id, from: order.status, to: derived,
           actor: actor.id, note: note ?? '어드민에서 변경',
         },
       });
 
       // 구매확정 적립. 여기까지 왔다는 것은 이 요청이 확정을 만들었다는 뜻이다.
-      if (slowest === 'CONFIRMED') {
+      if (derived === 'CONFIRMED') {
         rewarded = await grantPurchaseReward(tx, {
           id: order.id, orderNo: order.orderNo,
           userId: order.userId, rewardPoints: order.rewardPoints,
@@ -180,7 +212,7 @@ export async function transitionOrder(
       });
     }
 
-    return { moveOrder, count, slowest };
+    return { moveOrder, count, derived };
   });
 
   /*
@@ -188,10 +220,10 @@ export async function transitionOrder(
    * 상태 변경까지 되돌아가는데, 그건 사람이 한 처리를 알림 하나 때문에
    * 무르는 셈이다.
    */
-  if (result.moveOrder && (result.slowest === 'SHIPPED' || result.slowest === 'DELIVERED')) {
+  if (result.moveOrder && (result.derived === 'SHIPPED' || result.derived === 'DELIVERED')) {
     await recordNotification({
       userId: order.userId,
-      kind: result.slowest === 'SHIPPED' ? 'ORDER_SHIPPED' : 'ORDER_DELIVERED',
+      kind: result.derived === 'SHIPPED' ? 'ORDER_SHIPPED' : 'ORDER_DELIVERED',
       params: { orderNo: order.orderNo },
       linkPath: `/order/${order.orderNo}`,
     });
@@ -199,7 +231,7 @@ export async function transitionOrder(
 
   return {
     orderNo: order.orderNo,
-    orderStatus: result.moveOrder && result.slowest ? result.slowest : order.status,
+    orderStatus: result.moveOrder && result.derived ? result.derived : order.status,
     itemsMoved: result.count,
     waitingForOthers: !result.moveOrder,
     rewardGranted: rewarded.granted ? rewarded.amount : 0,

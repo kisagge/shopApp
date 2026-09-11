@@ -51,17 +51,46 @@ describe('권한', () => {
     ).resolves.toBeDefined();
   });
 
-  it('가맹점은 주문 취소를 못 한다 — 돈이 나가는 동작이다', async () => {
+  it('반품완료는 order:refund 를 요구한다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('RETURN_REQUESTED'));
     await expect(
-      transitionOrder('20260831-1234567', 'CANCELLED', merchantA),
+      transitionOrder('20260831-1234567', 'RETURNED', merchantA),
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
+});
 
-  it('관리자는 취소할 수 있다', async () => {
+describe('돈을 되돌리는 동작은 여기로 오지 않는다', () => {
+  /*
+   * 환불만 막아 두고 취소는 열어 뒀다. 취소는 재고·포인트·쿠폰을 되돌리고
+   * PG 취소까지 보내는 동작인데, 이 길로 오면 그중 아무것도 안 일어나고
+   * 줄 상태만 취소로 바뀐다 — 재고가 영영 잠긴다.
+   */
+  it('취소는 거절하고 어디로 가야 하는지 말한다', async () => {
     db.order.findFirst.mockResolvedValue(mixedOrder('PAID'));
     await expect(
       transitionOrder('20260831-1234567', 'CANCELLED', admin),
-    ).resolves.toBeDefined();
+    ).rejects.toMatchObject({ code: 'USE_CANCEL', status: 400 });
+    expect(tx.orderItem.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('환불도 마찬가지다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('CANCELLED'));
+    await expect(
+      transitionOrder('20260831-1234567', 'REFUNDED', admin),
+    ).rejects.toMatchObject({ code: 'USE_REFUND', status: 400 });
+  });
+
+  /*
+   * 반품접수에서 배송중으로 돌아가는 길은 반품을 **반려**할 때 쓰는 것이다.
+   * 상태 단추로 지나가면 신청은 접수된 채 남고 주문만 되감긴다 — 그 뒤에
+   * 승인해도 반품완료로 갈 길이 없어 신청이 영영 처리되지 않는다.
+   */
+  it('반품접수를 상태 단추로 되감을 수 없다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('RETURN_REQUESTED'));
+    await expect(
+      transitionOrder('20260831-1234567', 'SHIPPED', admin),
+    ).rejects.toMatchObject({ code: 'USE_RETURN_RESOLVE', status: 400 });
+    expect(tx.orderItem.updateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -136,10 +165,10 @@ describe('상태머신이 막는 전이', () => {
     ).rejects.toThrow(/결제완료.*배송중/);
   });
 
-  it('구매확정은 더 갈 곳이 없다', async () => {
+  it('구매확정에서 배송준비로 되돌릴 수 없다', async () => {
     db.order.findFirst.mockResolvedValue(mixedOrder('CONFIRMED'));
     await expect(
-      transitionOrder('20260831-1234567', 'CANCELLED', admin),
+      transitionOrder('20260831-1234567', 'PREPARING', admin),
     ).rejects.toBeInstanceOf(TransitionError);
   });
 
@@ -182,6 +211,22 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
     const r = await transitionOrder('20260831-1234567', 'PREPARING', admin);
     expect(r.orderStatus).toBe('SHIPPED');
     expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('SHIPPED');
+  });
+
+  /*
+   * **반품 승인을 받은 주문이 영영 환불되지 않았다.** 줄은 반품완료가 되는데
+   * 주문은 반품접수에 남았고, 반품접수에서 환불로 가는 길은 없다. 화면은
+   * 그러면서 "다른 가맹점 상품이 남아" 라고 말했다 — 기다릴 상대가 없는데.
+   */
+  it('모든 줄이 반품완료면 주문도 반품완료가 된다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('RETURN_REQUESTED'));
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'RETURNED' }, { status: 'RETURNED' }]);
+
+    const r = await transitionOrder('20260831-1234567', 'RETURNED', admin);
+
+    expect(r.waitingForOthers).toBe(false);
+    expect(r.orderStatus).toBe('RETURNED');
+    expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('RETURNED');
   });
 
   it('줄과 주문이 이미 같으면 주문을 건드리지 않는다', async () => {

@@ -63,8 +63,24 @@ export async function refundOrder(
     throw new RefundError('ALREADY_REFUNDED', '이미 환불된 주문입니다.');
   }
 
-  // 상태머신이 허용하지 않는 전이는 여기서 막힌다(취소·반품완료에서만 온다)
-  transition(order.status, 'REFUNDED');
+  /*
+   * 상태머신이 허용하지 않는 전이는 여기서 막힌다(취소·반품완료에서만 온다).
+   *
+   * **core 의 오류를 그대로 흘려보내지 않는다.** `transition` 은
+   * `OrderTransitionError` 를 던지는데 창구는 `RefundError` 와
+   * `TransitionError` 만 매핑한다 — 그대로 두면 **갈 수 없는 전이가 500** 이
+   * 된다. 반품접수 상태에서 환불을 눌러 보다 실제로 그렇게 났다. 화면이 낡은
+   * 단추를 들고 있었을 뿐인데 서버 잘못처럼 보인다.
+   */
+  try {
+    transition(order.status, 'REFUNDED');
+  } catch {
+    throw new RefundError(
+      'NOT_REFUNDABLE',
+      `${ORDER_STATUS_LABEL[order.status]} 주문은 환불할 수 없습니다. 취소나 반품완료를 거쳐야 합니다.`,
+      409,
+    );
+  }
 
   /**
    * 재고를 되돌릴지는 **어디서 왔는지**가 정한다.

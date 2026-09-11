@@ -16,6 +16,7 @@ export const STATE_FILE = {
   cartA11y: 'test-results/.auth/cart-a11y.json',
   cartBudget: 'test-results/.auth/cart-budget.json',
   cartLayout: 'test-results/.auth/cart-layout.json',
+  cartLifecycle: 'test-results/.auth/cart-lifecycle.json',
 } as const;
 
 /**
