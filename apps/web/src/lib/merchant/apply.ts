@@ -1,7 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canApplyAsMerchant, brandSlugOf,
+  canApplyAsMerchant, brandSlugOf, OPEN_MERCHANT_STATUS,
+  type MerchantStatus,
   MERCHANT_APPLICATION_ERROR,
   type Actor, type MerchantApplicationErrorCode,
 } from '@shop/core';
@@ -18,7 +19,12 @@ export interface ApplicationView {
   readonly id: string;
   readonly name: string;
   readonly brandName: string | null;
-  readonly status: string;
+  /*
+   * **좁혀서 내보낸다.** 예전에는 `string` 이라 화면이 쓸 때마다 캐스팅했고,
+   * 그 캐스팅이 있는 한 상태가 하나 늘어도 타입이 아무 말을 안 한다.
+   * Prisma 의 enum 과 core 의 목록이 같은 것을 가리키므로 여기서 못 박는다.
+   */
+  readonly status: MerchantStatus;
   readonly createdAt: Date;
   readonly approvedAt: Date | null;
 }
@@ -55,7 +61,7 @@ export async function applyForMerchant(
    * 길을 막으면 반려가 곧 영구 거절이 된다.
    */
   const existing = await prisma.merchant.findFirst({
-    where: { applicantId: actor.id, status: { in: ['PENDING', 'APPROVED', 'SUSPENDED'] } },
+    where: { applicantId: actor.id, status: { in: [...OPEN_MERCHANT_STATUS] } },
     select: { id: true },
   });
   if (existing) throw new MerchantApplicationError('ALREADY_APPLIED', 409);

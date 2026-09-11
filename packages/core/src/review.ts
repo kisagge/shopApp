@@ -28,7 +28,16 @@ export function isSizeFit(value: string): value is SizeFit {
  * 배송이 끝나야 쓴다. 결제만 하고 받지도 않은 물건에 후기를 쓰게 두면
  * 그 후기는 상품이 아니라 기대에 대한 것이 된다.
  */
-const REVIEWABLE_STATUS: readonly OrderStatus[] = ['DELIVERED', 'CONFIRMED'];
+/**
+ * **내보낸다.** 조회는 불리언이 아니라 목록이 필요하다 — Prisma 의
+ * `status: { in: [...] }` 에 그대로 들어간다.
+ *
+ * 내보내지 않았더니 리뷰 쓸 것 목록(`getReviewableItems`)과 마이페이지 배지가
+ * 각자 `['DELIVERED', 'CONFIRMED']` 를 손으로 적었다. 값이 같아서 조용했지만,
+ * 여기 규칙을 바꾸면 **쓰기만 바뀌고 보여주는 쪽은 안 바뀐다** — 화면이
+ * "리뷰 쓰기" 를 권했는데 누르면 409 가 된다.
+ */
+export const REVIEWABLE_STATUS: readonly OrderStatus[] = ['DELIVERED', 'CONFIRMED'];
 
 export function isReviewableStatus(status: OrderStatus): boolean {
   return REVIEWABLE_STATUS.includes(status);

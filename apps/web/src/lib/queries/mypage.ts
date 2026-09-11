@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
-  gradeProgress, won, ORDER_STATUS, expiringSoonAmount,
+  gradeProgress, won, ORDER_STATUS, expiringSoonAmount, REVIEWABLE_STATUS,
   type MemberGrade, type OrderStatus, type Won,
 } from '@shop/core';
 
@@ -50,7 +50,7 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
     // 배송완료됐는데 아직 리뷰를 안 쓴 항목
     prisma.orderItem.count({
       where: {
-        order: { userId, status: { in: ['DELIVERED', 'CONFIRMED'] } },
+        order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
         review: null,
       },
     }),

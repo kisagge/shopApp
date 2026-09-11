@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
-import { ratingBreakdown, sizeFitSummary, averageRating } from '@shop/core';
+import { ratingBreakdown, sizeFitSummary, averageRating, REVIEWABLE_STATUS } from '@shop/core';
 import type { ReviewSort } from '@shop/contract';
 
 /**
@@ -219,7 +219,7 @@ export interface ReviewableItem {
 export async function getReviewableItems(userId: string): Promise<ReviewableItem[]> {
   const items = await prisma.orderItem.findMany({
     where: {
-      order: { userId, status: { in: ['DELIVERED', 'CONFIRMED'] } },
+      order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
       review: null,
     },
     orderBy: { order: { deliveredAt: 'desc' } },

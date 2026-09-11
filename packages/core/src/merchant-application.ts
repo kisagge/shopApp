@@ -69,6 +69,29 @@ export function brandSlugOf(name: string): string {
 export const MERCHANT_STATUS = ['PENDING', 'APPROVED', 'SUSPENDED', 'TERMINATED'] as const;
 export type MerchantStatus = (typeof MERCHANT_STATUS)[number];
 
+/**
+ * 아직 살아 있는 신청 — 이 상태면 다시 낼 수 없다.
+ *
+ * **해지(TERMINATED)만 빠진다.** 해지된 경우는 다시 낼 수 있어야 한다 —
+ * 고쳐서 다시 오는 길을 막으면 반려가 곧 영구 거절이 된다.
+ *
+ * **목록에서 빼는 쪽으로 적는다.** `['PENDING', 'APPROVED', 'SUSPENDED']` 라고
+ * 적으면 상태가 하나 늘 때 조용히 빠진다 — 새 상태가 '살아 있는 것' 인데도
+ * 재신청이 열린다. 빼는 것만 적으면 새 상태는 저절로 '살아 있는 것' 이 되고,
+ * 그것이 틀렸다면 여기를 고치게 된다.
+ *
+ * 화면과 서버가 각자 `['PENDING', 'APPROVED', 'SUSPENDED']` 를 적고 있었다.
+ * 값이 같아서 조용했지만 둘 중 하나만 고치면 어긋난다.
+ */
+const CLOSED_STATUS: readonly MerchantStatus[] = ['TERMINATED'];
+
+export const OPEN_MERCHANT_STATUS: readonly MerchantStatus[] = MERCHANT_STATUS.filter(
+  (s) => !CLOSED_STATUS.includes(s),
+);
+
+export const isOpenApplication = (status: MerchantStatus): boolean =>
+  OPEN_MERCHANT_STATUS.includes(status);
+
 export const MERCHANT_STATUS_LABEL: Readonly<Record<MerchantStatus, string>> = {
   PENDING: '승인 대기',
   APPROVED: '정상',

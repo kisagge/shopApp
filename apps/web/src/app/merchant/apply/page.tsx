@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation';
 import { getViewer } from '~/lib/viewer';
 import Link from 'next/link';
 import type { Metadata } from 'next';
-import { MERCHANT_STATUS_LABEL } from '@shop/core';
-import type { MerchantStatusInput } from '@shop/contract';
+import { MERCHANT_STATUS_LABEL, isOpenApplication } from '@shop/core';
 import { getMyApplication } from '~/lib/merchant/apply';
 import { MerchantApplyForm } from '~/components/merchant-apply-form';
 import { getT } from '~/lib/i18n/server';
@@ -30,8 +29,8 @@ export default async function MerchantApplyPage() {
    */
   if (session.merchantId !== null) redirect('/admin');
 
-  const open =
-    application !== null && ['PENDING', 'APPROVED', 'SUSPENDED'].includes(application.status);
+  // 살아 있는 신청인지는 core 가 정한다 — 화면과 서버가 따로 적다가 어긋난다
+  const open = application !== null && isOpenApplication(application.status);
 
   return (
     <div className="mx-auto w-full max-w-[640px] px-4 pb-24 md:px-10">
@@ -48,8 +47,7 @@ export default async function MerchantApplyPage() {
           className="flex flex-col gap-3 rounded-md border border-[var(--border)] p-6"
         >
           <h2 id="status-title" className="text-[15px] font-semibold">
-            {application.name} — {MERCHANT_STATUS_LABEL[application.status as MerchantStatusInput]
-              ?? application.status}
+            {application.name} — {MERCHANT_STATUS_LABEL[application.status]}
           </h2>
           <dl className="grid grid-cols-[92px_1fr] gap-y-2 text-[13px]">
             <dt className="text-[var(--fg-muted)]">{t('merch.brandSection')}</dt>
