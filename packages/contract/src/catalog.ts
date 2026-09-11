@@ -105,3 +105,19 @@ export const catalogQuerySchema = z.object({
   brand: brandValues,
 });
 export type CatalogQuery = z.infer<typeof catalogQuerySchema>;
+
+/**
+ * 다음 쪽으로 넘어갈 때 **들고 가야 하는 조건들.**
+ *
+ * `cursor` 만 빼고 전부다. 목록은 계약에서 뽑는다 — 손으로 적어 두었더니
+ * 실제로 샜다. "더 보기" 가 `q`·`sort`·`minPrice`·`maxPrice` 넷만 들고
+ * 가면서 **색·사이즈·브랜드·가격대 프리셋 넷을 흘렸고**, 그래서 블랙으로
+ * 좁혀 놓고 더 보기를 누르면 조용히 전체 목록의 다음 쪽이 나왔다.
+ * 사용자는 같은 목록을 보고 있다고 믿은 채 다른 목록을 본다.
+ *
+ * 조건이 하나 늘면 이 목록도 저절로 는다.
+ */
+export const CATALOG_CARRY_KEYS = Object.keys(catalogQuerySchema.shape).filter(
+  (key) => key !== 'cursor',
+) as readonly Exclude<keyof CatalogQuery, 'cursor'>[];
+
