@@ -82,7 +82,7 @@ export default async function AdminOrderDetail({
                 <span className="text-xs text-[var(--fg-muted)]">— 내 가맹점 상품만</span>
               )}
             </div>
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="주문에 포함된 상품">
               <table className="data-table">
                 <caption className="sr-only">주문에 포함된 상품</caption>
                 <thead>
@@ -205,7 +205,7 @@ export default async function AdminOrderDetail({
             className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
           >
             <h2 id="log-title" className="mb-4 text-base font-semibold">처리 이력</h2>
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="주문 상태 변경 이력">
               <table className="data-table">
                 <caption className="sr-only">주문 상태 변경 이력</caption>
                 <thead>

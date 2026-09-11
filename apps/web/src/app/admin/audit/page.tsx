@@ -171,7 +171,7 @@ export default async function AdminAuditPage({
               {filtered ? '조건에 맞는 기록이 없습니다.' : '아직 기록된 동작이 없습니다.'}
             </p>
           ) : (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="관리자 동작 기록">
               <table>
                 <caption className="sr-only">
                   관리자 동작 기록 {filtered && '(필터 적용됨)'}

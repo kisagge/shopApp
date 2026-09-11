@@ -46,7 +46,12 @@ export function CouponTable({
       표는 안에서 잘 스크롤되는데 페이지가 1008px 이 되어 통째로 옆으로
       밀렸다. 눈으로는 표 말고 아무것도 안 보이니 원인을 찾기 어렵다.
     */
-    <div className="table-scroll relative rounded-md border border-[var(--border)] bg-[var(--bg)]">
+    <div
+      className="table-scroll relative rounded-md border border-[var(--border)] bg-[var(--bg)]"
+      role="region"
+      aria-label="발행한 쿠폰 목록"
+      tabIndex={0}
+    >
       {/*
         **폭을 손으로 정하지 않는다.** 860px 으로 못 박아 두었는데 칸 여덟에는
         모자라서, 768px 에서도 "10,000원" 과 "전체" 가 두 줄로 섰다. 얼마가

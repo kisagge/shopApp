@@ -199,7 +199,7 @@ export default async function AdminOrdersPage({
                 기준점이 없으면 스크롤 상자를 빠져나가 문서를 늘린다 —
                 쿠폰 표에서 같은 것에 당했다.
               */}
-              <div className="table-scroll">
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="주문 목록">
                 <table className="w-full">
                   <caption className="sr-only">주문 목록</caption>
                 <thead>

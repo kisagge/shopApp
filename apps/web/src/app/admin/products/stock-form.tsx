@@ -58,7 +58,7 @@ export function StockForm({ productId, variants }: { productId: string; variants
 
   return (
     <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-4">
-      <div className="table-scroll">
+      <div className="table-scroll" tabIndex={0} role="region" aria-label="옵션별 재고">
         <table>
           <caption className="sr-only">옵션별 재고</caption>
           <thead>

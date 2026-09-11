@@ -73,7 +73,7 @@ export default async function AdminUsersPage({
               조건에 맞는 회원이 없습니다.
             </p>
           ) : (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="회원 목록">
               <table>
                 <caption className="sr-only">회원 목록</caption>
                 <thead>

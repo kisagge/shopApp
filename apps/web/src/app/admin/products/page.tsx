@@ -96,7 +96,7 @@ export default async function AdminProductsPage({
               {filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
             </p>
           ) : (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="등록된 상품 목록">
               <table>
                 <caption className="sr-only">등록된 상품 목록</caption>
                 <thead>

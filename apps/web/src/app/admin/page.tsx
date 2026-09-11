@@ -169,7 +169,7 @@ export default async function AdminDashboard({
                 {d.rangeLabel} 판매 기록이 없습니다.
               </p>
             ) : (
-              <div className="table-scroll">
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="판매 상위 상품">
                 <table className="data-table">
                   <caption className="sr-only">{d.rangeLabel} 판매 상위 상품</caption>
                   <thead>
@@ -211,7 +211,7 @@ export default async function AdminDashboard({
             {d.recentOrders.length === 0 ? (
               <p className="py-10 text-center text-[13px] text-[var(--fg-muted)]">주문이 없습니다.</p>
             ) : (
-              <div className="table-scroll">
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="최근 접수된 주문">
                 <table className="data-table">
                   <caption className="sr-only">최근 접수된 주문</caption>
                   <thead>

@@ -124,6 +124,8 @@ export async function ProductGrid({
                 productName={p.name}
                 initialWishlisted={wishlisted.has(p.id)}
                 loggedIn={viewer !== null}
+                // 매대에서는 사진 위에 뜬다 — 사진은 테마를 타지 않는다
+                variant="floating"
               />
             }
           />

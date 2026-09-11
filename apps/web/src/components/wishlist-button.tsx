@@ -23,12 +23,25 @@ export function WishlistButton({
   initialWishlisted,
   loggedIn,
   size = 'sm',
+  variant = 'plain',
 }: {
   productId: string;
   productName: string;
   initialWishlisted: boolean;
   loggedIn: boolean;
   size?: 'sm' | 'md';
+  /**
+   * 어디에 얹히는가.
+   *
+   * **사진 위에 뜰 때(`floating`)는 테마를 타지 않는다.** 상품 사진은 밝든
+   * 어둡든 그 사진이라, 그 위의 알약은 늘 밝아야 읽힌다.
+   *
+   * **글 사이에 설 때(`plain`)는 테마를 탄다.** 상세 화면의 이 단추는
+   * 사진이 아니라 화면 바탕 위에 있는데, 늘 밝게 두었더니 어두운 화면에서
+   * 흰 동그라미로 떴다 — 바로 옆 공유 단추는 테마를 타고 있어서, 둘이
+   * 나란히 서서 서로 다른 화면에서 온 것처럼 보였다.
+   */
+  variant?: 'plain' | 'floating';
 }) {
   const t = useT();
   const router = useRouter();
@@ -37,6 +50,13 @@ export function WishlistButton({
   const [error, setError] = useState<string | null>(null);
 
   const box = size === 'md' ? 'h-11 w-11 text-[20px]' : 'h-9 w-9 text-[16px]';
+
+  const skin =
+    variant === 'floating'
+      ? 'border-n-900/12 bg-n-0/85 backdrop-blur-sm hover:bg-n-0'
+      : 'border-[var(--border-strong)] hover:bg-[var(--surface)]';
+  // 사진 위에서는 늘 밝은 알약 위라 진하게, 글 사이에서는 옆의 공유 단추와 같게
+  const glyph = variant === 'floating' ? 'text-n-600' : 'text-[var(--fg-secondary)]';
 
   async function toggle() {
     if (!loggedIn) {
@@ -81,14 +101,9 @@ export function WishlistButton({
             ? t('wish.remove', { name: productName })
             : t('wish.add', { name: productName })
         }
-        className={`flex items-center justify-center rounded-full border border-n-900/12 bg-n-0/85 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${box}`}
+        className={`flex items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${skin} ${box}`}
       >
-        {/*
-          **알약이 늘 밝다**(사진 위에 떠야 해서). 그 위의 하트가 n-400 이라
-          2.44:1 이었다 — 찜하는 단추인지 알아보기 어려웠다. 알약이 테마를
-          안 타므로 글자도 안 타는 값으로 두되, 읽히는 쪽으로 내린다.
-        */}
-        <span aria-hidden="true" className={wishlisted ? 'text-accent' : 'text-n-600'}>
+        <span aria-hidden="true" className={wishlisted ? 'text-accent' : glyph}>
           {wishlisted ? '♥' : '♡'}
         </span>
       </button>

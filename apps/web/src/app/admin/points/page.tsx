@@ -72,7 +72,7 @@ export default async function AdminPointsPage() {
               모든 회원의 잔액이 원장과 일치합니다.
             </p>
           ) : (
-            <div className="table-scroll">
+            <div className="table-scroll" tabIndex={0} role="region" aria-label="잔액과 원장이 어긋난 회원">
               <table className="data-table">
                 <caption className="sr-only">잔액과 원장이 어긋난 회원</caption>
                 <thead>

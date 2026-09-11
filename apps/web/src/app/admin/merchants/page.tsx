@@ -55,7 +55,7 @@ export default async function AdminMerchantsPage() {
           </p>
         ) : (
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
-          <div className="table-scroll">
+          <div className="table-scroll" tabIndex={0} role="region" aria-label="가맹점 목록">
             <table>
               <caption className="sr-only">가맹점 목록</caption>
               <thead>
