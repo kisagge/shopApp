@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  normalizeSearchTerm, normalizePriceRange, emptyResultReason,
+  normalizeSearchTerm, normalizePriceRange, emptyResultReason, searchWords, MAX_SEARCH_WORDS,
   isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH, sellingPriceOf,
   PRICE_BUCKET, resolvePriceRange,
 } from '../src/catalog';
@@ -193,5 +193,42 @@ describe('가격 구간 프리셋', () => {
 
   it('아무것도 없으면 범위도 없다', () => {
     expect(resolvePriceRange({})).toEqual({ min: null, max: null, bucket: null });
+  });
+});
+
+describe('searchWords — 낱말이 붙어 있지 않아도 찾는다', () => {
+  it('빈칸으로 쪼갠다', () => {
+    /*
+     * 예전에는 검색어 전체를 한 덩어리로 봤다. "블렌드 코트" 는 1건을 찾는데
+     * **"울 코트" 는 0건**이었다 — 두 낱말이 다 있는데 사이에 다른 말이
+     * 끼어 있었기 때문이다. 한국어로 물건을 찾을 때 아주 자연스러운 말이
+     * 0건이면 손님은 안 파는 물건이라고 읽는다.
+     */
+    expect(searchWords('울 코트')).toEqual(['울', '코트']);
+    expect(searchWords('코트 울')).toEqual(['코트', '울']);
+  });
+
+  it('소문자로 맞춘다 — searchText 가 소문자로 저장돼 있다', () => {
+    expect(searchWords('MOOR 니트')).toEqual(['moor', '니트']);
+  });
+
+  it('한 낱말이면 그대로다', () => {
+    expect(searchWords('코트')).toEqual(['코트']);
+  });
+
+  it('한 글자는 버리되, 그 한 글자로 뜻이 서면 남긴다', () => {
+    // "울" 은 낱말이고 "s" 는 아니다 — normalizeSearchTerm 과 같은 잣대다
+    expect(searchWords('울 코트')).toContain('울');
+    expect(searchWords('s coat')).toEqual(['coat']);
+  });
+
+  it('낱말이 너무 많으면 잘라 낸다 — 조건이 무한정 늘지 않게', () => {
+    const many = Array.from({ length: 20 }, (_, i) => `낱말${i}`).join(' ');
+    expect(searchWords(many)).toHaveLength(MAX_SEARCH_WORDS);
+  });
+
+  it('남는 낱말이 없으면 검색어를 통째로 쓴다', () => {
+    // 빈손으로 답하지 않는다 — 무엇이든 찾아 보려던 사람이다
+    expect(searchWords('a b')).toEqual(['a b']);
   });
 });

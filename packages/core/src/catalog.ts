@@ -68,6 +68,41 @@ export function standsAlone(term: string): boolean {
   return STANDS_ALONE.test(term);
 }
 
+/**
+ * 검색어를 낱말로 쪼갠다.
+ *
+ * **붙어 있어야만 찾던 것을 고친다.** 예전에는 검색어 전체를 한 덩어리로
+ * 보고 `searchText` 안에 그 문자열이 통째로 들어 있는지만 봤다. 그래서
+ * "블렌드 코트" 는 1건을 찾는데 **"울 코트" 는 0건**이었다 — "오버사이즈 울
+ * 블렌드 코트" 안에 두 낱말이 다 있는데도 사이에 다른 말이 끼어 있었기
+ * 때문이다. 낱말 순서를 바꾼 "코트 울" 도 마찬가지였다.
+ *
+ * 한국어로 물건을 찾을 때 "울 코트" 는 아주 자연스러운 말이다. 그것이 0건이면
+ * 손님은 안 파는 물건이라고 읽는다.
+ *
+ * **모두 들어 있어야 한다(AND).** 하나라도 걸리면 내놓는 방식(OR)으로 하면
+ * "코트 바지" 가 매대를 통째로 가져온다 — 좁히려고 낱말을 더했는데 넓어진다.
+ *
+ * **한 글자짜리는 버린다** — 단, 그 한 글자로 뜻이 서는 문자(한글 음절·한자·
+ * 가나)는 남긴다. `normalizeSearchTerm` 이 검색어 전체에 대해 쓰는 것과 같은
+ * 잣대다. "울" 은 낱말이고 "s" 는 아니다.
+ *
+ * 남는 낱말이 없으면 원래 검색어를 그대로 한 낱말로 본다 — 무엇이든 찾아
+ * 보려던 사람에게 빈손으로 답하지 않는다.
+ */
+export const MAX_SEARCH_WORDS = 6;
+
+export function searchWords(term: string): string[] {
+  const words = term
+    .toLowerCase()
+    .split(' ')
+    .filter((w) => w.length > 0)
+    .filter((w) => w.length >= MIN_SEARCH_LENGTH || standsAlone(w))
+    .slice(0, MAX_SEARCH_WORDS);
+
+  return words.length > 0 ? words : [term.toLowerCase()];
+}
+
 export function normalizeSearchTerm(raw: string): string | null {
   const trimmed = raw.trim().replace(/\s+/g, ' ');
   if (trimmed.length === 0) return null;

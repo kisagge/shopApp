@@ -1,6 +1,6 @@
 import 'server-only';
 import { Prisma } from '@shop/db';
-import { discountRateOf, won, VISIBLE_STATUS, type Won } from '@shop/core';
+import { discountRateOf, searchWords, won, VISIBLE_STATUS, type Won } from '@shop/core';
 
 /*
  * 카탈로그 질의가 공유하는 바닥.
@@ -127,4 +127,22 @@ export function toListItem(p: ListRow, now: number): ProductListItem {
     imageAlt: image?.alt,
     blurDataUrl: image?.blurDataUrl ?? undefined,
   };
+}
+
+/**
+ * 검색어를 Prisma 조건으로 바꾼다.
+ *
+ * **네 곳이 같은 조건을 써야 한다** — 목록·자동완성·색과 사이즈 칩·브랜드 칩.
+ * 하나만 고치면 "울 코트" 로 상품 하나가 나오는데 그 옆 브랜드 칩은 비는
+ * 식으로 화면이 스스로 어긋난다.
+ *
+ * 낱말로 쪼개는 규칙은 core 가 정한다(`searchWords`). 여기서는 그 낱말들을
+ * 전부 담고 있어야 한다는 조건으로 옮기기만 한다.
+ *
+ * **상품명과 브랜드명을 합쳐 둔 한 컬럼을 본다.** 두 테이블에 OR 를 걸면
+ * Postgres 가 어느 인덱스도 못 쓰고 전체를 훑는다. 소문자로 저장해 두므로
+ * 낱말도 소문자로 맞춘다(searchWords 가 한다).
+ */
+export function searchWhere(term: string): Prisma.ProductWhereInput {
+  return { AND: searchWords(term).map((word) => ({ searchText: { contains: word } })) };
 }

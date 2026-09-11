@@ -69,12 +69,12 @@ describe('자동완성', () => {
 
   it('대문자로 쳐도 소문자로 찾는다 — searchText 가 소문자다', async () => {
     await getSearchSuggestions('STUDIO');
-    expect(db.product.findMany.mock.calls[0]![0].where.searchText).toEqual({ contains: 'studio' });
+    expect(db.product.findMany.mock.calls[0]![0].where.AND).toEqual([{ searchText: { contains: 'studio' } }]);
   });
 
   it('앞뒤 공백을 떼고 찾는다', async () => {
     await getSearchSuggestions('  코트  ');
-    expect(db.product.findMany.mock.calls[0]![0].where.searchText).toEqual({ contains: '코트' });
+    expect(db.product.findMany.mock.calls[0]![0].where.AND).toEqual([{ searchText: { contains: '코트' } }]);
   });
 
   it('숨긴 상품은 제안하지 않는다 — 눌러도 갈 곳이 없다', async () => {

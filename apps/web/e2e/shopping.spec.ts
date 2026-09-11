@@ -86,6 +86,52 @@ test('브랜드 이름으로도 찾는다 — 브랜드명을 상품 행에 복�
   await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
 });
 
+test('낱말이 떨어져 있어도 찾는다', async ({ page }) => {
+  /*
+   * **"울 코트" 가 0건이었다.** 검색어 전체를 한 덩어리로 보고 그 문자열이
+   * 통째로 들어 있는지만 봤기 때문이다 — "오버사이즈 울 블렌드 코트" 안에
+   * 두 낱말이 다 있는데 사이에 "블렌드" 가 끼어 있었다. 한국어로 물건을 찾을
+   * 때 아주 자연스러운 말이 0건이면 손님은 안 파는 물건이라고 읽는다.
+   */
+  await page.goto('/search?q=' + encodeURIComponent('울 코트'));
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+
+  // 순서를 바꿔도 같은 것을 찾아야 한다 — 낱말에는 순서가 없다
+  await page.goto('/search?q=' + encodeURIComponent('코트 울'));
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+});
+
+test('낱말을 더하면 좁혀진다 — 넓어지지 않는다', async ({ page }) => {
+  /*
+   * 하나라도 걸리면 내놓는 방식(OR)으로 쪼개면 낱말을 더할수록 결과가
+   * 늘어난다. 좁히려고 더한 것인데 반대로 도는 셈이다.
+   */
+  const count = async (q: string) => {
+    await page.goto('/search?q=' + encodeURIComponent(q));
+    return page.locator('#main a[href^="/product/"]').count();
+  };
+
+  const wide = await count('코트');
+  const narrow = await count('울 코트');
+  expect(wide, '검색이 아무것도 못 찾고 있다').toBeGreaterThan(0);
+  expect(narrow, '낱말을 더했는데 결과가 늘었다').toBeLessThanOrEqual(wide);
+  expect(narrow).toBeGreaterThan(0);
+});
+
+test('브랜드 칩도 같은 조건으로 좁혀진다', async ({ page }) => {
+  /*
+   * 목록·자동완성·색과 사이즈 칩·브랜드 칩이 각자 조건을 들고 있었다.
+   * 하나만 고치면 상품은 나오는데 그 옆 칩은 비는 식으로 화면이 스스로
+   * 어긋난다.
+   */
+  await page.goto('/search?q=' + encodeURIComponent('울 코트'));
+  await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
+
+  await page.getByText('상품 좁혀 보기').click();
+  // 결과가 있는 검색에서 좁힐 거리가 하나도 없으면 조건이 어긋난 것이다
+  await expect(page.locator('#main')).toContainText(/브랜드|색|사이즈/);
+});
+
 test('결과가 없으면 무엇을 풀어야 하는지 알려 준다', async ({ page }) => {
   await page.goto('/search?q=존재하지않는상품명입니다');
 

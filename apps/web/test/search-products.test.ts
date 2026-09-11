@@ -24,18 +24,27 @@ beforeEach(() => {
 const whereOf = () => db.product.findMany.mock.calls[0]?.[0].where;
 const orderOf = () => db.product.findMany.mock.calls[0]?.[0].orderBy;
 
+/**
+ * 검색어가 만든 조건. 낱말마다 하나씩 달린다.
+ *
+ * **한 덩어리로 걸던 것을 낱말로 쪼갰다** — "울 코트" 가 0건이던 것을 고치면서다.
+ * 그래서 조건이 `searchText` 하나가 아니라 `AND` 배열이 된다.
+ */
+const searchTextOf = () =>
+  ((whereOf()?.AND ?? []) as { searchText?: unknown }[]).map((c) => c.searchText);
+
 describe('검색어', () => {
   it('상품명과 브랜드명을 합친 한 컬럼을 본다', async () => {
     // 두 테이블에 OR 를 걸면 Postgres 가 어느 인덱스도 못 쓴다.
     // 5만 행 기준 1196 → 14 buffers 차이였다.
     await searchProducts({ q: '코트' });
-    expect(whereOf().searchText).toEqual({ contains: '코트' });
+    expect(searchTextOf()).toEqual([{ contains: '코트' }]);
     expect(whereOf().OR).toBeUndefined();
   });
 
   it('소문자로 맞춰 찾는다 — 저장도 소문자다', async () => {
     await searchProducts({ q: 'MOOR' });
-    expect(whereOf().searchText).toEqual({ contains: 'moor' });
+    expect(searchTextOf()).toEqual([{ contains: 'moor' }]);
   });
 
   it('한글 한 글자도 검색어로 친다 — 한 글자가 낱말이다', async () => {
@@ -46,13 +55,22 @@ describe('검색어', () => {
      */
     const page = await searchProducts({ q: '울' });
     expect(page.term).toBe('울');
-    expect(whereOf().searchText).toEqual({ contains: '울' });
+    expect(searchTextOf()).toEqual([{ contains: '울' }]);
+  });
+
+  it('낱말마다 조건을 하나씩 단다 — 떨어져 있어도 찾는다', async () => {
+    /*
+     * 한 덩어리로 걸면 **"울 코트" 가 0건**이다. "오버사이즈 울 블렌드 코트"
+     * 안에 두 낱말이 다 있는데 사이에 "블렌드" 가 끼어 있기 때문이다.
+     */
+    await searchProducts({ q: '울 코트' });
+    expect(searchTextOf()).toEqual([{ contains: '울' }, { contains: '코트' }]);
   });
 
   it('라틴 한 글자는 여전히 검색어로 치지 않는다', async () => {
     const page = await searchProducts({ q: 'a' });
     expect(page.term).toBeNull();
-    expect(whereOf().searchText).toBeUndefined();
+    expect(searchTextOf()).toEqual([]);
   });
 
   it('앞뒤 공백을 정리해 쓴다', async () => {

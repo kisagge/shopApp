@@ -5,7 +5,7 @@ import {
   canSuggest, popularTerms, normalizeSearchTerm, SUGGEST_LIMIT,
   type SearchTermStat,
 } from '@shop/core';
-import { onDisplay, sellableBrand } from './shelf';
+import { onDisplay, sellableBrand, searchWhere } from './shelf';
 
 export interface SearchSuggestion {
   readonly kind: 'product' | 'brand' | 'category';
@@ -28,7 +28,8 @@ const suggestRows = cachedRead(
   async (lowered: string, limit: number) => {
     const [products, brands, categories] = await Promise.all([
       prisma.product.findMany({
-        where: { ...onDisplay(), brand: sellableBrand(), searchText: { contains: lowered } },
+        // 목록과 같은 조건을 쓴다 — 자동완성이 찾아 준 것을 눌렀는데 0건이면 안 된다
+        where: { ...onDisplay(), brand: sellableBrand(), ...searchWhere(lowered) },
         orderBy: [{ soldCount: 'desc' }, { id: 'desc' }],
         take: limit,
         select: { slug: true, name: true },

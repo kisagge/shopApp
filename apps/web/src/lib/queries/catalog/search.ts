@@ -7,7 +7,7 @@ import {
   type ProductSort, type Facets, type FacetValue, type FacetKey,
 } from '@shop/core';
 import {
-  onDisplay, sellableBrand, listSelect, toListItem, type ProductListItem,
+  onDisplay, sellableBrand, searchWhere, listSelect, toListItem, type ProductListItem,
 } from './shelf';
 
 export interface CatalogFilter {
@@ -186,10 +186,7 @@ async function catalogPage(q: CatalogQuery) {
   }
 
   if (q.term) {
-    // 상품명과 브랜드명을 합쳐 둔 한 컬럼을 본다. 두 테이블에 OR 를 걸면
-    // Postgres 가 어느 인덱스도 못 쓰고 전체를 훑는다.
-    // 소문자로 저장해 두므로 여기서도 소문자로 맞춘다.
-    where.searchText = { contains: q.term.toLowerCase() };
+    Object.assign(where, searchWhere(q.term));
   }
 
   const [rows, total] = await Promise.all([
@@ -239,7 +236,7 @@ const facetRows = cachedRead(
     const scope: Prisma.ProductWhereInput = { ...onDisplay(), brand: sellableBrand() };
     if (categoryIds) scope.categoryId = { in: categoryIds };
     if (brandSlug) scope.brand = { ...sellableBrand(), slug: brandSlug };
-    if (term) scope.searchText = { contains: term.toLowerCase() };
+    if (term) Object.assign(scope, searchWhere(term));
 
     return prisma.productOptionValue.findMany({
       where: {
@@ -286,7 +283,7 @@ const brandRows = cachedRead(
   async (categoryIds: string[] | null, term: string | null) => {
     const where: Prisma.ProductWhereInput = { ...onDisplay(), brand: sellableBrand() };
     if (categoryIds) where.categoryId = { in: categoryIds };
-    if (term) where.searchText = { contains: term.toLowerCase() };
+    if (term) Object.assign(where, searchWhere(term));
 
     const rows = await prisma.product.findMany({
       where,
