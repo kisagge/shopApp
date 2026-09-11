@@ -82,38 +82,40 @@ export default async function AdminOrderDetail({
                 <span className="text-xs text-[var(--fg-muted)]">— 내 가맹점 상품만</span>
               )}
             </div>
-            <table className="data-table">
-              <caption className="sr-only">주문에 포함된 상품</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">상품</th>
-                  <th scope="col" className="w-24 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">단가</th>
-                  <th scope="col" className="w-14 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수량</th>
-                  <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">합계</th>
-                  <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.items.map((i, idx) => (
-                  <tr key={idx} className="border-b border-[var(--surface-2)]">
-                    <td className="py-3.5">
-                      <span className="block text-[13px]">{i.productName}</span>
-                      <span className="block text-[11px] text-[var(--fg-muted)]">
-                        {i.brandName} · {i.optionLabel}
-                      </span>
-                    </td>
-                    <td className="tnum py-3.5 text-right text-[13px]">{format(won(i.unitPrice))}</td>
-                    <td className="tnum py-3.5 text-right text-[13px]">{i.quantity}</td>
-                    <td className="tnum py-3.5 text-right text-[13px] font-semibold">
-                      {format(won(i.subtotal))}
-                    </td>
-                    <td className="py-3.5 text-center">
-                      <Badge tone="neutral">{ORDER_STATUS_LABEL[i.status]}</Badge>
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table">
+                <caption className="sr-only">주문에 포함된 상품</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">상품</th>
+                    <th scope="col" className="w-24 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">단가</th>
+                    <th scope="col" className="w-14 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수량</th>
+                    <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">합계</th>
+                    <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {order.items.map((i, idx) => (
+                    <tr key={idx} className="border-b border-[var(--surface-2)]">
+                      <td className="py-3.5">
+                        <span className="block text-[13px]">{i.productName}</span>
+                        <span className="block text-[11px] text-[var(--fg-muted)]">
+                          {i.brandName} · {i.optionLabel}
+                        </span>
+                      </td>
+                      <td className="tnum py-3.5 text-right text-[13px]">{format(won(i.unitPrice))}</td>
+                      <td className="tnum py-3.5 text-right text-[13px]">{i.quantity}</td>
+                      <td className="tnum py-3.5 text-right text-[13px] font-semibold">
+                        {format(won(i.subtotal))}
+                      </td>
+                      <td className="py-3.5 text-center">
+                        <Badge tone="neutral">{ORDER_STATUS_LABEL[i.status]}</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <div className="grid gap-5 md:grid-cols-2">
@@ -203,33 +205,35 @@ export default async function AdminOrderDetail({
             className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
           >
             <h2 id="log-title" className="mb-4 text-base font-semibold">처리 이력</h2>
-            <table className="data-table">
-              <caption className="sr-only">주문 상태 변경 이력</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="w-40 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">일시</th>
-                  <th scope="col" className="w-32 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">처리자</th>
-                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">내용</th>
-                </tr>
-              </thead>
-              <tbody>
-                {order.statusLogs.map((l, idx) => (
-                  <tr key={idx} className="border-b border-[var(--surface-2)]">
-                    <td className="tnum py-2.5 text-xs text-[var(--fg-secondary)]">
-                      {l.createdAt.toLocaleString('ko-KR')}
-                    </td>
-                    <td className="py-2.5 text-xs">
-                      {l.actor === 'system' ? '시스템' : `${l.actor.slice(0, 8)}…`}
-                    </td>
-                    <td className="py-2.5 text-xs">
-                      {l.from === l.to
-                        ? l.note
-                        : `${l.from ? ORDER_STATUS_LABEL[l.from] : '신규'} → ${ORDER_STATUS_LABEL[l.to]}${l.note ? ` (${l.note})` : ''}`}
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table">
+                <caption className="sr-only">주문 상태 변경 이력</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="w-40 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">일시</th>
+                    <th scope="col" className="w-32 pb-2.5 text-left text-xs text-[var(--fg-secondary)]">처리자</th>
+                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">내용</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {order.statusLogs.map((l, idx) => (
+                    <tr key={idx} className="border-b border-[var(--surface-2)]">
+                      <td className="tnum py-2.5 text-xs text-[var(--fg-secondary)]">
+                        {l.createdAt.toLocaleString('ko-KR')}
+                      </td>
+                      <td className="py-2.5 text-xs">
+                        {l.actor === 'system' ? '시스템' : `${l.actor.slice(0, 8)}…`}
+                      </td>
+                      <td className="py-2.5 text-xs">
+                        {l.from === l.to
+                          ? l.note
+                          : `${l.from ? ORDER_STATUS_LABEL[l.from] : '신규'} → ${ORDER_STATUS_LABEL[l.to]}${l.note ? ` (${l.note})` : ''}`}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
         </div>
 

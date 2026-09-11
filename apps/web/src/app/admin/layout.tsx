@@ -1,9 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { hasPermission, USER_ROLE_LABEL, type Permission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { AdminSignOut } from '~/components/admin-sign-out';
+import { AdminNav } from '~/components/admin/admin-nav';
 import { NO_INDEX } from '~/lib/no-index';
 
 /** 운영 화면은 검색 결과에 뜰 일이 없다 */
@@ -48,41 +47,23 @@ export default async function AdminLayout({ children }: { children: ReactNode })
   const actor = await requireAdmin();
 
   return (
-    <div className="flex min-h-dvh">
-      <div className="flex w-[232px] shrink-0 flex-col gap-7 bg-dark-bg px-4 py-6">
-        <p className="flex items-baseline gap-2 px-1.5">
-          <span className="font-serif text-[19px] font-medium tracking-[0.16em] text-n-0">PLAIN</span>
-          <span className="text-[10px] font-medium tracking-[0.14em] text-dark-muted">ADMIN</span>
-        </p>
-
-        <nav aria-label="관리자 메뉴" className="flex-1">
-          <ul className="flex flex-col gap-0.5">
-            {/* 권한 없는 메뉴는 아예 그리지 않는다. 눌러 보고 튕기는 것보다 낫다. */}
-            {NAV.filter((n) => hasPermission(actor, n.permission)).map((n) => (
-              <li key={n.href}>
-                <Link
-                  href={n.href}
-                  className="flex min-h-11 items-center rounded-[5px] px-3.5 text-sm text-dark-muted no-underline hover:bg-dark-surface hover:text-n-0"
-                >
-                  {n.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-
-        <div className="border-t border-dark-surface2 pt-3">
-          <p className="px-3.5 pb-2">
-            <span className="block text-[13px] font-medium text-n-0">
-              {USER_ROLE_LABEL[actor.role]}
-            </span>
-            {actor.merchantId && (
-              <span className="block text-[11px] text-dark-muted">가맹점 계정</span>
-            )}
-          </p>
-          <AdminSignOut />
-        </div>
-      </div>
+    /*
+     * **좁은 화면에서는 메뉴가 위로 간다.** 옆에 세우면 232px 을 먹어 본문에
+     * 143px 밖에 안 남고, 한글이 한 자씩 줄바꿈돼 세로로 선다.
+     *
+     * `min-w-0` 이 본문에 붙어 있는 이유 — flex 자식은 기본으로 자기 내용보다
+     * 좁아지지 않는다. 없으면 표가 상자를 밀어내 화면 전체가 가로로 스크롤된다.
+     */
+    <div className="flex min-h-dvh flex-col md:flex-row">
+      <AdminNav
+        items={NAV.filter((n) => hasPermission(actor, n.permission)).map((n) => ({
+          // 권한 없는 메뉴는 아예 그리지 않는다. 눌러 보고 튕기는 것보다 낫다.
+          href: n.href,
+          label: n.label,
+        }))}
+        roleLabel={USER_ROLE_LABEL[actor.role]}
+        merchant={actor.merchantId !== null}
+      />
 
       <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface)]">{children}</div>
     </div>

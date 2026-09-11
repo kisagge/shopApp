@@ -107,61 +107,63 @@ export default async function SettlementsPage({
               이 기간에 정산할 가맹점이 없습니다.
             </p>
           ) : (
-            <table className="data-table">
-              <caption className="sr-only">{yearMonth} 가맹점별 정산 초안</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
-                  <th scope="col" className="w-20 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">건수</th>
-                  <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">확정 매출</th>
-                  <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
-                  <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">환불</th>
-                  <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
-                  <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
-                </tr>
-              </thead>
-              <tbody>
-                {drafts.map((d) => (
-                  <tr key={d.merchantId} className="border-b border-[var(--surface-2)] last:border-0">
-                    <td className="py-3 text-[13px]">
-                      {d.merchantName}
-                      <span className="ml-1.5 text-[11px] text-[var(--fg-muted)]">
-                        수수료 {d.commissionPercent}%
-                      </span>
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px]">{d.orderCount}</td>
-                    <td className="tnum py-3 text-right text-[13px]">{format(d.grossAmount)}</td>
-                    <td className="tnum py-3 text-right text-[13px] text-accent">
-                      −{format(d.commissionAmount)}
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px] text-accent">
-                      {d.refundAmount > 0 ? `−${format(d.refundAmount)}` : '—'}
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px] font-semibold">
-                      {format(d.netAmount)}
-                    </td>
-                    <td className="py-3 text-center">
-                      {d.existingStatus ? (
-                        <Badge tone={d.existingStatus === 'PAID' ? 'success' : 'neutral'}>
-                          {SETTLEMENT_STATUS_LABEL[d.existingStatus]}
-                        </Badge>
-                      ) : (
-                        <span className="text-[11px] text-[var(--fg-muted)]">미확정</span>
-                      )}
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table">
+                <caption className="sr-only">{yearMonth} 가맹점별 정산 초안</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
+                    <th scope="col" className="w-20 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">건수</th>
+                    <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">확정 매출</th>
+                    <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
+                    <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">환불</th>
+                    <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
+                    <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th scope="row" colSpan={5} className="pt-3 text-right text-xs text-[var(--fg-secondary)]">
-                    지급액 합계
-                  </th>
-                  <td className="tnum pt-3 text-right text-[15px] font-semibold">{format(total)}</td>
-                  <td />
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {drafts.map((d) => (
+                    <tr key={d.merchantId} className="border-b border-[var(--surface-2)] last:border-0">
+                      <td className="py-3 text-[13px]">
+                        {d.merchantName}
+                        <span className="ml-1.5 text-[11px] text-[var(--fg-muted)]">
+                          수수료 {d.commissionPercent}%
+                        </span>
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px]">{d.orderCount}</td>
+                      <td className="tnum py-3 text-right text-[13px]">{format(d.grossAmount)}</td>
+                      <td className="tnum py-3 text-right text-[13px] text-accent">
+                        −{format(d.commissionAmount)}
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px] text-accent">
+                        {d.refundAmount > 0 ? `−${format(d.refundAmount)}` : '—'}
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px] font-semibold">
+                        {format(d.netAmount)}
+                      </td>
+                      <td className="py-3 text-center">
+                        {d.existingStatus ? (
+                          <Badge tone={d.existingStatus === 'PAID' ? 'success' : 'neutral'}>
+                            {SETTLEMENT_STATUS_LABEL[d.existingStatus]}
+                          </Badge>
+                        ) : (
+                          <span className="text-[11px] text-[var(--fg-muted)]">미확정</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <th scope="row" colSpan={5} className="pt-3 text-right text-xs text-[var(--fg-secondary)]">
+                      지급액 합계
+                    </th>
+                    <td className="tnum pt-3 text-right text-[15px] font-semibold">{format(total)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
         </section>
 
@@ -175,57 +177,59 @@ export default async function SettlementsPage({
               확정된 정산 내역이 없습니다.
             </p>
           ) : (
-            <table className="data-table">
-              <caption className="sr-only">확정된 정산 내역</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">기간</th>
-                  {!actor.merchantId && (
-                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
-                  )}
-                  <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">매출</th>
-                  <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
-                  <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
-                  <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
-                  {canPay && (
-                    <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">지급</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {settlements.map((s) => (
-                  <tr key={s.id} className="border-b border-[var(--surface-2)] last:border-0">
-                    <td className="tnum py-3 text-xs">
-                      {dateFormat.format(s.periodStart)} ~ {endLabel(s.periodEnd)}
-                    </td>
-                    {!actor.merchantId && <td className="py-3 text-[13px]">{s.merchantName}</td>}
-                    <td className="tnum py-3 text-right text-[13px]">{format(s.grossAmount)}</td>
-                    <td className="tnum py-3 text-right text-[13px] text-accent">
-                      −{format(s.commissionAmount)}
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px] font-semibold">{format(s.netAmount)}</td>
-                    <td className="py-3 text-center">
-                      <Badge tone={s.status === 'PAID' ? 'success' : 'neutral'}>
-                        {SETTLEMENT_STATUS_LABEL[s.status as SettlementStatus] ?? s.status}
-                      </Badge>
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table">
+                <caption className="sr-only">확정된 정산 내역</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">기간</th>
+                    {!actor.merchantId && (
+                      <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
+                    )}
+                    <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">매출</th>
+                    <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
+                    <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
+                    <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                     {canPay && (
-                      <td className="py-3 text-center">
-                        {s.status === 'CONFIRMED' ? (
-                          <PayButton
-                            settlementId={s.id}
-                            merchantName={s.merchantName}
-                            disabledReason={s.netAmount < 0 ? '수동 처리' : undefined}
-                          />
-                        ) : (
-                          <span className="text-[11px] text-[var(--fg-muted)]">—</span>
-                        )}
-                      </td>
+                      <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">지급</th>
                     )}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {settlements.map((s) => (
+                    <tr key={s.id} className="border-b border-[var(--surface-2)] last:border-0">
+                      <td className="tnum py-3 text-xs">
+                        {dateFormat.format(s.periodStart)} ~ {endLabel(s.periodEnd)}
+                      </td>
+                      {!actor.merchantId && <td className="py-3 text-[13px]">{s.merchantName}</td>}
+                      <td className="tnum py-3 text-right text-[13px]">{format(s.grossAmount)}</td>
+                      <td className="tnum py-3 text-right text-[13px] text-accent">
+                        −{format(s.commissionAmount)}
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px] font-semibold">{format(s.netAmount)}</td>
+                      <td className="py-3 text-center">
+                        <Badge tone={s.status === 'PAID' ? 'success' : 'neutral'}>
+                          {SETTLEMENT_STATUS_LABEL[s.status as SettlementStatus] ?? s.status}
+                        </Badge>
+                      </td>
+                      {canPay && (
+                        <td className="py-3 text-center">
+                          {s.status === 'CONFIRMED' ? (
+                            <PayButton
+                              settlementId={s.id}
+                              merchantName={s.merchantName}
+                              disabledReason={s.netAmount < 0 ? '수동 처리' : undefined}
+                            />
+                          ) : (
+                            <span className="text-[11px] text-[var(--fg-muted)]">—</span>
+                          )}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>

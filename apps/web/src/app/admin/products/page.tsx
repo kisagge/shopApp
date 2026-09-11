@@ -96,81 +96,83 @@ export default async function AdminProductsPage({
               {filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
             </p>
           ) : (
-            <table>
-              <caption className="sr-only">등록된 상품 목록</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">상품</th>
-                  <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">카테고리</th>
-                  <th scope="col" className="w-32 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">판매가</th>
-                  <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">재고</th>
-                  <th scope="col" className="w-24 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
-                  {canPublish && (
-                    <th scope="col" className="w-56 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">검수</th>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => {
-                  const price = p.salePrice ?? p.listPrice;
-                  const rate = p.salePrice === null ? 0 : discountRateOf(p.listPrice, p.salePrice);
-                  return (
-                    <tr key={p.id} className="border-b border-[var(--surface-2)] last:border-0">
-                      <td className="px-4 py-3">
-                        {/* 행 전체를 클릭 영역으로 만들지 않는다. 링크는 링크로
-                            보여야 키보드 사용자가 순서대로 짚어 갈 수 있다. */}
-                        <Link
-                          href={`/admin/products/${p.id}`}
-                          className="block text-[13px] text-[var(--fg)] no-underline hover:underline"
-                        >
-                          {p.name}
-                        </Link>
-                        <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--fg-secondary)]">{p.categoryName}</td>
-                      <td className="px-4 py-3 text-right">
-                        {rate > 0 && (
-                          <span className="tnum block text-[11px] text-[var(--fg-muted)] line-through">
-                            {format(p.listPrice)}
-                          </span>
-                        )}
-                        <span className="tnum text-[13px] font-semibold">{format(price)}</span>
-                        {rate > 0 && <span className="tnum ml-1 text-[11px] text-accent">{rate}%</span>}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <span
-                          className={`tnum text-[13px] font-semibold ${
-                            p.totalStock === 0 ? 'text-accent' : p.lowStock ? 'text-warning' : ''
-                          }`}
-                        >
-                          {p.totalStock}
-                        </span>
-                        {/* 재고 경고를 색으로만 알리지 않는다 */}
-                        {p.totalStock > 0 && p.lowStock && (
-                          <span className="block text-[10px] text-warning">임박</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>
-                          {PRODUCT_STATUS_LABEL[p.status as ProductStatus] ?? p.status}
-                        </Badge>
-                      </td>
-                      {canPublish && (
+            <div className="table-scroll">
+              <table>
+                <caption className="sr-only">등록된 상품 목록</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">상품</th>
+                    <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">카테고리</th>
+                    <th scope="col" className="w-32 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">판매가</th>
+                    <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">재고</th>
+                    <th scope="col" className="w-24 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
+                    {canPublish && (
+                      <th scope="col" className="w-56 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">검수</th>
+                    )}
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => {
+                    const price = p.salePrice ?? p.listPrice;
+                    const rate = p.salePrice === null ? 0 : discountRateOf(p.listPrice, p.salePrice);
+                    return (
+                      <tr key={p.id} className="border-b border-[var(--surface-2)] last:border-0">
                         <td className="px-4 py-3">
-                          {isAwaitingReview(p.status as ProductStatus) ? (
-                            <ProductReview productId={p.id} productName={p.name} />
-                          ) : (
-                            <span className="text-[11px] text-[var(--fg-muted)]">
-                              {p.publishRejection ? '반려함' : '—'}
+                          {/* 행 전체를 클릭 영역으로 만들지 않는다. 링크는 링크로
+                              보여야 키보드 사용자가 순서대로 짚어 갈 수 있다. */}
+                          <Link
+                            href={`/admin/products/${p.id}`}
+                            className="block text-[13px] text-[var(--fg)] no-underline hover:underline"
+                          >
+                            {p.name}
+                          </Link>
+                          <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--fg-secondary)]">{p.categoryName}</td>
+                        <td className="px-4 py-3 text-right">
+                          {rate > 0 && (
+                            <span className="tnum block text-[11px] text-[var(--fg-muted)] line-through">
+                              {format(p.listPrice)}
                             </span>
                           )}
+                          <span className="tnum text-[13px] font-semibold">{format(price)}</span>
+                          {rate > 0 && <span className="tnum ml-1 text-[11px] text-accent">{rate}%</span>}
                         </td>
-                      )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td className="px-4 py-3 text-right">
+                          <span
+                            className={`tnum text-[13px] font-semibold ${
+                              p.totalStock === 0 ? 'text-accent' : p.lowStock ? 'text-warning' : ''
+                            }`}
+                          >
+                            {p.totalStock}
+                          </span>
+                          {/* 재고 경고를 색으로만 알리지 않는다 */}
+                          {p.totalStock > 0 && p.lowStock && (
+                            <span className="block text-[10px] text-warning">임박</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>
+                            {PRODUCT_STATUS_LABEL[p.status as ProductStatus] ?? p.status}
+                          </Badge>
+                        </td>
+                        {canPublish && (
+                          <td className="px-4 py-3">
+                            {isAwaitingReview(p.status as ProductStatus) ? (
+                              <ProductReview productId={p.id} productName={p.name} />
+                            ) : (
+                              <span className="text-[11px] text-[var(--fg-muted)]">
+                                {p.publishRejection ? '반려함' : '—'}
+                              </span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
         <div className="mt-5">

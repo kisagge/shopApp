@@ -41,7 +41,12 @@ export default async function AdminDashboard({
         </div>
       </header>
 
-      <div className="flex flex-col gap-5 p-8">
+      {/*
+        **좁은 화면에서는 여백을 줄인다.** 32px 씩 양옆을 비우면 375px 화면의
+        본문이 311px 이 되고, 그 안에서 두 칸으로 나눈 지표 상자는 107px 다 —
+        `1,800,000원` 이 125px 이라 잘렸다. 여백은 넓은 화면에서 쓰는 사치다.
+      */}
+      <div className="flex flex-col gap-5 p-4 sm:p-8">
         <section aria-labelledby="kpi-title">
           <h2 id="kpi-title" className="sr-only">{d.rangeLabel} 주요 지표</h2>
           <ul className="grid grid-cols-2 gap-4 xl:grid-cols-4">
@@ -71,7 +76,7 @@ export default async function AdminDashboard({
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <section
             aria-labelledby="chart-title"
-            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
             <div className="mb-2 flex items-start justify-between gap-5">
               <div className="flex flex-col gap-1">
@@ -92,7 +97,7 @@ export default async function AdminDashboard({
 
           <section
             aria-labelledby="todo-title"
-            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
             <h2 id="todo-title" className="mb-4 text-base font-semibold">처리가 필요한 일</h2>
             <ul className="flex flex-col">
@@ -112,7 +117,7 @@ export default async function AdminDashboard({
         {d.funnel && (
           <section
             aria-labelledby="funnel-title"
-            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
             <div className="mb-4 flex flex-col gap-1">
               <h2 id="funnel-title" className="text-base font-semibold">구매 퍼널</h2>
@@ -120,7 +125,11 @@ export default async function AdminDashboard({
                 {d.rangeLabel} 세션 기준 · 앞 단계를 거친 세션만 다음 단계로 셉니다
               </p>
             </div>
-            <ol className="grid grid-cols-4 gap-3">
+            {/*
+              네 칸을 그대로 두면 한 칸이 24px 이다 — 숫자 "391" 조차 안 들어간다.
+              퍼널은 순서가 뜻이라 두 줄로 접혀도 읽는 순서가 흐트러지지 않는다.
+            */}
+            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               {d.funnel.map((step) => (
                 <li key={step.step} className="rounded-sm bg-[var(--surface)] p-4">
                   <p className="text-xs text-[var(--fg-muted)]">{step.label}</p>
@@ -142,7 +151,7 @@ export default async function AdminDashboard({
         <div className="grid gap-5 xl:grid-cols-2">
           <section
             aria-labelledby="top-title"
-            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
             <h2 id="top-title" className="mb-4 text-base font-semibold">판매 상위 상품</h2>
             {d.topProducts.length === 0 ? (
@@ -150,38 +159,40 @@ export default async function AdminDashboard({
                 {d.rangeLabel} 판매 기록이 없습니다.
               </p>
             ) : (
-              <table className="data-table">
-                <caption className="sr-only">{d.rangeLabel} 판매 상위 상품</caption>
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <th scope="col" className="w-7 pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">#</th>
-                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">상품</th>
-                    <th scope="col" className="w-16 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">판매</th>
-                    <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">매출</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.topProducts.map((p, i) => (
-                    <tr key={p.productName} className="border-b border-[var(--surface-2)]">
-                      <td className="tnum py-3 text-xs font-semibold">{i + 1}</td>
-                      <td className="py-3">
-                        <span className="block text-[13px]">{p.productName}</span>
-                        <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
-                      </td>
-                      <td className="tnum py-3 text-right text-[13px]">{p.quantity}</td>
-                      <td className="tnum py-3 text-right text-[13px] font-semibold">
-                        {format(p.revenue)}
-                      </td>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <caption className="sr-only">{d.rangeLabel} 판매 상위 상품</caption>
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th scope="col" className="w-7 pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">#</th>
+                      <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">상품</th>
+                      <th scope="col" className="w-16 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">판매</th>
+                      <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">매출</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {d.topProducts.map((p, i) => (
+                      <tr key={p.productName} className="border-b border-[var(--surface-2)]">
+                        <td className="tnum py-3 text-xs font-semibold">{i + 1}</td>
+                        <td className="py-3">
+                          <span className="block text-[13px]">{p.productName}</span>
+                          <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
+                        </td>
+                        <td className="tnum py-3 text-right text-[13px]">{p.quantity}</td>
+                        <td className="tnum py-3 text-right text-[13px] font-semibold">
+                          {format(p.revenue)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
 
           <section
             aria-labelledby="recent-title"
-            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
           >
             <div className="mb-4 flex items-center justify-between">
               <h2 id="recent-title" className="text-base font-semibold">최근 주문</h2>
@@ -190,33 +201,35 @@ export default async function AdminDashboard({
             {d.recentOrders.length === 0 ? (
               <p className="py-10 text-center text-[13px] text-[var(--fg-muted)]">주문이 없습니다.</p>
             ) : (
-              <table className="data-table">
-                <caption className="sr-only">최근 접수된 주문</caption>
-                <thead>
-                  <tr className="border-b border-[var(--border)]">
-                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문번호</th>
-                    <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문자</th>
-                    <th scope="col" className="pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">금액</th>
-                    <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">상태</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.recentOrders.map((o) => (
-                    <tr key={o.orderNo} className="border-b border-[var(--surface-2)]">
-                      <td className="py-3">
-                        <Link href={`/admin/orders/${o.orderNo}`} className="tnum text-xs text-[var(--fg)]">
-                          {o.orderNo}
-                        </Link>
-                      </td>
-                      <td className="py-3 text-[13px]">{o.buyerName}</td>
-                      <td className="tnum py-3 text-right text-[13px]">{format(o.amount)}</td>
-                      <td className="py-3 text-right">
-                        <Badge tone="neutral">{ORDER_STATUS_LABEL[o.status]}</Badge>
-                      </td>
+              <div className="table-scroll">
+                <table className="data-table">
+                  <caption className="sr-only">최근 접수된 주문</caption>
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문번호</th>
+                      <th scope="col" className="pb-2.5 text-left text-[11px] text-[var(--fg-secondary)]">주문자</th>
+                      <th scope="col" className="pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">금액</th>
+                      <th scope="col" className="w-24 pb-2.5 text-right text-[11px] text-[var(--fg-secondary)]">상태</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {d.recentOrders.map((o) => (
+                      <tr key={o.orderNo} className="border-b border-[var(--surface-2)]">
+                        <td className="py-3">
+                          <Link href={`/admin/orders/${o.orderNo}`} className="tnum text-xs text-[var(--fg)]">
+                            {o.orderNo}
+                          </Link>
+                        </td>
+                        <td className="py-3 text-[13px]">{o.buyerName}</td>
+                        <td className="tnum py-3 text-right text-[13px]">{format(o.amount)}</td>
+                        <td className="py-3 text-right">
+                          <Badge tone="neutral">{ORDER_STATUS_LABEL[o.status]}</Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         </div>
@@ -227,7 +240,7 @@ export default async function AdminDashboard({
 
 function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
-    <li className="flex flex-col gap-2.5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-5">
+    <li className="flex flex-col gap-2.5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-5">
       <p className="text-xs text-[var(--fg-muted)]">{label}</p>
       <p className="tnum text-[27px] font-semibold tracking-tight">{value}</p>
       {note && <p className="text-xs text-[var(--fg-secondary)]">{note}</p>}

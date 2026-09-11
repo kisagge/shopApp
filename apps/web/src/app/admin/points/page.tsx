@@ -72,42 +72,44 @@ export default async function AdminPointsPage() {
               모든 회원의 잔액이 원장과 일치합니다.
             </p>
           ) : (
-            <table className="data-table">
-              <caption className="sr-only">잔액과 원장이 어긋난 회원</caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">회원</th>
-                  <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">저장 잔액</th>
-                  <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">원장 합계</th>
-                  <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">차이</th>
-                  <th scope="col" className="w-24 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">원장 줄</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.mismatches.map((m) => (
-                  <tr key={m.userId} className="border-b border-[var(--surface-2)] last:border-0">
-                    <td className="py-3">
-                      <span className="block text-[13px]">{m.name}</span>
-                      <span className="block text-[11px] text-[var(--fg-muted)]">{m.email}</span>
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px]">{format(won(m.storedBalance))}</td>
-                    <td className="tnum py-3 text-right text-[13px] font-semibold">
-                      {format(won(m.ledgerBalance))}
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px] text-accent">
-                      {m.difference > 0 ? '+' : ''}{format(won(m.difference))}
-                      {/* 부호를 색으로만 알리지 않는다 */}
-                      <span className="sr-only">
-                        {m.difference > 0 ? ' 초과 지급' : ' 미지급'}
-                      </span>
-                    </td>
-                    <td className="tnum py-3 text-right text-[13px] text-[var(--fg-muted)]">
-                      {m.entryCount}
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table">
+                <caption className="sr-only">잔액과 원장이 어긋난 회원</caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="pb-2.5 text-left text-xs text-[var(--fg-secondary)]">회원</th>
+                    <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">저장 잔액</th>
+                    <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">원장 합계</th>
+                    <th scope="col" className="w-28 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">차이</th>
+                    <th scope="col" className="w-24 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">원장 줄</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {result.mismatches.map((m) => (
+                    <tr key={m.userId} className="border-b border-[var(--surface-2)] last:border-0">
+                      <td className="py-3">
+                        <span className="block text-[13px]">{m.name}</span>
+                        <span className="block text-[11px] text-[var(--fg-muted)]">{m.email}</span>
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px]">{format(won(m.storedBalance))}</td>
+                      <td className="tnum py-3 text-right text-[13px] font-semibold">
+                        {format(won(m.ledgerBalance))}
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px] text-accent">
+                        {m.difference > 0 ? '+' : ''}{format(won(m.difference))}
+                        {/* 부호를 색으로만 알리지 않는다 */}
+                        <span className="sr-only">
+                          {m.difference > 0 ? ' 초과 지급' : ' 미지급'}
+                        </span>
+                      </td>
+                      <td className="tnum py-3 text-right text-[13px] text-[var(--fg-muted)]">
+                        {m.entryCount}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>

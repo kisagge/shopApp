@@ -55,76 +55,78 @@ export default async function AdminMerchantsPage() {
           </p>
         ) : (
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
-          <table>
-            <caption className="sr-only">가맹점 목록</caption>
-            <thead>
-              <tr className="border-b border-[var(--border)]">
-                <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
-                <th scope="col" className="w-52 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">사업자</th>
-                <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
-                <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
-                <th scope="col" className="w-64 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
-                  {canApprove ? '상태 변경' : '입점일'}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {merchants.map((m) => (
-                <tr key={m.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
-                  <td className="px-4 py-3">
-                    <span className="block text-[13px]">{m.name}</span>
-                    <span className="block text-[11px] text-[var(--fg-muted)]">
-                      {/*
-                        승인 전에는 브랜드가 아직 없다. 그때는 신청서에 적은
-                        이름을 보여 준다 — 무엇을 승인하는지 알아야 한다.
-                      */}
-                      {m.brandNames.join(' · ')
-                        || (m.appliedBrandName ? `${m.appliedBrandName} (신청)` : '브랜드 없음')}
-                      {' · 계정 '}
-                      {m.userCount}개
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="block text-[12px]">{m.businessName}</span>
-                    <span className="tnum block text-[11px] text-[var(--fg-muted)]">
-                      {m.businessNumber} · {m.representative}
-                    </span>
-                    {m.applicant && (
-                      // 승인하면 이 계정이 가맹점 계정이 된다. 누구인지 보여야 한다.
-                      <span className="block text-[11px] text-[var(--fg-muted)]">
-                        신청 {m.applicant.name} · {m.applicant.email}
-                      </span>
-                    )}
-                  </td>
-                  <td className="tnum px-4 py-3 text-right text-[13px]">{m.commissionPercent}%</td>
-                  <td className="px-4 py-3 text-center">
-                    <Badge tone={TONE[m.status] ?? 'neutral'}>
-                      {MERCHANT_STATUS_LABEL[m.status as MerchantStatusInput] ?? m.status}
-                    </Badge>
-                  </td>
-                  <td className="px-4 py-3">
-                    {canApprove ? (
-                      <MerchantStatusForm
-                        merchantId={m.id}
-                        merchantName={m.name}
-                        status={m.status as MerchantStatusInput}
-                      />
-                    ) : (
-                      <span className="text-[12px] text-[var(--fg-muted)]">
-                        {m.approvedAt ? (
-                          <time dateTime={m.approvedAt.toISOString()}>
-                            {dateFormat.format(m.approvedAt)}
-                          </time>
-                        ) : (
-                          '미승인'
-                        )}
-                      </span>
-                    )}
-                  </td>
+          <div className="table-scroll">
+            <table>
+              <caption className="sr-only">가맹점 목록</caption>
+              <thead>
+                <tr className="border-b border-[var(--border)]">
+                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">가맹점</th>
+                  <th scope="col" className="w-52 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">사업자</th>
+                  <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
+                  <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
+                  <th scope="col" className="w-64 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
+                    {canApprove ? '상태 변경' : '입점일'}
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {merchants.map((m) => (
+                  <tr key={m.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
+                    <td className="px-4 py-3">
+                      <span className="block text-[13px]">{m.name}</span>
+                      <span className="block text-[11px] text-[var(--fg-muted)]">
+                        {/*
+                          승인 전에는 브랜드가 아직 없다. 그때는 신청서에 적은
+                          이름을 보여 준다 — 무엇을 승인하는지 알아야 한다.
+                        */}
+                        {m.brandNames.join(' · ')
+                          || (m.appliedBrandName ? `${m.appliedBrandName} (신청)` : '브랜드 없음')}
+                        {' · 계정 '}
+                        {m.userCount}개
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="block text-[12px]">{m.businessName}</span>
+                      <span className="tnum block text-[11px] text-[var(--fg-muted)]">
+                        {m.businessNumber} · {m.representative}
+                      </span>
+                      {m.applicant && (
+                        // 승인하면 이 계정이 가맹점 계정이 된다. 누구인지 보여야 한다.
+                        <span className="block text-[11px] text-[var(--fg-muted)]">
+                          신청 {m.applicant.name} · {m.applicant.email}
+                        </span>
+                      )}
+                    </td>
+                    <td className="tnum px-4 py-3 text-right text-[13px]">{m.commissionPercent}%</td>
+                    <td className="px-4 py-3 text-center">
+                      <Badge tone={TONE[m.status] ?? 'neutral'}>
+                        {MERCHANT_STATUS_LABEL[m.status as MerchantStatusInput] ?? m.status}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {canApprove ? (
+                        <MerchantStatusForm
+                          merchantId={m.id}
+                          merchantName={m.name}
+                          status={m.status as MerchantStatusInput}
+                        />
+                      ) : (
+                        <span className="text-[12px] text-[var(--fg-muted)]">
+                          {m.approvedAt ? (
+                            <time dateTime={m.approvedAt.toISOString()}>
+                              {dateFormat.format(m.approvedAt)}
+                            </time>
+                          ) : (
+                            '미승인'
+                          )}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
         )}
       </div>

@@ -58,62 +58,64 @@ export function StockForm({ productId, variants }: { productId: string; variants
 
   return (
     <form onSubmit={(e) => onSubmit(e)} className="flex flex-col gap-4">
-      <table>
-        <caption className="sr-only">옵션별 재고</caption>
-        <thead>
-          <tr className="border-b border-[var(--border)]">
-            <th scope="col" className="px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">옵션</th>
-            <th scope="col" className="w-32 px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">SKU</th>
-            <th scope="col" className="w-28 px-3 py-2.5 text-right text-xs text-[var(--fg-secondary)]">재고</th>
-            <th scope="col" className="w-20 px-3 py-2.5 text-center text-xs text-[var(--fg-secondary)]">판매</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.id} className="border-b border-[var(--surface-2)] last:border-0">
-              <td className="px-3 py-2.5 text-[13px]">{r.optionLabel}</td>
-              <td className="px-3 py-2.5 text-[11px] text-[var(--fg-muted)]">{r.sku}</td>
-              <td className="px-3 py-2">
-                <label className="sr-only" htmlFor={`stock-${r.id}`}>
-                  {r.optionLabel} 재고 수량
-                </label>
-                <input
-                  id={`stock-${r.id}`}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={999999}
-                  value={r.stock}
-                  onChange={(e) =>
-                    setRows((prev) =>
-                      prev.map((p, j) =>
-                        j === i ? { ...p, stock: Math.max(0, Number(e.target.value) || 0) } : p,
-                      ),
-                    )
-                  }
-                  className="tnum h-10 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-right text-[13px]"
-                />
-              </td>
-              <td className="px-3 py-2 text-center">
-                <label className="sr-only" htmlFor={`active-${r.id}`}>
-                  {r.optionLabel} 판매 여부
-                </label>
-                <input
-                  id={`active-${r.id}`}
-                  type="checkbox"
-                  checked={r.isActive}
-                  onChange={(e) =>
-                    setRows((prev) =>
-                      prev.map((p, j) => (j === i ? { ...p, isActive: e.target.checked } : p)),
-                    )
-                  }
-                  className="size-4.5 accent-[var(--brand)]"
-                />
-              </td>
+      <div className="table-scroll">
+        <table>
+          <caption className="sr-only">옵션별 재고</caption>
+          <thead>
+            <tr className="border-b border-[var(--border)]">
+              <th scope="col" className="px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">옵션</th>
+              <th scope="col" className="w-32 px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">SKU</th>
+              <th scope="col" className="w-28 px-3 py-2.5 text-right text-xs text-[var(--fg-secondary)]">재고</th>
+              <th scope="col" className="w-20 px-3 py-2.5 text-center text-xs text-[var(--fg-secondary)]">판매</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.id} className="border-b border-[var(--surface-2)] last:border-0">
+                <td className="px-3 py-2.5 text-[13px]">{r.optionLabel}</td>
+                <td className="px-3 py-2.5 text-[11px] text-[var(--fg-muted)]">{r.sku}</td>
+                <td className="px-3 py-2">
+                  <label className="sr-only" htmlFor={`stock-${r.id}`}>
+                    {r.optionLabel} 재고 수량
+                  </label>
+                  <input
+                    id={`stock-${r.id}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    max={999999}
+                    value={r.stock}
+                    onChange={(e) =>
+                      setRows((prev) =>
+                        prev.map((p, j) =>
+                          j === i ? { ...p, stock: Math.max(0, Number(e.target.value) || 0) } : p,
+                        ),
+                      )
+                    }
+                    className="tnum h-10 w-full rounded-sm border border-n-300 bg-[var(--bg)] px-2 text-right text-[13px]"
+                  />
+                </td>
+                <td className="px-3 py-2 text-center">
+                  <label className="sr-only" htmlFor={`active-${r.id}`}>
+                    {r.optionLabel} 판매 여부
+                  </label>
+                  <input
+                    id={`active-${r.id}`}
+                    type="checkbox"
+                    checked={r.isActive}
+                    onChange={(e) =>
+                      setRows((prev) =>
+                        prev.map((p, j) => (j === i ? { ...p, isActive: e.target.checked } : p)),
+                      )
+                    }
+                    className="size-4.5 accent-[var(--brand)]"
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       {message && (
         <p

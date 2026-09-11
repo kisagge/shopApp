@@ -123,43 +123,45 @@ export default async function TrafficPage() {
               아직 접힌 이벤트가 없습니다. 롤업 배치는 매일 새벽에 어제치를 접습니다.
             </p>
           ) : (
-            <table className="data-table border-collapse text-[13px]">
-              <caption className="sr-only">
-                월별 상품 조회·장바구니 담기·결제 완료 이벤트 수와 전환율
-              </caption>
-              <thead>
-                <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--fg-muted)]">
-                  <th scope="col" className="py-2 font-medium">월</th>
-                  <th scope="col" className="py-2 text-right font-medium">상품 조회</th>
-                  <th scope="col" className="py-2 text-right font-medium">장바구니</th>
-                  <th scope="col" className="py-2 text-right font-medium">결제</th>
-                  <th scope="col" className="py-2 text-right font-medium">전환율</th>
-                  <th scope="col" className="py-2 pl-4 font-medium">조회 추이</th>
-                </tr>
-              </thead>
-              <tbody>
-                {months.map((m) => (
-                  <tr key={m.month} className="border-b border-[var(--border)] last:border-0">
-                    <th scope="row" className="py-2.5 text-left font-medium">{m.month}</th>
-                    <td className="tnum py-2.5 text-right">{m.viewItems.toLocaleString('ko-KR')}</td>
-                    <td className="tnum py-2.5 text-right">{m.addToCarts.toLocaleString('ko-KR')}</td>
-                    <td className="tnum py-2.5 text-right">{m.purchases.toLocaleString('ko-KR')}</td>
-                    <td className="tnum py-2.5 text-right">{m.conversionRate}%</td>
-                    <td className="py-2.5 pl-4">
-                      {/*
-                        막대는 표에 이미 있는 숫자를 눈으로 훑기 쉽게 만든 것뿐이라
-                        스크린리더에는 감춘다. 읽어 봐야 같은 값을 두 번 듣는다.
-                      */}
-                      <span
-                        aria-hidden="true"
-                        className="block h-1.5 rounded-full bg-n-900"
-                        style={{ width: `${Math.round((m.viewItems / peak) * 100)}%`, minWidth: m.viewItems > 0 ? '2px' : '0' }}
-                      />
-                    </td>
+            <div className="table-scroll">
+              <table className="data-table border-collapse text-[13px]">
+                <caption className="sr-only">
+                  월별 상품 조회·장바구니 담기·결제 완료 이벤트 수와 전환율
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-left text-xs text-[var(--fg-muted)]">
+                    <th scope="col" className="py-2 font-medium">월</th>
+                    <th scope="col" className="py-2 text-right font-medium">상품 조회</th>
+                    <th scope="col" className="py-2 text-right font-medium">장바구니</th>
+                    <th scope="col" className="py-2 text-right font-medium">결제</th>
+                    <th scope="col" className="py-2 text-right font-medium">전환율</th>
+                    <th scope="col" className="py-2 pl-4 font-medium">조회 추이</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {months.map((m) => (
+                    <tr key={m.month} className="border-b border-[var(--border)] last:border-0">
+                      <th scope="row" className="py-2.5 text-left font-medium">{m.month}</th>
+                      <td className="tnum py-2.5 text-right">{m.viewItems.toLocaleString('ko-KR')}</td>
+                      <td className="tnum py-2.5 text-right">{m.addToCarts.toLocaleString('ko-KR')}</td>
+                      <td className="tnum py-2.5 text-right">{m.purchases.toLocaleString('ko-KR')}</td>
+                      <td className="tnum py-2.5 text-right">{m.conversionRate}%</td>
+                      <td className="py-2.5 pl-4">
+                        {/*
+                          막대는 표에 이미 있는 숫자를 눈으로 훑기 쉽게 만든 것뿐이라
+                          스크린리더에는 감춘다. 읽어 봐야 같은 값을 두 번 듣는다.
+                        */}
+                        <span
+                          aria-hidden="true"
+                          className="block h-1.5 rounded-full bg-n-900"
+                          style={{ width: `${Math.round((m.viewItems / peak) * 100)}%`, minWidth: m.viewItems > 0 ? '2px' : '0' }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       </div>

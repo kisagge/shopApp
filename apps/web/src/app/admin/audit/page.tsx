@@ -171,70 +171,72 @@ export default async function AdminAuditPage({
               {filtered ? '조건에 맞는 기록이 없습니다.' : '아직 기록된 동작이 없습니다.'}
             </p>
           ) : (
-            <table>
-              <caption className="sr-only">
-                관리자 동작 기록 {filtered && '(필터 적용됨)'}
-              </caption>
-              <thead>
-                <tr className="border-b border-[var(--border)]">
-                  <th scope="col" className="w-44 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">시각</th>
-                  <th scope="col" className="w-48 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">행위자</th>
-                  <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">동작</th>
-                  <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">대상</th>
-                </tr>
-              </thead>
-              <tbody>
-                {page.rows.map((row) => (
-                  <tr key={row.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
-                    <td className="px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
-                      <time dateTime={row.createdAt.toISOString()}>
-                        {dateFormat.format(row.createdAt)}
-                      </time>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="block text-[13px]">{row.actorName}</span>
-                      <span className="block text-[11px] text-[var(--fg-muted)]">
-                        {/* 역할은 그 시점 스냅샷이다. 지금 역할이 바뀌었어도 그대로 남는다. */}
-                        {USER_ROLE_LABEL[row.actorRole] ?? row.actorRole}
-                        {row.actorEmail ? ` · ${row.actorEmail}` : ' · 자동 실행'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-[13px]">{ACTION_LABEL[row.action] ?? row.action}</td>
-                    <td className="px-4 py-3">
-                      <span className="block text-[12px]">
-                        {TARGET_LABEL[row.targetType] ?? row.targetType}{' '}
-                        <span className="text-[var(--fg-muted)]">{row.targetId}</span>
-                      </span>
-                      {(row.before !== null || row.after !== null) && (
-                        <details className="mt-1.5">
-                          <summary className="cursor-pointer text-[11px] text-[var(--fg-secondary)]">
-                            변경 내용
-                          </summary>
-                          <div className="mt-2 flex flex-col gap-2 md:flex-row">
-                            {row.before !== null && (
-                              <div className="min-w-0 flex-1">
-                                <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 전</h3>
-                                <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
-                                  {preview(row.before)}
-                                </pre>
-                              </div>
-                            )}
-                            {row.after !== null && (
-                              <div className="min-w-0 flex-1">
-                                <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 후</h3>
-                                <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
-                                  {preview(row.after)}
-                                </pre>
-                              </div>
-                            )}
-                          </div>
-                        </details>
-                      )}
-                    </td>
+            <div className="table-scroll">
+              <table>
+                <caption className="sr-only">
+                  관리자 동작 기록 {filtered && '(필터 적용됨)'}
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="w-44 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">시각</th>
+                    <th scope="col" className="w-48 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">행위자</th>
+                    <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">동작</th>
+                    <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">대상</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {page.rows.map((row) => (
+                    <tr key={row.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
+                      <td className="px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
+                        <time dateTime={row.createdAt.toISOString()}>
+                          {dateFormat.format(row.createdAt)}
+                        </time>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="block text-[13px]">{row.actorName}</span>
+                        <span className="block text-[11px] text-[var(--fg-muted)]">
+                          {/* 역할은 그 시점 스냅샷이다. 지금 역할이 바뀌었어도 그대로 남는다. */}
+                          {USER_ROLE_LABEL[row.actorRole] ?? row.actorRole}
+                          {row.actorEmail ? ` · ${row.actorEmail}` : ' · 자동 실행'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-[13px]">{ACTION_LABEL[row.action] ?? row.action}</td>
+                      <td className="px-4 py-3">
+                        <span className="block text-[12px]">
+                          {TARGET_LABEL[row.targetType] ?? row.targetType}{' '}
+                          <span className="text-[var(--fg-muted)]">{row.targetId}</span>
+                        </span>
+                        {(row.before !== null || row.after !== null) && (
+                          <details className="mt-1.5">
+                            <summary className="cursor-pointer text-[11px] text-[var(--fg-secondary)]">
+                              변경 내용
+                            </summary>
+                            <div className="mt-2 flex flex-col gap-2 md:flex-row">
+                              {row.before !== null && (
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 전</h3>
+                                  <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
+                                    {preview(row.before)}
+                                  </pre>
+                                </div>
+                              )}
+                              {row.after !== null && (
+                                <div className="min-w-0 flex-1">
+                                  <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 후</h3>
+                                  <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
+                                    {preview(row.after)}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          </details>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
