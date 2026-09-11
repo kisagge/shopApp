@@ -101,6 +101,40 @@ export const isCancellableByCustomer = (status: OrderStatus): boolean =>
   status === 'PENDING' || status === 'PAID';
 
 /**
+ * 송장을 붙일 수 있는 주문인가.
+ *
+ * **이 함수가 없어서 아무 주문에나 붙었다.** 송장 등록은 상태 전이보다 **먼저**
+ * 저장하고, 전이가 실패하면 그 오류를 삼켰다. 삼키는 것 자체는 뜻이 있었다 —
+ * 이미 배송 중인 주문의 송장 오타를 고치러 온 사람을 막으면 안 된다. 그런데
+ * 그 예외가 **모든 실패한 전이**에 걸려서, 취소·환불된 주문에도 송장이 붙었다.
+ * 고객 화면은 송장이 있으면 운송 조회를 그리므로, 취소한 주문에 배송 조회가
+ * 뜬다.
+ *
+ * 결제완료도 마찬가지로 잘못 열려 있었다. 결제완료에서 배송중으로 가는 길은
+ * 없는데(배송준비를 거쳐야 한다) 화면에는 "송장 등록하고 배송 시작" 이 떴고,
+ * 누르면 송장만 쓰이고 상태는 그대로였다 — 단추 이름이 거짓말을 했다.
+ *
+ * 그래서 둘로 나눈다. **보낼 수 있는 상태**이거나, **이미 보낸 것을 고치는
+ * 경우**만 허용한다.
+ */
+/** 여기서 송장을 붙이면 배송이 시작된다 */
+const READY_TO_SHIP: readonly OrderStatus[] = ['PREPARING'];
+
+/** 이미 보낸 것 — 송장 오타를 고치러 올 수 있다 */
+const ALREADY_SHIPPED: readonly OrderStatus[] = ['SHIPPED', 'DELIVERED', 'CONFIRMED'];
+
+/**
+ * **전이표에서 유도하지 않는다.** `canTransition(status, 'SHIPPED')` 로 쓰면
+ * 반품접수까지 열린다 — 전이표에 그 길이 있는 것은 **반품을 반려할 때** 왔던
+ * 자리로 되돌리기 위해서지, 거기서 새로 보내라는 뜻이 아니다. 송장 등록이
+ * 그 길의 뒷문이 되면 반려 사유도 없이 상태만 배송중으로 돌아간다.
+ *
+ * 같은 이름의 전이라도 **누가 왜 하느냐가 다르면 다른 문**이다.
+ */
+export const canRegisterShipment = (status: OrderStatus): boolean =>
+  READY_TO_SHIP.includes(status) || ALREADY_SHIPPED.includes(status);
+
+/**
  * 결제를 다시 걸 수 있는 주문인가.
  *
  * **이 함수가 생긴 이유는 사람이 갇혔기 때문이다.** 승인이 실패하면 주문은

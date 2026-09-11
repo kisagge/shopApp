@@ -3,7 +3,7 @@ import {
   orderFilterStatuses, ORDER_FILTER_GROUP, ORDER_FILTER_TAB,
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, OrderTransitionError, type OrderStatus,
-  statusBeforeReturn, isRepayable,
+  statusBeforeReturn, isRepayable, canRegisterShipment,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -235,4 +235,50 @@ describe('다시 결제할 수 있는가', () => {
       expect(isRepayable(status, 'DONE')).toBe(false);
     },
   );
+});
+
+/**
+ * 송장을 붙일 수 있는 주문인가.
+ *
+ * 붙이는 코드가 상태를 안 보고 먼저 저장한 탓에, 취소·환불된 주문에도 송장이
+ * 붙었다. 고객 화면은 송장이 있으면 운송 조회를 그리므로 취소한 주문에 배송
+ * 조회가 떴다.
+ */
+describe('송장을 붙일 수 있는가', () => {
+  it('배송준비면 붙일 수 있다 — 여기서 배송중으로 간다', () => {
+    expect(canRegisterShipment('PREPARING')).toBe(true);
+  });
+
+  it.each(['SHIPPED', 'DELIVERED', 'CONFIRMED'] as const)(
+    '%s 는 이미 보낸 것이라 고칠 수 있다',
+    (status) => {
+      expect(canRegisterShipment(status)).toBe(true);
+    },
+  );
+
+  /**
+   * **결제완료에서 배송중으로 가는 길은 없다.** 배송준비를 거쳐야 한다.
+   * 그런데 화면에는 "송장 등록하고 배송 시작" 이 떠 있었고, 누르면 송장만
+   * 쓰이고 상태는 결제완료 그대로였다.
+   */
+  it.each(['PENDING', 'PAID'] as const)('%s 는 아직 보낼 수 없다', (status) => {
+    expect(canRegisterShipment(status)).toBe(false);
+  });
+
+  it.each(['CANCELLED', 'REFUNDED', 'RETURNED'] as const)(
+    '%s 는 붙일 수 없다 — 보낼 물건이 없다',
+    (status) => {
+      expect(canRegisterShipment(status)).toBe(false);
+    },
+  );
+
+  /**
+   * **전이표만 보면 열린다.** 반품접수에서 배송중으로 가는 길이 표에 있기
+   * 때문인데, 그 길은 **반품을 반려할 때** 왔던 자리로 되돌리는 용도다.
+   * 송장 등록이 그 뒷문이 되면 반려 사유도 없이 상태만 돌아간다.
+   */
+  it('반품접수는 전이표에 길이 있어도 붙일 수 없다', () => {
+    expect(canTransition('RETURN_REQUESTED', 'SHIPPED')).toBe(true);
+    expect(canRegisterShipment('RETURN_REQUESTED')).toBe(false);
+  });
 });

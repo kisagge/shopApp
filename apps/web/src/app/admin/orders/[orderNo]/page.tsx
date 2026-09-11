@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
-  format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL,
+  format, won, nextStatuses, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
   PAYMENT_STATUS_LABEL,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
@@ -36,9 +36,16 @@ export default async function AdminOrderDetail({
    * 흔하고, 고칠 방법이 없으면 고객이 남의 택배를 조회하게 된다.
    * 취소·환불된 주문에는 의미가 없으므로 감춘다.
    */
+  /*
+   * **어떤 상태에 붙일 수 있는지는 core 가 정한다.**
+   *
+   * 예전에는 여기서 손으로 적은 제외 목록을 들고 있었고, 결제완료와 반품접수를
+   * 빠뜨렸다. 결제완료에서 배송중으로 가는 길은 없는데(배송준비를 거쳐야 한다)
+   * 단추가 떴고, 누르면 송장만 쓰이고 상태는 그대로였다 — 단추 이름이
+   * 거짓말을 했다. 서버도 따로 판단하고 있었고 둘이 달랐다.
+   */
   const canFulfill =
-    hasPermission(actor, 'order:fulfill') &&
-    !['CANCELLED', 'REFUNDED', 'RETURNED', 'PENDING'].includes(order.status);
+    hasPermission(actor, 'order:fulfill') && canRegisterShipment(order.status);
 
   const activeReturn = order.returnRequests[0] ?? null;
   // 반품 처리는 환불로 이어지는 판단이라 order:refund 를 요구한다
