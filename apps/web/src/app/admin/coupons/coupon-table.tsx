@@ -21,6 +21,21 @@ export function CouponTable({
   onToggle: (coupon: CouponRow) => void;
   onGrant: (coupon: CouponRow) => void;
 }) {
+  /*
+    **비었을 때 그 이유를 말한다.** 표 머리만 남으면 고장인지 원래 그런 건지
+    알 수 없다. 저장소를 처음 띄우면 쿠폰이 하나도 없는 것이 정상인데, 그때
+    화면이 아무 말도 안 하고 있었다.
+
+    주문·정산 목록이 쓰는 모양을 그대로 따른다 — 표를 문구로 대체한다.
+  */
+  if (coupons.length === 0) {
+    return (
+      <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
+        아직 발행한 쿠폰이 없습니다. 위에서 새 쿠폰을 만들 수 있습니다.
+      </p>
+    );
+  }
+
   return (
     /*
       **relative 가 있어야 낭독기 전용 글자가 새어 나가지 않는다.**

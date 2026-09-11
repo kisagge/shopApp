@@ -42,6 +42,18 @@ export default async function AdminMerchantsPage() {
           </p>
         )}
 
+        {/*
+          **비었을 때 그 이유를 말한다.** 표 머리만 남으면 고장인지 원래 그런
+          건지 알 수 없다. 저장소를 처음 띄우면 가맹점이 하나도 없는 것이
+          정상인데, 그때 화면이 아무 말도 안 하고 있었다.
+
+          주문·정산 목록이 쓰는 모양을 그대로 따른다 — 표를 문구로 대체한다.
+        */}
+        {merchants.length === 0 ? (
+          <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
+            아직 입점한 가맹점이 없습니다. 입점 신청이 들어오면 여기에 뜹니다.
+          </p>
+        ) : (
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
           <table>
             <caption className="sr-only">가맹점 목록</caption>
@@ -114,6 +126,7 @@ export default async function AdminMerchantsPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </>
   );
