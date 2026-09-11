@@ -66,8 +66,42 @@ describe('디자인 토큰 명도 대비 (다크)', () => {
     expect(contrastRatio(T['dark-fg']!, T['dark-surface']!)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 
-  it('다크 accent 가 기준을 지킨다', () => {
-    expect(contrastRatio(T['dark-accent']!, T['dark-bg']!)).toBeGreaterThanOrEqual(AA_TEXT);
+  /**
+   * **밝은 화면에서 고른 뜻 색은 어두운 화면에서 가라앉는다.**
+   *
+   * accent 만 다크 짝이 있었고 나머지는 밝은 값 그대로 쓰이고 있었다 —
+   * 화면에서 재 보니 정산의 환불 금액 3.66:1, 재고 임박 3.43:1, 게시중 배지
+   * 3.89:1 이었다. 밝은 쪽 목록과 같은 모양으로 다크도 함께 잰다.
+   */
+  it.each([
+    ['세일가 (accent)', 'dark-accent', AA_TEXT],
+    ['배송 정보 (info)', 'dark-info', AA_TEXT],
+    ['성공 (success)', 'dark-success', AA_TEXT],
+    ['경고 텍스트 (warning)', 'dark-warning', AA_TEXT],
+    ['경고 그래픽 (warning-graphic)', 'dark-warning-graphic', AA_GRAPHIC],
+  ])('다크에서 %s 가 기준을 지킨다', (_label, token, min) => {
+    const hex = T[token];
+    expect(hex, `토큰 --color-${token} 을 theme.css에서 찾지 못했습니다`).toBeDefined();
+    expect(contrastRatio(hex!, T['dark-bg']!)).toBeGreaterThanOrEqual(min);
+  });
+
+  it('다크 soft 배경 위의 같은 계열 텍스트가 읽힌다', () => {
+    /*
+     * `bg-accent-soft text-accent` 처럼 짝으로 쓴다. 밝은 화면에서는 옅은 판
+     * 위의 진한 글씨인데, 어두운 화면에서는 **짙은 판 위의 밝은 글씨**가
+     * 되어야 같은 역할을 한다. 한쪽만 뒤집으면 글자가 판에 묻는다.
+     */
+    for (const kind of ['accent', 'info', 'success', 'warning']) {
+      expect(
+        contrastRatio(T[`dark-${kind}`]!, T[`dark-${kind}-soft`]!),
+        `다크 ${kind} 가 자기 soft 배경 위에서 안 읽힙니다`,
+      ).toBeGreaterThanOrEqual(AA_TEXT);
+    }
+  });
+
+  it('다크 accent 버튼 위의 글씨가 기준을 지킨다', () => {
+    // 밝은 화면에서는 흰 글씨였다. 어두운 화면의 accent 는 밝으므로 뒤집는다.
+    expect(contrastRatio(T['dark-bg']!, T['dark-accent']!)).toBeGreaterThanOrEqual(AA_TEXT);
   });
 });
 

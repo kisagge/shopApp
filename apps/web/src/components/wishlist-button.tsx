@@ -83,7 +83,12 @@ export function WishlistButton({
         }
         className={`flex items-center justify-center rounded-full border border-n-900/12 bg-n-0/85 backdrop-blur-sm transition-colors hover:bg-n-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${box}`}
       >
-        <span aria-hidden="true" className={wishlisted ? 'text-accent' : 'text-n-400'}>
+        {/*
+          **알약이 늘 밝다**(사진 위에 떠야 해서). 그 위의 하트가 n-400 이라
+          2.44:1 이었다 — 찜하는 단추인지 알아보기 어려웠다. 알약이 테마를
+          안 타므로 글자도 안 타는 값으로 두되, 읽히는 쪽으로 내린다.
+        */}
+        <span aria-hidden="true" className={wishlisted ? 'text-accent' : 'text-n-600'}>
           {wishlisted ? '♥' : '♡'}
         </span>
       </button>

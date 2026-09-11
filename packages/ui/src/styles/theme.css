@@ -48,6 +48,28 @@
   --color-dark-muted:    oklch(0.660 0.009 75);
   --color-dark-fg:       oklch(0.945 0.004 75);
   --color-dark-accent:   oklch(0.680 0.150 25);
+  /*
+   * **뜻을 가진 색의 어두운 화면 짝.**
+   *
+   * 위의 accent·info·success·warning 은 **흰 바탕에서** 고른 값이다. 어두운
+   * 바탕에 그대로 얹으면 3.3~3.9:1 로 내려앉는다 — 정산의 환불 금액, 재고
+   * 임박, 게시중 배지가 전부 그랬다.
+   *
+   * 옅은 색(`*-soft`)은 배경으로 쓰인다. 어두운 화면에서는 옅게가 아니라
+   * **짙게** 가야 같은 역할을 한다 — 밝은 판을 깔면 그 위의 글자가 뒤집힌다.
+   *
+   * 이름을 따로 두는 이유는 검사가 토큰을 이름으로 읽기 때문이다. 같은
+   * 이름을 아래에서 덮어쓰면 밝은 화면 검사가 어두운 값을 재게 된다.
+   */
+  --color-dark-accent-hover: oklch(0.760 0.140 25);
+  --color-dark-accent-soft:  oklch(0.280 0.055 25);
+  --color-dark-info:         oklch(0.720 0.120 250);
+  --color-dark-info-soft:    oklch(0.275 0.050 250);
+  --color-dark-success:      oklch(0.740 0.130 155);
+  --color-dark-success-soft: oklch(0.270 0.050 155);
+  --color-dark-warning:          oklch(0.790 0.115 75);
+  --color-dark-warning-graphic:  oklch(0.820 0.135 75);
+  --color-dark-warning-soft:     oklch(0.280 0.045 75);
 
   /* ── 상품 이미지 플레이스홀더 톤 ──────────────────── */
   --color-ph-sand:  oklch(0.905 0.018 80);
@@ -128,7 +150,19 @@
     --fg: var(--color-n-900);
     --fg-secondary: var(--color-n-700);
     --fg-muted: var(--color-n-500);
-    --fg-disabled: var(--color-n-400);
+    /*
+     * **못 누르는 상태에도 테마가 있다.**
+     *
+     * 이 두 값은 선언만 해 두고 아무도 안 쓰고 있었다. 단추는 `bg-n-200`
+     * 처럼 저울의 눈금을 직접 불렀는데, 그 값은 테마가 바뀌어도 안 바뀐다 —
+     * 어두운 화면에서 못 누르는 단추가 **가장 밝은 덩어리**가 됐다. 흐려
+     * 보이라고 준 색이 오히려 제일 눈에 띈 셈이다.
+     *
+     * 글자는 n-400(1.87:1) 대신 n-500 을 쓴다. 못 누르는 것은 명암비 기준
+     * 밖이지만(WCAG 1.4.3), 1.87 은 무슨 단추인지도 안 읽힌다.
+     */
+    --fg-disabled: var(--color-n-500);
+    --bg-disabled: var(--color-n-200);
     --brand: var(--color-n-900);
     --brand-hover: var(--color-n-950);
     --ring: var(--color-n-900);
@@ -144,10 +178,24 @@
       --fg: var(--color-dark-fg);
       --fg-secondary: oklch(0.820 0.006 75);
       --fg-muted: var(--color-dark-muted);
-      --fg-disabled: oklch(0.480 0.008 75);
+      --fg-disabled: oklch(0.580 0.008 75);
+      /* 어두운 화면에서는 **가라앉은 면**이다. 밝게 하면 눌러도 되는 줄 안다. */
+      --bg-disabled: var(--color-dark-surface2);
       --brand: var(--color-dark-fg);
       --brand-hover: oklch(1 0 0);
       --ring: var(--color-dark-fg);
+
+      /* 뜻을 가진 색도 테마를 탄다 — 값과 이유는 @theme 의 dark-* 주석에 */
+      --color-accent: var(--color-dark-accent);
+      --color-accent-hover: var(--color-dark-accent-hover);
+      --color-accent-soft: var(--color-dark-accent-soft);
+      --color-info: var(--color-dark-info);
+      --color-info-soft: var(--color-dark-info-soft);
+      --color-success: var(--color-dark-success);
+      --color-success-soft: var(--color-dark-success-soft);
+      --color-warning: var(--color-dark-warning);
+      --color-warning-graphic: var(--color-dark-warning-graphic);
+      --color-warning-soft: var(--color-dark-warning-soft);
     }
   }
 
@@ -160,10 +208,23 @@
     --fg: var(--color-dark-fg);
     --fg-secondary: oklch(0.820 0.006 75);
     --fg-muted: var(--color-dark-muted);
-    --fg-disabled: oklch(0.480 0.008 75);
+    --fg-disabled: oklch(0.580 0.008 75);
+    --bg-disabled: var(--color-dark-surface2);
     --brand: var(--color-dark-fg);
     --brand-hover: oklch(1 0 0);
     --ring: var(--color-dark-fg);
+
+    /* 뜻을 가진 색도 테마를 탄다 — 값과 이유는 @theme 의 dark-* 주석에 */
+    --color-accent: var(--color-dark-accent);
+    --color-accent-hover: var(--color-dark-accent-hover);
+    --color-accent-soft: var(--color-dark-accent-soft);
+    --color-info: var(--color-dark-info);
+    --color-info-soft: var(--color-dark-info-soft);
+    --color-success: var(--color-dark-success);
+    --color-success-soft: var(--color-dark-success-soft);
+    --color-warning: var(--color-dark-warning);
+    --color-warning-graphic: var(--color-dark-warning-graphic);
+    --color-warning-soft: var(--color-dark-warning-soft);
   }
 
   html {

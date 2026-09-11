@@ -71,7 +71,7 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n)\.spec\.ts/,
+        /(auth|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n|dark-contrast)\.spec\.ts/,
     },
     {
       name: 'customer',
@@ -84,7 +84,7 @@ export default defineConfig({
       name: 'admin',
       use: { ...devices['Desktop Chrome'], storageState: STATE_FILE.admin },
       testMatch:
-        /(admin|slug-history|a11y-admin|layout-admin|layout-admin-locales|separation-of-duties|admin-drawer)\.spec\.ts/,
+        /(admin|slug-history|a11y-admin|layout-admin|layout-admin-locales|separation-of-duties|admin-drawer|dark-contrast-admin|rich-editor)\.spec\.ts/,
       dependencies: ['setup'],
     },
     {

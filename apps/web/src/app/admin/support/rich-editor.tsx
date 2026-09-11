@@ -1,6 +1,9 @@
 'use client';
 
-import { useEditor, EditorContent, type Content, type Editor } from '@tiptap/react';
+import {
+  useEditor, useEditorState, EditorContent,
+  type Content, type Editor,
+} from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import { useId, useState } from 'react';
@@ -72,9 +75,14 @@ function ToolbarButton({
          * 찍지만 엄지는 못 찍는다 — 굵게를 누르려다 기울임이 걸린다.
          */
         'h-11 shrink-0 rounded-sm border px-3 text-[13px] sm:h-8 sm:px-2 sm:text-[12px]',
+        /*
+          **눌린 모양도 테마를 탄다.** `bg-n-900` 은 저울의 눈금이라 테마가
+          바뀌어도 안 바뀐다 — 어두운 화면에서 켜진 단추가 바탕과 같은 검정이
+          되어, 눌렀는지 아닌지가 다시 안 보였다.
+        */
         active
-          ? 'border-n-900 bg-n-900 text-n-0'
-          : 'border-n-300 bg-[var(--bg)] text-[var(--fg-secondary)]',
+          ? 'border-[var(--brand)] bg-[var(--brand)] text-[var(--bg)]'
+          : 'border-[var(--border-strong)] bg-[var(--bg)] text-[var(--fg-secondary)]',
       ].join(' ')}
     >
       {label}
@@ -127,7 +135,7 @@ export function RichEditor({
          * 좁은 화면에서만 16px 로 둔다. 어차피 폰에서는 13px 이 작기도 하다.
          */
         class:
-          'min-h-52 rounded-b-sm border border-t-0 border-n-300 bg-[var(--bg)] p-2.5 ' +
+          'min-h-52 rounded-b-sm border border-t-0 border-[var(--border-strong)] bg-[var(--bg)] p-2.5 ' +
           'text-[16px] leading-relaxed outline-none sm:text-[13px] ' +
           // 편집 중에도 결과와 비슷하게 보여야 한다 — 목록이 점 없이 보이면 목록인지 모른다
           '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 ' +
@@ -140,9 +148,35 @@ export function RichEditor({
     onUpdate: ({ editor: e }) => onChange(e.getJSON() as RichTextDoc),
   });
 
-  if (!editor) {
+  /**
+   * **눌린 상태를 따로 구독한다.**
+   *
+   * TipTap 3 은 트랜잭션마다 컴포넌트를 다시 그리지 않는다(2 에서 바뀐
+   * 점이다). 그래서 `editor.isActive('bold')` 를 그리는 김에 읽어 두면
+   * **굵게를 눌러도 단추가 그대로였다** — 글자를 한 자 치고 나서야 켜진
+   * 것으로 보였다. 눌렀는지 아닌지를 사람이 알 수 없는 토글은 토글이 아니다.
+   *
+   * 매 트랜잭션마다 다시 그리게 켜는 길도 있지만, 그러면 글자를 칠 때마다
+   * 도구 모음 열두 개가 같이 그려진다. 필요한 값만 골라 구독한다.
+   */
+  const active = useEditorState({
+    editor,
+    selector: ({ editor: e }) => ({
+      bold: e?.isActive('bold') ?? false,
+      italic: e?.isActive('italic') ?? false,
+      strike: e?.isActive('strike') ?? false,
+      code: e?.isActive('code') ?? false,
+      headings: RICH_TEXT_HEADING_LEVEL.map((level) => e?.isActive('heading', { level }) ?? false),
+      bulletList: e?.isActive('bulletList') ?? false,
+      orderedList: e?.isActive('orderedList') ?? false,
+      blockquote: e?.isActive('blockquote') ?? false,
+      link: e?.isActive('link') ?? false,
+    }),
+  });
+
+  if (!editor || !active) {
     // 불러오는 동안에도 자리는 잡아 둔다 — 안 그러면 폼이 덜컥 뛴다
-    return <div className="min-h-60 rounded-sm border border-n-300 bg-[var(--surface)]" />;
+    return <div className="min-h-60 rounded-sm border border-[var(--border-strong)] bg-[var(--surface)]" />;
   }
 
   const applyLink = () => {
@@ -172,43 +206,43 @@ export function RichEditor({
          * 아래에 선다 — 넓은 화면에는 그 띠가 없으므로 맨 위다.
          */
         className={
-          'sticky top-14 z-10 flex gap-1 overflow-x-auto rounded-t-sm border border-n-300 ' +
+          'sticky top-14 z-10 flex gap-1 overflow-x-auto rounded-t-sm border border-[var(--border-strong)] ' +
           'bg-[var(--surface)] p-1.5 md:top-0 sm:flex-wrap sm:overflow-visible'
         }
       >
-        <ToolbarButton editor={editor} label="굵게" active={editor.isActive('bold')}
+        <ToolbarButton editor={editor} label="굵게" active={active.bold}
           onClick={() => editor.chain().focus().toggleBold().run()} />
-        <ToolbarButton editor={editor} label="기울임" active={editor.isActive('italic')}
+        <ToolbarButton editor={editor} label="기울임" active={active.italic}
           onClick={() => editor.chain().focus().toggleItalic().run()} />
-        <ToolbarButton editor={editor} label="취소선" active={editor.isActive('strike')}
+        <ToolbarButton editor={editor} label="취소선" active={active.strike}
           onClick={() => editor.chain().focus().toggleStrike().run()} />
-        <ToolbarButton editor={editor} label="코드" active={editor.isActive('code')}
+        <ToolbarButton editor={editor} label="코드" active={active.code}
           onClick={() => editor.chain().focus().toggleCode().run()} />
 
-        {RICH_TEXT_HEADING_LEVEL.map((level) => (
+        {RICH_TEXT_HEADING_LEVEL.map((level, i) => (
           <ToolbarButton
             key={level}
             editor={editor}
             label={`제목${level - 1}`}
-            active={editor.isActive('heading', { level })}
+            active={active.headings[i] ?? false}
             onClick={() => editor.chain().focus().toggleHeading({ level }).run()}
           />
         ))}
 
-        <ToolbarButton editor={editor} label="글머리" active={editor.isActive('bulletList')}
+        <ToolbarButton editor={editor} label="글머리" active={active.bulletList}
           onClick={() => editor.chain().focus().toggleBulletList().run()} />
-        <ToolbarButton editor={editor} label="번호" active={editor.isActive('orderedList')}
+        <ToolbarButton editor={editor} label="번호" active={active.orderedList}
           onClick={() => editor.chain().focus().toggleOrderedList().run()} />
-        <ToolbarButton editor={editor} label="인용" active={editor.isActive('blockquote')}
+        <ToolbarButton editor={editor} label="인용" active={active.blockquote}
           onClick={() => editor.chain().focus().toggleBlockquote().run()} />
         <ToolbarButton editor={editor} label="구분선" active={false}
           onClick={() => editor.chain().focus().setHorizontalRule().run()} />
         <ToolbarButton
           editor={editor}
           label="링크"
-          active={editor.isActive('link')}
+          active={active.link}
           onClick={() => {
-            setLinkHref(editor.isActive('link') ? (editor.getAttributes('link')['href'] ?? '') : '');
+            setLinkHref(active.link ? (editor.getAttributes('link')['href'] ?? '') : '');
             setLinkOpen((open) => !open);
           }}
         />
@@ -224,7 +258,7 @@ export function RichEditor({
          * 자리 검사가 이것을 못 봤다 — 링크 줄은 눌러야 나오므로 화면을 그냥
          * 열어서는 없는 것이다. 그래서 layout-admin 이 눌러 보고 재게 했다.
          */
-        <div className="flex items-center gap-2 border-x border-n-300 bg-[var(--surface)] px-1.5 pb-1.5">
+        <div className="flex items-center gap-2 border-x border-[var(--border-strong)] bg-[var(--surface)] px-1.5 pb-1.5">
           <label htmlFor={linkId} className="shrink-0 text-[12px] text-[var(--fg-muted)]">
             주소
           </label>
@@ -241,14 +275,14 @@ export function RichEditor({
             placeholder="https://…"
             className={
               // 16px 아래면 iOS 가 확대한다 — 편집 영역과 같은 이유다
-              'h-11 min-w-0 flex-1 rounded-sm border border-n-300 bg-[var(--bg)] px-2 ' +
+              'h-11 min-w-0 flex-1 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 ' +
               'text-[16px] sm:h-8 sm:text-[12px]'
             }
           />
           <button
             type="button"
             onClick={applyLink}
-            className="h-11 shrink-0 rounded-sm border border-n-300 px-3 text-[13px] sm:h-8 sm:px-2.5 sm:text-[12px]"
+            className="h-11 shrink-0 rounded-sm border border-[var(--border-strong)] px-3 text-[13px] sm:h-8 sm:px-2.5 sm:text-[12px]"
           >
             {/*
               **단추 이름이 무슨 일이 일어날지 말한다.** 예전에는 자리글에
@@ -256,7 +290,7 @@ export function RichEditor({
               잘려서 안 보였고 자리글은 글자를 넣는 순간 사라진다 — 정작
               뗄 때 읽을 수 없는 안내였다.
             */}
-            {editor.isActive('link') && linkHref.trim().length === 0 ? '링크 떼기' : '적용'}
+            {active.link && linkHref.trim().length === 0 ? '링크 떼기' : '적용'}
           </button>
         </div>
       )}

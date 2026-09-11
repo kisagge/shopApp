@@ -58,7 +58,7 @@ export function Price({
      */
     <p data-price={amount} className={cn('flex flex-col gap-0.5', className)}>
       {hasDiscount && (
-        <span className={cn('tnum text-n-500', s.strike)}>
+        <span className={cn('tnum text-[var(--fg-muted)]', s.strike)}>
           <VisuallyHidden>{uiText(locale, 'price.listPrice')} </VisuallyHidden>
           <s>{formatMoney(locale, listPrice)}</s>
         </span>

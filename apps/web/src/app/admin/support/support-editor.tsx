@@ -24,7 +24,7 @@ import { TOPIC_KEY } from '~/lib/i18n/support';
  */
 const RichEditor = dynamic(() => import('./rich-editor').then((m) => m.RichEditor), {
   ssr: false,
-  loading: () => <div className="min-h-60 rounded-sm border border-n-300 bg-[var(--surface)]" />,
+  loading: () => <div className="min-h-60 rounded-sm border border-[var(--border-strong)] bg-[var(--surface)]" />,
 });
 
 /** 편집기가 빈 문서로 여기는 모양 */

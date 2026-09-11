@@ -32,25 +32,27 @@ const button = cva(
       variant: {
         primary:
           'bg-[var(--brand)] text-[var(--bg)] hover:bg-[var(--brand-hover)] ' +
-          'disabled:bg-n-200 disabled:text-n-400 ' +
-          'aria-disabled:bg-n-200 aria-disabled:text-n-400 aria-disabled:hover:bg-n-200',
+          'disabled:bg-[var(--bg-disabled)] disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:bg-[var(--bg-disabled)] aria-disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:hover:bg-[var(--bg-disabled)]',
         secondary:
           'border border-n-300 bg-[var(--bg)] text-[var(--fg)] hover:bg-[var(--surface)] hover:border-n-500 ' +
-          'disabled:border-n-200 disabled:text-n-400 ' +
-          'aria-disabled:border-n-200 aria-disabled:text-n-400 ' +
-          'aria-disabled:hover:bg-[var(--bg)] aria-disabled:hover:border-n-200',
+          'disabled:border-[var(--border)] disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:border-[var(--border)] aria-disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:hover:bg-[var(--bg)] aria-disabled:hover:border-[var(--border)]',
         accent:
           'bg-accent text-n-0 hover:bg-accent-hover ' +
-          'disabled:bg-n-200 disabled:text-n-400 ' +
-          'aria-disabled:bg-n-200 aria-disabled:text-n-400 aria-disabled:hover:bg-n-200',
+          'disabled:bg-[var(--bg-disabled)] disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:bg-[var(--bg-disabled)] aria-disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:hover:bg-[var(--bg-disabled)]',
         ghost:
           'text-[var(--fg-secondary)] hover:bg-[var(--surface-2)] ' +
-          'disabled:text-n-400 ' +
-          'aria-disabled:text-n-400 aria-disabled:hover:bg-transparent',
+          'disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:text-[var(--fg-disabled)] aria-disabled:hover:bg-transparent',
         danger:
           'border border-n-200 text-accent hover:bg-accent-soft ' +
-          'disabled:text-n-400 ' +
-          'aria-disabled:text-n-400 aria-disabled:hover:bg-transparent',
+          'disabled:text-[var(--fg-disabled)] ' +
+          'aria-disabled:text-[var(--fg-disabled)] aria-disabled:hover:bg-transparent',
       },
       size: {
         // 모바일 터치 타겟 최소 44px. sm/md는 데스크톱 전용으로만 쓸 것.
