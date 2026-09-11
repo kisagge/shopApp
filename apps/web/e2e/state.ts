@@ -9,6 +9,7 @@
 export const STATE_FILE = {
   customer: 'test-results/.auth/customer.json',
   admin: 'test-results/.auth/admin.json',
+  superAdmin: 'test-results/.auth/super-admin.json',
   merchant: 'test-results/.auth/merchant.json',
 
   cartOrdering: 'test-results/.auth/cart-ordering.json',
