@@ -97,16 +97,35 @@ test('출고하고 반품·환불로 닫는다', async ({ page, browser }) => {
     await mp.getByLabel('송장번호').fill('1234-5678-9012');
     await mp.getByRole('button', { name: '송장 등록하고 배송 시작' }).click();
 
-    // 송장만 저장되고 상태가 그대로면 단추 이름이 거짓말을 한 것이다
-    await expect(mp.getByText('배송중').first()).toBeVisible({ timeout: 15_000 });
+    /*
+     * 송장만 저장되고 상태가 그대로면 단추 이름이 거짓말을 한 것이다.
+     *
+     * **주문 상태 배지만 본다.** 화면 아무 데서나 '배송중' 을 찾으면 상태
+     * 고르는 칸 같은 데 있는 같은 글자에 걸려, 아직 안 바뀌었는데 바뀐 줄 안다.
+     */
+    await expect(mp.getByRole('heading', { name: '주문 상세' }).locator('..'))
+      .toContainText('배송중', { timeout: 15_000 });
 
     /*
      * **손님에게도 보여야 한다.** 운송 조회는 송장이 있을 때만 그려지므로,
      * 여기까지 와야 "붙었고 보인다" 가 확인된다.
+     *
+     * **다시 열면서 기다린다.** 이 화면은 서버가 그려서 보내므로, 그릴 때
+     * 없던 값은 DOM 을 아무리 기다려도 나타나지 않는다 — `toBeVisible` 의
+     * 재시도는 같은 HTML 을 다시 볼 뿐이다. 부하가 걸린 기계에서 송장 저장이
+     * 이 화면보다 늦게 끝나 실제로 그렇게 한 번 졌다(혼자 돌리면 통과했다).
+     * 기다릴 것은 화면이 아니라 **서버의 다음 대답**이다.
      */
-    await page.goto(`/order/${orderNo}`);
-    await ready(page);
-    await expect(page.getByText('1234-5678-9012')).toBeVisible();
+    await expect
+      .poll(
+        async () => {
+          await page.goto(`/order/${orderNo}`);
+          await ready(page);
+          return await page.getByText('1234-5678-9012').count();
+        },
+        { message: '손님 화면에 송장이 안 보인다', timeout: 20_000 },
+      )
+      .toBeGreaterThan(0);
 
     // ── 뒷정리: 배송완료 → 반품 신청 → 승인 → 환불(재고 복원)
     const toDelivered = await admin.request.post(`/api/admin/orders/${orderNo}/status`, {

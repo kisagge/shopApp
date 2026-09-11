@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { SupportPostView } from '~/lib/queries/support';
+import type { SupportPostSummary } from '~/lib/queries/support';
 import { getLocale } from '~/lib/i18n/server';
 import { formatDate } from '@shop/i18n';
 
@@ -12,7 +12,7 @@ export async function NoticeLines({
   notices,
   empty,
 }: {
-  notices: readonly SupportPostView[];
+  notices: readonly SupportPostSummary[];
   empty: string;
 }) {
   const locale = await getLocale();

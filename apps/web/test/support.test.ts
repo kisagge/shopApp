@@ -40,6 +40,12 @@ beforeEach(() => {
   });
 });
 
+/** 본문 나무 하나. 계약이 받는 가장 작은 모양이다. */
+const doc = (text: string) => ({
+  type: 'doc' as const,
+  content: [{ type: 'paragraph' as const, content: [{ type: 'text' as const, text }] }],
+});
+
 describe('손님에게 보이는 것', () => {
   it('내보내지 않은 글과 지운 글은 조회에서 빠진다', async () => {
     await getNotices();
@@ -114,7 +120,7 @@ describe('운영진만 쓴다', () => {
   it('가맹점은 쓸 수도 없다', async () => {
     await expect(
       createSupportPost(merchant, {
-        kind: 'NOTICE', title: '제목', body: '본문',
+        kind: 'NOTICE', title: '제목', bodyRich: doc('본문'),
         pinned: false, sortOrder: 0, published: true,
       }),
     ).rejects.toThrow(ForbiddenError);
@@ -132,7 +138,7 @@ describe('운영진만 쓴다', () => {
 
 describe('게시일', () => {
   const input = {
-    kind: 'NOTICE' as const, title: '제목', body: '본문',
+    kind: 'NOTICE' as const, title: '제목', bodyRich: doc('본문'),
     pinned: false, sortOrder: 0, published: true,
   };
 

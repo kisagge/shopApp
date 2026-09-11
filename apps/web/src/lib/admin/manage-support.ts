@@ -1,6 +1,9 @@
 import 'server-only';
-import { prisma } from '@shop/db';
-import { assertPermission, type Actor, type SupportPostKind } from '@shop/core';
+import { prisma, Prisma } from '@shop/db';
+import {
+  assertPermission, richTextToPlainText,
+  type Actor, type SupportPostKind,
+} from '@shop/core';
 import type { SupportPostInput } from '@shop/contract';
 import { recordAudit } from '~/lib/audit';
 
@@ -25,7 +28,17 @@ function dataOf(input: SupportPostInput, current: Date | null) {
   return {
     kind: input.kind,
     title: input.title,
-    body: input.body,
+    /*
+     * **평문은 서버가 뽑는다.** 화면이 둘 다 보내면 어느 날 서로 다른 말을
+     * 하게 되고, 그때 목록은 옛 글을 보여 주면서 본문은 새 글을 보여 준다.
+     * 뽑는 규칙은 core 에 하나뿐이다.
+     */
+    body: richTextToPlainText(input.bodyRich),
+    /*
+     * Prisma 의 Json 칸은 **읽기 전용 타입을 받지 않는다.** 계약이 돌려주는
+     * 나무는 readonly 라 여기서 한 번 벗긴다 — 값은 그대로고 모양만 바꾼다.
+     */
+    bodyRich: input.bodyRich as unknown as Prisma.InputJsonValue,
     topic: input.topic ?? null,
     pinned: input.pinned,
     sortOrder: input.sortOrder,

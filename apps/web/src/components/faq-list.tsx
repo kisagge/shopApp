@@ -1,4 +1,5 @@
 import type { SupportPostView } from '~/lib/queries/support';
+import { RichText } from './rich-text';
 
 /**
  * FAQ 한 묶음.
@@ -29,9 +30,19 @@ export function FaqList({ items }: { items: readonly SupportPostView[] }) {
                 </span>
               </span>
             </summary>
-            <p className="whitespace-pre-wrap pt-1 pb-5 pl-5 text-[13px] leading-loose text-[var(--fg-secondary)]">
-              {item.body}
-            </p>
+            {/*
+              **서식 없이 쓰인 옛 글은 평문 그대로 그린다.** 나무가 생기기
+              전에 쓴 글이 있고, 그 글도 계속 읽혀야 한다.
+            */}
+            <div className="pt-1 pb-5 pl-5">
+              {item.bodyRich ? (
+                <RichText doc={item.bodyRich} className="text-[13px]" />
+              ) : (
+                <p className="whitespace-pre-wrap text-[13px] leading-loose text-[var(--fg-secondary)]">
+                  {item.body}
+                </p>
+              )}
+            </div>
           </details>
         </li>
       ))}

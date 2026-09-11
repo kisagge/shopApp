@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import {
   SUPPORT_POST_KIND, INQUIRY_TOPIC, topicRequired,
-  SUPPORT_TITLE_MAX_LENGTH, SUPPORT_BODY_MAX_LENGTH,
+  SUPPORT_TITLE_MAX_LENGTH, isRichTextEmpty,
 } from '@shop/core';
+import { richTextSchema } from './rich-text';
 
 /**
  * 고객센터 글 계약.
@@ -15,7 +16,16 @@ export const supportPostSchema = z
   .object({
     kind: z.enum(SUPPORT_POST_KIND),
     title: z.string().trim().min(2, 'valid.titleRequired').max(SUPPORT_TITLE_MAX_LENGTH, 'valid.tooLongChars'),
-    body: z.string().trim().min(2, 'valid.bodyRequired').max(SUPPORT_BODY_MAX_LENGTH, 'valid.tooLongChars'),
+    /**
+     * 본문은 **나무 하나로만** 들어온다.
+     *
+     * 평문(`body`)도 저장하지만 그것은 서버가 나무에서 뽑는다. 둘 다 받으면
+     * 어느 날 서로 다른 말을 하게 되고, 그때 목록은 옛 글을 보여 주면서
+     * 본문은 새 글을 보여 준다.
+     */
+    bodyRich: richTextSchema.refine((doc) => !isRichTextEmpty(doc), {
+      message: 'valid.bodyRequired',
+    }),
     topic: z.enum(INQUIRY_TOPIC).nullish(),
     pinned: z.boolean().default(false),
     sortOrder: z.number().int('valid.integerOnly').min(0, 'valid.tooSmall').max(9_999, 'valid.tooBig').default(0),

@@ -28,6 +28,7 @@ export * from './image';
 export * from './schedule';
 export * from './order-hold';
 export * from './banner';
+export * from './rich-text';
 export * from './blur';
 export * from './slug-history';
 export * from './collection';

@@ -1473,7 +1473,21 @@ model SupportPost {
   kind SupportPostKind
 
   title String
+
+  /// 서식을 뺀 본문.
+  ///
+  /// **나무(bodyRich)가 있어도 이 칸은 남긴다.** 목록의 요약, 검색,
+  /// `<meta description>` 은 서식이 필요 없고 오히려 방해가 된다. 뽑아내는
+  /// 규칙은 core 에 하나뿐이라(richTextToPlainText) 목록과 본문이 다른 말을
+  /// 하지 않는다. 나무가 없는 옛 글은 이 칸만 갖는다.
   body  String
+
+  /// 서식 있는 본문. core 가 정한 어휘로만 이뤄진 나무다.
+  ///
+  /// **HTML 문자열이 아니다.** 편집기가 만든 HTML 을 그대로 담으면 이 칸이
+  /// 공개 화면에서 그대로 실행된다. 어휘는 rich-text.ts 가 정하고 계약이
+  /// 강제한다. 서식 없이 쓰인 옛 글은 null 이다.
+  bodyRich Json?
 
   /// FAQ 의 갈래. 공지에는 없다.
   topic InquiryTopic?

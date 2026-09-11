@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { supportPostSchema, createInquirySchema } from '../src';
 
+/** 본문은 나무로 들어온다 — 평문은 서버가 여기서 뽑는다 */
+const body = (text: string) => ({
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+});
+
 const post = (over: Record<string, unknown> = {}) => ({
-  kind: 'NOTICE', title: '배송 안내', body: '연휴에는 늦어집니다', ...over,
+  kind: 'NOTICE', title: '배송 안내', bodyRich: body('연휴에는 늦어집니다'), ...over,
 });
 
 describe('고객센터 글', () => {
@@ -36,7 +42,12 @@ describe('고객센터 글', () => {
 
   it('빈 제목과 빈 본문은 받지 않는다', () => {
     expect(supportPostSchema.safeParse(post({ title: ' ' })).success).toBe(false);
-    expect(supportPostSchema.safeParse(post({ body: '' })).success).toBe(false);
+    /*
+     * 편집기는 아무것도 안 써도 빈 문단 하나를 내보낸다. 길이만 보면 그것이
+     * "내용 있음" 으로 통과해서 제목만 있는 공지가 게시된다.
+     */
+    const empty = { type: 'doc', content: [{ type: 'paragraph' }] };
+    expect(supportPostSchema.safeParse(post({ bodyRich: empty })).success).toBe(false);
   });
 });
 

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { formatDate } from '@shop/i18n';
 import { getNotice } from '~/lib/queries/support';
 import { getLocale, getT } from '~/lib/i18n/server';
+import { RichText } from '~/components/rich-text';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +39,14 @@ export default async function NoticePage({ params }: Params) {
         )}
       </header>
 
-      <p className="whitespace-pre-wrap pt-8 text-[15px] leading-loose text-[var(--fg-secondary)]">
-        {notice.body}
-      </p>
+      {/* 나무가 없는 옛 글은 평문 그대로 — 서식이 생기기 전에 쓴 글도 읽혀야 한다 */}
+      {notice.bodyRich ? (
+        <RichText doc={notice.bodyRich} className="pt-8" />
+      ) : (
+        <p className="whitespace-pre-wrap pt-8 text-[15px] leading-loose text-[var(--fg-secondary)]">
+          {notice.body}
+        </p>
+      )}
 
       <p className="pt-12">
         <Link

@@ -1,21 +1,57 @@
 'use client';
 
 import { useId, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import {
   INQUIRY_TOPIC, SUPPORT_POST_KIND, topicRequired,
-  SUPPORT_TITLE_MAX_LENGTH, SUPPORT_BODY_MAX_LENGTH,
-  type InquiryTopic, type SupportPostKind,
+  SUPPORT_TITLE_MAX_LENGTH,
+  type InquiryTopic, type RichTextDoc, type SupportPostKind,
 } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { TOPIC_KEY } from '~/lib/i18n/support';
+
+/**
+ * 편집기는 **열어 볼 때 받아 온다.**
+ *
+ * TipTap 과 ProseMirror 는 이 화면에서만 쓰는데 무게가 만만치 않다. 같은
+ * 묶음에 넣으면 공지를 고치러 오지 않은 사람도 그 무게를 치른다 — 운영
+ * 화면의 무게 상한(bundle-budget-admin)을 두고 있는 이유다.
+ *
+ * `ssr: false` 인 이유는 편집기가 DOM 을 직접 만지기 때문이다. 서버에서 한 번
+ * 그리면 하이드레이션이 어긋난다.
+ */
+const RichEditor = dynamic(() => import('./rich-editor').then((m) => m.RichEditor), {
+  ssr: false,
+  loading: () => <div className="min-h-60 rounded-sm border border-n-300 bg-[var(--surface)]" />,
+});
+
+/** 편집기가 빈 문서로 여기는 모양 */
+const emptyDoc = (): RichTextDoc => ({ type: 'doc', content: [{ type: 'paragraph' }] });
+
+/**
+ * 서식 없이 쓰인 옛 글을 편집기에 올린다.
+ *
+ * 나무가 없는 행은 평문뿐이다. 그대로 두면 고치러 들어온 사람에게 빈 편집기가
+ * 보이고, 저장하는 순간 본문이 사라진다. 줄바꿈으로 끊어 문단으로 만든다.
+ */
+const docFrom = (bodyRich: RichTextDoc | null, body: string): RichTextDoc => {
+  if (bodyRich) return bodyRich;
+  const paragraphs = body.split('\n').map((line) =>
+    line.length === 0
+      ? { type: 'paragraph' as const }
+      : { type: 'paragraph' as const, content: [{ type: 'text' as const, text: line }] },
+  );
+  return { type: 'doc', content: paragraphs.length > 0 ? paragraphs : [{ type: 'paragraph' }] };
+};
 
 export interface SupportPostItem {
   readonly id: string;
   readonly kind: SupportPostKind;
   readonly title: string;
   readonly body: string;
+  readonly bodyRich: RichTextDoc | null;
   readonly topic: InquiryTopic | null;
   readonly pinned: boolean;
   readonly sortOrder: number;
@@ -29,7 +65,7 @@ const KIND_LABEL: Record<SupportPostKind, string> = { NOTICE: '공지', FAQ: 'FA
 interface Draft {
   kind: SupportPostKind;
   title: string;
-  body: string;
+  bodyRich: RichTextDoc;
   topic: InquiryTopic | null;
   pinned: boolean;
   sortOrder: number;
@@ -39,7 +75,7 @@ interface Draft {
 const emptyDraft = (): Draft => ({
   kind: 'NOTICE',
   title: '',
-  body: '',
+  bodyRich: emptyDoc(),
   topic: null,
   pinned: false,
   sortOrder: 0,
@@ -49,7 +85,7 @@ const emptyDraft = (): Draft => ({
 const draftOf = (post: SupportPostItem): Draft => ({
   kind: post.kind,
   title: post.title,
-  body: post.body,
+  bodyRich: docFrom(post.bodyRich, post.body),
   topic: post.topic,
   pinned: post.pinned,
   sortOrder: post.sortOrder,
@@ -213,17 +249,18 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label htmlFor={`${formId}-body`} className="text-[12px] text-[var(--fg-muted)]">
+          {/*
+            편집기는 `<textarea>` 가 아니라 `contenteditable` 이라 `<label for>`
+            가 안 붙는다. 이름표를 id 로 주고 편집 영역이 자기를 가리키게 한다.
+          */}
+          <span id={`${formId}-body`} className="text-[12px] text-[var(--fg-muted)]">
             {draft.kind === 'FAQ' ? '답변' : '내용'}
-          </label>
-          <textarea
-            id={`${formId}-body`}
-            value={draft.body}
-            onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-            required
-            rows={10}
-            maxLength={SUPPORT_BODY_MAX_LENGTH}
-            className="rounded-sm border border-n-300 bg-[var(--bg)] p-2.5 text-[13px] leading-relaxed"
+          </span>
+          <RichEditor
+            key={editing ?? 'new'}
+            value={draft.bodyRich}
+            onChange={(bodyRich) => setDraft((d) => ({ ...d, bodyRich }))}
+            labelledBy={`${formId}-body`}
           />
         </div>
 
