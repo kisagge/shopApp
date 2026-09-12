@@ -42,10 +42,11 @@ export const SEED_ACCOUNT = {
   cartLayout: 'cart-layout@plain.test',
   cartLifecycle: 'cart-lifecycle@plain.test',
   cartDeposit: 'cart-deposit@plain.test',
+  cartTotal: 'cart-total@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit',
+  'cartDeposit', 'cartTotal',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

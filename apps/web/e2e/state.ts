@@ -19,6 +19,7 @@ export const STATE_FILE = {
   cartLayout: 'test-results/.auth/cart-layout.json',
   cartLifecycle: 'test-results/.auth/cart-lifecycle.json',
   cartDeposit: 'test-results/.auth/cart-deposit.json',
+  cartTotal: 'test-results/.auth/cart-total.json',
 } as const;
 
 /**
