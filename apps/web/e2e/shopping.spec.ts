@@ -108,6 +108,12 @@ test('낱말을 더하면 좁혀진다 — 넓어지지 않는다', async ({ pag
    */
   const count = async (q: string) => {
     await page.goto('/search?q=' + encodeURIComponent(q));
+    /*
+     * **그려질 때까지 기다린 뒤에 센다.** 곧바로 세면 0 이 나오고, 0 은
+     * "좁혀졌다" 로 읽혀 조용히 통과한다 — 실제로 매대가 커지면서 한 번
+     * 그렇게 졌다.
+     */
+    await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
     return page.locator('#main a[href^="/product/"]').count();
   };
 
@@ -130,6 +136,40 @@ test('브랜드 칩도 같은 조건으로 좁혀진다', async ({ page }) => {
   await page.getByText('상품 좁혀 보기').click();
   // 결과가 있는 검색에서 좁힐 거리가 하나도 없으면 조건이 어긋난 것이다
   await expect(page.locator('#main')).toContainText(/브랜드|색|사이즈/);
+});
+
+test('"더 보기" 가 다음 쪽을 가져오고, 조건을 그대로 들고 간다', async ({ page }) => {
+  /*
+   * **이 자리는 오랫동안 밟을 수 없었다.** 한 쪽이 24개인데 가장 큰 목록이
+   * 13개라 "더 보기" 가 화면에 아예 안 나왔다. 그래서 거기 있던 결함 —
+   * 색·사이즈·브랜드 필터를 안 들고 가던 것 — 도 여태 안 보였다.
+   * 아우터를 26개로 올려 길을 냈다.
+   */
+  const slugs = async () =>
+    (await page.locator('#main a[href^="/product/"]').evaluateAll((links) =>
+      links.map((l) => l.getAttribute('href')),
+    )).filter((h): h is string => h !== null);
+
+  await page.goto('/category/outer?sort=price_asc');
+  const first = new Set(await slugs());
+  expect(first.size, '한 쪽이 다 안 찼으면 더 보기가 나올 수 없다').toBe(24);
+
+  const more = page.getByRole('link', { name: /더 보기|더보기|more/i });
+  await expect(more).toBeVisible();
+
+  // 조건이 주소에 실려 있어야 다음 쪽도 같은 목록이다
+  const href = await more.getAttribute('href');
+  expect(href, '더 보기가 정렬을 흘린다').toContain('sort=price_asc');
+
+  await more.click();
+  await page.waitForURL(/cursor=/);
+
+  const second = await slugs();
+  expect(second.length, '다음 쪽이 비었다').toBeGreaterThan(0);
+  // 같은 상품을 두 번 보여 주면 커서가 제자리를 못 잡은 것이다
+  for (const slug of second) {
+    expect(first.has(slug), `${slug} 가 두 쪽에 다 나온다`).toBe(false);
+  }
 });
 
 test('결과가 없으면 무엇을 풀어야 하는지 알려 준다', async ({ page }) => {

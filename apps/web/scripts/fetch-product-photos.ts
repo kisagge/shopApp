@@ -77,6 +77,21 @@ const QUERY: Readonly<Record<string, string>> = {
   'leather-belt-35mm': 'leather belt accessory',
   'wool-beanie': 'wool beanie hat',
   'leather-card-wallet': 'leather card wallet',
+
+  // ── 아우터를 한 쪽보다 많게 더하면서(seed.ts) 함께 ──────────────
+  'melton-single-coat': 'melton wool coat fashion',
+  'toggle-hood-coat': 'hooded winter coat fashion',
+  'wool-chester-coat': 'chesterfield coat fashion',
+  'alpaca-blend-robe-coat': 'belted wrap coat fashion',
+  'goose-down-long-padding': 'long puffer coat fashion',
+  'lightweight-down-vest': 'down vest fashion',
+  'quilted-liner-jacket': 'quilted jacket fashion',
+  'tweed-collarless-jacket': 'tweed jacket fashion',
+  'suede-trucker-jacket': 'suede jacket fashion',
+  'cotton-field-jacket': 'field jacket fashion',
+  'leather-sleeve-blouson': 'varsity jacket fashion',
+  'nylon-coach-blouson': 'coach jacket fashion',
+  'corduroy-blouson': 'corduroy jacket fashion',
 };
 
 const PER_PRODUCT = 2;

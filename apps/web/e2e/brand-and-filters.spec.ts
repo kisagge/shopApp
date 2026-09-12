@@ -138,6 +138,35 @@ test('접은 채로 정렬만 바꿔도 조건이 풀리지 않는다', async ({
   await expect(page).toHaveURL(/sort=price_asc/);
 });
 
+
+/**
+ * 목록을 **쪽 끝까지** 따라가며 모은다.
+ *
+ * **한 쪽에 다 나온다고 믿고 있었다.** 아우터가 스물여섯이 되면서 첫 쪽에
+ * 스물넷만 나오는데, 그때까지 이 파일의 검사들은 첫 쪽을 매대 전체로 알고
+ * 셌다 — "구간을 다 더하면 매대 전체가 된다" 가 26 ≠ 24 로 졌다.
+ * 좁힌 목록은 한 쪽에 들어가고 안 좁힌 목록은 두 쪽이니, 세는 방법이
+ * 다르면 비교 자체가 성립하지 않는다.
+ */
+async function walkShelf<T>(
+  page: import('@playwright/test').Page,
+  url: string,
+  read: () => Promise<T[]>,
+): Promise<T[]> {
+  await page.goto(url);
+  await expect(page.locator('#main').first()).toBeVisible();
+
+  const out: T[] = [];
+  for (let guard = 0; guard < 10; guard += 1) {
+    out.push(...(await read()));
+    const more = page.getByRole('link', { name: /더 보기|더보기|more/i });
+    if ((await more.count()) === 0) break;
+    await more.click();
+    await page.waitForURL(/cursor=/);
+  }
+  return out;
+}
+
 test('가격으로 좁히면 실제 가격과 맞는다', async ({ page }) => {
   /*
    * 이 명세가 없어서 못 봤다. 파는 가격은 `salePrice ?? listPrice` 인
@@ -149,13 +178,12 @@ test('가격으로 좁히면 실제 가격과 맞는다', async ({ page }) => {
    * 안에 있는지, 그리고 좁히기 전보다 줄었는지 — 둘 다 봐야 한다. 개수만
    * 보면 0 개도 통과한다.
    */
-  const priced = async (url: string) => {
-    await page.goto(url);
-    await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
-    return page.locator('#main [data-price]').evaluateAll((els) =>
-      els.map((e) => Number((e as HTMLElement).dataset['price'])),
+  const priced = (url: string) =>
+    walkShelf(page, url, () =>
+      page.locator('#main [data-price]').evaluateAll((els) =>
+        els.map((e) => Number((e as HTMLElement).dataset['price'])),
+      ),
     );
-  };
 
   const all = await priced('/category/outer');
   expect(all.length).toBeGreaterThan(1);
@@ -321,8 +349,13 @@ test('구간을 다 더하면 매대 전체가 된다', async ({ page }) => {
    * 여기서는 진짜 매대를 네 번 세어 합이 맞는지 본다.
    */
   const count = async (query: string) => {
-    await page.goto(`/category/outer${query}`);
-    return page.locator('#main a[href^="/product/"]').count();
+    const links = await walkShelf(page, `/category/outer${query}`, () =>
+      page.locator('#main a[href^="/product/"]').evaluateAll((els) =>
+        els.map((e) => e.getAttribute('href') ?? ''),
+      ),
+    );
+    // 같은 상품이 두 쪽에 겹쳐 나오면 합이 부풀어 검사가 헛통과한다
+    return new Set(links).size;
   };
 
   const all = await count('');

@@ -161,7 +161,19 @@ export async function seedReviews(): Promise<void> {
     return;
   }
 
-  let orderSeq = 0;
+  /**
+   * **0 부터 세면 두 번째 시드가 터진다.**
+   *
+   * 주문번호가 `날짜-9000001` 처럼 이 숫자로 만들어지는데, 이 함수는 리뷰가
+   * 없는 상품만 골라 돈다 — 상품을 더하고 다시 시드하면 새 상품만 처리하면서
+   * 번호를 1 부터 다시 매기고, 지난번에 만든 주문과 부딪힌다. 실제로 아우터를
+   * 열세 개 더하고 다시 돌렸더니 `orders_orderNo_key` 에서 멈췄다.
+   *
+   * 이미 있는 주문 수만큼 건너뛰고 시작한다. 번호는 늘 앞으로만 가므로
+   * 몇 번을 다시 돌려도 부딪히지 않는다.
+   */
+  let orderSeq = await prisma.order.count();
+  const startedAt = orderSeq;
   let reviewCount = 0;
   let productIndex = 0;
 
@@ -257,7 +269,8 @@ export async function seedReviews(): Promise<void> {
 
   await recountAll();
 
-  console.log(`  리뷰어 ${reviewers.length}명 · 주문 ${orderSeq}건 · 리뷰 ${reviewCount}건`);
+  const made = orderSeq - startedAt;
+  console.log(`  리뷰어 ${reviewers.length}명 · 주문 ${made}건 · 리뷰 ${reviewCount}건`);
 }
 
 /**
