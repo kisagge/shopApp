@@ -3,7 +3,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * README 가 코드와 다른 말을 하지 않는다.
+ * 문서가 코드와 다른 말을 하지 않는다.
  *
  * **읽는 사람이 가장 먼저 보는 문서이고, 아무도 안 고친다.** 실제로 함수를
  * 서울(`icn1`)에서 싱가포르(`sin1`)로 옮기면서 `vercel.json` 과 배포 문서는
@@ -17,6 +17,7 @@ import { join } from 'node:path';
 
 const ROOT = join(process.cwd(), '..', '..');
 const README = readFileSync(join(ROOT, 'README.md'), 'utf8');
+const DEPLOY = readFileSync(join(ROOT, 'docs/DEPLOY.md'), 'utf8');
 
 describe('README 가 코드와 같은 말을 한다', () => {
   it('README 를 실제로 읽었다 — 못 읽으면 아래가 전부 헛돈다', () => {
@@ -65,5 +66,33 @@ describe('README 가 코드와 같은 말을 한다', () => {
       if (name === 'web' || name === 'mobile') continue; // apps/ 아래다
       expect(real.has(name), `README 가 없는 패키지 ${name} 을 가리킨다`).toBe(true);
     }
+  });
+});
+
+describe('배포 문서가 코드와 같은 말을 한다', () => {
+  it('DEPLOY.md 를 실제로 읽었다', () => {
+    expect(DEPLOY.length).toBeGreaterThan(3_000);
+    expect(DEPLOY).toContain('pnpm db:seed');
+  });
+
+  it('운영 DB 시드 명령에 문지기 플래그가 들어 있다', () => {
+    /*
+     * **따라 할 수 없는 지시는 없는 것보다 나쁘다.** 시드는 원격 DB 를
+     * 가리키면 플래그 없이는 거절한다 — 셸에 운영 주소를 남겨 둔 채 다른
+     * 명령을 돌리는 실수를 막으려고 일부러 둔 문지기다. 그런데 문서에 적힌
+     * 명령에는 그 플래그가 빠져 있었고, 그대로 따라 하면 멈췄다.
+     *
+     * 플래그 이름은 코드에서 가져온다. 이름을 바꾸면 여기서 걸린다.
+     */
+    const target = readFileSync(
+      join(ROOT, 'packages/db/src/seed-target.ts'),
+      'utf8',
+    );
+    const flag = /SEED_REMOTE_FLAG = '([A-Z_]+)'/.exec(target)?.[1];
+    expect(flag, 'seed-target.ts 에서 플래그 이름을 못 찾았다').toBeDefined();
+
+    const line = DEPLOY.split('\n').find((l) => l.includes('pnpm db:seed') && l.includes('DATABASE_URL'));
+    expect(line, 'DEPLOY.md 에서 운영 시드 명령을 못 찾았다').toBeDefined();
+    expect(line, `그대로 따라 하면 ${flag} 가 없어 거절당한다`).toContain(`${flag}=yes`);
   });
 });
