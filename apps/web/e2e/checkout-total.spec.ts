@@ -126,6 +126,30 @@ test('포인트를 쓰면 그만큼 줄고, 줄들은 여전히 맞는다', asyn
   expect(before - after, '포인트를 쓴 만큼 안 줄었다').toBe(1000);
 });
 
+test('쿠폰을 받으면 줄이 하나 늘고, 합은 여전히 맞는다', async ({ page }) => {
+  /*
+   * **쿠폰 줄이 한 번도 안 그려지고 있었다.** 위 검사들은 "없으면 0" 으로
+   * 세므로, 쿠폰을 가진 적 없는 계정에서는 그 줄을 확인한 적이 없다 —
+   * 덧셈에 늘 0 만 넣고 통과한 셈이다.
+   *
+   * 받는 것부터 밟는다. 쿠폰을 받아 쓰는 길은 화면 검사가 없던 자리이기도 하다.
+   */
+  const claim = await page.request.post('/api/coupons/claim', {
+    data: { code: 'WELCOME10000' },
+  });
+  // 두 번째 실행부터는 이미 받은 상태다 — 그것도 정상이다
+  expect([200, 409], `쿠폰을 못 받았다 (${claim.status()})`).toContain(claim.status());
+
+  await toCheckout(page);
+
+  const coupon = await row(page, '쿠폰 할인');
+  expect(coupon, '쿠폰을 받았는데 쿠폰 할인 줄이 없다').not.toBeNull();
+  // 시드의 WELCOME10000 은 3만원 이상에 1만원 정액이다
+  expect(coupon, '정액 쿠폰인데 다른 값이 빠졌다').toBe(10_000);
+
+  await expectRowsAddUp(page);
+});
+
 test('화면에 보인 금액이 그대로 청구된다', async ({ page }) => {
   /*
    * **여기가 이 파일의 요점이다.** 위 검사들은 화면 안에서 앞뒤가 맞는지만
@@ -155,4 +179,19 @@ test('화면에 보인 금액이 그대로 청구된다', async ({ page }) => {
     data: { reason: '검사가 만든 주문을 되돌립니다' },
   });
   expect(undo.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${undo.status()})`).toBe(true);
+
+  /*
+   * **취소하면 쿠폰이 되살아난다.** 취소는 주문 생성이 한 일을 역순으로 푸는
+   * 것이고, 쓴 쿠폰을 돌려주는 것도 거기 들어 있다. 안 돌려주면 취소 한 번에
+   * 쿠폰이 사라지는데, 화면은 아무 말도 하지 않는다 — 쓸 때가 되어서야 없는
+   * 것을 안다.
+   *
+   * 이 검사가 앞의 쿠폰 검사를 **다음 실행까지 살려 두는** 장치이기도 하다.
+   * 되살아나지 않으면 두 번째 실행부터 쿠폰 줄이 안 그려진다.
+   */
+  await toCheckout(page);
+  expect(
+    await row(page, '쿠폰 할인'),
+    '주문을 취소했는데 쿠폰이 안 돌아왔다',
+  ).toBe(10_000);
 });
