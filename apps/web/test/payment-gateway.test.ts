@@ -208,8 +208,8 @@ describe('결제 방식을 정하는 자리는 하나다', () => {
 
   it('결제 화면이 서버 결론을 계산해 폼에 내려 준다', async () => {
     const { readFileSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const page = readFileSync(join(process.cwd(), 'src/app/checkout/page.tsx'), 'utf8');
+    const { appFile } = await import('./app-routes');
+    const page = readFileSync(appFile('/checkout'), 'utf8');
     expect(page).toContain('serverPaymentMode');
     expect(page).toContain('paymentMode={');
   });

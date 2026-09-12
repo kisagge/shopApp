@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { DISALLOWED_PATHS, isDisallowedPath } from '@shop/core';
+import { APP, appDir, appFile } from './app-routes';
 
 /**
  * 색인 정책이 화면과 어긋나지 않는지 지킨다.
@@ -11,12 +12,14 @@ import { DISALLOWED_PATHS, isDisallowedPath } from '@shop/core';
  * 화면 쪽 noindex 도 함께 있어야 하고, 둘 중 하나만 있으면 아무도 모른다.
  */
 
-const APP = join(process.cwd(), 'src', 'app');
-
 /** 이 경로 아래에 noindex 가 걸려 있는가 — 자기 자신이거나 조상 레이아웃이거나 */
 function guarded(path: string): boolean {
-  const dir = join(APP, path.replace(/^\//, ''));
-  if (!existsSync(dir)) return false;
+  let dir: string;
+  try {
+    dir = appDir(path);
+  } catch {
+    return false;
+  }
 
   for (const name of ['layout.tsx', 'page.tsx']) {
     const file = join(dir, name);
@@ -109,12 +112,12 @@ describe('색인에서 빼는 경로', () => {
 
 describe('공개 화면', () => {
   it('상품 상세는 색인돼야 한다', () => {
-    const source = readFileSync(join(APP, 'product', '[slug]', 'page.tsx'), 'utf8');
+    const source = readFileSync(appFile('/product/[slug]'), 'utf8');
     expect(source).not.toContain('NO_INDEX');
   });
 
   it('상품 상세가 구조화 데이터를 낸다', () => {
-    const source = readFileSync(join(APP, 'product', '[slug]', 'page.tsx'), 'utf8');
+    const source = readFileSync(appFile('/product/[slug]'), 'utf8');
     expect(source).toContain('application/ld+json');
     expect(source).toContain('productStructuredData');
   });
@@ -124,12 +127,12 @@ describe('공개 화면', () => {
      * 상품명·설명은 운영자가 넣는 값이다. </script> 가 들어오면 그 자리에서
      * 스크립트가 끊기고 뒤가 마크업으로 읽힌다.
      */
-    const source = readFileSync(join(APP, 'product', '[slug]', 'page.tsx'), 'utf8');
+    const source = readFileSync(appFile('/product/[slug]'), 'utf8');
     expect(source).toMatch(/replace\(\/<\/g,\s*'\\\\u003c'\)/);
   });
 
   it('홈과 카테고리도 색인된다', () => {
-    for (const file of [join(APP, 'page.tsx'), join(APP, 'category', '[slug]', 'page.tsx')]) {
+    for (const file of [appFile('/'), appFile('/category/[slug]')]) {
       expect(readFileSync(file, 'utf8'), relative(APP, file)).not.toContain('NO_INDEX');
     }
   });
@@ -146,8 +149,8 @@ describe('공개 화면', () => {
    * 때 이것을 빠뜨리기 쉬워서 같은 자리에서 지킨다.
    */
   const LISTING_PAGES = [
-    ['매대', join(APP, 'category', '[slug]', 'page.tsx')],
-    ['기획전', join(APP, 'collection', '[slug]', 'page.tsx')],
+    ['매대', appFile('/category/[slug]')],
+    ['기획전', appFile('/collection/[slug]')],
   ] as const;
 
   it.each(LISTING_PAGES)('%s 화면이 담은 것을 구조화 데이터로 낸다', (_label, file) => {

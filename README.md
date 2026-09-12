@@ -33,6 +33,9 @@ iOS 는 시뮬레이터에 설치해 확인한 상태다.
 ```
 apps/
   web/         Next.js 16 (App Router) — 스토어프론트 + /api/* 백엔드 + 어드민
+               src/app/(shop)/  가게 화면. 머리와 발을 두른다 (그룹 폴더라 주소엔 안 들어간다)
+               src/app/admin/   운영 화면. 자기 사이드바만 두른다
+               src/app/api/     백엔드
   mobile/      Capacitor 8 셸 — 배포된 웹을 띄우고 네이티브 기능만 브릿지로 쓴다
 packages/
   core/        도메인 순수 로직 — 금액·장바구니·배송비·주문 상태머신·권한·매출 인식
@@ -186,7 +189,7 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 
 ```
 core 793 · web 2,142 · contract 221 · ui 120 · auth 38 · i18n 39 · db 28 · native 22 · mail 7
-e2e 723 (Playwright, 51 파일)
+e2e 730 (Playwright, 52 파일)
 ```
 
 ```bash

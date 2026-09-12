@@ -67,7 +67,20 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         theme={await getTheme()}
       />
 
-      <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface)]">{children}</div>
+      {/*
+        **`main` 이 여기 있어야 한다.** 예전에는 루트 레이아웃이 하나를 그려서
+        운영 화면도 그 안에 들어갔는데, 그 레이아웃에서 매장의 머리와 발을
+        떼면서 함께 나갔다. 없으면 '본문 바로가기' 가 가리킬 곳이 없어지고
+        (주소만 바뀌고 초점은 사라진다), 낭독기는 이 화면에 본문이 없다고
+        말한다 — 표가 가장 빽빽한 화면들이 여기다.
+      */}
+      <main
+        id="main"
+        tabIndex={-1}
+        className="flex min-w-0 flex-1 flex-col bg-[var(--surface)] focus:outline-none"
+      >
+        {children}
+      </main>
     </div>
   );
 }

@@ -10,8 +10,6 @@ import { NativeSplash } from '~/components/native-splash';
 import { NativeDeepLink } from '~/components/native-deep-link';
 import { NativeBackButton } from '~/components/native-back-button';
 import { ServiceWorker } from '~/components/service-worker';
-import { SiteHeader } from '~/components/site-header';
-import { SiteFooter } from '~/components/site-footer';
 import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
 import { getDictionary, getLocale, getT } from '~/lib/i18n/server';
@@ -19,7 +17,6 @@ import { getViewer } from '~/lib/viewer';
 import { getTheme } from '~/lib/theme';
 import { themeAttribute } from '@shop/core';
 import { LocaleProvider } from '~/lib/i18n/client';
-import { CompareTray } from '~/components/compare-tray';
 
 /**
  * **웹폰트는 세리프 하나뿐이다.**
@@ -130,21 +127,16 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         </a>
         <LocaleProvider locale={locale} dict={dict}>
           <Providers>
-            <div className="flex min-h-dvh flex-col">
-              <SiteHeader />
-              {/*
-                * tabIndex 가 없으면 건너뛰기 링크가 주소만 바꾸고 **초점은
-                * body 로 사라진다.** Chrome 은 다음 Tab 을 본문에서 이어 주지만
-                * 초점이 없으니 낭독기는 본문에 왔다고 말하지 않고, 그 이어주기가
-                * 없는 브라우저에서는 링크가 아무 일도 하지 않는다.
-                */}
-              <main id="main" tabIndex={-1} className="flex-1 focus:outline-none">
-                {children}
-              </main>
-              <SiteFooter />
-            </div>
-            {/* 담아 둔 것이 없으면 아무것도 그리지 않는다 */}
-            <CompareTray />
+            {/*
+              **머리와 발은 여기서 그리지 않는다.** 그러면 `/admin` 아래에도
+              그대로 붙는다 — 주문 표 밑에 카테고리 목록과 입점 신청 링크가
+              달려 있었다. 매장 화면은 `(shop)` 그룹의 레이아웃이, 운영 화면은
+              `/admin` 의 레이아웃이 각자 두른다.
+
+              이 레이아웃에 남는 것은 **어느 쪽에나 필요한 것들**이다 — 말과
+              테마, 건너뛰기 링크, 기록과 네이티브 셸.
+            */}
+            {children}
             <AnalyticsProvider />
             {/* 실사용자 성능. 같은 파이프라인으로 나간다. */}
             <WebVitalsReporter />

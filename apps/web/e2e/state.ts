@@ -50,10 +50,17 @@ export const REVIEW_PRODUCT = {
  *
  * 신호는 헤더의 로그인 상태 조각이다 — 세션을 읽기 전에는 자리만 잡고 있다가,
  * 하이드레이션이 끝나고 나서야 로그인이나 마이페이지 링크로 바뀐다.
+ *
+ * **운영 화면에는 그 헤더가 없다.** 매장의 머리와 발을 `/admin` 에서 떼면서
+ * 이 신호도 함께 사라졌다 — 여기를 안 고쳤다면 운영 검사 열몇 개가 30초씩
+ * 기다리다 죽었을 것이다. 그쪽 신호는 운영 메뉴다. 둘 중 먼저 오는 것을
+ * 기다린다.
  */
 export async function ready(page: import('@playwright/test').Page): Promise<void> {
   await page
-    .locator('header a[href="/login"], header a[href="/mypage"]')
+    .locator(
+      'header a[href="/login"], header a[href="/mypage"], [aria-label="관리자 메뉴"] a[href]',
+    )
     .first()
     .waitFor({ state: 'attached' });
 }

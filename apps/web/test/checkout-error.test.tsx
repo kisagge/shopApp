@@ -10,7 +10,7 @@ vi.mock('next/link', () => ({
   useLinkStatus: () => ({ pending: false }),
 }));
 
-const CheckoutError = (await import('~/app/checkout/error')).default;
+const CheckoutError = (await import('~/app/(shop)/checkout/error')).default;
 
 /**
  * 결제 도중 화면이 깨졌을 때.

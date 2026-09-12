@@ -17,7 +17,17 @@ import { join, relative } from 'node:path';
  * 훑기는 멀쩡한 화면만 지나간다.
  */
 
-const APP = join(process.cwd(), 'src', 'app');
+import { APP, appFile } from './app-routes';
+
+/**
+ * 그룹 폴더는 주소에 안 들어가므로 **구역 이름에서도 뺀다.**
+ * `(shop)/mypage` 가 아니라 `mypage` 다 — 주소가 그러니까.
+ */
+const asRoute = (path: string): string =>
+  relative(APP, path)
+    .split('/')
+    .filter((segment) => !segment.startsWith('('))
+    .join('/');
 
 /**
  * 경계를 따로 두지 않아도 되는 구역과 그 이유.
@@ -26,7 +36,9 @@ const APP = join(process.cwd(), 'src', 'app');
  */
 const EXEMPT: Readonly<Record<string, string>> = {
   'mypage':
-    '루트 껍데기(머리말·꼬리말)만 쓰고 자기 메뉴가 없다. 루트 경계가 잡아도 사용자가 잃는 것이 없다.',
+    '매장 껍데기(머리말·꼬리말)만 쓰고 자기 메뉴가 없다. 한 단 위의 경계가 잡아도 사용자가 잃는 것이 없다.',
+  '':
+    '그룹 폴더 자체다. 주소에 안 들어가고, 매장 껍데기를 두르는 것이 하는 일의 전부다.',
 };
 
 /** layout.tsx 를 가진 폴더 = 자기 껍데기를 가진 구역 */
@@ -55,19 +67,23 @@ describe('구역마다 오류 경계', () => {
     expect(existsSync(join(APP, 'global-error.tsx'))).toBe(true);
   });
 
-  it.each(segments.map((s) => relative(APP, s)))('%s 에 오류 경계가 있다', (rel) => {
-    if (rel in EXEMPT) return;
-    expect(
-      existsSync(join(APP, rel, 'error.tsx')),
-      `${rel} 는 자기 레이아웃이 있는데 오류 경계가 없다. 루트가 잡으면 그 레이아웃까지 사라진다 — ` +
-        'error.tsx 를 두거나, 필요 없는 이유를 EXEMPT 에 적는다.',
-    ).toBe(true);
-  });
+  it.each(segments.map((s) => [relative(APP, s), s] as const))(
+    '%s 에 오류 경계가 있다',
+    (rel, dir) => {
+      if (asRoute(dir) in EXEMPT) return;
+      expect(
+        existsSync(join(dir, 'error.tsx')),
+        `${rel} 는 자기 레이아웃이 있는데 오류 경계가 없다. 한 단 위가 잡으면 그 레이아웃까지 ` +
+          '사라진다 — error.tsx 를 두거나, 필요 없는 이유를 EXEMPT 에 적는다.',
+      ).toBe(true);
+    },
+  );
 
   it('면제한 구역은 실제로 있고 이유가 적혀 있다', () => {
-    for (const [rel, reason] of Object.entries(EXEMPT)) {
-      expect(existsSync(join(APP, rel)), rel).toBe(true);
-      expect(reason.trim().length, rel).toBeGreaterThan(20);
+    const routes = new Set(segments.map(asRoute));
+    for (const [route, reason] of Object.entries(EXEMPT)) {
+      expect(routes.has(route), `${route} 는 이제 자기 껍데기가 없다 — 면제도 지운다`).toBe(true);
+      expect(reason.trim().length, route).toBeGreaterThan(20);
     }
   });
 
@@ -79,7 +95,7 @@ describe('구역마다 오류 경계', () => {
    * 사게 된다.
    */
   it('결제 경계는 다시 시도 대신 확인으로 보낸다', () => {
-    const source = readFileSync(join(APP, 'checkout', 'error.tsx'), 'utf8');
+    const source = readFileSync(appFile('/checkout', 'error.tsx'), 'utf8');
     expect(source, '주문 내역으로 데려가지 않는다').toContain('/mypage/orders');
     expect(source, '결제 화면에서 reset() 을 권하면 두 번 사게 된다').not.toContain('reset()');
   });

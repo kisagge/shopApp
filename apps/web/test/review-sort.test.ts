@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { appFile } from './app-routes';
 import { REVIEW_SORT, reviewListQuerySchema } from '@shop/contract';
 
 const db = vi.hoisted(() => ({
@@ -76,7 +76,7 @@ describe('주소에서 정렬을 읽는 길', () => {
      * 것을 빠뜨리면 **탭은 눌리는데 목록은 그대로**가 된다 — 실제로 한 번
      * 그렇게 만들었다. 상품 화면이 그 다리를 놓는지 확인한다.
      */
-    const source = readFileSync(join(process.cwd(), 'src/app/product/[slug]/page.tsx'), 'utf8');
+    const source = readFileSync(appFile('/product/[slug]'), 'utf8');
     expect(source).toContain("sort: (await searchParams)['reviewSort']");
   });
 });

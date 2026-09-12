@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
+import { appFile } from './app-routes';
 
 /**
  * 첫 화면 밖의 조회가 첫 화면을 붙잡지 않게 지킨다.
@@ -14,7 +15,7 @@ import { join } from 'node:path';
  */
 
 const SRC = join(process.cwd(), 'src');
-const page = readFileSync(join(SRC, 'app', 'product', '[slug]', 'page.tsx'), 'utf8');
+const page = readFileSync(appFile('/product/[slug]'), 'utf8');
 
 describe('상품 화면의 스트리밍 경계', () => {
   it('첫 화면 밖 조각을 Suspense 로 감싼다', () => {
