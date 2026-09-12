@@ -27,7 +27,8 @@
     "e2e": "turbo run e2e",
     "mobile:ios": "pnpm --filter @shop/mobile run ios",
     "mobile:android": "pnpm --filter @shop/mobile run android",
-    "ci:local": "bash tooling/ci-local.sh",
+    "ci:quick": "bash tooling/ci-local.sh quick",
+    "ci:local": "bash tooling/ci-local.sh full",
     "audit:ci": "node tooling/audit.mjs",
     "i18n:groups": "node tooling/gen-client-groups.mjs"
   },
