@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
+import { PaymentError } from '@shop/core';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -47,6 +48,18 @@ export default async function CheckoutSuccessPage({
   try {
     await confirmPayment({ orderNo, paymentKey, amount }, user);
   } catch (error) {
+    /**
+     * **승인이 못 나는 이유는 두 종류다.**
+     *
+     * 우리가 먼저 막는 것(`ConfirmError` — 없는 주문, 이미 처리됨)과 결제
+     * 자체가 거절되는 것(`PaymentError` — 금액 불일치, 한도 초과, PG 장애).
+     * 뒤쪽을 빠뜨리고 있었다: 쿼리의 금액을 고쳐 들어오면 승인은 제대로
+     * 막았지만 화면이 오류 번호만 띄웠다. 막은 것은 맞는데, 사람은 자기
+     * 주문이 어떻게 됐는지 한 글자도 못 봤다.
+     */
+    if (error instanceof PaymentError) {
+      redirect(`/order/${orderNo}?payment=failed&reason=${encodeURIComponent(error.code)}`);
+    }
     if (error instanceof ConfirmError) {
       /**
        * 주문 자체가 없으면 실패 화면으로 보낸다.
