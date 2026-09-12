@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { getTopCategories } from '~/lib/queries/catalog/products';
 import { getT } from '~/lib/i18n/server';
 import { LocaleSwitcher } from './locale-switcher';
+import { ThemeSwitcher } from './theme-switcher';
+import { getTheme } from '~/lib/theme';
 
 export async function SiteFooter() {
-  const [categories, t] = await Promise.all([getTopCategories(), getT()]);
+  const [categories, t, theme] = await Promise.all([getTopCategories(), getT(), getTheme()]);
 
   return (
     <footer className="safe-b mt-20 border-t border-[var(--border)] bg-[var(--surface)]">
@@ -75,8 +77,9 @@ export async function SiteFooter() {
           한 번 고르면 다시 건드릴 일이 드문 설정이다 — 매 화면 위쪽 자리를
           차지할 만한 것이 아니다.
         */}
-        <div className="mt-6 border-t border-[var(--border)] pt-4">
+        <div className="mt-6 flex flex-col gap-2 border-t border-[var(--border)] pt-4">
           <LocaleSwitcher />
+          <ThemeSwitcher current={theme} />
         </div>
       </div>
     </footer>

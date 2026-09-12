@@ -25,7 +25,9 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'api/health/route.ts':
     'DB 를 치지 않는 상태 확인 창구다. 여기를 조이면 감시 도구가 먼저 막힌다.',
   'api/locale/route.ts':
-    '쿠키 하나를 굽고 끝난다. 저장소도 DB 도 건드리지 않는다.',
+    '평범한 폼 전송이라 429 를 주면 사람이 JSON 을 보게 된다. 로그인했으면 자기 행의 locale 한 칸을 갱신하는데, 세션이 있어야 하고 자기 행뿐이라 남에게 번지지 않는다.',
+  'api/theme/route.ts':
+    '쿠키 하나를 굽고 끝난다 — DB 도 저장소도 안 건드린다. 언어와 같은 폼 전송이라 429 의 JSON 이 사람에게 그대로 보인다.',
   'api/webhooks/toss/route.ts':
     '결제사가 부른다. 사람이 아니라 재시도 정책이 호출 빈도를 정하고, 조이면 입금 통지를 놓친다. 서명 검증이 아무나 못 부르게 막는다.',
   'api/cart/route.ts':

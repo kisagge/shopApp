@@ -47,6 +47,7 @@ export const CLIENT_MESSAGE_GROUPS: readonly string[] = [
   'sizeFit',
   'suggest',
   'support',
+  'theme',
   'topic',
   'valid',
   'wish',

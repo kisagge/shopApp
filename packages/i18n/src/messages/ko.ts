@@ -39,6 +39,10 @@ export const ko = {
   'nav.merchantApply': '입점 신청',
   'nav.console': '{role} 페이지',
   'nav.languageChange': '언어 선택',
+  'nav.themeChange': '화면 밝기 선택',
+  'theme.system': '시스템 설정',
+  'theme.light': '밝게',
+  'theme.dark': '어둡게',
   'footer.disclaimer': '포트폴리오 목적으로 제작된 화면입니다. 브랜드명과 사업자 정보는 플레이스홀더입니다.',
 
   // ── 카테고리 이름 ────────────────────────────────────────

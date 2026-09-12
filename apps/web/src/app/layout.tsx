@@ -16,6 +16,8 @@ import { Providers } from '~/components/providers';
 import { absoluteUrl } from '~/lib/urls';
 import { getDictionary, getLocale, getT } from '~/lib/i18n/server';
 import { getViewer } from '~/lib/viewer';
+import { getTheme } from '~/lib/theme';
+import { themeAttribute } from '@shop/core';
 import { LocaleProvider } from '~/lib/i18n/client';
 import { CompareTray } from '~/components/compare-tray';
 
@@ -72,26 +74,53 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export const viewport: Viewport = {
-  // Capacitor 웹뷰에서 safe-area-inset이 동작하려면 viewport-fit=cover가 필요하다
-  viewportFit: 'cover',
-  width: 'device-width',
-  initialScale: 1,
-  // 사용자가 확대할 수 있어야 한다 — maximumScale로 막지 않는다
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#FEFDFC' },
-    { media: '(prefers-color-scheme: dark)', color: '#100E0B' },
-  ],
-};
+/** 상태바 색. 테마 CSS 의 `--color-n-0` · `--color-dark-bg` 와 같은 값이다. */
+const THEME_COLOR = { light: '#FEFDFC', dark: '#100E0B' } as const;
+
+/**
+ * **상태바도 고른 밝기를 따라간다.**
+ *
+ * 휴대폰에서 이 값이 헤더 위 상태바 바탕이 된다. 미디어 쿼리 두 줄로만 두면
+ * OS 가 밝은데 사람이 어둡게 고른 경우 — 화면은 검은데 그 위 상태바만 흰
+ * 띠로 남는다. 앱 셸에서 특히 눈에 띈다.
+ *
+ * 고른 적이 없을 때만 OS 에 맡긴다.
+ */
+export async function generateViewport(): Promise<Viewport> {
+  const theme = await getTheme();
+
+  return {
+    // Capacitor 웹뷰에서 safe-area-inset이 동작하려면 viewport-fit=cover가 필요하다
+    viewportFit: 'cover',
+    width: 'device-width',
+    initialScale: 1,
+    // 사용자가 확대할 수 있어야 한다 — maximumScale로 막지 않는다
+    themeColor:
+      theme === 'system'
+        ? [
+            { media: '(prefers-color-scheme: light)', color: THEME_COLOR.light },
+            { media: '(prefers-color-scheme: dark)', color: THEME_COLOR.dark },
+          ]
+        : THEME_COLOR[theme],
+  };
+}
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [locale, t, dict, viewer] = await Promise.all([
-    getLocale(), getT(), getDictionary(), getViewer(),
+  const [locale, t, dict, viewer, theme] = await Promise.all([
+    getLocale(), getT(), getDictionary(), getViewer(), getTheme(),
   ]);
 
   return (
     /* lang 이 틀리면 낭독기가 한국어를 영어 발음으로 읽는다 */
-    <html lang={LOCALE_TAG[locale]} className={serif.variable}>
+    <html
+      lang={LOCALE_TAG[locale]}
+      className={serif.variable}
+      /*
+       * 고른 적이 없으면 아예 안 붙는다 — 없는 것이 곧 "OS 를 따른다" 다.
+       * CSS 쪽 이유는 `@shop/core` 의 theme.ts 에 적었다.
+       */
+      data-theme={themeAttribute(theme)}
+    >
       <body>
         <a
           href="#main"

@@ -142,6 +142,17 @@
   }
 
   :root {
+    /*
+     * **브라우저가 그리는 것에도 테마가 있다.**
+     *
+     * 스크롤바·기본 폼 위젯·자동완성 배경·화면 밖 오버스크롤 바탕은 우리가
+     * 칠하는 것이 아니라 브라우저가 칠한다. 이 값을 안 주면 브라우저는 무조건
+     * 밝게 그린다 — 어두운 화면에 **흰 스크롤바**가 붙어 있었다.
+     *
+     * 아래 어두운 블록들이 이 값을 `dark` 로 덮는다.
+     */
+    color-scheme: light;
+
     --bg: var(--color-n-0);
     --surface: var(--color-n-50);
     --surface-2: var(--color-n-100);
@@ -170,6 +181,8 @@
 
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
+      color-scheme: dark;
+
       --bg: var(--color-dark-bg);
       --surface: var(--color-dark-surface);
       --surface-2: var(--color-dark-surface2);
@@ -200,6 +213,8 @@
   }
 
   :root[data-theme="dark"] {
+    color-scheme: dark;
+
     --bg: var(--color-dark-bg);
     --surface: var(--color-dark-surface);
     --surface-2: var(--color-dark-surface2);

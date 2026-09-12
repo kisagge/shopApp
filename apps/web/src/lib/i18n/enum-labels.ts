@@ -1,6 +1,6 @@
 import {
   ORDER_STATUS, MEMBER_GRADE, RETURN_TYPE, RETURN_REASON, RETURN_STATUS,
-  SIZE_FIT, REPORT_REASON, POINT_REASON,
+  SIZE_FIT, REPORT_REASON, POINT_REASON, THEMES, type Theme,
   type OrderStatus, type MemberGrade, type ReturnType, type ReturnReason,
   type ReturnStatus, type SizeFit, type ReportReason, type PointReason,
 } from '@shop/core';
@@ -19,6 +19,7 @@ import type { MessageKey } from '@shop/i18n';
 const keysOf = <T extends string>(values: readonly T[], group: string): Record<T, MessageKey> =>
   Object.fromEntries(values.map((v) => [v, `${group}.${v}`])) as Record<T, MessageKey>;
 
+export const THEME_KEY: Record<Theme, MessageKey> = keysOf(THEMES, 'theme');
 export const ORDER_STATUS_KEY: Record<OrderStatus, MessageKey> = keysOf(
   ORDER_STATUS,
   'orderStatus',

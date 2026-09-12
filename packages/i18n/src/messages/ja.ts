@@ -32,6 +32,10 @@ export const ja: Dictionary = {
   'nav.merchantApply': '出店申請',
   'nav.console': '{role}ページ',
   'nav.languageChange': '言語を選択',
+  'nav.themeChange': '画面の明るさを選択',
+  'theme.system': 'システム設定',
+  'theme.light': 'ライト',
+  'theme.dark': 'ダーク',
   'footer.disclaimer':
     'ポートフォリオとして制作した画面です。ブランド名と事業者情報はプレースホルダーです。',
 

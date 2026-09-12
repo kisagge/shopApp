@@ -36,6 +36,10 @@ export const en: Dictionary = {
   'nav.merchantApply': 'Sell with us',
   'nav.console': '{role} console',
   'nav.languageChange': 'Choose a language',
+  'nav.themeChange': 'Choose a colour theme',
+  'theme.system': 'System',
+  'theme.light': 'Light',
+  'theme.dark': 'Dark',
   'footer.disclaimer':
     'This is a portfolio project. The brand and business details are placeholders.',
 
