@@ -59,3 +59,50 @@ describe('상품을 흔드는 명세', () => {
     }
   });
 });
+
+/**
+ * **리뷰를 쓰는 명세와 읽는 명세가 같은 상품을 쓰지 않는다.**
+ *
+ * 한 상품의 리뷰 목록은 하나뿐이다. 한쪽이 리뷰를 쓰는 순간 다른 쪽이 보던
+ * "첫 번째 리뷰" 가 바뀐다 — 도움됐어요 검사가 실제로 그렇게 졌다. 장바구니
+ * 하나를 넷이 나눠 쓰다 산발로 지던 것과 같은 모양이다.
+ *
+ * 슬러그는 `e2e/state.ts` 에 모아 두었다. 떨어져 있으면 겹친 줄 모른다.
+ */
+describe('리뷰를 건드리는 명세', () => {
+  const state = readFileSync(join(E2E, 'state.ts'), 'utf8');
+
+  const slugOf = (key: string): string | null =>
+    new RegExp(`${key}: '([a-z0-9-]+)'`).exec(state)?.[1] ?? null;
+
+  it('읽는 쪽과 쓰는 쪽의 상품을 실제로 찾아냈다', () => {
+    expect(slugOf('readOnly'), 'state.ts 에서 readOnly 상품을 못 찾았다').not.toBeNull();
+    expect(slugOf('written'), 'state.ts 에서 written 상품을 못 찾았다').not.toBeNull();
+  });
+
+  it('둘이 다른 상품이다', () => {
+    expect(
+      slugOf('written'),
+      '리뷰를 쓰는 명세와 읽는 명세가 같은 상품을 쥐고 있다',
+    ).not.toBe(slugOf('readOnly'));
+  });
+
+  it('아무도 슬러그를 주소에 다시 박아 두지 않는다', () => {
+    /*
+     * state.ts 를 거치지 않고 주소에 직접 적으면 이 검사를 지나간다.
+     * 리뷰를 건드리는 두 명세만 본다 — 나머지는 읽기만 하므로 상관없다.
+     */
+    const written = slugOf('written')!;
+    const owners = specs.filter((s) =>
+      /order-lifecycle|review-helpful/.test(s.name),
+    );
+    expect(owners.length, '리뷰를 건드리는 명세를 못 찾았다').toBe(2);
+    for (const spec of owners) {
+      expect(
+        [...pinnedSlugs(spec.source)],
+        `${spec.name} 이 상품 슬러그를 주소에 직접 박아 두었다 — state.ts 를 쓰자`,
+      ).toEqual([]);
+    }
+    expect(written).toBeTruthy();
+  });
+});

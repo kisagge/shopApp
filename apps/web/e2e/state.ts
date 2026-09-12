@@ -23,6 +23,23 @@ export const STATE_FILE = {
 } as const;
 
 /**
+ * 리뷰를 건드리는 명세는 **저마다 자기 상품을 쓴다.**
+ *
+ * 한 상품의 리뷰 목록은 하나뿐이다. 두 명세가 나눠 쓰면 한쪽이 리뷰를 쓰는
+ * 순간 다른 쪽이 보던 "첫 번째 리뷰" 가 바뀐다 — 도움됐어요 검사가 실제로
+ * 그렇게 졌다. 장바구니를 나눠 쓰다 산발로 지던 것과 같은 모양이다.
+ *
+ * 슬러그를 여기 모아 두는 이유는 **떨어져 있으면 겹친 줄 모르기** 때문이다.
+ * 둘이 달라야 한다는 것은 e2e-fixture-isolation 이 지킨다.
+ */
+export const REVIEW_PRODUCT = {
+  /** 리뷰를 읽고 누르기만 한다 — review-helpful */
+  readOnly: 'oversized-wool-coat',
+  /** 리뷰를 쓰고 지운다 — order-lifecycle. 가맹점(스튜디오눈) 상품이어야 한다. */
+  written: 'short-padding-blouson',
+} as const;
+
+/**
  * 화면이 **눌릴 준비가 됐는지** 기다린다.
  *
  * 하이드레이션 도중에 떨어진 클릭은 삼켜진다 — 링크의 기본 동작은 React 가

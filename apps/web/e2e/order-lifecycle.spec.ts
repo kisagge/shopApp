@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, ready } from './state';
+import { STATE_FILE, REVIEW_PRODUCT, ready } from './state';
 
 /**
  * 결제 뒤의 한 바퀴 — 배송준비 · 출고 · 배송완료 · 반품 · 환불.
@@ -31,7 +31,7 @@ test.describe.configure({ mode: 'serial' });
  * 그 주문이 아예 안 보이고, 검사는 이유 없이 기다리다 진다 — 처음에 그렇게
  * 졌다. e2e 의 가맹점 계정은 스튜디오눈이다(seed-fixtures).
  */
-const MERCHANT_PRODUCT = '/product/oversized-wool-coat';
+const MERCHANT_PRODUCT = `/product/${REVIEW_PRODUCT.written}`;
 
 /** 결제까지 마친 주문 하나를 만든다 */
 async function placePaidOrder(page: import('@playwright/test').Page): Promise<string> {
@@ -132,6 +132,67 @@ test('출고하고 반품·환불로 닫는다', async ({ page, browser }) => {
       data: { to: 'DELIVERED' },
     });
     expect(toDelivered.ok(), `배송완료로 못 옮겼다 (${toDelivered.status()})`).toBe(true);
+
+    /*
+     * ── 배송완료가 되면 리뷰를 쓸 수 있다 ────────────────────────
+     *
+     * **리뷰 쓰기는 손님 쪽에서 마지막까지 화면 검사가 없던 길이다.** 단위
+     * 검사가 쓰기 자체는 덮고 있지만, 평점은 상품 행에 **미리 세어 둔 값**
+     * (ratingSum · reviewCount · ratingScore)이라 그 갱신이 어긋나면 카드와
+     * 목록 정렬이 통째로 틀어진다. 시드가 `assertDerivedColumns` 를 들고
+     * 있는 이유가 그것이다.
+     *
+     * 여기서 밟는 것은 **한 바퀴**다 — 쓰면 늘고, 지우면 되돌아온다.
+     * 되돌아오는 쪽이 더 중요하다: 세어 둔 값은 더할 때보다 뺄 때 틀린다.
+     */
+    const countOn = async (): Promise<number> => {
+      await page.goto(MERCHANT_PRODUCT);
+      await ready(page);
+      const text = await page.locator('#main').innerText();
+      const hit = /리뷰\s*([\d,]+)/.exec(text);
+      expect(hit, '상품 화면에서 리뷰 수를 못 찾았다').not.toBeNull();
+      return Number(hit![1]!.replace(/,/g, ''));
+    };
+
+    const before = await countOn();
+
+    await page.goto('/mypage/reviews');
+    await ready(page);
+    /*
+     * **별 라벨을 누른다.** 라디오 자체는 `sr-only` 라 눈에 안 보이고,
+     * 보이지 않는 것은 누를 수 없다고 Playwright 가 막는다 — 처음에 `check()`
+     * 로 썼다가 150초를 기다리다 졌다. 마우스 쓰는 사람이 실제로 누르는 것은
+     * 별 모양이 있는 라벨이다.
+     */
+    await page.locator('label').filter({ hasText: '5점' }).first().click();
+    await page
+      .getByRole('textbox', { name: '후기' })
+      .first()
+      .fill('검사가 쓴 후기입니다. 소재가 생각보다 도톰하고 기장이 알맞았습니다.');
+    await page.getByRole('button', { name: '리뷰 등록' }).first().click();
+    await expect(page.getByText('리뷰를 등록했습니다')).toBeVisible();
+
+    expect(await countOn(), '리뷰를 썼는데 상품의 리뷰 수가 그대로다').toBe(before + 1);
+
+    /*
+     * **지운 뒤에 되돌아오는지 본다.** 미리 세어 둔 값은 더할 때보다 뺄 때
+     * 틀린다 — 지우면서 합계만 줄이고 개수를 안 줄이면 평점이 조용히 내려간다.
+     */
+    /*
+     * **지운 뒤에 되돌아오는지 본다.** 미리 세어 둔 값은 더할 때보다 뺄 때
+     * 틀린다 — 지우면서 합계만 줄이고 개수를 안 줄이면 평점이 조용히 내려간다.
+     *
+     * 화면에서 지운다. 내 리뷰에만 붙는 단추라, 그 단추가 거기 있다는 것
+     * 자체도 함께 확인되는 셈이다.
+     */
+    await page.goto(MERCHANT_PRODUCT);
+    await ready(page);
+    await page.getByRole('button', { name: '내 리뷰 삭제' }).first().click();
+    await page.getByRole('button', { name: '삭제', exact: true }).first().click();
+
+    await expect
+      .poll(countOn, { message: '리뷰를 지웠는데 상품의 리뷰 수가 안 줄었다', timeout: 15_000 })
+      .toBe(before);
 
     const asked = await page.request.post(`/api/orders/${orderNo}/return`, {
       data: { type: 'RETURN', reason: 'CHANGED_MIND', detail: '검사가 만든 주문을 되돌립니다' },

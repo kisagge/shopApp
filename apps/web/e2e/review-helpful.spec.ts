@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { REVIEW_PRODUCT } from './state';
 
 /**
  * 리뷰 도움돼요.
@@ -40,7 +41,7 @@ async function expectReviewsRendered(page: Page) {
 }
 
 async function openProductWithReviews(page: Page) {
-  await page.goto('/product/oversized-wool-coat');
+  await page.goto(`/product/${REVIEW_PRODUCT.readOnly}`);
   await expectReviewsRendered(page);
 
   /*
@@ -128,7 +129,7 @@ test('도움순은 표를 받은 리뷰를 위로 올린다', async ({ page }) =
   for (let i = 0; i < count - 1; i += 1) await setPressed(buttons.nth(i), false);
   await setPressed(buttons.last(), true);
 
-  await page.goto('/product/oversized-wool-coat?reviewSort=helpful');
+  await page.goto(`/product/${REVIEW_PRODUCT.readOnly}?reviewSort=helpful`);
 
   /*
    * 표를 받은 리뷰가 맨 앞으로 온다. 글을 맞춰 보는 대신 **첫 리뷰의 버튼이
