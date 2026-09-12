@@ -44,10 +44,18 @@ export const SEED_ACCOUNT = {
   cartDeposit: 'cart-deposit@plain.test',
   cartTotal: 'cart-total@plain.test',
   cartCallback: 'cart-callback@plain.test',
+
+  /*
+   * **마지막 한 개를 두 사람이 동시에 산다.** 이 둘만은 서로를 상대로 쓰는
+   * 계정이라, 하나로는 검사가 성립하지 않는다 — 같은 사람이 두 번 보내는
+   * 것은 경쟁이 아니라 중복이고, 그건 다른 자리(order-idempotency)가 본다.
+   */
+  raceBuyerA: 'race-a@plain.test',
+  raceBuyerB: 'race-b@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit', 'cartTotal', 'cartCallback',
+  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

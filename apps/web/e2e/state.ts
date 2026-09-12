@@ -21,6 +21,10 @@ export const STATE_FILE = {
   cartDeposit: 'test-results/.auth/cart-deposit.json',
   cartTotal: 'test-results/.auth/cart-total.json',
   cartCallback: 'test-results/.auth/cart-callback.json',
+
+  /** 마지막 한 개를 두고 겨루는 두 사람 — stock-race */
+  raceBuyerA: 'test-results/.auth/race-a.json',
+  raceBuyerB: 'test-results/.auth/race-b.json',
 } as const;
 
 /**
