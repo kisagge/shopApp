@@ -17,7 +17,25 @@ import { useT } from '~/lib/i18n/client';
  * 을 색으로 표시하면, 하필 그 색이 안 보이는 사람에게 아무 정보도 주지
  * 못한다. `aria-current` 로 이름에 붙이고 밑줄로도 표시한다.
  */
-export function ThemeSwitcher({ current }: { current: Theme }) {
+/**
+ * 색만 갈아 끼운다.
+ *
+ * **운영 사이드바는 테마와 무관하게 늘 어둡다.** 그 위에 매장 푸터와 같은
+ * 색을 쓰면 글자가 바탕에 묻는다. 바뀌는 것은 두 줄의 색뿐이고, 폼의 구조와
+ * 접근성 표시는 한 벌로 둔다 — 갈라 두면 한쪽만 고쳐진다.
+ */
+const TONE = {
+  page: { on: 'text-[var(--fg)]', off: 'text-[var(--fg-secondary)] hover:text-[var(--fg)]' },
+  sidebar: { on: 'text-n-0', off: 'text-dark-muted hover:text-n-0' },
+} as const;
+
+export function ThemeSwitcher({
+  current,
+  tone = 'page',
+}: {
+  current: Theme;
+  tone?: keyof typeof TONE;
+}) {
   const t = useT();
   const pathname = usePathname();
   const params = useSearchParams().toString();
@@ -40,8 +58,8 @@ export function ThemeSwitcher({ current }: { current: Theme }) {
                 aria-current={active ? 'true' : undefined}
                 className={`inline-flex h-9 items-center text-[13px] ${
                   active
-                    ? 'font-medium text-[var(--fg)] underline underline-offset-4'
-                    : 'text-[var(--fg-secondary)] hover:text-[var(--fg)]'
+                    ? `font-medium underline underline-offset-4 ${TONE[tone].on}`
+                    : TONE[tone].off
                 }`}
               >
                 {t(THEME_KEY[theme])}

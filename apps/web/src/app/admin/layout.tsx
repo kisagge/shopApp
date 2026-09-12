@@ -4,6 +4,7 @@ import { hasPermission, USER_ROLE_LABEL, type Permission } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { AdminNav } from '~/components/admin/admin-nav';
 import { NO_INDEX } from '~/lib/no-index';
+import { getTheme } from '~/lib/theme';
 
 /** 운영 화면은 검색 결과에 뜰 일이 없다 */
 export const metadata: Metadata = NO_INDEX;
@@ -63,6 +64,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         }))}
         roleLabel={USER_ROLE_LABEL[actor.role]}
         merchant={actor.merchantId !== null}
+        theme={await getTheme()}
       />
 
       <div className="flex min-w-0 flex-1 flex-col bg-[var(--surface)]">{children}</div>

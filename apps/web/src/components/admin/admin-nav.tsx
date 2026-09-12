@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSignOut } from '~/components/admin-sign-out';
+import { ThemeSwitcher } from '~/components/theme-switcher';
+import type { Theme } from '@shop/core';
 
 /**
  * 운영 화면의 메뉴.
@@ -32,10 +34,12 @@ export function AdminNav({
   items,
   roleLabel,
   merchant,
+  theme,
 }: {
   items: readonly AdminNavItem[];
   roleLabel: string;
   merchant: boolean;
+  theme: Theme;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -185,7 +189,20 @@ export function AdminNav({
         </nav>
 
         <div className="border-t border-dark-surface2 pt-3">
-          <p className="px-3.5 pb-2">
+          {/*
+            **눈에 있는 쪽에 둔다.** 같은 것이 매장 푸터에도 있고 그 푸터는
+            운영 화면 맨 아래에도 붙는다 — 다만 주문 표가 몇 백 줄인 화면에서
+            그것은 스크롤 끝의 다른 세상이다. 사이드바는 늘 보인다.
+
+            이 사이드바는 테마와 무관하게 늘 어둡다. 그래서 "밝게" 를 눌러도
+            여기는 안 바뀌는데, 말해 주지 않으면 눌러도 안 먹는 것으로 읽힌다.
+          */}
+          <div className="px-3.5 pb-3">
+            <p className="pb-1 text-[11px] text-dark-muted">화면 밝기 — 본문에 적용됩니다</p>
+            <ThemeSwitcher current={theme} tone="sidebar" />
+          </div>
+
+          <p className="border-t border-dark-surface2 px-3.5 pt-3 pb-2">
             <span className="block text-[13px] font-medium text-n-0">{roleLabel}</span>
             {merchant && <span className="block text-[11px] text-dark-muted">가맹점 계정</span>}
           </p>
