@@ -1,10 +1,11 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  DEFAULT_SHIPPING, discountRateOf, gte, won,
+  discountRateOf, gte, won,
   type ComparableProduct,
 } from '@shop/core';
 import { onDisplay, sellableBrand } from './shelf';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 
 /**
  * 견줄 상품들을 읽는다.
@@ -27,6 +28,9 @@ export async function getComparableProducts(
   slugs: readonly string[],
 ): Promise<CompareItem[]> {
   if (slugs.length === 0) return [];
+
+  // 무료배송 표시가 결제 금액과 갈리면 안 된다 — 같은 정책을 읽는다
+  const shipping = await getShippingPolicy();
 
   const rows = await prisma.product.findMany({
     where: {
@@ -93,8 +97,7 @@ export async function getComparableProducts(
          * 값으로 판단하는 이유는, 비교표가 **이 상품을 살지**를 정하는
          * 자리이기 때문이다 — 함께 담을 것을 아직 모른다.
          */
-        freeShipping:
-          DEFAULT_SHIPPING.freeThreshold !== null && gte(price, DEFAULT_SHIPPING.freeThreshold),
+        freeShipping: shipping.freeThreshold !== null && gte(price, shipping.freeThreshold),
         options,
         imageUrl: image?.url,
         imageAlt: image?.alt,

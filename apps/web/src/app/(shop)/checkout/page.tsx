@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { getDefaultAddress } from '~/lib/queries/orders';
@@ -38,7 +39,11 @@ export default async function CheckoutPage() {
       {payment.mode === 'blocked' ? (
         <CheckoutUnavailable />
       ) : (
-        <CheckoutForm defaultAddress={address} paymentMode={payment.mode} />
+        <CheckoutForm
+          defaultAddress={address}
+          paymentMode={payment.mode}
+          remoteSurcharge={(await getShippingPolicy()).remoteSurcharge}
+        />
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, defaultAddressId } from './state';
 
 /**
  * 한 장짜리 쿠폰이 두 주문에 붙지 않는다.
@@ -50,12 +50,7 @@ test('한 장짜리 쿠폰이 두 주문에 붙지 않는다', async ({ page, br
   const variantId = await addProductToCart(page, RACE_PRODUCT.coupon);
   expect(variantId, '담을 수 있는 상품이 없다 — 시드가 비었다').not.toBeNull();
 
-  const body = (await (await page.request.get('/api/addresses')).json()) as
-    | { id: string; isDefault: boolean }[]
-    | { addresses: { id: string; isDefault: boolean }[] };
-  const rows = Array.isArray(body) ? body : body.addresses;
-  const address = rows.find((a) => a.isDefault) ?? rows[0];
-  expect(address, '시드가 이 계정에 배송지를 안 만들었다').toBeDefined();
+  const addressId = await defaultAddressId(page);
 
   /*
    * **최소 주문 금액을 넘겨야 쿠폰이 붙는다.** 안 넘기면 둘 다 쿠폰 없이
@@ -89,7 +84,7 @@ test('한 장짜리 쿠폰이 두 주문에 붙지 않는다', async ({ page, br
     context.request.post('/api/orders', {
       data: {
         lines: [{ variantId: variantId!, quantity }],
-        addressId: address!.id,
+        addressId,
         paymentMethod: 'CARD',
         agreedToTerms: true,
         couponCode: COUPON.code,

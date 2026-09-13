@@ -43,7 +43,7 @@ vi.mock('~/lib/checkout/place-order', () => ({
 
 const { CheckoutForm } = await import('~/components/checkout-form');
 
-const draw = () => render(<CheckoutForm defaultAddress={null} paymentMode="mock" />);
+const draw = () => render(<CheckoutForm remoteSurcharge={3000} defaultAddress={null} paymentMode="mock" />);
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -47,6 +47,7 @@ layoutTests(test, expect, [
   ['리뷰 신고', '/admin/reviews'],
   ['문의', '/admin/inquiries'],
   ['고객센터 글', '/admin/support'],
+  ['배송비', '/admin/shipping'],
   ['포인트', '/admin/points'],
   ['트래픽', '/admin/traffic'],
   ['감사 로그', '/admin/audit'],

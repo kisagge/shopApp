@@ -5,7 +5,7 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
 import {
-  DEFAULT_SHIPPING, GRADE_REWARD_PERCENT, percentOf,
+  GRADE_REWARD_PERCENT, percentOf,
   productStructuredData, breadcrumbStructuredData,
   isBlurDataUrl,
 } from '@shop/core';
@@ -27,6 +27,7 @@ import { Recommendations } from '~/components/recommendations';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 import { reviewListQuerySchema } from '@shop/contract';
 
 export const dynamic = 'force-dynamic';
@@ -77,12 +78,14 @@ export default async function ProductPage({ params, searchParams }: Params) {
    * **상품과 세션은 서로를 기다릴 이유가 없다.** 예전에는 상품을 받고 나서야
    * 세션을 물어, 왕복 한 번이 그냥 더 붙었다.
    */
-  const [product, viewer, locale, t] = await Promise.all([
+  const [product, viewer, locale, t, shipping] = await Promise.all([
     getProductBySlug(slug),
     // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
     headers().then((h) => getSessionUser(h)),
     getLocale(),
     getT(),
+    // 화면에 적는 배송 안내도 결제와 같은 정책을 읽어야 한다
+    getShippingPolicy(),
   ]);
   /*
    * **없으면 곧바로 404 가 아니다.** slug 는 운영자가 고칠 수 있고, 고치는
@@ -299,8 +302,8 @@ export default async function ProductPage({ params, searchParams }: Params) {
               </dt>
               <dd className="text-[13px] leading-relaxed">
                 {t('product.shippingValue', {
-                  threshold: formatMoney(locale, DEFAULT_SHIPPING.freeThreshold ?? 0),
-                  surcharge: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+                  threshold: formatMoney(locale, shipping.freeThreshold ?? 0),
+                  surcharge: formatMoney(locale, shipping.remoteSurcharge),
                 })}
               </dd>
             </div>

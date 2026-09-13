@@ -31,6 +31,12 @@ const CACHED_READS = [
 
 /** 카탈로그를 털어야 하는 쓰기 창구 */
 const CATALOG_WRITERS = [
+  /*
+   * **배송비 정책도 카탈로그를 바꾼다.** 상품 화면과 비교가 무료배송 기준을
+   * 적어 두기 때문이다 — 안 털면 결제는 새 기준으로 계산하는데 상품 화면은
+   * 옛 기준을 적고 있다. 주문이 재고 때문에 카탈로그를 터는 것과 같은 결이다.
+   */
+  'app/api/admin/shipping/route.ts',
   'app/api/admin/products/route.ts',
   'app/api/admin/products/[id]/route.ts',
   'app/api/admin/products/[id]/stock/route.ts',

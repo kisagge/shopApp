@@ -4,10 +4,12 @@ const findManyVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const findFirstUserCoupon = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 /** 견적은 쓸 수 있는 쿠폰 목록도 함께 돌려준다 */
 const findManyUserCoupons = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const findPolicy = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/db', () => ({
   prisma: {
     productVariant: { findMany: findManyVariants },
     userCoupon: { findFirst: findFirstUserCoupon, findMany: findManyUserCoupons },
+    shippingPolicy: { findUnique: findPolicy },
   },
 }));
 
@@ -31,6 +33,8 @@ beforeEach(() => {
   findManyVariants.mockReset();
   findManyUserCoupons.mockReset().mockResolvedValue([]);
   findFirstUserCoupon.mockReset().mockResolvedValue(null);
+  // 배송비 정책은 이제 DB 에서 온다. 안 정하면 코드의 바닥값으로 간다.
+  findPolicy.mockReset().mockResolvedValue(null);
 });
 
 describe('가격은 DB 가 정한다', () => {
@@ -454,5 +458,64 @@ describe('쿠폰 자동 적용', () => {
 
     expect(q.couponCode).toBe('BIG');
     expect(q.couponName).toBe('BIG 쿠폰');
+  });
+});
+
+/**
+ * 배송비 정책이 **견적까지 닿는가.**
+ *
+ * 값이 코드 상수에서 운영 데이터로 옮겨 갔다. 옮기는 것보다 어려운 것은
+ * **읽는 자리를 하나도 빠뜨리지 않는 것**이다 — 견적이 옛 상수를 계속 보고
+ * 있으면, 상품 화면은 새 기준을 적어 놓고 결제는 옛 기준으로 계산한다.
+ * 어느 쪽이 맞는지는 아무도 말해 주지 않고, 차이는 배송비 몇 천 원이라
+ * 눈에도 잘 안 띈다.
+ *
+ * **화면 검사로는 이 자리를 못 잡는다.** 정책은 가게 전체에 하나뿐이라,
+ * 검사가 그것을 바꾸는 동안 다른 검사들이 다른 금액을 본다. 그래서 여기서
+ * 잰다 — 실제로 이 줄을 빼 보고 e2e 가 통과하는 것을 확인했다.
+ */
+describe('배송비 정책', () => {
+  beforeEach(() => {
+    findManyVariants.mockResolvedValue([variant()]);
+  });
+
+  it('운영이 정한 값으로 계산한다', async () => {
+    findPolicy.mockResolvedValue({
+      id: 'default', baseFee: 2500, freeThreshold: 10_000_000, remoteSurcharge: 4500,
+    });
+
+    const quote = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, null);
+
+    // 코드의 바닥값은 3,000 이다. 2,500 이 나오면 DB 값을 읽은 것이다.
+    expect(quote.shippingFee).toBe(2500);
+  });
+
+  it('도서산간 추가금도 운영이 정한 값이다', async () => {
+    findPolicy.mockResolvedValue({
+      id: 'default', baseFee: 2500, freeThreshold: 10_000_000, remoteSurcharge: 4500,
+    });
+
+    const quote = await quoteCart(
+      { lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: true },
+      null,
+    );
+    expect(quote.shippingFee).toBe(2500 + 4500);
+  });
+
+  it('무료 기준도 운영이 정한 값이다', async () => {
+    // 코드의 바닥값(5만원)이면 289,000원짜리는 이미 무료다 — 기준을 올려서 가른다
+    findPolicy.mockResolvedValue({
+      id: 'default', baseFee: 3000, freeThreshold: 500_000, remoteSurcharge: 3000,
+    });
+
+    const quote = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, null);
+    expect(quote.isFreeShipping, '옛 기준(5만원)으로 판정했다').toBe(false);
+  });
+
+  it('정책 줄이 없으면 바닥값으로 간다 — 배송비를 못 읽었다고 결제를 막지 않는다', async () => {
+    findPolicy.mockResolvedValue(null);
+
+    const quote = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, null);
+    expect(quote.isFreeShipping).toBe(true); // 289,000 >= 50,000
   });
 });

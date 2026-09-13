@@ -680,6 +680,7 @@ export const ja: Dictionary = {
   'valid.duplicateItems': '同じ商品が二重に追加されています',
   'valid.upperSlugFormat': '英大文字・数字・ハイフンのみ使えます',
   'valid.stockMin': '在庫は0以上にしてください',
+  'valid.freeThresholdTooLow': '送料無料の基準は基本送料より大きくしてください。',
   'valid.salePriceOverList': '販売価格は定価を超えられません',
   'valid.suspendNeedsReason': '停止・解除には理由が必要です',
   'valid.merchantNeedsScope': '加盟店アカウントには所属加盟店が必要です',

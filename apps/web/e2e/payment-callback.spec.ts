@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart, ready } from './state';
+import { STATE_FILE, addFirstProductToCart, defaultAddressId, ready } from './state';
 
 /**
  * 결제창이 돌아오는 자리(`/checkout/success`).
@@ -51,17 +51,12 @@ async function placePending(page: Page): Promise<Placed> {
   };
   expect(cart.items.length, '장바구니가 비었다').toBeGreaterThan(0);
 
-  const addresses = (await (await page.request.get('/api/addresses')).json()) as
-    | { id: string; isDefault: boolean }[]
-    | { addresses: { id: string; isDefault: boolean }[] };
-  const rows = Array.isArray(addresses) ? addresses : addresses.addresses;
-  const address = rows.find((a) => a.isDefault) ?? rows[0];
-  expect(address, '시드가 이 계정에 배송지를 안 만들었다').toBeDefined();
+  const addressId = await defaultAddressId(page);
 
   const created = await page.request.post('/api/orders', {
     data: {
       lines: cart.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
-      addressId: address!.id,
+      addressId,
       paymentMethod: 'CARD',
       agreedToTerms: true,
     },

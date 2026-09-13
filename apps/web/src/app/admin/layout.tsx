@@ -16,7 +16,7 @@ interface NavItem {
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
-    | '/admin/traffic' | '/admin/coupons';
+    | '/admin/traffic' | '/admin/coupons' | '/admin/shipping';
   readonly label: string;
   readonly permission: Permission;
 }
@@ -37,6 +37,7 @@ const NAV: readonly NavItem[] = [
   // 가맹점도 본다 — 자기 상품 문의는 파는 사람이 답하는 것이 맞다
   { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/support', label: '공지·FAQ', permission: 'support:write' },
+  { href: '/admin/shipping', label: '배송비', permission: 'shipping:write' },
   { href: '/admin/settlements', label: '정산', permission: 'settlement:read' },
   { href: '/admin/merchants', label: '가맹점', permission: 'merchant:read' },
   { href: '/admin/users', label: '회원', permission: 'user:read' },

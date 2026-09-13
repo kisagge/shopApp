@@ -712,6 +712,7 @@ export const ko = {
   'valid.duplicateItems': '같은 상품이 두 번 담겼습니다',
   'valid.upperSlugFormat': '영대문자·숫자·하이픈만 쓸 수 있습니다',
   'valid.stockMin': '재고는 0 이상이어야 합니다',
+  'valid.freeThresholdTooLow': '무료배송 기준은 기본 배송비보다 커야 합니다.',
   'valid.salePriceOverList': '판매가가 정가보다 클 수 없습니다',
   'valid.suspendNeedsReason': '정지·해지에는 사유가 필요합니다',
   'valid.merchantNeedsScope': '가맹점 계정에는 소속 가맹점이 필요합니다',

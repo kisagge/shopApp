@@ -5,7 +5,6 @@ import { Badge, Button } from '@shop/ui';
 import { AddressForm, type SavedAddress } from '~/components/address-form';
 import { formatMoney } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
-import { DEFAULT_SHIPPING } from '@shop/core';
 
 /**
  * 저장된 배송지 중에서 고르거나 새로 추가한다.
@@ -17,10 +16,20 @@ export function AddressPicker({
   currentId,
   onPicked,
   onCancel,
+  remoteSurcharge,
 }: {
   currentId: string | null;
   onPicked: (address: SavedAddress) => void;
   onCancel: () => void;
+  /**
+   * 제주·도서산간 추가 배송비. **서버가 읽어 내려보낸다.**
+   *
+   * 예전에는 이 컴포넌트가 `DEFAULT_SHIPPING` 상수를 직접 읽었다. 그 값이
+   * 운영 데이터가 된 뒤로는, 상수를 읽으면 **운영이 바꾼 값과 화면에 적힌
+   * 값이 갈린다** — 결제는 4,000원을 받는데 안내는 3,000원이라고 말하는
+   * 상태이고, 그건 고객이 결제 직전에 발견한다.
+   */
+  remoteSurcharge: number;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -76,6 +85,7 @@ export function AddressPicker({
   if (adding) {
     return (
       <AddressForm
+        remoteSurcharge={remoteSurcharge}
         onSaved={onPicked}
         submitLabel={t('addr.use')}
         onCancel={
@@ -128,7 +138,7 @@ export function AddressPicker({
               {a.isRemoteArea && (
                 <span className="text-[12px] text-[var(--fg-muted)]">
                   {t('addr.remoteFee', {
-                    fee: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+                    fee: formatMoney(locale, remoteSurcharge),
                   })}
                 </span>
               )}

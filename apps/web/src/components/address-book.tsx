@@ -7,7 +7,6 @@ import { AddressForm, type SavedAddress } from '~/components/address-form';
 import { formatMoney } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
-import { DEFAULT_SHIPPING } from '@shop/core';
 
 /**
  * 배송지 목록.
@@ -16,7 +15,21 @@ import { DEFAULT_SHIPPING } from '@shop/core';
  * 주문 도중에 배송지를 지울 일은 없고, 그 자리에 삭제 버튼을 두면
  * 고르려다 지우는 사고가 난다.
  */
-export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
+export function AddressBook({
+  initial,
+  remoteSurcharge,
+}: {
+  initial: readonly SavedAddress[];
+  /**
+   * 제주·도서산간 추가 배송비. **서버가 읽어 내려보낸다.**
+   *
+   * 예전에는 이 컴포넌트가 `DEFAULT_SHIPPING` 상수를 직접 읽었다. 그 값이
+   * 운영 데이터가 된 뒤로는, 상수를 읽으면 **운영이 바꾼 값과 화면에 적힌
+   * 값이 갈린다** — 결제는 4,000원을 받는데 안내는 3,000원이라고 말하는
+   * 상태이고, 그건 고객이 결제 직전에 발견한다.
+   */
+  remoteSurcharge: number;
+}) {
   const t = useT();
   const locale = useLocale();
   const [addresses, setAddresses] = useState<readonly SavedAddress[]>(initial);
@@ -117,7 +130,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
                 {a.isRemoteArea && (
                   <p className="text-[12px] text-[var(--fg-muted)]">
                     {t('addr.remoteFee', {
-                      fee: formatMoney(locale, DEFAULT_SHIPPING.remoteSurcharge),
+                      fee: formatMoney(locale, remoteSurcharge),
                     })}
                   </p>
                 )}
@@ -161,6 +174,7 @@ export function AddressBook({ initial }: { initial: readonly SavedAddress[] }) {
       {adding ? (
         <section aria-label={t('addr.new')} className="rounded-sm border border-[var(--border)] p-4">
           <AddressForm
+            remoteSurcharge={remoteSurcharge}
             submitLabel={t('addr.save')}
             onSaved={(saved) => {
               // 새로 넣은 것은 기본이 된다. 기존 기본은 내려온다.

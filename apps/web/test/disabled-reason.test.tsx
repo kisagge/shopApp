@@ -74,7 +74,7 @@ beforeEach(() => {
 
 describe('못 누르는 버튼이 이유를 말한다', () => {
   it('결제하기 — 약관에 동의하기 전', () => {
-    render(<CheckoutForm defaultAddress={address} paymentMode="mock" />);
+    render(<CheckoutForm remoteSurcharge={3000} defaultAddress={address} paymentMode="mock" />);
     const submit = screen.getByRole('button', { name: /289,000|주문/ });
 
     expect(submit).toHaveAttribute('aria-disabled', 'true');
@@ -82,7 +82,7 @@ describe('못 누르는 버튼이 이유를 말한다', () => {
   });
 
   it('결제하기 — 배송지가 없을 때는 약관이 아니라 배송지를 말한다', () => {
-    render(<CheckoutForm defaultAddress={null} paymentMode="mock" />);
+    render(<CheckoutForm remoteSurcharge={3000} defaultAddress={null} paymentMode="mock" />);
     const submit = screen.getByRole('button', { name: /289,000|주문/ });
 
     expect(announced(submit)).toContain('받으실 곳을 먼저 입력해 주세요');
@@ -91,7 +91,7 @@ describe('못 누르는 버튼이 이유를 말한다', () => {
 
   it('결제하기 — 다 갖추면 이유가 사라지고 눌린다', async () => {
     const user = userEvent.setup();
-    render(<CheckoutForm defaultAddress={address} paymentMode="mock" />);
+    render(<CheckoutForm remoteSurcharge={3000} defaultAddress={address} paymentMode="mock" />);
     await user.click(screen.getByRole('checkbox'));
 
     const submit = screen.getByRole('button', { name: /289,000|주문/ });

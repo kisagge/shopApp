@@ -8,6 +8,7 @@ import {
 import {
   type CartQuoteRequest, type CartQuoteResponse, type CartQuoteLine, type LineIssue,
 } from '@shop/contract';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 
 /**
  * 장바구니 견적.
@@ -196,6 +197,12 @@ export async function quoteCart(
     // 보유 포인트는 세션이 말하는 값만 믿는다
     pointsAvailable,
     isRemoteArea: input.isRemoteArea,
+    /*
+     * **배송비 정책은 운영이 정한다.** 여기서 안 넘기면 계산기가 코드의
+     * 바닥값을 쓰고, 운영이 바꿔 둔 무료 기준이 **견적에만 반영되지 않는다** —
+     * 상품 화면은 3만원이라고 적어 놓고 결제는 5만원으로 계산하는 상태다.
+     */
+    shippingPolicy: await getShippingPolicy(),
     // 등급별 적립률. 없으면 calculateCart 가 기본값을 쓴다.
     ...(viewer?.rewardPercent === undefined ? {} : { rewardPercent: viewer.rewardPercent }),
   });

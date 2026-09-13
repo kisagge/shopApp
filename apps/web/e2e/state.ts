@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 /**
  * 역할별 세션 파일. .gitignore 의 test-results/ 아래에 둔다.
  *
@@ -90,6 +91,41 @@ export async function ready(page: import('@playwright/test').Page): Promise<void
 }
 
 /**
+ * 이 계정의 기본 배송지 id.
+ *
+ * **연결이 한 번 끊겼다고 명세가 지면 안 된다.** `ECONNRESET` 은 서버가 잠깐
+ * 연결을 끊은 것이지 배송지가 잘못된 것이 아니다 — 장바구니 기다림이 같은
+ * 이유로 예외를 삼키게 돼 있고, 실제로 여기서 한 번 졌다.
+ *
+ * **산발적으로 지는 검사는 없는 검사보다 나쁘다.** 진짜 회귀를 봐도 "또
+ * 그거겠지" 하고 넘기게 된다. 그래서 몇 번 다시 물어보되, **끝내 못 받으면
+ * 조용히 넘어가지 않고 진다** — 배송지가 정말 없는 것도 알아야 한다.
+ */
+export async function defaultAddressId(
+  page: import('@playwright/test').Page,
+): Promise<string> {
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      const body = (await (await page.request.get('/api/addresses')).json()) as
+        | { id: string; isDefault: boolean }[]
+        | { addresses: { id: string; isDefault: boolean }[] };
+      const rows = Array.isArray(body) ? body : body.addresses;
+      const picked = rows.find((a) => a.isDefault) ?? rows[0];
+      if (picked) return picked.id;
+
+      throw new Error('시드가 이 계정에 배송지를 안 만들었다');
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(200);
+    }
+  }
+
+  throw new Error(`배송지를 못 읽었다: ${String(lastError)}`);
+}
+
+/**
  * 첫 상품을 장바구니에 담고 그 변형 id 를 돌려준다.
  *
  * 결제 화면은 담긴 것이 없으면 볼 것이 없다 — 빈 화면을 훑으면 정작 검사하려던
@@ -148,8 +184,25 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
     if ((await pick.count()) > 0) await pick.click();
   }
 
+  /*
+   * **단추가 열릴 때까지 기다린다.**
+   *
+   * 담기 단추는 옵션이 다 골라지기 전까지 `aria-disabled` 다. 고른 직후에
+   * 곧바로 물으면 아직 옛 상태를 본다 — 부하가 걸린 기계에서는 그 사이가
+   * 눈에 띄게 벌어진다. 실제로 문지기 한 판이 "담을 수 있는 상품이 없다" 로
+   * 졌는데, 같은 상품을 바로 다시 돌리면 통과했다.
+   *
+   * **기다려도 안 열리면 null 이다.** 재고가 정말 없는 경우를 기다림으로
+   * 덮으면 안 되므로, 짧게 기다리고 포기한다 — 부르는 쪽이 건너뛸지 정한다.
+   */
   const addToCart = page.getByRole('button', { name: '장바구니 담기' });
-  if ((await addToCart.getAttribute('aria-disabled')) === 'true') return null;
+  try {
+    await expect
+      .poll(() => addToCart.getAttribute('aria-disabled'), { timeout: 5_000 })
+      .not.toBe('true');
+  } catch {
+    return null;
+  }
   await addToCart.click();
 
   /*

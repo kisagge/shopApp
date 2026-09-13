@@ -37,10 +37,18 @@ interface SavedAddress {
 export function CheckoutForm({
   defaultAddress: initialAddress,
   paymentMode,
+  remoteSurcharge,
 }: {
   defaultAddress: SavedAddress | null;
   /** 서버가 정한 결제 방식. 브라우저는 다시 정하지 않는다 — place-order.ts 주석 참고 */
   paymentMode: PaymentMode;
+  /**
+   * 제주·도서산간 추가 배송비. **서버가 읽어 내려보낸다.**
+   *
+   * 금액 자체는 견적이 계산한다 — 이 값은 배송지 목록 옆에 적는 **안내**다.
+   * 그런데 안내가 결제 금액과 갈리면 그게 더 나쁘다. 같은 정책을 읽는다.
+   */
+  remoteSurcharge: number;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -231,6 +239,7 @@ export function CheckoutForm({
               </p>
             )}
             <AddressPicker
+              remoteSurcharge={remoteSurcharge}
               currentId={defaultAddress?.id ?? null}
               onPicked={(picked) => {
                 setDefaultAddress(picked);

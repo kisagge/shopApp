@@ -72,6 +72,12 @@ export const PERMISSION = [
   // 공지와 FAQ 를 쓴다. **가맹점에게 주지 않는다** — 고객센터의 글은 한
   // 브랜드가 아니라 이 가게 전체의 말이고, 배송·환불 정책은 플랫폼이 정한다.
   'support:write',
+  /*
+   * 배송비 정책. **가맹점에게 주지 않는다** — 배송비는 한 브랜드가 아니라
+   * 이 가게 전체의 약속이고, 무료 기준 하나가 모든 주문의 금액을 바꾼다.
+   * 공지와 FAQ 를 플랫폼이 쓰는 것과 같은 이유다.
+   */
+  'shipping:write',
   // 전체 트래픽 지표. 가맹점은 자기 매출만 보고 플랫폼 전체 방문·전환은 못 본다 —
   // 다른 가맹점의 성과를 역산할 수 있는 값이다.
   'analytics:all',
@@ -121,7 +127,7 @@ const ADMIN: readonly Permission[] = [
   'collection:read', 'collection:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:read', 'review:moderate',
-  'inquiry:answer', 'support:write',
+  'inquiry:answer', 'support:write', 'shipping:write',
   'analytics:all',
 ];
 

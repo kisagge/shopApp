@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 // 모노레포 루트의 .env 를 읽는다 (cwd 는 packages/db)
 config({ path: resolve(import.meta.dirname, '../../../.env'), quiet: true });
 
-import { searchTextFor, sellingPriceOf } from '@shop/core';
+import { DEFAULT_SHIPPING, searchTextFor, sellingPriceOf } from '@shop/core';
 import { prisma } from './client';
 import { assertSeedTarget } from './seed-target';
 import { seedReviews } from './seed-reviews';
@@ -788,6 +788,26 @@ async function main(): Promise<void> {
     }
   }
   console.log(`  상품 ${PRODUCTS.length}개 · 변형 ${variantCount}개`);
+
+  /*
+   * 배송비 정책. **한 줄짜리 표라 upsert 로 심고, 있으면 건드리지 않는다** —
+   * 운영이 화면에서 바꿔 둔 값을 시드가 되돌리면 안 된다. 배너가 같은 이유로
+   * update 를 비워 두고 있다.
+   *
+   * 줄이 없어도 가게는 돌아간다(코드의 바닥값). 그래도 심는 이유는 **운영
+   * 화면이 처음부터 값을 보여 주게** 하기 위해서다 — 빈 칸으로 시작하면
+   * 지금 얼마를 받고 있는지 화면에서 알 수 없다.
+   */
+  await prisma.shippingPolicy.upsert({
+    where: { id: 'default' },
+    update: {},
+    create: {
+      id: 'default',
+      baseFee: DEFAULT_SHIPPING.baseFee,
+      freeThreshold: DEFAULT_SHIPPING.freeThreshold,
+      remoteSurcharge: DEFAULT_SHIPPING.remoteSurcharge,
+    },
+  });
 
   // ── 쿠폰
   await prisma.coupon.upsert({

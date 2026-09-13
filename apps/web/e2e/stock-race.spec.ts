@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, defaultAddressId } from './state';
 
 /**
  * 마지막 한 개를 두 사람이 동시에 산다.
@@ -40,14 +40,7 @@ async function buyer(
   const context = await browser.newContext({ storageState });
   const page = await context.newPage();
 
-  const body = (await (await page.request.get('/api/addresses')).json()) as
-    | { id: string; isDefault: boolean }[]
-    | { addresses: { id: string; isDefault: boolean }[] };
-  const rows = Array.isArray(body) ? body : body.addresses;
-  const address = rows.find((a) => a.isDefault) ?? rows[0];
-  expect(address, '시드가 이 계정에 배송지를 안 만들었다').toBeDefined();
-
-  return { context, page, addressId: address!.id };
+  return { context, page, addressId: await defaultAddressId(page) };
 }
 
 /** 되돌린다. 못 되돌리면 그 주문이 재고를 물고 다음 실행을 오염시킨다. */
