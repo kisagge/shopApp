@@ -28,6 +28,8 @@ export const STATE_FILE = {
   raceBuyerB: 'test-results/.auth/race-b.json',
   /** 같은 쿠폰·포인트로 두 번 결제해 보는 사람 — double-spend */
   doubleSpender: 'test-results/.auth/double-spend.json',
+  /** 주문 내역 검색 — order-search */
+  orderSearch: 'test-results/.auth/order-search.json',
 } as const;
 
 /**

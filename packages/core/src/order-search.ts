@@ -46,6 +46,31 @@ export function readOrderSearch(raw: string | undefined): OrderSearchTerm {
   return { kind: 'buyer', value };
 }
 
+export type MyOrderSearchKind = 'orderNo' | 'orderNoPartial' | 'product' | 'none';
+
+export interface MyOrderSearchTerm {
+  readonly kind: MyOrderSearchKind;
+  readonly value: string;
+}
+
+/**
+ * 내 주문 검색어를 읽는다.
+ *
+ * **운영자와 손님은 다른 것을 쥐고 온다.** 운영자는 문의를 받았으니 주문번호
+ * 아니면 **사는 사람의 이름**을 쥐고 있다. 손님은 자기 주문만 보므로 이름으로
+ * 찾을 일이 없다 — 대신 "작년에 산 그 코트" 를 찾는다. 그래서 나머지를
+ * **상품명**으로 읽는다.
+ *
+ * 번호를 가리는 규칙은 운영자 쪽과 같은 것을 쓴다. 둘로 나눠 적으면 주문번호
+ * 모양이 바뀔 때 한쪽만 고쳐진다.
+ */
+export function readMyOrderSearch(raw: string | undefined): MyOrderSearchTerm {
+  const term = readOrderSearch(raw);
+  // 'buyer' 만 다르게 읽는다. 나머지 갈래는 뜻이 같다.
+  if (term.kind === 'buyer') return { kind: 'product', value: term.value };
+  return { kind: term.kind, value: term.value };
+}
+
 export interface DateRange {
   /** 포함 */
   readonly from: Date | null;

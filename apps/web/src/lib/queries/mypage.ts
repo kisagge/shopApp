@@ -3,7 +3,7 @@ import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
   gradeProgress, won, ORDER_STATUS, expiringSoonAmount, REVIEWABLE_STATUS,
-  type MemberGrade, type OrderStatus, type Won,
+  type DateRange, type MemberGrade, type MyOrderSearchTerm, type OrderStatus, type Won,
 } from '@shop/core';
 
 /** 마이페이지 상단의 주문 처리 현황 — 시안의 5칸 */
@@ -89,18 +89,65 @@ export interface MyOrderSummary {
 }
 
 /** 주문 내역. status 를 주면 그 상태만 거른다. */
-export async function getMyOrders(
-  userId: string,
+export interface MyOrderFilter {
   /**
    * 걸러 볼 상태들. **하나도 묶음도 같은 모양으로 받는다** — 부르는 쪽이
    * "취소·반품" 처럼 여럿을 묶은 칸을 다시 나누지 않게 하려는 것이다.
    * 목록을 무엇으로 펴는지는 core 의 orderFilterStatuses 가 정한다.
    */
-  statuses?: readonly OrderStatus[] | null,
+  readonly statuses?: readonly OrderStatus[] | null;
+  /** 주문번호이거나 상품명. 어느 쪽인지는 core 의 readMyOrderSearch 가 읽는다 */
+  readonly search?: MyOrderSearchTerm;
+  /** 주문한 날 기준. 끝날을 포함한다 — readDateRange 가 그렇게 만든다 */
+  readonly range?: DateRange;
+}
+
+export async function getMyOrders(
+  userId: string,
+  filter: MyOrderFilter = {},
   take = 20,
 ): Promise<MyOrderSummary[]> {
+  const { statuses, search, range } = filter;
+
+  /*
+   * **완전한 주문번호는 정확히 일치로 찾는다.** orderNo 에 유니크 인덱스가
+   * 있어서 부분 일치로 던지면 그 인덱스를 못 쓰고 전체를 훑는다. 운영자
+   * 검색이 같은 판단을 한다.
+   *
+   * 상품명은 **주문 항목의 스냅샷**을 본다. 지금 상품 이름이 아니라 살 때
+   * 찍힌 이름이다 — 그 사이에 이름이 바뀌었어도 사람이 기억하는 것은 그때
+   * 이름이고, 주문은 애초에 그 값을 안고 있다.
+   */
+  const searchWhere =
+    search === undefined || search.kind === 'none'
+      ? {}
+      : search.kind === 'orderNo'
+        ? { orderNo: search.value }
+        : search.kind === 'orderNoPartial'
+          ? { orderNo: { contains: search.value } }
+          : {
+              items: {
+                some: { productName: { contains: search.value, mode: 'insensitive' as const } },
+              },
+            };
+
+  const placedAt =
+    range && (range.from || range.until)
+      ? {
+          placedAt: {
+            ...(range.from ? { gte: range.from } : {}),
+            ...(range.until ? { lt: range.until } : {}),
+          },
+        }
+      : {};
+
   const orders = await prisma.order.findMany({
-    where: { userId, ...(statuses && statuses.length > 0 ? { status: { in: [...statuses] } } : {}) },
+    where: {
+      userId,
+      ...(statuses && statuses.length > 0 ? { status: { in: [...statuses] } } : {}),
+      ...searchWhere,
+      ...placedAt,
+    },
     orderBy: { placedAt: 'desc' },
     take,
     select: {
