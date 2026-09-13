@@ -29,6 +29,25 @@ describe('역할과 권한', () => {
   it('가맹점은 어드민 콘솔에 들어간다 — 자기 상품을 관리해야 한다', () => {
     expect(hasPermission(merchant, 'admin:access')).toBe(true);
   });
+
+  it('가맹점은 자기 상품의 평을 읽되 내리지는 못한다', () => {
+    /*
+     * **읽기와 내리기를 가른 자리다.**
+     *
+     * 파는 사람이 자기 물건이 어떤 소리를 듣는지 모르면 고칠 수가 없다 —
+     * 한동안 문의는 답까지 하게 해 두고 리뷰는 보지도 못하게 두었다.
+     *
+     * 그렇다고 내리게 하면 자기 상품의 혹평을 지울 수 있고, 그러면 리뷰가
+     * 상품 설명의 일부가 된다. 둘을 한 권한으로 묶으면 이 구분이 사라진다.
+     */
+    expect(hasPermission(merchant, 'review:read')).toBe(true);
+    expect(hasPermission(merchant, 'review:moderate')).toBe(false);
+  });
+
+  it('고객은 리뷰 관리 조회에 못 들어간다 — 남의 평까지 보게 된다', () => {
+    expect(hasPermission(customer, 'review:read')).toBe(false);
+    expect(hasPermission(admin, 'review:read')).toBe(true);
+  });
 });
 
 describe('관리자와 슈퍼관리자의 경계', () => {

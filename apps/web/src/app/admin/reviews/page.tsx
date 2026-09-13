@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  MODERATION_STATE_LABEL, type ModerationState,
+  MODERATION_STATE_LABEL, hasPermission, type ModerationState,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import {
@@ -37,11 +37,26 @@ export default async function AdminReviewsPage({
 }: {
   searchParams: Promise<SearchParams>;
 }) {
-  const actor = await requireAdmin('review:moderate');
+  /*
+   * **읽는 것은 가맹점도 한다.** 조회는 `review:read` 로 열고, 내리기·되살리기
+   * 단추는 아래에서 `review:moderate` 를 가진 사람에게만 세운다. 무엇을 보는지는
+   * 조회 쪽이 `merchantScope` 로 좁힌다 — 여기서 거르지 않는다.
+   */
+  const actor = await requireAdmin('review:read');
+  const canModerate = hasPermission(actor, 'review:moderate');
   const t = await getT();
   const params = await searchParams;
 
-  const tab: ReviewTab = isReviewTab(params.tab) ? params.tab : 'reported';
+  /*
+   * **처리 대기는 조치하는 사람의 일감이다.** 내릴 수 없는 사람에게 그 줄을
+   * 보여 주면 할 일처럼 보이는데 할 수 있는 것이 없다. 가맹점은 전체에서
+   * 시작하고, 그 탭 자체를 세우지 않는다.
+   */
+  const tabs: readonly ReviewTab[] = canModerate
+    ? REVIEW_TAB
+    : REVIEW_TAB.filter((t) => t !== 'reported');
+  const asked: ReviewTab = isReviewTab(params.tab) ? params.tab : 'reported';
+  const tab: ReviewTab = tabs.includes(asked) ? asked : tabs[0]!;
   const q = params.q?.trim() || undefined;
 
   const page = await getAdminReviews(actor, {
@@ -63,7 +78,11 @@ export default async function AdminReviewsPage({
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">리뷰 관리</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            {page.pending > 0 ? `처리 대기 ${page.pending}건` : '처리할 신고 없음'}
+            {canModerate
+              ? page.pending > 0
+                ? `처리 대기 ${page.pending}건`
+                : '처리할 신고 없음'
+              : '내 상품에 달린 평입니다 — 내리는 것은 운영진이 합니다'}
           </p>
         </div>
       </header>
@@ -71,7 +90,7 @@ export default async function AdminReviewsPage({
       <div className="flex flex-col gap-5 p-8">
         {/* 탭은 링크다. 주소에 남아야 공유하고 뒤로 갈 수 있다. */}
         <nav aria-label="리뷰 상태" className="flex gap-1 border-b border-[var(--border)]">
-          {REVIEW_TAB.map((t) => {
+          {tabs.map((t) => {
             const current = t === tab;
             return (
               <Link
@@ -215,11 +234,13 @@ export default async function AdminReviewsPage({
                     </details>
                   )}
 
-                  <ReviewModeration
-                    reviewId={row.id}
-                    removed={row.state === 'removed'}
-                    openReports={row.openReports}
-                  />
+                  {canModerate && (
+                    <ReviewModeration
+                      reviewId={row.id}
+                      removed={row.state === 'removed'}
+                      openReports={row.openReports}
+                    />
+                  )}
                 </article>
               </li>
             ))}

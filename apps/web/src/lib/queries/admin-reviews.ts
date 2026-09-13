@@ -1,16 +1,23 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, moderationState, reportPriority,
+  assertPermission, merchantScope, moderationState, reportPriority,
   type Actor, type ModerationState, type ReportReason,
 } from '@shop/core';
 
 /**
  * 리뷰 관리 조회.
  *
- * **가맹점은 여기 들어오지 못한다.** `review:moderate` 는 관리자 이상만
- * 갖는다 — 자기 상품의 혹평을 내릴 수 있는 사람이 그 상품을 파는 사람이면
- * 리뷰가 상품 설명의 일부가 된다.
+ * **가맹점도 들어온다 — 다만 자기 상품만, 읽기만.** 파는 사람이 자기 물건이
+ * 어떤 소리를 듣는지 모르면 고칠 수가 없다. 한동안 문의는 답까지 하게 해
+ * 두었으면서(`inquiry:answer`) 리뷰는 보지도 못했다.
+ *
+ * 내리는 것은 여전히 운영진뿐이다(`review:moderate`) — 자기 상품의 혹평을
+ * 내릴 수 있으면 리뷰가 상품 설명의 일부가 된다.
+ *
+ * **권한을 낮추는 것만으로는 부족하다.** 범위를 함께 좁히지 않으면 가맹점이
+ * 남의 브랜드 리뷰까지 본다. 상품 검색·주문 조회가 쓰는 `merchantScope` 를
+ * 같은 방식으로 건다.
  */
 
 export interface ReportRow {
@@ -140,7 +147,16 @@ export async function getAdminReviews(
   actor: Actor,
   query: { tab?: ReviewTab; q?: string | undefined; cursor?: string | undefined } = {},
 ): Promise<AdminReviewList> {
-  assertPermission(actor, 'review:moderate');
+  assertPermission(actor, 'review:read');
+
+  /*
+   * 운영진이면 null(전체), 가맹점이면 자기 id, 그 밖이면 undefined 다.
+   * undefined 는 위 권한 검사에서 이미 걸러지지만, 값이 새어 들어와도 아무
+   * 상품에도 안 걸리는 조건이 되도록 그대로 넘긴다.
+   */
+  const scope = merchantScope(actor);
+  const mine =
+    scope === null ? {} : { product: { brand: { merchantId: scope ?? '__없는_가맹점__' } } };
 
   const tab = query.tab ?? 'reported';
   const term = query.q?.trim();
@@ -162,7 +178,7 @@ export async function getAdminReviews(
     : {};
 
   const pending = await prisma.review.count({
-    where: { deletedAt: null, reports: { some: { resolvedAt: null } } },
+    where: { deletedAt: null, reports: { some: { resolvedAt: null } }, ...mine },
   });
 
   if (tab === 'reported') {
@@ -172,7 +188,7 @@ export async function getAdminReviews(
      * 것이 이 화면의 사용법이다.
      */
     const raw = (await prisma.review.findMany({
-      where: { deletedAt: null, reports: { some: { resolvedAt: null } }, ...search },
+      where: { deletedAt: null, reports: { some: { resolvedAt: null } }, ...mine, ...search },
       orderBy: { createdAt: 'desc' },
       take: QUEUE_CAP + 1,
       select: reviewSelect,
@@ -190,8 +206,8 @@ export async function getAdminReviews(
 
   const where =
     tab === 'removed'
-      ? { deletedAt: { not: null }, ...search }
-      : { deletedAt: null, ...search };
+      ? { deletedAt: { not: null }, ...mine, ...search }
+      : { deletedAt: null, ...mine, ...search };
 
   const raw = (await prisma.review.findMany({
     where,

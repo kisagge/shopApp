@@ -41,13 +41,44 @@ beforeEach(() => {
 });
 
 describe('누가 볼 수 있는가', () => {
-  it('가맹점은 들어오지 못한다', async () => {
+  it('가맹점은 들어오되 자기 상품만 본다', async () => {
     /*
-     * 자기 상품의 혹평을 내릴 수 있는 사람이 그 상품을 파는 사람이면
-     * 리뷰가 상품 설명의 일부가 된다.
+     * **한동안 아예 못 들어왔다.** 그때 적어 둔 이유("자기 상품의 혹평을
+     * 내릴 수 있으면 리뷰가 상품 설명의 일부가 된다")는 지금도 맞지만, 그건
+     * **내리는 것**에 걸리는 말이지 읽는 것에 걸리는 말이 아니었다. 읽기는
+     * `review:read`, 내리기는 `review:moderate` 로 갈랐다.
+     *
+     * **여기서 보는 것은 범위다.** 권한을 낮추기만 하고 조회를 안 좁히면
+     * 가맹점이 경쟁 브랜드의 혹평까지 본다. 그건 화면이 아니라 쿼리의 일이다.
      */
-    await expect(getAdminReviews(MERCHANT)).rejects.toBeInstanceOf(ForbiddenError);
-    expect(db.review.findMany).not.toHaveBeenCalled();
+    await expect(getAdminReviews(MERCHANT)).resolves.toMatchObject({ rows: [] });
+
+    const where = db.review.findMany.mock.calls[0]?.[0]?.where as
+      | { product?: { brand?: { merchantId?: string } } }
+      | undefined;
+    expect(
+      where?.product?.brand?.merchantId,
+      '가맹점 조회에 자기 가맹점 조건이 안 붙었다',
+    ).toBe(MERCHANT.merchantId);
+  });
+
+  it('처리 대기 수도 자기 것만 센다 — 남의 신고 건수가 새면 안 된다', async () => {
+    await getAdminReviews(MERCHANT);
+
+    const where = db.review.count.mock.calls[0]?.[0]?.where as
+      | { product?: { brand?: { merchantId?: string } } }
+      | undefined;
+    expect(where?.product?.brand?.merchantId).toBe(MERCHANT.merchantId);
+  });
+
+  it('운영진 조회에는 가맹점 조건이 안 붙는다', async () => {
+    // 좁히는 조건이 늘 붙으면 관리자가 아무것도 못 본다
+    await getAdminReviews(ADMIN);
+
+    const where = db.review.findMany.mock.calls[0]?.[0]?.where as
+      | { product?: unknown }
+      | undefined;
+    expect(where?.product, '관리자 조회까지 가맹점으로 좁혀졌다').toBeUndefined();
   });
 
   it('고객도 마찬가지다', async () => {

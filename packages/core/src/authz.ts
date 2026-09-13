@@ -55,6 +55,17 @@ export const PERMISSION = [
   'settlement:confirm', // 정산 금액 확정
   'settlement:pay',     // 실제 지급 집행
   'review:write',
+  /*
+   * **읽는 것과 내리는 것을 가른다.**
+   *
+   * 가맹점은 자기 상품의 평을 볼 수 있어야 한다 — 파는 사람이 자기 물건이
+   * 어떤 소리를 듣는지 모르면 고칠 수가 없다. 문의는 답까지 하게 해 두었으면서
+   * 리뷰는 보지도 못하는 상태였다.
+   *
+   * 내리는 것은 다르다. 자기 상품의 혹평을 내릴 수 있으면 리뷰가 상품 설명의
+   * 일부가 된다. 그래서 `review:moderate` 는 운영진에게만 남긴다.
+   */
+  'review:read',
   'review:moderate',
   // 상품 문의에 답한다. 가맹점은 자기 상품만.
   'inquiry:answer',
@@ -88,6 +99,8 @@ const MERCHANT: readonly Permission[] = [
   'order:read', 'order:fulfill',
   'merchant:read', 'merchant:write',
   'settlement:read',
+  // 자기 상품의 평을 읽는다. 내리지는 못한다 — review:moderate 주석을 보라.
+  'review:read',
   // 자기 상품에 들어온 문의에 답한다. 답할 사람이 파는 사람인 것이 맞다.
   'inquiry:answer',
 ];
@@ -107,7 +120,7 @@ const ADMIN: readonly Permission[] = [
   'banner:read', 'banner:write',
   'collection:read', 'collection:write',
   'settlement:read', 'settlement:confirm',
-  'review:write', 'review:moderate',
+  'review:write', 'review:read', 'review:moderate',
   'inquiry:answer', 'support:write',
   'analytics:all',
 ];

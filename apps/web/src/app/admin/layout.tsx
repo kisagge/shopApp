@@ -32,7 +32,8 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/coupons', label: '쿠폰', permission: 'coupon:read' },
   // 가맹점에게는 보이지 않는다. 자기 상품의 혹평을 내릴 수 있으면
   // 리뷰가 상품 설명의 일부가 된다.
-  { href: '/admin/reviews', label: '리뷰', permission: 'review:moderate' },
+  // 가맹점도 들어온다 — 자기 상품만, 읽기만. 자세한 이유는 authz 의 review:read 에
+  { href: '/admin/reviews', label: '리뷰', permission: 'review:read' },
   // 가맹점도 본다 — 자기 상품 문의는 파는 사람이 답하는 것이 맞다
   { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/support', label: '공지·FAQ', permission: 'support:write' },
