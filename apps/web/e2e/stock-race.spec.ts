@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import type { BrowserContext, Page } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart } from './state';
 
 /**
  * 마지막 한 개를 두 사람이 동시에 산다.
@@ -88,8 +88,13 @@ test('마지막 한 개는 한 사람에게만 간다', async ({ browser }) => {
   try {
     const adminPage = await admin.newPage();
 
-    // 겨룰 물건을 고른다. 화면에서 고르는 이유는 재고 있는 조합만 담기기 때문이다.
-    const variantId = await addFirstProductToCart(a.page);
+    /*
+     * 겨룰 물건을 고른다. 화면에서 고르는 이유는 재고 있는 조합만 담기기
+     * 때문이고, **홈의 첫 상품이 아니라 자기 상품**을 여는 이유는 여기서 그
+     * 재고를 1 로 내리기 때문이다 — 남의 상품을 내리면 그것을 담으려던 다른
+     * 명세가 품절을 만난다.
+     */
+    const variantId = await addProductToCart(a.page, RACE_PRODUCT.stock);
     expect(variantId, '담을 수 있는 상품이 없다 — 시드가 비었다').not.toBeNull();
 
     /*

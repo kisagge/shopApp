@@ -25,6 +25,8 @@ export const STATE_FILE = {
   /** 마지막 한 개를 두고 겨루는 두 사람 — stock-race */
   raceBuyerA: 'test-results/.auth/race-a.json',
   raceBuyerB: 'test-results/.auth/race-b.json',
+  /** 같은 쿠폰·포인트로 두 번 결제해 보는 사람 — double-spend */
+  doubleSpender: 'test-results/.auth/double-spend.json',
 } as const;
 
 /**
@@ -37,6 +39,24 @@ export const STATE_FILE = {
  * 슬러그를 여기 모아 두는 이유는 **떨어져 있으면 겹친 줄 모르기** 때문이다.
  * 둘이 달라야 한다는 것은 e2e-fixture-isolation 이 지킨다.
  */
+/**
+ * 재고를 건드리는 명세는 **저마다 자기 상품을 쓴다.**
+ *
+ * `addFirstProductToCart` 는 홈의 첫 상품을 집는다. 그 길을 아홉 명세가 함께
+ * 쓰고 있는데, 재고 경쟁 검사는 그 변형의 재고를 **1 로 내렸다가 되돌린다** —
+ * 그 사이에 담으려던 다른 명세는 품절을 만난다. 실제로 한 판이 그렇게 졌다.
+ * 리뷰를 나눠 쓰다 진 것, 장바구니를 나눠 쓰다 진 것과 같은 모양이다.
+ *
+ * 그래서 이 둘은 홈에서 고르지 않고 **자기 상품 주소로 곧장 간다.** 둘이
+ * 달라야 한다는 것은 e2e-fixture-isolation 이 지킨다.
+ */
+export const RACE_PRODUCT = {
+  /** 재고를 1 로 내렸다 되돌린다 — stock-race */
+  stock: 'washed-denim-straight',
+  /** 여섯을 한꺼번에 산다 — double-spend. 쿠폰 최소 금액을 한 개로 넘겨야 한다 */
+  coupon: 'heavy-cotton-hoodie',
+} as const;
+
 export const REVIEW_PRODUCT = {
   /** 리뷰를 읽고 누르기만 한다 — review-helpful */
   readOnly: 'oversized-wool-coat',
@@ -93,6 +113,29 @@ export async function addFirstProductToCart(
   await page.locator('#main a[href^="/product/"]').first().click();
   await page.waitForURL(/\/product\//);
   await ready(page);
+
+  return await pickAndAdd(page);
+}
+
+/**
+ * 정해 둔 상품을 담는다.
+ *
+ * 홈의 첫 상품을 집는 위 함수와 **고르는 자리만 다르다.** 재고를 건드리는
+ * 명세는 남의 상품을 건드리면 안 되므로 자기 주소로 곧장 간다 —
+ * `RACE_PRODUCT` 에 이유를 적었다.
+ */
+export async function addProductToCart(
+  page: import('@playwright/test').Page,
+  slug: string,
+): Promise<string | null> {
+  await page.request.put('/api/cart', { data: { lines: [] } });
+  await page.goto(`/product/${slug}`);
+  await ready(page);
+  return await pickAndAdd(page);
+}
+
+/** 상품 화면에서 옵션을 고르고 담는다. 담지 못했으면 null 이다. */
+async function pickAndAdd(page: import('@playwright/test').Page): Promise<string | null> {
 
   // 옵션 그룹이 여럿이면(색·사이즈) 그룹마다 하나씩 골라야 조합이 정해진다
   const groups = await page.locator('[role="radiogroup"]').count();

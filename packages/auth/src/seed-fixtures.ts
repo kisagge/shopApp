@@ -52,10 +52,16 @@ export const SEED_ACCOUNT = {
    */
   raceBuyerA: 'race-a@plain.test',
   raceBuyerB: 'race-b@plain.test',
+
+  /*
+   * **같은 쿠폰과 같은 포인트로 두 번 결제해 본다.** 이쪽은 한 사람이다 —
+   * 쿠폰도 포인트도 계정에 붙어 있어서, 두 사람으로는 겨룰 것이 없다.
+   */
+  doubleSpender: 'double-spend@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB',
+  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];
