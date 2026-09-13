@@ -13,7 +13,18 @@ vi.mock('@shop/auth/session', () => ({ getSessionUser }));
 
 // 동의는 세션이 아니라 DB 에서 읽는다
 const findUniqueUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve({ analyticsConsent: null })));
-vi.mock('@shop/db', () => ({ prisma: { user: { findUnique: findUniqueUser } } }));
+/*
+ * 상품 조회가 하나 늘었다 — 이벤트에 **가맹점을 달아 주는** 자리다(상품에서
+ * 끌어온다. 본문에 적힌 값은 믿지 않는다). 흉내에 이 표가 없으면 수집이
+ * 통째로 실패하고, 그러면 이 파일의 검사들이 전부 "거부됨" 을 본다.
+ */
+const findManyProducts = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('@shop/db', () => ({
+  prisma: {
+    user: { findUnique: findUniqueUser },
+    product: { findMany: findManyProducts },
+  },
+}));
 
 const { POST } = await import('~/app/api/events/route');
 
@@ -41,6 +52,8 @@ beforeEach(() => {
   recordEvents.mockClear();
   getSessionUser.mockResolvedValue(null);
   findUniqueUser.mockClear().mockResolvedValue({ analyticsConsent: null });
+  // 상품을 못 찾으면 가맹점은 빈 채로 둔다 — 그 갈래는 event-merchant 가 본다
+  findManyProducts.mockClear().mockResolvedValue([]);
 });
 
 describe('POST /api/events — 정상 수집', () => {

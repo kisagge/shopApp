@@ -125,15 +125,33 @@ export default async function AdminDashboard({
           >
             <div className="mb-4 flex flex-col gap-1">
               <h2 id="funnel-title" className="text-base font-semibold">구매 퍼널</h2>
-              <p className="text-xs text-[var(--fg-muted)]">
+              <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
                 {d.rangeLabel} 세션 기준 · 앞 단계를 거친 세션만 다음 단계로 셉니다
+                {d.scope && (
+                  <>
+                    {' · '}
+                    {/*
+                      **왜 세 칸인지 말해 준다.** 운영진 화면에는 네 칸이 있고,
+                      아무 말 없이 하나 적으면 빠진 것처럼 보인다. 주문서 진입은
+                      장바구니 전체의 일이라 한 가맹점에 귀속되지 않는다 —
+                      자세한 이유는 core 의 MERCHANT_FUNNEL_STEP 에 적었다.
+                    */}
+                    <b>내 상품 기준</b>입니다. 주문서 진입은 장바구니 전체의 일이라
+                    가맹점별로 나눌 수 없어 빠져 있습니다.
+                  </>
+                )}
               </p>
             </div>
             {/*
               네 칸을 그대로 두면 한 칸이 24px 이다 — 숫자 "391" 조차 안 들어간다.
               퍼널은 순서가 뜻이라 두 줄로 접혀도 읽는 순서가 흐트러지지 않는다.
             */}
-            <ol className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {/* 칸 수가 단계 수를 따라간다 — 가맹점은 셋, 운영진은 넷이다 */}
+            <ol
+              className={`grid grid-cols-2 gap-3 ${
+                d.funnel.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-4'
+              }`}
+            >
               {d.funnel.map((step) => (
                 <li key={step.step} className="rounded-sm bg-[var(--surface)] p-4">
                   <p className="text-xs text-[var(--fg-muted)]">{step.label}</p>

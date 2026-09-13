@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { ready } from './state';
 
 /** 가맹점은 자기 것만 본다 */
 
@@ -135,4 +136,34 @@ test('가맹점은 문의 대기줄을 본다', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '상품 문의', level: 1 })).toBeVisible();
   // 남의 상품 문의가 섞이면 할 일 목록이 되지 않는다
   await expect(page.getByText('내 브랜드만')).toBeVisible();
+});
+
+test('가맹점도 자기 상품의 전환을 본다', async ({ page }) => {
+  /*
+   * **한동안 아예 안 보여 줬다.** 자기 물건이 몇 번 조회되고 몇 번 담기는지
+   * 모르면 무엇을 고쳐야 할지도 알 수 없다. 그 뿌리는 더 아래에 있었다 —
+   * 이벤트의 가맹점 칸이 한 번도 안 채워져서(개발 DB 1만 7천 건 중 0건)
+   * 가맹점별로 셀 수가 없었다.
+   */
+  await page.goto('/admin');
+  await ready(page);
+
+  const funnel = page.getByRole('region', { name: '구매 퍼널' });
+  await expect(funnel, '가맹점에게 퍼널이 없다').toBeVisible();
+
+  /*
+   * **네 칸이 아니라 세 칸이다.** 주문서 진입은 장바구니 전체의 일이라 한
+   * 가맹점에 귀속되지 않는다 — 그 사실을 화면이 말해야 한다. 아무 말 없이
+   * 하나 적으면 빠진 것처럼 보인다.
+   */
+  const steps = funnel.getByRole('listitem');
+  await expect(steps).toHaveCount(3);
+
+  /*
+   * **칸 목록에서 찾는다.** 안내 문구에도 "주문서 진입" 이 들어 있어서
+   * 구역 전체 글자로 보면 늘 걸린다 — 처음에 그렇게 짜서 멀쩡한 화면을
+   * 틀렸다고 읽었다. 빠졌다는 것은 **단계 칸에 없다**는 뜻이다.
+   */
+  await expect(steps).toContainText(['상품 조회', '장바구니 담기', '결제 완료']);
+  await expect(funnel, '왜 세 칸인지 말해 주지 않는다').toContainText('내 상품 기준');
 });

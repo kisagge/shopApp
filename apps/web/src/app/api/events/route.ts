@@ -5,8 +5,9 @@ import { prisma } from '@shop/db';
 import { eventBatchSchema, type EventBatchResponse } from '@shop/contract';
 import { NextResponse } from 'next/server';
 import {
-  deviceTypeOf, hashIp, recordEvents, toTrackedEvent, type CollectionContext,
+  deviceTypeOf, hashIp, recordEvents, toTrackedEvent, withMerchant, type CollectionContext,
 } from '~/lib/analytics/server';
+import { merchantOfProducts } from '~/lib/analytics/merchant-of';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, tooLarge } from '~/lib/api/respond';
 
@@ -107,7 +108,13 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    await recordEvents(allowed.map((e) => toTrackedEvent(e, ctx)));
+    /*
+     * **가맹점은 상품에서 끌어온다.** 본문에 적힌 값을 믿으면 아무나 남의
+     * 가맹점 지표를 부풀릴 수 있다 — userId 를 세션에서만 읽는 것과 같다.
+     */
+    await recordEvents(
+      await withMerchant(allowed.map((e) => toTrackedEvent(e, ctx)), merchantOfProducts),
+    );
   } catch (error) {
     // fanOut 이 이미 삼키지만 어댑터 밖의 실패까지 막는다.
     console.error('[analytics] 이벤트 적재 실패', error);

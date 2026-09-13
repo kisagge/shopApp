@@ -89,6 +89,21 @@ export const FUNNEL_STEP_LABEL: Readonly<Record<FunnelStep, string>> = {
   purchase: '결제 완료',
 };
 
+/**
+ * 가맹점이 보는 퍼널.
+ *
+ * **주문서 진입이 빠져 있다.** 그 단계는 장바구니 **전체**의 일이라 한
+ * 가맹점에 귀속되지 않는다 — 남의 상품만 담고 주문서에 들어간 세션을
+ * 우리 전환으로 세면 비율이 부풀고, 반대로 우리 상품이 섞여 있었다고
+ * 세면 남의 전환을 우리 것으로 읽는다. 어느 쪽도 맞지 않으므로 뺀다.
+ *
+ * 대신 **결제는 주문에서 센다.** purchase 이벤트는 주문 하나에 하나뿐이라
+ * 가맹점을 달 수 없다(한 주문에 여러 가맹점이 섞인다). 주문 항목에는
+ * 가맹점이 찍혀 있으니 그쪽이 진실이다.
+ */
+export const MERCHANT_FUNNEL_STEP = ['view_item', 'add_to_cart', 'purchase'] as const;
+export type MerchantFunnelStep = (typeof MERCHANT_FUNNEL_STEP)[number];
+
 export interface SessionEventNames {
   readonly sessionId: string;
   readonly names: readonly string[];
@@ -126,12 +141,16 @@ const round1 = (n: number): number => Math.round(n * 10) / 10;
  * 작은 데이터는 메모리에서 세고(computeFunnel), 대시보드는 SQL 로 센다.
  * 비율까지 두 벌로 두면 두 화면이 다른 수를 말하게 된다.
  */
-export function funnelFromCounts(cumulative: readonly number[]): FunnelStepResult[] {
+export function funnelFromCounts(
+  cumulative: readonly number[],
+  /** 셀 단계. 가맹점 퍼널은 주문서 진입이 빠진 셋이다 */
+  steps: readonly FunnelStep[] = FUNNEL_STEP,
+): FunnelStepResult[] {
   const results: FunnelStepResult[] = [];
   const startCount = cumulative[0] ?? 0;
   let previousCount = startCount;
 
-  for (const [i, step] of FUNNEL_STEP.entries()) {
+  for (const [i, step] of steps.entries()) {
     const count = cumulative[i] ?? 0;
 
     results.push({
@@ -155,15 +174,18 @@ export function funnelFromCounts(cumulative: readonly number[]): FunnelStepResul
  * 행을 전부 들고 있을 수 있을 때만 쓴다. 대시보드처럼 기간이 길어지면
  * SQL 로 세고 funnelFromCounts 에 넘긴다.
  */
-export function computeFunnel(sessions: readonly SessionEventNames[]): FunnelStepResult[] {
+export function computeFunnel(
+  sessions: readonly SessionEventNames[],
+  steps: readonly FunnelStep[] = FUNNEL_STEP,
+): FunnelStepResult[] {
   let remaining = sessions.map((s) => new Set(s.names));
 
-  const cumulative = FUNNEL_STEP.map((step) => {
+  const cumulative = steps.map((step) => {
     remaining = remaining.filter((names) => names.has(step));
     return remaining.length;
   });
 
-  return funnelFromCounts(cumulative);
+  return funnelFromCounts(cumulative, steps);
 }
 
 // ── 싱크 ──────────────────────────────────────────────────────

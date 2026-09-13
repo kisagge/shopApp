@@ -73,7 +73,16 @@ export function toTrackedEvent(input: EventInput, ctx: CollectionContext): Track
     productId: pick('productId'),
     variantId: pick('variantId'),
     orderId: pick('orderId'),
-    merchantId: pick('merchantId'),
+    /*
+     * **브라우저가 보낸 가맹점 id 는 쓰지 않는다.**
+     *
+     * 이 값은 가맹점이 자기 상품의 조회·전환을 보는 근거가 된다. 요청 본문을
+     * 믿으면 아무나 남의 가맹점 id 를 적어 넣어 그쪽 지표를 부풀리거나
+     * 더럽힐 수 있다 — userId 를 세션에서만 읽는 것과 같은 이유다.
+     *
+     * 상품에서 끌어온다(`withMerchant`). 여기서는 자리만 비워 둔다.
+     */
+    merchantId: null,
     value: pickNum('value'),
     quantity: pickNum('quantity'),
     deviceType: ctx.deviceType,
@@ -97,4 +106,30 @@ export function recordServerEvent(
   return recordEvents([
     { referrer: null, deviceType: null, ipHash: null, ...event },
   ]);
+}
+
+/**
+ * 이벤트에 가맹점을 달아 준다.
+ *
+ * **칸은 처음부터 있었는데 아무도 안 채웠다.** 재 보니 1만 7천 건 중 0건이었다 —
+ * 그래서 가맹점은 자기 상품이 몇 번 조회됐는지 볼 방법이 없었다.
+ *
+ * **상품에서 끌어온다.** 브라우저가 적어 보내게 하면 남의 가맹점 지표를
+ * 더럽힐 수 있고, 무엇보다 그 값은 서버가 이미 알고 있다.
+ *
+ * 한 묶음에 조회 한 번만 쓴다. 이벤트는 최대 20개씩 오는데 그것을 하나씩
+ * 물으면 수집 창구가 화면보다 느려진다.
+ */
+export async function withMerchant(
+  events: readonly TrackedEvent[],
+  lookup: (productIds: readonly string[]) => Promise<ReadonlyMap<string, string | null>>,
+): Promise<readonly TrackedEvent[]> {
+  const productIds = [...new Set(events.map((e) => e.productId).filter((id): id is string => !!id))];
+  if (productIds.length === 0) return events;
+
+  const owner = await lookup(productIds);
+
+  return events.map((e) =>
+    e.productId ? { ...e, merchantId: owner.get(e.productId) ?? null } : e,
+  );
 }

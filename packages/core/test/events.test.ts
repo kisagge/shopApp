@@ -2,7 +2,9 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   COMMERCE_EVENT, isCommerceEvent, isServerOnlyEvent, requiresConsent,
   FUNNEL_STEP, FUNNEL_STEP_LABEL, computeFunnel, fanOut, AllSinksFailedError,
-  type EventSink, type SessionEventNames, type TrackedEvent, funnelFromCounts } from '../src/events';
+  funnelFromCounts, MERCHANT_FUNNEL_STEP,
+  type EventSink, type EventName, type SessionEventNames, type TrackedEvent,
+} from '../src/events';
 
 describe('이벤트 분류', () => {
   it('알 수 없는 이름을 걸러낸다', () => {
@@ -180,5 +182,69 @@ describe('누적 수에서 퍼널 만들기', () => {
     const result = funnelFromCounts([100, 40, 10, 3]);
     expect(result.map((r) => r.droppedFromPrevious)).toEqual([0, 60, 30, 7]);
     expect(result.map((r) => r.rateFromPrevious)).toEqual([100, 40, 25, 30]);
+  });
+});
+
+/**
+ * 가맹점이 보는 퍼널.
+ *
+ * **주문서 진입이 빠져 있다.** 그 단계는 장바구니 전체의 일이라 한 가맹점에
+ * 귀속되지 않는다 — 남의 상품만 담고 주문서에 들어간 세션을 우리 전환으로
+ * 세면 비율이 부풀고, 반대로 세지 않으면 남의 전환을 우리 것으로 읽는다.
+ */
+describe('가맹점 퍼널', () => {
+  it('주문서 진입을 빼고 센다', () => {
+    expect([...MERCHANT_FUNNEL_STEP]).toEqual(['view_item', 'add_to_cart', 'purchase']);
+    expect([...MERCHANT_FUNNEL_STEP]).not.toContain('begin_checkout');
+  });
+
+  it('주문서를 안 거쳐도 결제까지 이어진다', () => {
+    /*
+     * **여기가 이 검사의 요점이다.** 운영진 퍼널은 주문서 진입을 거쳐야
+     * 결제로 세는데, 가맹점 퍼널이 그 규칙을 그대로 쓰면 **결제가 늘 0**
+     * 이 된다 — 그 단계를 아예 안 세기 때문이다.
+     */
+    const sessions = [
+      { sessionId: 's1', names: ['view_item', 'add_to_cart', 'purchase'] as const },
+    ];
+
+    const merchant = computeFunnel(
+      sessions.map((s) => ({ ...s, names: [...s.names] })),
+      [...MERCHANT_FUNNEL_STEP],
+    );
+    expect(merchant.at(-1)?.sessions, '결제가 0 으로 떨어졌다').toBe(1);
+
+    // 같은 세션을 네 단계로 세면 주문서를 안 거쳤으므로 결제가 0 이다
+    const staff = computeFunnel(sessions.map((s) => ({ ...s, names: [...s.names] })));
+    expect(staff.at(-1)?.sessions).toBe(0);
+  });
+
+  it('비율 규칙은 운영진 퍼널과 같다', () => {
+    /*
+     * 세는 곳은 둘이어도(메모리·SQL, 전체·가맹점) 규칙은 하나여야 한다.
+     * 두 벌로 두면 두 화면이 다른 수를 말한다.
+     */
+    const sessions = [
+      ['view_item', 'add_to_cart', 'purchase'],
+      ['view_item', 'add_to_cart'],
+      ['view_item'],
+      ['view_item'],
+    ].map((names, i) => ({ sessionId: `s${i}`, names: names as EventName[] }));
+
+    const funnel = computeFunnel(sessions, [...MERCHANT_FUNNEL_STEP]);
+
+    expect(funnel.map((f) => f.sessions)).toEqual([4, 2, 1]);
+    expect(funnel[1]?.rateFromStart).toBe(50);
+    expect(funnel[1]?.rateFromPrevious).toBe(50);
+    expect(funnel[2]?.rateFromPrevious).toBe(50);
+    expect(funnel[1]?.droppedFromPrevious).toBe(2);
+  });
+
+  it('이름표는 한 곳에서 온다', () => {
+    // 가맹점 화면이 따로 적으면 운영진 화면과 다른 말을 하게 된다
+    const funnel = computeFunnel([], [...MERCHANT_FUNNEL_STEP]);
+    expect(funnel.map((f) => f.label)).toEqual(
+      MERCHANT_FUNNEL_STEP.map((s) => FUNNEL_STEP_LABEL[s]),
+    );
   });
 });

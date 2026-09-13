@@ -1,9 +1,10 @@
 import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
-  funnelFromCounts, won, FUNNEL_STEP, rangeStart, DASHBOARD_RANGE_LABEL,
-  netRevenue, REFUND_STATUS,
+  funnelFromCounts, computeFunnel, won, FUNNEL_STEP, MERCHANT_FUNNEL_STEP,
+  rangeStart, DASHBOARD_RANGE_LABEL, netRevenue, REFUND_STATUS,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
+  type EventName,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 
@@ -75,7 +76,15 @@ export interface Dashboard {
   readonly topProducts: readonly TopProduct[];
   readonly recentOrders: readonly RecentOrder[];
   readonly dailyRevenue: readonly DailyRevenue[];
-  /** 전환율 퍼널. 가맹점에게는 주지 않는다 — 전체 트래픽 지표다. */
+  /**
+   * 전환율 퍼널.
+   *
+   * 운영진은 네 단계(주문서 진입 포함), 가맹점은 **자기 상품 기준 세 단계**를
+   * 본다 — 주문서 진입이 왜 빠지는지는 core 의 MERCHANT_FUNNEL_STEP 에 적었다.
+   *
+   * 한동안 가맹점에게는 아예 주지 않았다. 자기 물건이 몇 번 조회되고 몇 번
+   * 담기는지 모르면 무엇을 고쳐야 할지도 알 수 없다.
+   */
   readonly funnel: readonly FunnelStepResult[] | null;
 }
 
@@ -124,7 +133,7 @@ export async function getDashboard(
       loadTopProducts(scope, since),
       loadRecentOrders(scope),
       loadDailyRevenue(scope, since),
-      scope === null ? loadFunnel(since) : Promise.resolve(null),
+      scope === null ? loadFunnel(since) : loadMerchantFunnel(scope, since),
     ]);
 
   const totals = netRevenue(
@@ -305,3 +314,59 @@ async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
   return funnelFromCounts([row.s1, row.s2, row.s3, row.s4].map(Number));
 }
 
+/**
+ * 가맹점이 보는 퍼널.
+ *
+ * **조회·담기는 이벤트에서, 결제는 주문에서 센다.** purchase 이벤트는 주문
+ * 하나에 하나뿐이라 가맹점을 달 수 없다 — 한 주문에 여러 가맹점이 섞인다.
+ * 주문 항목에는 가맹점이 찍혀 있으니 그쪽이 진실이다.
+ *
+ * 세 벌을 **세션 id 로 맞댄다.** 주문은 브라우저 세션을 안고 있어서
+ * (browserSessionId) 조회·담기와 같은 자리에서 이어진다 — 그 값이 없는
+ * 주문은 퍼널에서 빠진다(결제창에서 돌아오지 못한 경우 등).
+ */
+async function loadMerchantFunnel(
+  merchantId: string,
+  since: Date,
+): Promise<FunnelStepResult[]> {
+  const [viewed, added, bought] = await Promise.all([
+    prisma.eventLog.groupBy({
+      by: ['sessionId'],
+      where: { merchantId, name: 'view_item', receivedAt: { gte: since } },
+    }),
+    prisma.eventLog.groupBy({
+      by: ['sessionId'],
+      where: { merchantId, name: 'add_to_cart', receivedAt: { gte: since } },
+    }),
+    prisma.order.findMany({
+      where: {
+        paidAt: { gte: since },
+        browserSessionId: { not: null },
+        items: { some: { merchantId } },
+      },
+      select: { browserSessionId: true },
+      distinct: ['browserSessionId'],
+    }),
+  ]);
+
+  /*
+   * 세션마다 밟은 단계를 모아 core 에 넘긴다. 비율 계산을 여기서 다시 적으면
+   * 운영진 퍼널과 다른 수를 말하게 된다 — 세는 곳은 둘이어도 규칙은 하나다.
+   */
+  const names = new Map<string, Set<string>>();
+  const mark = (sessionId: string | null, step: string): void => {
+    if (!sessionId) return;
+    const set = names.get(sessionId) ?? new Set<string>();
+    set.add(step);
+    names.set(sessionId, set);
+  };
+
+  for (const row of viewed) mark(row.sessionId, 'view_item');
+  for (const row of added) mark(row.sessionId, 'add_to_cart');
+  for (const row of bought) mark(row.browserSessionId, 'purchase');
+
+  return computeFunnel(
+    [...names].map(([sessionId, set]) => ({ sessionId, names: [...set] as EventName[] })),
+    [...MERCHANT_FUNNEL_STEP],
+  );
+}
