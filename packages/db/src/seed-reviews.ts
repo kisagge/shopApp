@@ -12,6 +12,7 @@
  * 무작위를 쓰지 않고 고정 시드 난수를 쓴다. 여러 번 돌려도 같은 데이터가
  * 나와야 화면을 비교하며 개발할 수 있다.
  */
+import { GRADE_REWARD_PERCENT, percentOf, rewardExpiresAt, type Won } from '@shop/core';
 import { prisma } from './client';
 
 /** 고정 시드 선형 합동 생성기. Math.random 을 쓰면 매번 다른 데이터가 나온다. */
@@ -158,6 +159,9 @@ export async function seedReviews(): Promise<void> {
     // 만들지 않더라도 **집계는 항상 다시 센다.** 상품 upsert 가 돌면서
     // 값이 어긋나 있을 수 있고, 다시 세는 비용은 상품 수만큼뿐이다.
     await recountAll();
+    // 적립도 마찬가지다. 여기서 빠져나가면 옛 주문의 원장이 영영 안 채워진다.
+    await grantMissingRewards();
+    await assertRewardLedger();
     return;
   }
 
@@ -207,6 +211,8 @@ export async function seedReviews(): Promise<void> {
           listTotal: product.listPrice,
           productDiscount: product.listPrice - unitPrice,
           payable: unitPrice,
+          // 앱은 주문할 때 이 값을 계산해 두고 확정할 때 그만큼 준다
+          rewardPoints: percentOf(unitPrice as Won, GRADE_REWARD_PERCENT.BASIC),
           recipient: '수령인',
           recipientPhone: '010-0000-0000',
           postalCode: '06236',
@@ -268,6 +274,8 @@ export async function seedReviews(): Promise<void> {
   }
 
   await recountAll();
+  await grantMissingRewards();
+  await assertRewardLedger();
 
   const made = orderSeq - startedAt;
   console.log(`  리뷰어 ${reviewers.length}명 · 주문 ${made}건 · 리뷰 ${reviewCount}건`);
@@ -304,4 +312,142 @@ async function recountAll(): Promise<void> {
       },
     });
   }
+}
+
+/**
+ * 구매확정 주문에 **빠져 있는 적립을 채운다.**
+ *
+ * 앱에서 구매확정은 언제나 적립과 함께 일어난다 — 상태를 바꾸는 그 트랜잭션
+ * 안에서 `EARN_PURCHASE` 원장을 쓰고 잔액을 올린다(grant-reward). 그런데
+ * 시드는 확정된 주문을 곧바로 만들어 왔고, **그래서 이 DB 에는 확정 주문이
+ * 수백 건인데 구매 적립 원장이 한 줄도 없었다.** 화면에는 가입 축하 포인트만
+ * 보이고, 소멸 예정도 정산 배치도 볼 것이 없다.
+ *
+ * 파생 칸을 시드가 안 채워 검색이 0건이던 것과 같은 자리다 — 규칙이 앱 경로에만
+ * 있으면 시드가 만든 데이터는 그 규칙 밖에 산다.
+ *
+ * **이미 있는 주문도 채운다.** 원장 유무로 고르므로 몇 번을 돌려도 한 번만
+ * 준다 — 앱의 `grantPurchaseReward` 가 같은 방식으로 두 번 주지 않는 것과
+ * 같은 이유이고, 같은 조건이다.
+ */
+async function grantMissingRewards(): Promise<void> {
+  const confirmed = await prisma.order.findMany({
+    where: { status: 'CONFIRMED' },
+    select: { id: true, orderNo: true, userId: true, payable: true, rewardPoints: true, confirmedAt: true },
+  });
+
+  const granted = await prisma.pointTransaction.findMany({
+    where: { reason: 'EARN_PURCHASE', orderId: { in: confirmed.map((o) => o.id) } },
+    select: { orderId: true },
+  });
+  const already = new Set(granted.map((g) => g.orderId));
+
+  let filled = 0;
+  let total = 0;
+
+  for (const order of confirmed) {
+    if (already.has(order.id)) continue;
+
+    /*
+     * 옛 시드가 만든 주문에는 적립 예정값이 없다. 그때는 앱과 같은 규칙으로
+     * 지금 계산해 **주문에도 함께 적어 둔다** — 화면이 "확정 시 N포인트" 라고
+     * 말하는 자리가 그 칸이다.
+     */
+    const amount =
+      order.rewardPoints > 0
+        ? order.rewardPoints
+        : percentOf(order.payable as Won, GRADE_REWARD_PERCENT.BASIC);
+    if (amount <= 0) continue;
+
+    const at = order.confirmedAt ?? new Date();
+
+    await prisma.$transaction([
+      ...(order.rewardPoints === amount
+        ? []
+        : [prisma.order.update({ where: { id: order.id }, data: { rewardPoints: amount } })]),
+      prisma.pointTransaction.create({
+        data: {
+          userId: order.userId,
+          amount,
+          reason: 'EARN_PURCHASE',
+          orderId: order.id,
+          note: `주문 ${order.orderNo} 구매확정 적립`,
+          expiresAt: rewardExpiresAt(at),
+          createdAt: at,
+        },
+      }),
+      prisma.user.update({
+        where: { id: order.userId },
+        data: { pointBalance: { increment: amount } },
+      }),
+    ]);
+
+    filled += 1;
+    total += amount;
+  }
+
+  if (filled > 0) console.log(`  구매 적립 ${filled}건 ${total.toLocaleString('ko-KR')}P 채움`);
+}
+
+/**
+ * 적립 원장이 맞는지 시드가 스스로 확인한다.
+ *
+ * **파생 칸 확인(seed.ts 의 assertDerivedColumns)과 같은 자리다.** 한 번
+ * 채워 놓아도 다음에 누가 확정 주문을 만드는 길을 하나 더 내면 또 어긋난다.
+ * 어긋난 채로 시드가 끝나면 화면은 멀쩡해 보이고, 포인트가 안 맞는다는 것은
+ * 한참 뒤에나 드러난다.
+ *
+ * 두 가지를 본다.
+ * 1. 구매확정 주문마다 `EARN_PURCHASE` 원장이 **정확히 하나**다 — 없으면 약속한
+ *    적립이 안 나간 것이고, 둘이면 돈을 두 번 준 것이다.
+ * 2. 잔액이 원장 합과 같다 — 잔액은 캐시이고 원장이 진실이라는 앱의 규칙이다.
+ *    `reconcile-points` 배치가 보는 값이 이것이다.
+ */
+async function assertRewardLedger(): Promise<void> {
+  const confirmed = await prisma.order.findMany({
+    where: { status: 'CONFIRMED' },
+    select: { id: true, orderNo: true, rewardPoints: true },
+  });
+
+  const rows = await prisma.pointTransaction.groupBy({
+    by: ['orderId'],
+    where: { reason: 'EARN_PURCHASE', orderId: { in: confirmed.map((o) => o.id) } },
+    _count: { _all: true },
+  });
+  /*
+   * 타입을 손으로 적는다. `groupBy` 가 돌려주는 것은 넓은 타입이라, 그대로
+   * 쓰면 숫자인 줄 알고 문자열에 끼워 넣는 자리에서 `{}` 로 읽힌다 —
+   * lint 가 그것을 잡아 준다.
+   */
+  const counted = new Map<string, number>(
+    rows.map((r) => [String(r.orderId), Number(r._count._all)]),
+  );
+
+  // 적립할 것이 없는 주문(0원)은 원장도 없는 것이 맞다
+  const wrong = confirmed.filter((o) => (counted.get(o.id) ?? 0) !== (o.rewardPoints > 0 ? 1 : 0));
+  if (wrong.length > 0) {
+    for (const o of wrong.slice(0, 5)) {
+      console.error(`  주문 ${o.orderNo}  적립예정 ${o.rewardPoints}P  원장 ${counted.get(o.id) ?? 0}줄`);
+    }
+    throw new Error(
+      `구매확정 주문 ${wrong.length}건의 적립 원장이 맞지 않는다. ` +
+        '확정 주문을 만드는 길이 적립을 함께 쓰지 않은 것이다.',
+    );
+  }
+
+  const ledger = await prisma.pointTransaction.groupBy({ by: ['userId'], _sum: { amount: true } });
+  const owed = new Map<string, number>(
+    ledger.map((l) => [String(l.userId), Number(l._sum.amount ?? 0)]),
+  );
+  const users = await prisma.user.findMany({ select: { id: true, email: true, pointBalance: true } });
+
+  const off = users.filter((u) => (owed.get(u.id) ?? 0) !== u.pointBalance);
+  if (off.length > 0) {
+    for (const u of off.slice(0, 5)) {
+      console.error(`  ${u.email}  잔액 ${u.pointBalance}P  원장 ${owed.get(u.id) ?? 0}P`);
+    }
+    throw new Error(`잔액이 원장과 어긋난 회원 ${off.length}명.`);
+  }
+
+  console.log(`  적립 원장 확인 — 확정 주문 ${confirmed.length}건, 잔액 ${users.length}명 모두 맞음`);
 }
