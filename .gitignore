@@ -55,3 +55,15 @@ pnpm-debug.log*
 # Prisma 생성물 (prisma generate 로 재생성)
 packages/db/src/generated/
 .vercel
+
+# 에이전트 도구가 만드는 스킬 문서.
+#
+# Prisma CLI 가 `migrate dev` 같은 명령을 돌릴 때 패키지 안에 풀어 놓는다.
+# 우리가 쓴 코드가 아니라 도구가 받아 온 참고 문서라, 저장소에 두면 기능
+# 커밋에 90개씩 섞여 든다 — 실제로 한 번 그랬다. 필요하면 각자 기계에서
+# 다시 받는다.
+.agents/
+.windsurf/
+skills-lock.json
+packages/*/.claude/
+
