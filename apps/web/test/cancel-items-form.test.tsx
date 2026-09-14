@@ -126,3 +126,24 @@ describe('취소', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+describe('취소 뒤 남은 상품이 하나일 때', () => {
+  it('여는 단추는 감추되, 방금 끝난 취소의 안내는 남는다', async () => {
+    /*
+     * 두 줄 중 하나를 취소하면 화면이 새로 그려져 남은 줄이 하나가 된다. 부품이 통째로 사라지면
+     * "취소했습니다" 도 함께 사라진다 — 문지기의 e2e 가 그렇게 졌다.
+     */
+    const view = render(<CancelItemsForm orderNo="20260914-0000001" items={ITEMS} />);
+    await userEvent.click(screen.getByRole('button', { name: '일부 상품만 취소' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+    await screen.findByText('25,500원');
+    await userEvent.click(screen.getByRole('button', { name: '고른 상품 취소' }));
+    await screen.findByText('상품 1개를 취소했습니다.');
+
+    // 새로 그려져 남은 줄이 하나로 내려온다
+    view.rerender(<CancelItemsForm orderNo="20260914-0000001" items={[ITEMS[0]!]} />);
+
+    expect(screen.queryByRole('button', { name: '일부 상품만 취소' })).toBeNull();
+    expect(screen.getByText('상품 1개를 취소했습니다.')).toBeInTheDocument();
+  });
+});

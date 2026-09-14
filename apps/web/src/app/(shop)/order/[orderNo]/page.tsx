@@ -112,7 +112,9 @@ export default async function OrderPage({
     order.status === 'PAID' &&
     (order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED') &&
     order.payment.method !== 'VIRTUAL_ACCOUNT' &&
-    liveItems.length >= 2;
+    // 남은 줄이 하나여도 세운다 — 부품이 단추를 감추고, 방금 끝난 취소의 안내를 남긴다
+    order.items.length >= 2 &&
+    liveItems.length >= 1;
 
   const refundedCash = order.refunds.reduce((sum, r) => sum + r.amount, 0);
   const refundedPoints = order.refunds.reduce((sum, r) => sum + r.points, 0);

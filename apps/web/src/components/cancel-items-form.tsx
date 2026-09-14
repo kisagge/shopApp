@@ -131,11 +131,18 @@ export function CancelItemsForm({
   }
 
   if (!open) {
+    /*
+     * **골라 취소할 것이 하나 이하여도 이 자리는 남는다.** 두 줄 중 하나를 취소하면 화면이 새로
+     * 그려지고 남은 줄은 하나다 — 예전에는 그때 이 부품이 통째로 사라져서 방금 띄운 "취소했습니다"
+     * 도 함께 사라졌다. 사람도 낭독기도 끝났다는 말을 못 듣는다. 문지기의 e2e 가 잡았다.
+     */
     return (
       <div className="flex flex-col gap-2">
-        <Button ref={triggerRef} variant="secondary" block onClick={() => setOpen(true)} aria-expanded={false}>
-          {t('cancel.itemsOpen')}
-        </Button>
+        {items.length >= 2 && (
+          <Button ref={triggerRef} variant="secondary" block onClick={() => setOpen(true)} aria-expanded={false}>
+            {t('cancel.itemsOpen')}
+          </Button>
+        )}
         {/* 끝났다는 말은 접힌 뒤에도 남아야 한다. 화면은 새로 그려져 조용히 바뀐다 */}
         <p aria-live="polite" className="text-center text-[12px] text-[var(--fg-muted)]">{done}</p>
       </div>
