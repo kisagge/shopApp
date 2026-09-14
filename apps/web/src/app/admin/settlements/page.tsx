@@ -99,7 +99,22 @@ export default async function SettlementsPage({
               </p>
             </div>
 
-            {canConfirm && closed && <CloseButton yearMonth={yearMonth} />}
+            <div className="flex flex-wrap items-center gap-2">
+              {/*
+                **숫자가 어느 주문에서 왔는지.** 합계 한 줄로는 자기 장부와 맞춰 볼 수 없다. 판매·차감 줄과
+                가맹점마다의 합계가 든 파일을 준다. 줄을 고르는 조건이 이 초안과 같아 합이 맞는다.
+
+                평범한 링크로 받는다 — 손님 정보가 없는 읽기라 버튼·스크립트를 거칠 이유가 없다.
+              */}
+              <a
+                href={`/api/admin/settlements/export?period=${yearMonth}`}
+                download
+                className="inline-flex h-10 items-center rounded-sm border border-[var(--border-strong)] px-4 text-[13px] font-medium text-[var(--fg)] no-underline"
+              >
+                내역 CSV 내려받기
+              </a>
+              {canConfirm && closed && <CloseButton yearMonth={yearMonth} />}
+            </div>
           </div>
 
           {drafts.length === 0 ? (
@@ -119,6 +134,9 @@ export default async function SettlementsPage({
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">환불</th>
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
                     <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
+                    {!actor.merchantId && (
+                      <th scope="col" className="w-16 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">내역</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -150,6 +168,26 @@ export default async function SettlementsPage({
                           <span className="text-[11px] text-[var(--fg-muted)]">미확정</span>
                         )}
                       </td>
+                      {/*
+                        운영진은 가맹점 하나만 따로 받아 그 가맹점에 보낼 수 있다. 이름 칸에 섞지 않고 칸을
+                        따로 둔다 — 이름 칸에 링크 글자가 붙으면 낭독기가 "무어 수수료 12% 내역" 을 한 이름으로 읽는다.
+                      */}
+                      {!actor.merchantId && (
+                        <td className="py-3 text-center">
+                          {d.orderCount > 0 || d.refundAmount > 0 ? (
+                            <a
+                              href={`/api/admin/settlements/export?period=${yearMonth}&merchant=${d.merchantId}`}
+                              download
+                              aria-label={`${d.merchantName} ${yearMonth} 정산 내역 CSV 내려받기`}
+                              className="text-[12px] text-[var(--fg-secondary)] underline underline-offset-2"
+                            >
+                              CSV
+                            </a>
+                          ) : (
+                            <span className="text-[11px] text-[var(--fg-muted)]">—</span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -160,6 +198,7 @@ export default async function SettlementsPage({
                     </th>
                     <td className="tnum pt-3 text-right text-[15px] font-semibold">{format(total)}</td>
                     <td />
+                    {!actor.merchantId && <td />}
                   </tr>
                 </tfoot>
               </table>

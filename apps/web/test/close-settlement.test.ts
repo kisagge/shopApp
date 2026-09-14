@@ -59,7 +59,6 @@ describe('초안 계산', () => {
   it('매출은 구매확정 시각으로 자른다 — 결제 시각이 아니다', async () => {
     await previewSettlements(admin, '2026-08');
     const where = db.orderItem.groupBy.mock.calls[0]?.[0].where;
-    expect(where.order.status).toBe('CONFIRMED');
     expect(where.order.confirmedAt.gte.toISOString()).toBe('2026-07-31T15:00:00.000Z');
     expect(where.order.confirmedAt.lt.toISOString()).toBe('2026-08-31T15:00:00.000Z');
   });
@@ -69,6 +68,16 @@ describe('초안 계산', () => {
    * 정산에 실린 적이 없으므로, 그것을 빼면 가맹점이 **다른 주문으로 번 돈에서**
    * 받은 적 없는 금액만큼 깎인다. 전에는 `paidAt` 만 봐서 실제로 그랬다.
    */
+  it('판매는 지금 주문 상태를 보지 않는다 — 확정 뒤 반품된 주문이 판 달에서 빠지지 않는다', async () => {
+    /*
+     * 예전에는 "구매확정 상태인 주문" 이었다. 확정 뒤 주문째 반품·환불되면 상태가 환불완료가 되어
+     * 그 달 판매에서 빠지고, 차감에는 잡혔다 — 같은 달이면 두 번 깎인다. 반품을 접수만 해도 빠졌다.
+     */
+    await previewSettlements(admin, '2026-08');
+    const where = db.orderItem.groupBy.mock.calls[0]?.[0].where;
+    expect(where.order.status).toBeUndefined();
+  });
+
   it('차감은 확정 뒤에 돈이 돌아간 줄만 — 줄이 스스로 기억한다', async () => {
     /*
      * 예전에는 "환불 상태 주문 + 확정된 적 있음" 이었다. 한 줄만 반품한 구매확정 주문은 환불

@@ -151,6 +151,9 @@ export const RATE_LIMIT = {
    */
   stockExport: { limit: 10, windowMs: MINUTE },
   stockBulk: { limit: 5, windowMs: MINUTE },
+
+  /** 정산 내역 내려받기. 기간·가맹점마다 한 번씩 받는 창구라 이보다 잦을 일이 없다 */
+  settlementExport: { limit: 20, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
-import { previousYearMonth, SETTLEMENT_STATUS_LABEL } from '@shop/core';
+import { readFile } from 'node:fs/promises';
+import { parseCsv, previousYearMonth, SETTLEMENT_STATUS_LABEL } from '@shop/core';
 import { STATE_FILE, ready } from './state';
 
 /**
@@ -109,6 +110,36 @@ test('초안의 줄이 서로 맞는다', async ({ page }) => {
   // 합계가 줄과 따로 계산되면 사람은 어느 쪽을 믿어야 할지 모른다
   const total = await page.getByRole('row', { name: /지급액 합계/ }).locator('td').first().innerText();
   expect(wonOf(total), '지급액 합계가 줄의 합과 다르다').toBe(sum);
+});
+
+test('내려받은 내역의 합이 초안과 같다', async ({ page }) => {
+  /*
+   * 가맹점은 합계 한 줄이 아니라 **어느 주문에서 온 숫자인지** 맞춰 봐야 한다. 그 파일의 합이 화면의
+   * 정산과 다르면 둘 다 믿을 수 없다 — 줄을 고르는 조건을 초안과 한 함수로 둔 이유다. 여기서는 사람이
+   * 받는 그대로(링크) 받아 가맹점마다 판매 줄 수·판매 합·지급액을 초안의 줄과 맞춘다.
+   */
+  await openPeriod(page, PERIOD);
+  const draft = await rows(page, '정산 미리보기');
+
+  const [file] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('link', { name: '내역 CSV 내려받기', exact: true }).click(),
+  ]);
+  const [header, ...lines] = parseCsv((await readFile(await file.path())).toString('utf8'));
+  expect(header).toEqual(['구분', '가맹점', '주문번호', '기준일시', '상품', '옵션', '수량', '금액']);
+
+  for (const [merchantCell, count, gross, , , net] of draft) {
+    // 첫 칸은 "무어수수료 12%" 처럼 수수료율이 붙어 나온다
+    const name = merchantCell!.split('수수료')[0]!.trim();
+    const mine = lines.filter((l) => l[1] === name);
+    const sales = mine.filter((l) => l[0] === '판매');
+    const payout = mine.find((l) => l[0] === '합계 · 지급액');
+
+    expect(sales.length, `${name} 판매 줄 수가 초안의 건수와 다르다`).toBe(Number(count!.replace(/[^\d]/g, '')));
+    if (sales.length === 0 && !payout) continue;
+    expect(sales.reduce((sum, l) => sum + Number(l[7]), 0), `${name} 판매 합이 초안과 다르다`).toBe(wonOf(gross!));
+    expect(Number(payout?.[7]), `${name} 지급액이 초안과 다르다`).toBe(wonOf(net!));
+  }
 });
 
 test('아직 안 끝난 기간은 얼리지 못한다', async ({ page }) => {

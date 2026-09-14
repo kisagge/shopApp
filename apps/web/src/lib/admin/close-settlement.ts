@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  won, SETTLEMENT_SALE_STATUS,
+  won,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 
@@ -35,6 +35,43 @@ export interface SettlementDraft {
   readonly existingStatus: SettlementStatus | null;
 }
 
+/**
+ * 정산 **판매**로 싣는 줄.
+ *
+ * 구매확정 시점 기준이다. 결제 시점으로 잡으면 반품 가능 기간이 지나지 않은 돈까지 가맹점에 넘어간다.
+ *
+ * **지금 주문 상태를 보지 않는다 — 확정된 적이 있는지(확정 시각)만 본다.** 예전에는 "구매확정 상태인
+ * 주문" 이었다. 그러면 확정 뒤 반품·환불된 주문이 **그 달 판매에서 소리 없이 빠지고**, 아래 차감에는
+ * 잡힌다 — 같은 달이면 가맹점이 두 번 깎이고, 다른 달이면 이미 지급한 달의 판매가 바뀐다. 반품을
+ * 접수만 해도(반품접수 상태) 빠졌다가 반려하면 되돌아왔다. 판 것은 판 달에 싣고, 돌아간 것은 돌아간
+ * 달에 뺀다.
+ *
+ * 돈이 돌아간 줄 중 **확정 전에 돌아간 것**(출고 전 일부 취소)은 판 것이 아니므로 뺀다.
+ *
+ * 정산 초안과 정산 내역 내려받기가 이 조건 하나를 쓴다 — 따로 적으면 파일의 합이 초안과 어긋난다.
+ */
+export function settlementSaleWhere(period: { start: Date; end: Date }, merchantId?: string) {
+  return {
+    merchantId: merchantId ?? { not: null },
+    OR: [{ canceledAt: null }, { refundedAfterConfirm: true }],
+    order: { confirmedAt: { gte: period.start, lt: period.end } },
+  };
+}
+
+/**
+ * 정산에서 **빼는** 줄 — 확정 뒤에 돈이 돌아간 줄만, 돌아간 달에.
+ *
+ * 확정 전에 돌아간 줄은 판매에 실린 적이 없어 빼면 가맹점이 받은 적 없는 돈을 토해낸다. 주문 상태로
+ * 가르면 한 줄만 반품한 주문(구매확정인 채로 남는다)이 빠진다. 줄이 스스로 기억한다.
+ */
+export function settlementDeductionWhere(period: { start: Date; end: Date }, merchantId?: string) {
+  return {
+    merchantId: merchantId ?? { not: null },
+    canceledAt: { gte: period.start, lt: period.end },
+    refundedAfterConfirm: true,
+  };
+}
+
 /** 한 기간의 가맹점별 정산 초안을 계산한다. 쓰지 않는다. */
 export async function previewSettlements(
   actor: Actor,
@@ -51,47 +88,15 @@ export async function previewSettlements(
   });
 
   const [sales, refunds, existing] = await Promise.all([
-    // 구매확정 시점 기준. 결제 시점으로 잡으면 반품 가능 기간이 지나지 않은
-    // 돈까지 가맹점에 넘어간다.
     prisma.orderItem.groupBy({
       by: ['merchantId'],
-      where: {
-        merchantId: { not: null },
-        /*
-         * 돈이 돌아간 줄 중 **확정 전에 돌아간 것**(출고 전 일부 취소)은 판 것이 아니다. 확정
-         * 뒤에 돌아간 것(확정 뒤 반품)은 이 달에 판 것이 맞고 돌아간 달에 뺀다 — 여기서 빼면
-         * 이미 지급한 달의 판매가 소리 없이 줄고 차감은 영영 안 된다.
-         */
-        OR: [{ canceledAt: null }, { refundedAfterConfirm: true }],
-        order: { status: SETTLEMENT_SALE_STATUS, confirmedAt: { gte: period.start, lt: period.end } },
-      },
+      where: settlementSaleWhere(period),
       _sum: { subtotal: true },
       _count: { _all: true },
     }),
-    /*
-     * 빼는 것은 **이미 지급한 적 있는 돈뿐이다.**
-     *
-     * 전에는 `paidAt` 만 봤다. 그런데 정산 매출로 잡는 것은 구매확정된 주문뿐이고
-     * (위 블록), 결제만 되고 확정 전에 취소된 주문은 정산에 실린 적이 없다.
-     * 그것을 빼면 가맹점이 **다른 주문으로 번 돈에서** 받은 적 없는 금액만큼
-     * 깎인다. 그래서 확정된 적이 있는지(`confirmedAt`)로 바꿨다.
-     *
-     * 지금 상태 기계에서 구매확정은 종착이라 이 조건은 사실상 아무것도 고르지
-     * 않는다. 지우지 않는 이유는 `deductibleFromSettlement` 의 주석에 있다 —
-     * 확정 뒤 환불을 허용하는 날 규칙이 저절로 맞아야 한다.
-     */
     prisma.orderItem.groupBy({
       by: ['merchantId'],
-      where: {
-        merchantId: { not: null },
-        canceledAt: { gte: period.start, lt: period.end },
-        /*
-         * **확정 뒤에 돌아간 줄만.** 주문 상태로 가르면 둘 다 틀린다: 한 줄만 반품한 주문은
-         * 구매확정인 채로 남아 차감에서 빠지고, 출고 전 일부 취소 뒤 확정된 주문은 confirmedAt
-         * 이 차서 판 적 없는 줄을 뺀다(가맹점이 두 번 깎인다). 줄이 스스로 기억한다.
-         */
-        refundedAfterConfirm: true,
-      },
+      where: settlementDeductionWhere(period),
       _sum: { subtotal: true },
     }),
     prisma.settlement.findMany({
