@@ -78,7 +78,7 @@ export async function assertCanReview(
   const item = await prisma.orderItem.findUnique({
     where: { id: orderItemId },
     select: {
-      id: true, status: true,
+      id: true, status: true, canceledAt: true,
       // OrderItem 은 상품을 직접 가리키지 않는다. 옵션(변형)을 거쳐야 한다 —
       // 주문은 "어떤 옵션을 샀는가"의 기록이기 때문이다.
       variant: { select: { productId: true } },
@@ -93,6 +93,12 @@ export async function assertCanReview(
   if (!isReviewableStatus(item.order.status)) {
     throw new ReviewError('NOT_DELIVERED', 409);
   }
+  /*
+   * 주문은 배송완료여도 **그 줄은 돈이 돌아갔을 수 있다**(출고 전 일부 취소, 받은 뒤 일부 반품).
+   * 돌려보낸 물건의 후기는 산 사람의 후기가 아니다. 목록에서 거르는 것만으로는 id 를 알고 직접
+   * 보내는 요청을 못 막는다.
+   */
+  if (item.canceledAt) throw new ReviewError('NOT_PURCHASED', 409);
   // 운영진이 내린 리뷰는 행이 남아 이 검사에 걸린다 — 다시 올릴 수 없다.
   // 본인이 지운 것은 행이 없으므로 다시 쓸 수 있다.
   if (item.review) throw new ReviewError('ALREADY_REVIEWED', 409);

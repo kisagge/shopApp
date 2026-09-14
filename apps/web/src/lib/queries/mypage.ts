@@ -52,6 +52,8 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
       where: {
         order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
         review: null,
+        // 취소·반품된 줄은 셈에서 뺀다 — 목록(getReviewableItems)과 같은 조건이어야 숫자가 맞는다
+        canceledAt: null,
       },
     }),
   ]);

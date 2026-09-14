@@ -78,6 +78,15 @@ describe('배송 완료 확인', () => {
     db.orderItem.findUnique.mockResolvedValue(item({ order: { userId: USER, status: 'CONFIRMED' } }));
     await expect(createReview(USER, input)).resolves.toBeDefined();
   });
+
+  it('주문이 배송완료여도 반품·취소로 돈이 돌아간 줄에는 쓸 수 없다', async () => {
+    /*
+     * 일부 반품·일부 취소가 생기자 "주문이 배송완료" 가 곧 "이 줄을 샀다" 가 아니게 됐다. 돌려보낸
+     * 니트에 후기가 붙으면 산 사람의 후기가 아니다. id 를 알고 직접 보내는 요청도 막는다.
+     */
+    db.orderItem.findUnique.mockResolvedValue(item({ canceledAt: new Date('2026-09-12') }));
+    await expect(createReview(USER, input)).rejects.toMatchObject({ code: 'NOT_PURCHASED' });
+  });
 });
 
 describe('중복 방지', () => {

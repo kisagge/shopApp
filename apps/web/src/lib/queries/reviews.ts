@@ -221,6 +221,11 @@ export async function getReviewableItems(userId: string): Promise<ReviewableItem
     where: {
       order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
       review: null,
+      /*
+       * 돈이 돌아간 줄은 산 것이 아니다. 주문은 배송완료여도 그 줄은 출고 전에 취소됐거나 받은 뒤
+       * 반품·환불됐다 — 거르지 않으면 돌려보낸 니트에 후기를 쓰게 된다.
+       */
+      canceledAt: null,
     },
     orderBy: { order: { deliveredAt: 'desc' } },
     take: 50,
