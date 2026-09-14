@@ -74,6 +74,9 @@ export const SEED_ACCOUNT = {
   /** 가맹점 상품을 받아 반품한다 — 가맹점이 승인·회수 확인하고 운영진이 환불한다 */
   merchantReturner: 'merchant-return@plain.test',
 
+  /** 찜하고 풀고, 품절 옵션에 재입고 알림을 걸어 알림을 받는다 — wishlist-restock */
+  wishlistRestock: 'wishlist-restock@plain.test',
+
   /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *
@@ -87,5 +90,5 @@ export const SEED_ACCOUNT = {
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
-  'partialCanceler', 'partialReturner', 'merchantReturner',
+  'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

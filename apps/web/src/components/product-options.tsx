@@ -81,7 +81,8 @@ export function ProductOptions({
         />
       ))}
 
-      {selected && (
+      {/* 품절을 고르면 수량을 고를 것이 없다 — 아래 재입고 알림이 그 자리를 대신한다 */}
+      {selected && selected.stock > 0 && (
         <div className="flex items-center justify-between gap-4 rounded-sm border border-[var(--border)] bg-[var(--surface)] p-3.5">
           <div className="flex flex-col gap-1">
             <p className="text-xs text-[var(--fg-secondary)]">{selected.label}</p>
@@ -225,12 +226,13 @@ function OptionGroup({
 }) {
   const t = useT();
 
+  /*
+   * **품절 옵션도 고를 수 있다.** 예전에는 막아 두었는데(aria-disabled, 클릭 무시), 그러면 품절 옵션을 고른
+   * 순간에만 뜨는 재입고 알림 신청이 **어디서도 열리지 않았다** — 품절 사이즈를 기다리는 사람이 할 수 있는 일이
+   * 하나도 없었다. 고르면 담기 대신 재입고 알림을 준다. 품절이라는 것은 이름에 넣어 함께 읽힌다.
+   */
   const { groupProps, radioProps } = useRadioGroup({
-    items: group.values.map((v) => ({
-      id: v.id,
-      // 품절 사이즈는 보이되 화살표로 건너뛴다. 고를 수 없는 것에 멈춰 설 이유가 없다.
-      disabled: !(availability.get(v.id) ?? false),
-    })),
+    items: group.values.map((v) => ({ id: v.id })),
     checked: picked,
     onSelect: onPick,
   });
@@ -262,28 +264,24 @@ function OptionGroup({
                 type="button"
                 role="radio"
                 aria-checked={on}
-                aria-disabled={!available}
+                // 화면 검사가 재고 있는 옵션을 고를 때 쓰는 표시. 뜻은 이름("… 품절")이 말한다
+                data-sold-out={available ? undefined : ''}
                 {...radioProps(value.id)}
-                onClick={() => {
-                  if (!available) return;
-                  onPick(value.id);
-                }}
+                onClick={() => onPick(value.id)}
                 className={[
-                  'h-12 w-full rounded-sm border text-sm',
-                  !available
-                    ? 'border-[var(--border)] bg-[var(--surface)] text-n-400 line-through'
-                    : on
-                      ? 'border-[var(--brand)] bg-[var(--brand)] font-semibold text-[var(--bg)]'
+                  'flex h-12 w-full flex-col items-center justify-center rounded-sm border text-sm leading-tight',
+                  on
+                    ? 'border-[var(--brand)] bg-[var(--brand)] font-semibold text-[var(--bg)]'
+                    : !available
+                      ? 'border-[var(--border)] bg-[var(--surface)] text-[var(--fg-muted)]'
                       : 'border-[var(--border-strong)] bg-[var(--bg)] text-[var(--fg)]',
                 ].join(' ')}
               >
-                {value.value}
+                {/* 줄만 긋지 않는다 — 색·줄은 못 보는 사람에게 아무 말도 안 한다 */}
+                <span className={available ? '' : 'line-through'}>{value.value}</span>
+                {/* 사이 공백은 화면에는 안 보이고(세로 배치) 이름을 "XL 품절" 로 띄어 읽게 한다 */}
+                {!available && <>{' '}<span className="text-[10px] font-normal">{t('catalog.soldOut')}</span></>}
               </button>
-              {!available && (
-                <span className="mt-1 block text-center text-[10px] text-[var(--fg-muted)]">
-                  {t('catalog.soldOut')}
-                </span>
-              )}
             </div>
           );
         })}

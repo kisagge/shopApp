@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
 
 /**
  * 가맹점이 자기 상품 반품을 처리한다 — 승인과 도착 확인은 가맹점이, 환불은 운영진이.
@@ -18,7 +18,7 @@ test.describe.configure({ mode: 'serial' });
 async function addSecondLine(page: Page): Promise<void> {
   const groups = page.locator('[role="radiogroup"]');
   const last = groups.nth((await groups.count()) - 1);
-  const choices = last.locator('[role="radio"]:not([aria-disabled="true"])');
+  const choices = last.locator('[role="radio"]:not([data-sold-out])');
   expect(await choices.count(), '두 번째로 고를 옵션이 없다 — 시드 재고를 본다').toBeGreaterThanOrEqual(2);
   await choices.nth(1).click();
   const add = page.getByRole('button', { name: '장바구니 담기' });
@@ -32,10 +32,6 @@ async function addSecondLine(page: Page): Promise<void> {
     .toBe(2);
 }
 
-async function stockOf(page: Page, variantId: string): Promise<number> {
-  const res = await page.request.post('/api/cart/quote', { data: { lines: [{ variantId, quantity: 1 }] } });
-  return ((await res.json()) as { lines: { stock: number }[] }).lines[0]!.stock;
-}
 
 test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록을 보고 환불한다', async ({ page, browser }) => {
   test.setTimeout(150_000);

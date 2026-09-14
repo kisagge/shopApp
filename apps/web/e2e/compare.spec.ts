@@ -111,7 +111,7 @@ test.describe('좁은 화면의 아래쪽 막대', () => {
     await page.getByRole('link', { name: /코트/ }).first().click();
     await page.waitForURL(/\/product\//);
     for (const group of await page.getByRole('radiogroup').all()) {
-      const pick = group.getByRole('radio').filter({ hasNot: page.locator('[aria-disabled="true"]') });
+      const pick = group.locator('[role="radio"]:not([data-sold-out])');
       await pick.first().click();
     }
     await page.getByRole('button', { name: '장바구니 담기' }).click();

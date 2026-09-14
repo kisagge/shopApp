@@ -60,7 +60,7 @@ async function pickVariant(page: import('@playwright/test').Page): Promise<strin
   // 옵션을 다 고르기 전에는 담기 버튼이 눌리지 않는다. 품절 조합은 건너뛴다.
   const add = page.getByRole('button', { name: '장바구니 담기' });
   for (const group of await page.getByRole('radiogroup').all()) {
-    await group.locator('[role="radio"]:not([aria-disabled="true"])').first().click();
+    await group.locator('[role="radio"]:not([data-sold-out])').first().click();
   }
   await expect(add, '고른 조합이 살 수 있어야 한다').toBeEnabled();
   await add.click();

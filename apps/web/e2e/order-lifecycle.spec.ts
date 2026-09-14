@@ -44,7 +44,8 @@ async function placePaidOrder(page: import('@playwright/test').Page): Promise<st
   const count = await radios.count();
   for (let i = 0; i < count; i++) {
     const r = radios.nth(i);
-    if ((await r.getAttribute('aria-disabled')) !== 'true') await r.click();
+    // 품절 옵션도 고를 수는 있다(재입고 알림) — 담으려면 재고 있는 것만
+    if ((await r.getAttribute('data-sold-out')) === null) await r.click();
   }
   const add = page.getByRole('button', { name: /장바구니 담기/ });
   await expect(add).toBeEnabled();

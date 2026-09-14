@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
 
 /**
  * 받은 두 줄 중 한 줄만 반품한다 — 신청(손님) → 승인(운영) → 회수 확인·환불(운영 화면).
@@ -19,7 +19,7 @@ test.describe.configure({ mode: 'serial' });
 async function addSecondLine(page: Page): Promise<void> {
   const groups = page.locator('[role="radiogroup"]');
   const last = groups.nth((await groups.count()) - 1);
-  const choices = last.locator('[role="radio"]:not([aria-disabled="true"])');
+  const choices = last.locator('[role="radio"]:not([data-sold-out])');
   expect(await choices.count(), '두 번째로 고를 옵션이 없다').toBeGreaterThanOrEqual(2);
   await choices.nth(1).click();
   const add = page.getByRole('button', { name: '장바구니 담기' });
@@ -33,10 +33,6 @@ async function addSecondLine(page: Page): Promise<void> {
     .toBe(2);
 }
 
-async function stockOf(page: Page, variantId: string): Promise<number> {
-  const res = await page.request.post('/api/cart/quote', { data: { lines: [{ variantId, quantity: 1 }] } });
-  return ((await res.json()) as { lines: { stock: number }[] }).lines[0]!.stock;
-}
 
 test('받은 두 줄 중 한 줄만 반품하면 그 줄만 돌려받고 주문은 배송완료로 돌아온다', async ({ page, browser }) => {
   test.setTimeout(150_000);

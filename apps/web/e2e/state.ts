@@ -38,6 +38,8 @@ export const STATE_FILE = {
   partialReturner: 'test-results/.auth/partial-return.json',
   /** 가맹점이 반품을 처리한다 — merchant-return */
   merchantReturner: 'test-results/.auth/merchant-return.json',
+  /** 찜·재입고 알림 화면 — wishlist-restock */
+  wishlistRestock: 'test-results/.auth/wishlist-restock.json',
 } as const;
 
 /**
@@ -80,6 +82,11 @@ export const RACE_PRODUCT = {
    * 기준(5) 이하여야 한다** — 사면서 새로 기준을 넘기면 가맹점 알림이 생겨 low-stock-alert 를 흔든다.
    */
   merchantReturn: 'leather-sleeve-blouson',
+  /**
+   * 한 옵션의 재고를 0 으로 내렸다가 되돌려 재입고 알림을 부른다 — wishlist-restock. 가맹점 없는 브랜드 상품이라 재고를
+   * 내려도 가맹점 재고 부족 알림이 생기지 않는다. 옵션이 여럿이라 한 옵션이 품절이어도 담는 명세는 다른 옵션을 고른다.
+   */
+  restock: 'nylon-coach-jacket',
 } as const;
 
 export const REVIEW_PRODUCT = {
@@ -203,7 +210,7 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
     const pick = page
       .locator('[role="radiogroup"]')
       .nth(i)
-      .locator('[role="radio"]:not([aria-disabled="true"])')
+      .locator('[role="radio"]:not([data-sold-out])')
       .first();
     if ((await pick.count()) > 0) await pick.click();
   }
@@ -227,7 +234,7 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
   } catch {
     // **왜 null 인지 남긴다.** 두 갈래가 같은 null 이라, 문지기 로그만으로는 어느 쪽인지 알 수 없었다
     const radios = await page.locator('[role="radio"]').evaluateAll((els) =>
-      els.map((e) => `${e.getAttribute('aria-label') ?? e.textContent?.trim()}:${e.getAttribute('aria-checked')}/${e.getAttribute('aria-disabled')}`),
+      els.map((e) => `${e.getAttribute('aria-label') ?? e.textContent?.trim()}:${e.getAttribute('aria-checked')}/${e.hasAttribute('data-sold-out') ? 'sold-out' : 'in-stock'}`),
     );
     console.warn(`[pickAndAdd] 담기 단추가 안 열렸다 ${page.url()} radios=${radios.join(' ')}`);
     return null;
@@ -262,4 +269,24 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
   }
   if (!variantId) console.warn(`[pickAndAdd] 담았는데 장바구니에 줄이 안 생겼다 ${page.url()}`);
   return variantId ?? null;
+}
+
+/**
+ * 이 옵션의 지금 재고(견적 창구로 읽는다).
+ *
+ * 반품·취소 명세 셋이 같은 몇 줄을 따로 들고 있었고, 그중 하나가 **읽기 한 번의 ECONNRESET** 으로 졌다 — 서버가 잠깐
+ * 연결을 끊은 것이지 재고가 틀린 것이 아니다. defaultAddressId 와 같은 판단으로 몇 번 다시 묻고, 끝내 못 읽으면 진다.
+ */
+export async function stockOf(page: import('@playwright/test').Page, variantId: string): Promise<number> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const res = await page.request.post('/api/cart/quote', { data: { lines: [{ variantId, quantity: 1 }] } });
+      return ((await res.json()) as { lines: { stock: number }[] }).lines[0]!.stock;
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(200);
+    }
+  }
+  throw new Error(`재고를 못 읽었다: ${String(lastError)}`);
 }
