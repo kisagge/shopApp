@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
   hasPermission, assertPermission, ForbiddenError, canManageProduct,
-  canRefundOrder, canAssignRole, canEditUser, merchantScope,
+  canRefundOrder, canAssignRole, canEditUser, merchantScope, canResolveReturnOf,
   type Actor,
 } from '../src/authz';
 
@@ -129,5 +129,33 @@ describe('assertPermission', () => {
 
   it('있는 권한이면 조용히 통과한다', () => {
     expect(() => assertPermission(admin, 'order:refund')).not.toThrow();
+  });
+});
+
+describe('반품 처리', () => {
+  const merchant = { id: 'u-m', role: 'MERCHANT' as const, merchantId: 'm-a' };
+  const admin = { id: 'u-a', role: 'ADMIN' as const, merchantId: null };
+  const customer = { id: 'u-c', role: 'CUSTOMER' as const, merchantId: null };
+
+  it('가맹점은 승인·회수 확인은 하되 환불은 못 한다 — 돈을 내보내는 것은 운영진이다', () => {
+    expect(hasPermission(merchant, 'return:resolve')).toBe(true);
+    expect(canRefundOrder(merchant)).toBe(false);
+  });
+
+  it('가맹점은 신청한 줄이 전부 자기 상품일 때만 처리한다', () => {
+    expect(canResolveReturnOf(merchant, ['m-a', 'm-a'])).toBe(true);
+    // 남의 상품이 섞이면 한 가맹점이 남의 반품까지 승인하게 된다
+    expect(canResolveReturnOf(merchant, ['m-a', 'm-b'])).toBe(false);
+    expect(canResolveReturnOf(merchant, [null])).toBe(false);
+    expect(canResolveReturnOf(merchant, [])).toBe(false);
+  });
+
+  it('운영진은 섞인 신청도 처리하고, 손님은 아무것도 못 한다', () => {
+    expect(canResolveReturnOf(admin, ['m-a', 'm-b'])).toBe(true);
+    expect(canResolveReturnOf(customer, ['m-a'])).toBe(false);
+  });
+
+  it('소속 없는 가맹점 계정은 닫힌다', () => {
+    expect(canResolveReturnOf({ id: 'u-x', role: 'MERCHANT', merchantId: null }, [null])).toBe(false);
   });
 });

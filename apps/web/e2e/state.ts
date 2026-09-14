@@ -36,6 +36,8 @@ export const STATE_FILE = {
   partialCanceler: 'test-results/.auth/partial-cancel.json',
   /** 두 줄을 받고 한 줄만 반품한다 — partial-return */
   partialReturner: 'test-results/.auth/partial-return.json',
+  /** 가맹점이 반품을 처리한다 — merchant-return */
+  merchantReturner: 'test-results/.auth/merchant-return.json',
 } as const;
 
 /**
@@ -73,6 +75,11 @@ export const RACE_PRODUCT = {
   partialCancel: 'light-down-vest',
   /** 두 사이즈를 받아 하나를 반품한다 — partial-return */
   partialReturn: 'merino-turtleneck',
+  /**
+   * 두 사이즈를 받아 전부 반품한다 — merchant-return. **스튜디오눈 상품이고, 두 옵션 다 재고가 이미
+   * 기준(5) 이하여야 한다** — 사면서 새로 기준을 넘기면 가맹점 알림이 생겨 low-stock-alert 를 흔든다.
+   */
+  merchantReturn: 'leather-sleeve-blouson',
 } as const;
 
 export const REVIEW_PRODUCT = {

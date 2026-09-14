@@ -132,6 +132,7 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       ...(scope ? { items: { some: { merchantId: scope } } } : {}),
     },
     select: {
+      id: true,
       orderNo: true, status: true, placedAt: true, paidAt: true,
       listTotal: true, productDiscount: true, couponDiscount: true,
       pointsUsed: true, shippingFee: true, payable: true, rewardPoints: true,
@@ -147,6 +148,7 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
         select: {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
+          receivedAt: true,
         },
       },
       // 돌려준 돈. 가맹점에게는 주문 전체의 환불액이라 내려주지 않는다(아래에서 비운다)
@@ -171,8 +173,25 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
   });
   if (!order) return null;
 
+  /*
+   * **진행 중인 반품의 줄이 어느 가맹점 것인가.** 가맹점에게는 자기 줄만 내려주므로 화면이 스스로
+   * 알 수 없다 — 남의 상품이 섞인 신청에 단추를 세웠다가 누르면 거절된다. 가맹점 id 만 센다(무엇을
+   * 샀는지·금액은 새지 않는다).
+   */
+  const active = order.returnRequests[0];
+  const returnMerchantIds = active
+    ? (await prisma.orderItem.findMany({
+        where: {
+          orderId: order.id,
+          ...(active.itemIds.length > 0 ? { id: { in: active.itemIds } } : { status: 'RETURN_REQUESTED', canceledAt: null }),
+        },
+        select: { merchantId: true },
+      })).map((i) => i.merchantId)
+    : [];
+
   return {
     ...order,
+    returnMerchantIds,
     /*
      * 주문자 개인정보는 가맹점에게 최소한만 준다.
      *

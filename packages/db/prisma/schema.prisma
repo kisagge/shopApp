@@ -1256,6 +1256,14 @@ model ReturnRequest {
 
   requestedAt DateTime  @default(now())
   resolvedAt  DateTime?
+
+  /// 돌려보낸 물건이 도착했다고 확인한 시각과 사람.
+  ///
+  /// 물건을 받는 곳은 가맹점 창고다. 가맹점이 확인하고, 운영진은 그것을 보고 환불한다 — 운영진이
+  /// 물건을 본 적도 없이 "도착했다" 를 누르면 안 오는 물건의 값을 치를 수 있다. 운영진이 직접
+  /// 회수 확인 · 환불을 누르면 그때 함께 찍힌다.
+  receivedAt DateTime?
+  receivedBy String?
   /// 처리한 운영자. 배치나 시스템이면 null
   resolvedBy  String?
 

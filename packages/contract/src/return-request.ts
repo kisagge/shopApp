@@ -34,6 +34,8 @@ export const resolveReturnSchema = z.discriminatedUnion('action', [
    * 돈을 돌려주면 안 오는 물건의 값을 치른다.
    */
   z.object({ action: z.literal('COMPLETE') }),
+  /** 돌려보낸 물건이 도착했다. 가맹점이 누른다. 돈은 움직이지 않는다 */
+  z.object({ action: z.literal('RECEIVE') }),
   z.object({
     action: z.literal('REJECT'),
     /**

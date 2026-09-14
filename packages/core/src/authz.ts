@@ -36,6 +36,15 @@ export const PERMISSION = [
   'order:fulfill',      // 배송 준비 → 배송중
   'order:cancel',
   'order:refund',       // 돈이 나가는 동작
+  /*
+   * **반품 신청을 승인·반려하고, 돌아온 물건을 확인한다.** 돈은 움직이지 않는다.
+   *
+   * 반품된 물건을 받는 곳은 가맹점 창고다. 운영진이 승인하고 회수까지 확인하게 두면 운영진은
+   * 물건을 본 적도 없이 "도착했다" 를 누르고, 가맹점은 자기 상품이 돌아오는지 알 길이 없다.
+   * 판단과 확인은 물건 곁에 있는 사람이 한다. 돈을 내보내는 환불(order:refund)은 운영진에게
+   * 남긴다 — 가맹점이 자기 상품 반품에 스스로 돈을 돌려주면 권한을 나눈 뜻이 없다.
+   */
+  'return:resolve',
   'merchant:read',
   'merchant:write',
   'merchant:approve',   // 입점 승인
@@ -103,6 +112,8 @@ const MERCHANT: readonly Permission[] = [
   'admin:access',
   'product:read', 'product:write',
   'order:read', 'order:fulfill',
+  // 자기 상품의 반품을 승인·반려하고 회수를 확인한다. 환불은 못 한다
+  'return:resolve',
   'merchant:read', 'merchant:write',
   'settlement:read',
   // 자기 상품의 평을 읽는다. 내리지는 못한다 — review:moderate 주석을 보라.
@@ -119,7 +130,7 @@ const MERCHANT: readonly Permission[] = [
 const ADMIN: readonly Permission[] = [
   'admin:access',
   'product:read', 'product:write', 'product:publish',
-  'order:read', 'order:fulfill', 'order:cancel', 'order:refund',
+  'order:read', 'order:fulfill', 'order:cancel', 'order:refund', 'return:resolve',
   'merchant:read', 'merchant:write',
   'user:read', 'user:write',
   'coupon:read', 'coupon:write',
@@ -227,4 +238,20 @@ export function merchantScope(actor: Actor): string | null | undefined {
   if (isStaff(actor)) return null;
   if (actor.role === 'MERCHANT' && actor.merchantId !== null) return actor.merchantId;
   return undefined;
+}
+
+/**
+ * 이 반품 신청을 처리(승인·반려·회수 확인)할 수 있는가.
+ *
+ * **가맹점은 신청한 줄이 전부 자기 상품일 때만.** 한 주문에 두 가맹점 상품이 섞였고 신청이
+ * 둘 다 돌려보내는 것이면, 한 가맹점이 승인하는 순간 남의 상품 반품까지 승인한 셈이 된다.
+ * 그런 신청은 운영진이 처리한다. 신청한 줄이 없으면(알 수 없으면) 닫는다.
+ */
+export function canResolveReturnOf(
+  actor: Actor,
+  lineMerchantIds: readonly (string | null)[],
+): boolean {
+  if (!hasPermission(actor, 'return:resolve')) return false;
+  if (isStaff(actor)) return true;
+  return lineMerchantIds.length > 0 && lineMerchantIds.every((id) => id !== null && id === actor.merchantId);
 }

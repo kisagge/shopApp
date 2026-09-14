@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getActor } from '@shop/auth/session';
 import { resolveReturnSchema } from '@shop/contract';
-import { resolveReturn, ReturnError } from '~/lib/orders/return-request';
+import { receiveReturn, resolveReturn, ReturnError } from '~/lib/orders/return-request';
 import { completeReturn } from '~/lib/orders/complete-return';
 import { revalidateCatalog } from '~/lib/cache';
 import { PaymentError } from '@shop/core';
@@ -41,6 +41,20 @@ export async function POST(
       // 돌아온 물건이 다시 팔려야 한다
       revalidateCatalog();
       return NextResponse.json(done);
+    }
+
+    if (parsed.data.action === 'RECEIVE') {
+      const received = await receiveReturn(orderNo, actor);
+      // 운영진이 이 기록을 보고 환불한다. 누가 도착을 확인했는지가 곧 근거다
+      await recordAudit({
+        actor,
+        action: 'order.receiveReturn',
+        targetType: 'order',
+        targetId: orderNo,
+        after: received,
+        request,
+      });
+      return NextResponse.json(received);
     }
 
     const result = await resolveReturn(orderNo, parsed.data, actor);

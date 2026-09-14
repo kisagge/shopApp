@@ -67,7 +67,7 @@ function loadOrder(db: Pick<typeof prisma, 'order'>, orderNo: string) {
       returnRequests: {
         orderBy: { requestedAt: 'desc' },
         take: 1,
-        select: { id: true, status: true, reason: true, itemIds: true },
+        select: { id: true, status: true, reason: true, itemIds: true, receivedAt: true, receivedBy: true },
       },
     },
   });
@@ -165,7 +165,11 @@ export async function completeReturn(
     const refund = await refundOrder(orderNo, actor, '반품 회수 확인', gateway);
     await prisma.returnRequest.update({
       where: { id: firstRequest.id },
-      data: { status: 'COMPLETED', resolvedAt: new Date(), resolvedBy: actor.id },
+      data: {
+        status: 'COMPLETED', resolvedAt: new Date(), resolvedBy: actor.id,
+        // 가맹점이 먼저 확인했으면 그 기록을 남기고, 아니면 운영진이 눌렀을 때가 확인한 때다
+        ...(firstRequest.receivedAt ? {} : { receivedAt: new Date(), receivedBy: actor.id }),
+      },
     });
     return {
       orderNo, kind: 'full', refunded: refund.refunded, pointsReturned: refund.pointsReturned,
@@ -262,7 +266,10 @@ export async function completeReturn(
 
       await tx.returnRequest.update({
         where: { id: request.id },
-        data: { status: 'COMPLETED', resolvedAt: now, resolvedBy: actor.id },
+        data: {
+          status: 'COMPLETED', resolvedAt: now, resolvedBy: actor.id,
+          ...(request.receivedAt ? {} : { receivedAt: now, receivedBy: actor.id }),
+        },
       });
 
       // 남은 줄은 받은 그대로다 — 주문은 그 자리로 돌아간다

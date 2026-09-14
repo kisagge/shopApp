@@ -70,11 +70,14 @@ export const SEED_ACCOUNT = {
 
   /** 두 줄을 받고 한 줄만 반품한다 */
   partialReturner: 'partial-return@plain.test',
+
+  /** 가맹점 상품을 받아 반품한다 — 가맹점이 승인·회수 확인하고 운영진이 환불한다 */
+  merchantReturner: 'merchant-return@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
-  'partialCanceler', 'partialReturner',
+  'partialCanceler', 'partialReturner', 'merchantReturner',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

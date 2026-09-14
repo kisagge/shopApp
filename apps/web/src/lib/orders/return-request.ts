@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  checkReturnEligibility, shippingBorneBy, transition, canRefundOrder, isReturnableLine,
+  checkReturnEligibility, shippingBorneBy, transition, isReturnableLine, hasPermission, canResolveReturnOf,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type ReturnReason, type ReturnType,
   statusBeforeReturn,
@@ -135,7 +135,88 @@ export async function requestReturn(
 }
 
 /**
- * 운영진이 신청을 처리한다.
+ * 처리할 신청을 읽고 **처리해도 되는 사람인지** 본다.
+ *
+ * 가맹점도 처리한다(`return:resolve`) — 반품된 물건을 받는 곳이 가맹점 창고다. 다만 신청한 줄이
+ * 전부 자기 상품일 때만이다(`canResolveReturnOf`). 섞였으면 운영진 몫이라고 **이유를 말해**
+ * 거절한다. 남의 주문인지 아닌지를 새지 않게, 자기 상품이 하나도 없는 주문은 없는 주문으로 답한다.
+ */
+async function loadForResolve(orderNo: string, actor: Actor) {
+  if (!hasPermission(actor, 'return:resolve')) {
+    throw new ReturnError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { orderNo },
+    select: {
+      id: true, orderNo: true, status: true,
+      // 반려하면 왔던 자리로 되돌린다. 그 자리를 이 두 시각으로 되짚는다.
+      confirmedAt: true, deliveredAt: true,
+      items: { select: { id: true, status: true, canceledAt: true, merchantId: true } },
+      returnRequests: {
+        orderBy: { requestedAt: 'desc' },
+        take: 1,
+        select: { id: true, status: true, itemIds: true, receivedAt: true },
+      },
+    },
+  });
+  const mine = actor.merchantId ? order?.items.some((i) => i.merchantId === actor.merchantId) : true;
+  if (!order || !mine) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+
+  const request = order.returnRequests[0];
+  if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+
+  // 옛 신청(줄 없음)은 반품접수인 줄 전부다
+  const lines = order.items.filter((i) =>
+    request.itemIds.length > 0 ? request.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED' && !i.canceledAt);
+  if (!canResolveReturnOf(actor, lines.map((l) => l.merchantId))) {
+    throw new ReturnError(
+      'MIXED_MERCHANTS',
+      '다른 가맹점 상품이 함께 신청된 반품입니다. 운영진이 처리합니다.',
+      403,
+    );
+  }
+  return { order, request };
+}
+
+/**
+ * 돌려보낸 물건이 도착했다고 확인한다. **돈은 움직이지 않는다.**
+ *
+ * 승인한 신청에만, 한 번만. 운영진은 이 표시를 보고 환불한다.
+ */
+export async function receiveReturn(
+  orderNo: string,
+  actor: Actor,
+  now: Date = new Date(),
+): Promise<{ orderNo: string; receivedAt: Date }> {
+  const { order, request } = await loadForResolve(orderNo, actor);
+  if (request.status !== 'APPROVED') {
+    throw new ReturnError('NOT_APPROVED', '승인한 신청만 회수를 확인할 수 있습니다.');
+  }
+  if (request.receivedAt) {
+    throw new ReturnError('ALREADY_RECEIVED', '이미 회수를 확인한 신청입니다.');
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // 조건부 UPDATE — 두 사람이 동시에 눌러도 한 번만 찍힌다
+    const { count } = await tx.returnRequest.updateMany({
+      where: { id: request.id, status: 'APPROVED', receivedAt: null },
+      data: { receivedAt: now, receivedBy: actor.id },
+    });
+    if (count === 0) throw new ReturnError('ALREADY_RECEIVED', '이미 회수를 확인한 신청입니다.');
+    await tx.orderStatusLog.create({
+      data: {
+        orderId: order.id, from: order.status, to: order.status, actor: actor.id,
+        note: actor.merchantId ? '반품 회수 확인 (가맹점)' : '반품 회수 확인',
+      },
+    });
+  });
+
+  return { orderNo: order.orderNo, receivedAt: now };
+}
+
+/**
+ * 신청을 처리한다(승인·반려). 가맹점도 자기 상품 신청이면 한다.
  *
  * 승인하면 회수를 기다리는 상태가 되고, 실제 회수·환불은 기존 반품완료·
  * 환불 흐름을 그대로 탄다. **여기서 돈을 움직이지 않는다** — 환불은
@@ -149,27 +230,7 @@ export async function resolveReturn(
   input: { action: 'APPROVE' | 'REJECT'; rejectReason?: string | undefined },
   actor: Actor,
 ): Promise<{ orderNo: string; status: string; orderStatus: string }> {
-  if (!canRefundOrder(actor)) {
-    throw new ReturnError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
-  }
-
-  const order = await prisma.order.findFirst({
-    where: { orderNo },
-    select: {
-      id: true, orderNo: true, status: true,
-      // 반려하면 왔던 자리로 되돌린다. 그 자리를 이 두 시각으로 되짚는다.
-      confirmedAt: true, deliveredAt: true,
-      returnRequests: {
-        orderBy: { requestedAt: 'desc' },
-        take: 1,
-        select: { id: true, status: true, itemIds: true },
-      },
-    },
-  });
-  if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
-
-  const request = order.returnRequests[0];
-  if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+  const { order, request } = await loadForResolve(orderNo, actor);
   if (request.status !== 'REQUESTED') {
     throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
   }

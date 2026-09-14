@@ -118,9 +118,12 @@ export function ReturnActions({ orderNo }: { orderNo: string }) {
 export function CompleteReturnButton({
   orderNo,
   preview,
+  received = false,
 }: {
   orderNo: string;
   preview: CompleteReturnPreview | null;
+  /** 가맹점이 이미 도착을 확인했으면 운영진은 환불만 한다 */
+  received?: boolean;
 }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
@@ -153,7 +156,9 @@ export function CompleteReturnButton({
   return (
     <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
       <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
-        돌려보낸 물건이 도착했는지 확인한 뒤 누릅니다. 재고가 돌아오고 결제가 취소됩니다.
+        {received
+          ? '가맹점이 물건 도착을 확인했습니다. 누르면 재고가 돌아오고 결제가 취소됩니다.'
+          : '돌려보낸 물건이 도착했는지 확인한 뒤 누릅니다. 재고가 돌아오고 결제가 취소됩니다.'}
       </p>
       {preview?.kind === 'partial' && (
         <dl className="flex flex-col gap-1 rounded-sm bg-[var(--surface)] px-3.5 py-3 text-[13px]" aria-label="돌려줄 금액">
@@ -186,7 +191,62 @@ export function CompleteReturnButton({
       <p aria-live="polite" className="text-[12px] text-[var(--fg-muted)]">{status}</p>
       <div>
         <Button type="button" size="md" variant="accent" onClick={() => void complete()} aria-disabled={pending}>
-          {pending ? '환불하는 중…' : '회수 확인 · 환불'}
+          {pending ? '환불하는 중…' : received ? '환불' : '회수 확인 · 환불'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 반품 회수 확인 — 가맹점.
+ *
+ * **돈은 움직이지 않는다.** 물건이 창고에 도착했다고 적을 뿐이고, 운영진이 이 기록을 보고 환불한다.
+ * 도착하지 않은 물건의 값을 치르지 않게, 확인하는 사람이 물건 곁에 있는 사람이다.
+ */
+export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
+
+  async function receive() {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderNo}/return`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'RECEIVE' }),
+      });
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        setError(result.message ?? '확인하지 못했습니다.');
+        return;
+      }
+      setStatus('도착을 확인했습니다. 운영진이 환불을 진행합니다.');
+      router.refresh();
+    } catch {
+      setError('네트워크 오류로 처리하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+      <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
+        돌려보낸 물건이 창고에 도착하면 누릅니다. 환불은 운영진이 이 확인을 보고 진행합니다.
+      </p>
+      {error && (
+        <p role="alert" className="text-[13px] text-accent">
+          {error}
+        </p>
+      )}
+      <p aria-live="polite" className="text-[12px] text-[var(--fg-muted)]">{status}</p>
+      <div>
+        <Button type="button" size="md" onClick={() => void receive()} aria-disabled={pending}>
+          {pending ? '확인하는 중…' : '물건 도착 확인'}
         </Button>
       </div>
     </div>

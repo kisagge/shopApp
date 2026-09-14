@@ -17,9 +17,11 @@ vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
 const completeReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/complete-return', () => ({ completeReturn }));
 const resolveReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const receiveReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/return-request', async (importOriginal) => ({
   ...(await importOriginal<typeof import('~/lib/orders/return-request')>()),
   resolveReturn,
+  receiveReturn,
 }));
 
 const { ReturnError } = await import('~/lib/orders/return-request');
@@ -40,6 +42,7 @@ beforeEach(() => {
   getActor.mockResolvedValue(admin);
   completeReturn.mockResolvedValue({ orderNo: '20260914-0000002', kind: 'partial', refunded: 24_000, pointsReturned: 0, shippingDeducted: 3_000, orderStatus: 'DELIVERED' });
   resolveReturn.mockResolvedValue({ orderNo: '20260914-0000002', status: 'APPROVED', orderStatus: 'RETURN_REQUESTED' });
+  receiveReturn.mockResolvedValue({ orderNo: '20260914-0000002', receivedAt: new Date('2026-09-15T01:00:00Z') });
 });
 
 describe('운영 반품 창구', () => {
@@ -65,5 +68,17 @@ describe('운영 반품 창구', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: 'NOT_APPROVED' });
     expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('도착 확인은 누가 확인했는지 남기고, 돈도 재고도 건드리지 않는다', async () => {
+    const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
+    getActor.mockResolvedValue(merchant);
+    const response = await call({ action: 'RECEIVE' });
+    expect(response.status).toBe(200);
+    expect(receiveReturn).toHaveBeenCalledWith('20260914-0000002', merchant);
+    expect(completeReturn).not.toHaveBeenCalled();
+    expect(recordAudit.mock.calls[0]![0]).toMatchObject({ action: 'order.receiveReturn', actor: merchant });
+    // 재고는 환불할 때 돌아온다 — 도착 확인만으로 카탈로그를 털 이유가 없다
+    expect(revalidateCatalog).not.toHaveBeenCalled();
   });
 });

@@ -4,11 +4,11 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
-  PAYMENT_STATUS_LABEL, isPaidStatus,
+  PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
-import { ReturnActions, CompleteReturnButton } from './return-actions';
+import { ReturnActions, CompleteReturnButton, ReceiveReturnButton } from './return-actions';
 import { previewCompleteReturn } from '~/lib/orders/complete-return';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
@@ -67,8 +67,14 @@ export default async function AdminOrderDetail({
   const refundedCash = order.refunds.reduce((sum, r) => sum + r.amount, 0);
   const refundedPoints = order.refunds.reduce((sum, r) => sum + r.points, 0);
   const shippingDeducted = order.refunds.reduce((sum, r) => sum + r.shippingDeducted, 0);
-  // 반품 처리는 환불로 이어지는 판단이라 order:refund 를 요구한다
-  const canResolveReturn = hasPermission(actor, 'order:refund');
+  /*
+   * **반품은 둘로 나눈다.** 승인·반려·회수 확인은 물건 곁에 있는 사람(가맹점도)이, 돈을 내보내는
+   * 환불은 운영진이 한다. 가맹점은 신청한 줄이 전부 자기 상품일 때만 — 섞였으면 운영진 몫이다.
+   */
+  const canResolveReturn = canResolveReturnOf(actor, order.returnMerchantIds);
+  const canRefundReturn = hasPermission(actor, 'order:refund');
+  const mixedReturn =
+    activeReturn !== null && hasPermission(actor, 'return:resolve') && !canResolveReturn;
 
   // 어떤 전이가 가능한지는 상태머신이 정하고, 그중 권한이 있는 것만 보여 준다.
   /*
@@ -79,7 +85,7 @@ export default async function AdminOrderDetail({
         activeReturn.itemIds.length > 0 ? activeReturn.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED')
     : [];
   const returnPreview =
-    activeReturn?.status === 'APPROVED' && canResolveReturn
+    activeReturn?.status === 'APPROVED' && canRefundReturn
       ? await previewCompleteReturn(order.orderNo, actor).catch(() => null)
       : null;
 
@@ -229,7 +235,23 @@ export default async function AdminOrderDetail({
                 {activeReturn.rejectReason && (
                   <Row label="반려 사유" value={activeReturn.rejectReason} />
                 )}
+                {activeReturn.status === 'APPROVED' || activeReturn.status === 'COMPLETED' ? (
+                  <Row
+                    label="회수 확인"
+                    value={
+                      activeReturn.receivedAt
+                        ? activeReturn.receivedAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+                        : '아직 — 물건이 도착하면 확인합니다'
+                    }
+                  />
+                ) : null}
               </dl>
+
+              {mixedReturn && (
+                <p className="mt-4 rounded-sm bg-[var(--surface)] px-3.5 py-2.5 text-[12px] leading-relaxed text-[var(--fg-secondary)]">
+                  다른 가맹점 상품이 함께 신청된 반품이라 운영진이 처리합니다.
+                </p>
+              )}
 
               {/*
                 아직 처리 안 된 신청에만 버튼을 둔다. 이미 승인·반려한 것에
@@ -238,9 +260,17 @@ export default async function AdminOrderDetail({
               {activeReturn.status === 'REQUESTED' && canResolveReturn && (
                 <ReturnActions orderNo={order.orderNo} />
               )}
-              {/* 승인한 뒤 물건이 돌아오면 여기서 돌려준다. 금액은 서버가 미리 센 값이다 */}
-              {activeReturn.status === 'APPROVED' && canResolveReturn && (
-                <CompleteReturnButton orderNo={order.orderNo} preview={returnPreview} />
+              {/* 물건이 도착하면 확인한다 — 가맹점이 누르고, 운영진은 이 기록을 보고 환불한다 */}
+              {activeReturn.status === 'APPROVED' && !activeReturn.receivedAt && canResolveReturn && !canRefundReturn && (
+                <ReceiveReturnButton orderNo={order.orderNo} />
+              )}
+              {/* 돈을 내보내는 것은 운영진이다. 금액은 서버가 미리 센 값이다 */}
+              {activeReturn.status === 'APPROVED' && canRefundReturn && (
+                <CompleteReturnButton
+                  orderNo={order.orderNo}
+                  preview={returnPreview}
+                  received={activeReturn.receivedAt !== null}
+                />
               )}
             </section>
           )}

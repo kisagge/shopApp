@@ -5,12 +5,12 @@ const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
-  returnRequest: { create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  returnRequest: { create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { requestReturn, resolveReturn } = await import('~/lib/orders/return-request');
+const { requestReturn, resolveReturn, receiveReturn } = await import('~/lib/orders/return-request');
 
 const user = { id: 'u-1' };
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -157,6 +157,10 @@ describe('운영진 처리', () => {
     id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
     // Prisma 는 없는 시각을 null 로 준다. 픽스처도 그래야 진짜와 같다.
     confirmedAt: null, deliveredAt: delivered,
+    items: [
+      { id: 'i-coat', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' },
+      { id: 'i-knit', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-b' },
+    ],
     returnRequests: [{ id: 'r-1', status: 'REQUESTED', itemIds: [] }],
   };
 
@@ -164,10 +168,37 @@ describe('운영진 처리', () => {
     db.order.findFirst.mockResolvedValue(requested);
   });
 
-  it('가맹점은 반품을 처리할 수 없다 — 환불로 이어지는 판단이다', async () => {
+  it('가맹점은 신청한 줄이 전부 자기 상품이면 승인한다 — 물건을 받는 곳이 가맹점 창고다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...requested,
+      returnRequests: [{ id: 'r-1', status: 'REQUESTED', itemIds: ['i-coat'] }],
+    });
+    const r = await resolveReturn('20260901-0000001', { action: 'APPROVE' }, merchant);
+    expect(r.status).toBe('APPROVED');
+  });
+
+  it('남의 상품이 섞인 신청은 가맹점이 처리하지 못하고, 운영진 몫이라고 말한다', async () => {
+    // 옛 신청(줄 없음) — 반품접수인 줄 전부, 곧 두 가맹점 상품이다
     await expect(
       resolveReturn('20260901-0000001', { action: 'APPROVE' }, merchant),
-    ).rejects.toMatchObject({ status: 403 });
+    ).rejects.toMatchObject({ status: 403, code: 'MIXED_MERCHANTS' });
+    expect(db.returnRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('자기 상품이 하나도 없는 주문은 없는 주문으로 답한다 — 남의 주문인지 새지 않게', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...requested,
+      items: requested.items.map((i) => ({ ...i, merchantId: 'm-z' })),
+    });
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'APPROVE' }, merchant),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it('손님은 처리하지 못한다', async () => {
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'APPROVE' }, { id: 'u-c', role: 'CUSTOMER', merchantId: null }),
+    ).rejects.toMatchObject({ status: 403, code: 'FORBIDDEN' });
   });
 
   it('승인하면 주문 상태를 건드리지 않는다 — 환불은 별도 동작이다', async () => {
@@ -304,5 +335,61 @@ describe('줄을 골라 돌려보낸다', () => {
     db.order.findFirst.mockResolvedValue(order({ status: 'RETURN_REQUESTED' }));
     await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적' }, admin);
     expect(db.orderItem.updateMany.mock.calls[0]![0].where).toMatchObject({ status: 'RETURN_REQUESTED' });
+  });
+});
+
+describe('회수 확인', () => {
+  const approved = (over: Record<string, unknown> = {}) => order({
+    status: 'RETURN_REQUESTED',
+    items: [
+      { id: 'i-coat', status: 'DELIVERED', canceledAt: null, merchantId: 'm-b' },
+      { id: 'i-knit', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' },
+    ],
+    returnRequests: [{ id: 'rr-1', status: 'APPROVED', itemIds: ['i-knit'], receivedAt: null }],
+    ...over,
+  });
+
+  beforeEach(() => {
+    db.returnRequest.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('가맹점이 자기 상품의 도착을 확인하면 시각과 사람을 남기고, 돈은 움직이지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(approved());
+    const at = new Date('2026-09-05T10:00:00+09:00');
+    const r = await receiveReturn('20260901-0000001', merchant, at);
+
+    expect(r.receivedAt).toBe(at);
+    expect(db.returnRequest.updateMany.mock.calls[0]![0]).toMatchObject({
+      where: { id: 'rr-1', status: 'APPROVED', receivedAt: null },
+      data: { receivedAt: at, receivedBy: 'u-m' },
+    });
+    // 신청 행만 바뀐다 — 줄·주문·결제는 운영진의 환불이 옮긴다
+    expect(db.orderItem.updateMany).not.toHaveBeenCalled();
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('승인 전이면 확인할 수 없다', async () => {
+    db.order.findFirst.mockResolvedValue(approved({
+      returnRequests: [{ id: 'rr-1', status: 'REQUESTED', itemIds: ['i-knit'], receivedAt: null }],
+    }));
+    await expect(receiveReturn('20260901-0000001', merchant)).rejects.toMatchObject({ code: 'NOT_APPROVED' });
+  });
+
+  it('두 번 확인하지 않는다 — 동시에 눌러도 한 번만 찍힌다', async () => {
+    db.order.findFirst.mockResolvedValue(approved({
+      returnRequests: [{ id: 'rr-1', status: 'APPROVED', itemIds: ['i-knit'], receivedAt: new Date() }],
+    }));
+    await expect(receiveReturn('20260901-0000001', merchant)).rejects.toMatchObject({ code: 'ALREADY_RECEIVED' });
+
+    db.order.findFirst.mockResolvedValue(approved());
+    db.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+    await expect(receiveReturn('20260901-0000001', merchant)).rejects.toMatchObject({ code: 'ALREADY_RECEIVED' });
+  });
+
+  it('남의 상품 반품의 도착은 확인하지 못한다', async () => {
+    db.order.findFirst.mockResolvedValue(approved({
+      returnRequests: [{ id: 'rr-1', status: 'APPROVED', itemIds: ['i-coat'], receivedAt: null }],
+    }));
+    await expect(receiveReturn('20260901-0000001', merchant)).rejects.toMatchObject({ code: 'MIXED_MERCHANTS' });
   });
 });
