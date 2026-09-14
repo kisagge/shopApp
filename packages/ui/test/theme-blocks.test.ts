@@ -81,3 +81,19 @@ describe('어두운 테마 두 벌', () => {
     expect(declarations(block(':root {', '--color-n-0'))['color-scheme']).toBe('light');
   });
 });
+
+describe('문서 끝의 러버밴드', () => {
+  it('html 과 body 가 끝에서 더 당겨지지 않는다', () => {
+    /*
+     * 맨 위에서 한 번 더 당기면 머리 위에 빈 띠가 드러났다. 이 줄이 빠지면 눈으로만 알 수
+     * 있고, 그것도 트랙패드나 휴대폰에서 끝까지 당겨 봐야 보인다.
+     */
+    const rule = (selector: string) => {
+      const at = CSS.search(new RegExp(`\\n\\s*${selector} \\{`));
+      expect(at, `${selector} 규칙을 못 찾았다`).toBeGreaterThan(-1);
+      return CSS.slice(at, CSS.indexOf('}', at));
+    };
+    expect(rule('html')).toContain('overscroll-behavior-y: none');
+    expect(rule('body')).toContain('overscroll-behavior-y: none');
+  });
+});
