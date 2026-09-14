@@ -306,6 +306,18 @@ async function main(): Promise<void> {
       created += 1;
       console.log(`  ${product.name} ${i + 1}/${PER_PRODUCT} — ${photo.user.name}`);
     }
+
+    /*
+     * **진짜 사진이 올라갔으면 이 상품의 자리표시를 치운다.** 예전에는 추가만 했다. 자리표시도
+     * 진짜 첫 장도 순서가 0 이라, 한 장만 집는 카드(매대·기획전·장바구니)에서는 DB 가 아무거나
+     * 줘서 **회색 네모가 떴다** — 상세는 여러 장을 보여 줘서 멀쩡해 보였다. 운영에서 그렇게 났다.
+     *
+     * `--replace` 처럼 출처 없는 사진을 통째로 지우지 않는다. 운영자가 올린 사진도 출처가 없다.
+     * 앱 안의 자리표시(/seed/…)만 지운다.
+     */
+    await prisma.productImage.deleteMany({
+      where: { productId: product.id, url: { startsWith: '/seed/' } },
+    });
   }
 
   console.log(`\n총 ${created}장 생성`);

@@ -712,10 +712,14 @@ async function main(): Promise<void> {
      * 볼 것이 없어 CI 에서 아무 일도 하지 않는다 — 상품 격자는 이 매대에서
      * 사진이 가장 많이 쓰이는 자리인데 그랬다.
      *
-     * 진짜 사진은 seed:photos 가 나중에 덮는다. 그쪽은 "저장소에 올라간
-     * 것(http)" 만 사진으로 치므로 이 한 장이 길을 막지 않는다.
+     * 진짜 사진은 seed:photos 가 나중에 올리고, 올리면서 이 자리표시를 치운다.
+     *
+     * **사진이 이미 있으면 넣지 않는다.** 둘이 나란히 있으면 순서가 같아(0) 한 장만 집는
+     * 카드가 회색 네모를 집는다. 진짜 사진을 올린 뒤 시드를 다시 돌리면 지운 자리표시가
+     * 되살아나서 운영에서 그렇게 났다.
      */
-    await prisma.productImage.upsert({
+    const imageCount = await prisma.productImage.count({ where: { productId: product.id } });
+    if (imageCount === 0) await prisma.productImage.upsert({
       where: { id: `seedimg${product.id}` },
       update: {},
       create: {
