@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { checkExchangeOption } from '@shop/core';
 
 /** 체크아웃에서 쓸 기본 배송지 */
 export async function getDefaultAddress(userId: string) {
@@ -46,6 +47,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         select: {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
+          exchangeLines: { select: { orderItemId: true, fromOptionLabel: true, toOptionLabel: true, quantity: true } },
+          reshipCarrier: true, reshipTrackingNumber: true,
         },
       },
       items: {
@@ -56,8 +59,47 @@ export async function getOrderForUser(orderNo: string, userId: string) {
           // 주문한 그때의 사진. 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
           imageUrl: true,
           listPrice: true, unitPrice: true, quantity: true, subtotal: true,
+          // 교환 옵션을 고르려면 같은 상품·같은 추가금인지 알아야 한다
+          variant: { select: { id: true, productId: true, priceOverride: true } },
         },
       },
     },
   });
+}
+
+export interface ExchangeOption {
+  readonly variantId: string;
+  readonly label: string;
+}
+
+/**
+ * 줄마다 바꿀 수 있는 옵션 — 같은 상품·같은 추가금·판매 중·수량만큼 재고(core checkExchangeOption).
+ *
+ * 화면이 내미는 목록과 서버가 받는 조건이 **같은 함수**다. 화면이 고를 수 있게 둔 옵션을 신청에서 거절하면 손님은
+ * 무엇을 골라야 하는지 알 수 없다. 재고는 신청 순간 다시 본다 — 여기 목록은 열었을 때의 사정이다.
+ */
+export async function getExchangeOptions(
+  items: readonly {
+    id: string; quantity: number;
+    variant: { id: string; productId: string; priceOverride: number | null };
+  }[],
+): Promise<Record<string, ExchangeOption[]>> {
+  if (items.length === 0) return {};
+  const siblings = await prisma.productVariant.findMany({
+    where: { productId: { in: [...new Set(items.map((i) => i.variant.productId))] } },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, productId: true, priceOverride: true, stock: true, isActive: true, label: true },
+  });
+  return Object.fromEntries(
+    items.map((item) => [
+      item.id,
+      siblings
+        .filter((c) =>
+          checkExchangeOption(
+            { productId: item.variant.productId, variantId: item.variant.id, priceOverride: item.variant.priceOverride, quantity: item.quantity },
+            { productId: c.productId, variantId: c.id, priceOverride: c.priceOverride, stock: c.stock, isActive: c.isActive },
+          ).ok)
+        .map((c) => ({ variantId: c.id, label: c.label })),
+    ]),
+  );
 }

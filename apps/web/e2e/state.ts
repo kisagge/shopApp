@@ -40,6 +40,8 @@ export const STATE_FILE = {
   merchantReturner: 'test-results/.auth/merchant-return.json',
   /** 찜·재입고 알림 화면 — wishlist-restock */
   wishlistRestock: 'test-results/.auth/wishlist-restock.json',
+  /** 받은 상품을 다른 옵션으로 교환한다 — exchange */
+  exchanger: 'test-results/.auth/exchange.json',
 } as const;
 
 /**
@@ -87,6 +89,11 @@ export const RACE_PRODUCT = {
    * 내려도 가맹점 재고 부족 알림이 생기지 않는다. 옵션이 여럿이라 한 옵션이 품절이어도 담는 명세는 다른 옵션을 고른다.
    */
   restock: 'nylon-coach-jacket',
+  /**
+   * 사서 받고 다른 옵션으로 교환한다 — exchange. 바꿀 옵션의 재고를 잡고 돌아온 옵션을 되돌리므로 자기 상품이어야 한다.
+   * 옵션이 여럿이고 추가금이 없는(같은 값) 자사 브랜드 상품이다.
+   */
+  exchange: 'cotton-field-jacket',
 } as const;
 
 export const REVIEW_PRODUCT = {

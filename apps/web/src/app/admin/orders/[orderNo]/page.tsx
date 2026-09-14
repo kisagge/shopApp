@@ -4,11 +4,11 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
-  PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf,
+  PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf, carrierOf, formatTrackingNumber,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
-import { ReturnActions, CompleteReturnButton, ReceiveReturnButton } from './return-actions';
+import { ReturnActions, CompleteReturnButton, ReceiveReturnButton, ShipExchangeForm } from './return-actions';
 import { previewCompleteReturn } from '~/lib/orders/complete-return';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
@@ -84,8 +84,9 @@ export default async function AdminOrderDetail({
     ? order.items.filter((i) =>
         activeReturn.itemIds.length > 0 ? activeReturn.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED')
     : [];
+  const isExchange = activeReturn?.type === 'EXCHANGE';
   const returnPreview =
-    activeReturn?.status === 'APPROVED' && canRefundReturn
+    activeReturn?.status === 'APPROVED' && canRefundReturn && !isExchange
       ? await previewCompleteReturn(order.orderNo, actor).catch(() => null)
       : null;
 
@@ -218,10 +219,24 @@ export default async function AdminOrderDetail({
                 </span>
               </div>
               <dl className="flex flex-col">
-                <Row
-                  label="돌려받을 상품"
-                  value={returnLines.map((i) => `${i.productName} (${i.optionLabel}) × ${i.quantity}`).join(', ') || '—'}
-                />
+                {isExchange ? (
+                  <Row
+                    label="교환할 상품"
+                    value={
+                      activeReturn.exchangeLines
+                        .map((l) => {
+                          const item = order.items.find((i) => i.id === l.orderItemId);
+                          return `${item?.productName ?? ''} (${l.fromOptionLabel} → ${l.toOptionLabel}) × ${l.quantity}`;
+                        })
+                        .join(', ') || '—'
+                    }
+                  />
+                ) : (
+                  <Row
+                    label="돌려받을 상품"
+                    value={returnLines.map((i) => `${i.productName} (${i.optionLabel}) × ${i.quantity}`).join(', ') || '—'}
+                  />
+                )}
                 <Row label="사유" value={t(RETURN_REASON_KEY[activeReturn.reason as ReturnReason])} />
                 <Row
                   label="반송비"
@@ -245,6 +260,12 @@ export default async function AdminOrderDetail({
                     }
                   />
                 ) : null}
+                {activeReturn.reshipTrackingNumber && (
+                  <Row
+                    label="교환 송장"
+                    value={`${carrierOf(activeReturn.reshipCarrier ?? '')?.name ?? activeReturn.reshipCarrier ?? ''} ${formatTrackingNumber(activeReturn.reshipTrackingNumber)}`}
+                  />
+                )}
               </dl>
 
               {mixedReturn && (
@@ -258,14 +279,18 @@ export default async function AdminOrderDetail({
                 다시 버튼이 보이면 두 번 누르게 된다.
               */}
               {activeReturn.status === 'REQUESTED' && canResolveReturn && (
-                <ReturnActions orderNo={order.orderNo} />
+                <ReturnActions orderNo={order.orderNo} exchange={isExchange} />
+              )}
+              {/* 교환은 돈이 안 움직여 반품 처리 권한으로 끝까지 한다 — 환불 단추 대신 교환 상품 발송 */}
+              {isExchange && activeReturn.status === 'APPROVED' && canResolveReturn && (
+                <ShipExchangeForm orderNo={order.orderNo} />
               )}
               {/* 물건이 도착하면 확인한다 — 가맹점이 누르고, 운영진은 이 기록을 보고 환불한다 */}
-              {activeReturn.status === 'APPROVED' && !activeReturn.receivedAt && canResolveReturn && !canRefundReturn && (
+              {!isExchange && activeReturn.status === 'APPROVED' && !activeReturn.receivedAt && canResolveReturn && !canRefundReturn && (
                 <ReceiveReturnButton orderNo={order.orderNo} />
               )}
               {/* 돈을 내보내는 것은 운영진이다. 금액은 서버가 미리 센 값이다 */}
-              {activeReturn.status === 'APPROVED' && canRefundReturn && (
+              {!isExchange && activeReturn.status === 'APPROVED' && canRefundReturn && (
                 <CompleteReturnButton
                   orderNo={order.orderNo}
                   preview={returnPreview}

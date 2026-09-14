@@ -67,7 +67,7 @@ function loadOrder(db: Pick<typeof prisma, 'order'>, orderNo: string) {
       returnRequests: {
         orderBy: { requestedAt: 'desc' },
         take: 1,
-        select: { id: true, status: true, reason: true, itemIds: true, receivedAt: true, receivedBy: true },
+        select: { id: true, type: true, status: true, reason: true, itemIds: true, receivedAt: true, receivedBy: true },
       },
     },
   });
@@ -84,6 +84,13 @@ function requestedLines(order: Loaded, itemIds: readonly string[]) {
 function approvedRequest(order: Loaded) {
   const request = order.returnRequests[0];
   if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+  /*
+   * **교환은 환불하지 않는다.** 예전에는 신청 종류를 보지 않아 교환을 승인하고 이 단추를 누르면 돈이 나갔다 — 손님은
+   * 바꿀 물건도 못 받고 반품이 됐다. 교환의 끝은 바꾼 옵션을 보내는 것이다(complete-exchange).
+   */
+  if (request.type === 'EXCHANGE') {
+    throw new ReturnError('EXCHANGE_NOT_REFUNDABLE', '교환 신청입니다. 환불이 아니라 교환 상품 발송으로 처리합니다.');
+  }
   if (request.status !== 'APPROVED') {
     throw new ReturnError(
       'NOT_APPROVED',

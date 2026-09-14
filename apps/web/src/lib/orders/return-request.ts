@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   checkReturnEligibility, shippingBorneBy, transition, isReturnableLine, hasPermission, canResolveReturnOf,
+  checkExchangeOption, EXCHANGE_OPTION_MESSAGE,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type ReturnReason, type ReturnType,
   statusBeforeReturn,
@@ -15,9 +16,9 @@ import {
  * **반송비 부담은 요청으로 받지 않고 사유에서 정한다.** 받아 쓰면 누구나
  * "판매자 부담" 을 보내 반송비를 넘길 수 있다.
  *
- * 교환은 상태머신에 따로 두지 않았다. 상태로 보면 반품과 같은 자리(회수)를
- * 지나고, 그 뒤 재배송은 운영이 새 출고로 처리한다. 자동 재배송까지 넣으려면
- * 상태가 두 갈래로 늘어나는데, 지금 필요한 것은 **접수 창구**다.
+ * 교환은 상태머신에 따로 두지 않았다. 상태로 보면 반품과 같은 자리(회수)를 지나고, 끝이 다를 뿐이다 —
+ * 반품은 돈을 돌려주고(complete-return), 교환은 바꾼 옵션을 보낸다(complete-exchange). 신청할 때 바꿀 옵션을
+ * 받아 그 재고를 잡아 둔다.
  */
 
 export class ReturnError extends Error {
@@ -44,6 +45,8 @@ export async function requestReturn(
     detail?: string | undefined;
     /** 돌려보낼 줄. 비우면 받은 줄 전부 */
     itemIds?: readonly string[] | undefined;
+    /** 교환 — 줄마다 대신 받을 옵션 */
+    exchanges?: readonly { itemId: string; variantId: string }[] | undefined;
   },
   user: { id: string },
   now: Date = new Date(),
@@ -53,7 +56,12 @@ export async function requestReturn(
     where: { orderNo, userId: user.id },
     select: {
       id: true, orderNo: true, status: true, deliveredAt: true,
-      items: { select: { id: true, status: true, canceledAt: true } },
+      items: {
+        select: {
+          id: true, status: true, canceledAt: true, quantity: true, optionLabel: true,
+          variant: { select: { id: true, productId: true, priceOverride: true } },
+        },
+      },
     },
   });
   if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
@@ -85,6 +93,13 @@ export async function requestReturn(
     throw new ReturnError('NO_ITEMS', '돌려보낼 상품이 없습니다.', 400);
   }
 
+  /*
+   * **교환이면 돌려보내는 줄마다 바꿀 옵션이 하나씩.** 빠진 줄이 있으면 그 줄은 무엇으로 바꿀지 모르고, 신청하지 않은
+   * 줄에 옵션을 붙이면 받지도 않은 물건을 보내게 된다. 옵션은 같은 상품·같은 추가금·재고 있음(core)이어야 한다.
+   */
+  const exchangePlan =
+    input.type === 'EXCHANGE' ? await planExchange(order.items, chosen, input.exchanges ?? []) : [];
+
   const borneBy = shippingBorneBy(input.reason);
   const nextStatus = transition(order.status, 'RETURN_REQUESTED');
 
@@ -102,6 +117,20 @@ export async function requestReturn(
       data: { status: nextStatus },
     });
 
+    /*
+     * 바꿀 옵션의 재고를 **지금 잡는다** — 승인·회수를 기다리는 사이 팔려 나가면 보낼 물건이 없다. 조건부로 깎아
+     * 그 사이 누가 사 갔으면 여기서 멈춘다(주문 생성과 같은 방식).
+     */
+    for (const line of exchangePlan) {
+      const { count: reserved } = await tx.productVariant.updateMany({
+        where: { id: line.toVariantId, isActive: true, stock: { gte: line.quantity } },
+        data: { stock: { decrement: line.quantity } },
+      });
+      if (reserved === 0) {
+        throw new ReturnError('OUT_OF_STOCK', `${line.toOptionLabel} — ${EXCHANGE_OPTION_MESSAGE.OUT_OF_STOCK}`);
+      }
+    }
+
     await tx.returnRequest.create({
       data: {
         orderId: order.id,
@@ -110,6 +139,7 @@ export async function requestReturn(
         ...(input.detail ? { detail: input.detail } : {}),
         shippingBorneBy: borneBy,
         itemIds: chosen,
+        ...(exchangePlan.length > 0 ? { exchangeLines: { create: exchangePlan } } : {}),
       },
     });
 
@@ -134,6 +164,53 @@ export async function requestReturn(
   };
 }
 
+interface ExchangeLinePlan {
+  readonly orderItemId: string;
+  readonly fromVariantId: string;
+  readonly fromOptionLabel: string;
+  readonly toVariantId: string;
+  readonly toOptionLabel: string;
+  readonly quantity: number;
+}
+
+async function planExchange(
+  items: readonly {
+    id: string; quantity: number; optionLabel: string;
+    variant: { id: string; productId: string; priceOverride: number | null };
+  }[],
+  chosen: readonly string[],
+  exchanges: readonly { itemId: string; variantId: string }[],
+): Promise<ExchangeLinePlan[]> {
+  const byItem = new Map(exchanges.map((e) => [e.itemId, e.variantId]));
+  if (byItem.size !== exchanges.length || exchanges.some((e) => !chosen.includes(e.itemId)) || chosen.some((id) => !byItem.has(id))) {
+    throw new ReturnError('EXCHANGE_MISMATCH', '교환할 상품마다 바꿀 옵션을 하나씩 골라 주세요.', 400);
+  }
+
+  const candidates = await prisma.productVariant.findMany({
+    where: { id: { in: [...byItem.values()] } },
+    select: { id: true, productId: true, priceOverride: true, stock: true, isActive: true, label: true },
+  });
+
+  return chosen.map((itemId) => {
+    const item = items.find((i) => i.id === itemId)!;
+    const candidate = candidates.find((c) => c.id === byItem.get(itemId));
+    if (!candidate) throw new ReturnError('EXCHANGE_OPTION_NOT_FOUND', '바꿀 옵션을 찾을 수 없습니다.', 400);
+    const check = checkExchangeOption(
+      { productId: item.variant.productId, variantId: item.variant.id, priceOverride: item.variant.priceOverride, quantity: item.quantity },
+      { productId: candidate.productId, variantId: candidate.id, priceOverride: candidate.priceOverride, stock: candidate.stock, isActive: candidate.isActive },
+    );
+    if (!check.ok) throw new ReturnError(check.code, `${candidate.label} — ${EXCHANGE_OPTION_MESSAGE[check.code]}`, 400);
+    return {
+      orderItemId: item.id,
+      fromVariantId: item.variant.id,
+      fromOptionLabel: item.optionLabel,
+      toVariantId: candidate.id,
+      toOptionLabel: candidate.label,
+      quantity: item.quantity,
+    };
+  });
+}
+
 /**
  * 처리할 신청을 읽고 **처리해도 되는 사람인지** 본다.
  *
@@ -141,7 +218,7 @@ export async function requestReturn(
  * 전부 자기 상품일 때만이다(`canResolveReturnOf`). 섞였으면 운영진 몫이라고 **이유를 말해**
  * 거절한다. 남의 주문인지 아닌지를 새지 않게, 자기 상품이 하나도 없는 주문은 없는 주문으로 답한다.
  */
-async function loadForResolve(orderNo: string, actor: Actor) {
+export async function loadForResolve(orderNo: string, actor: Actor) {
   if (!hasPermission(actor, 'return:resolve')) {
     throw new ReturnError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
   }
@@ -156,7 +233,10 @@ async function loadForResolve(orderNo: string, actor: Actor) {
       returnRequests: {
         orderBy: { requestedAt: 'desc' },
         take: 1,
-        select: { id: true, status: true, itemIds: true, receivedAt: true },
+        select: {
+          id: true, type: true, status: true, itemIds: true, receivedAt: true,
+          exchangeLines: { select: { orderItemId: true, fromVariantId: true, toVariantId: true, toOptionLabel: true, quantity: true } },
+        },
       },
     },
   });
@@ -265,6 +345,14 @@ export async function resolveReturn(
 
     if (approve) return;
 
+    // 교환을 반려하면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다
+    for (const line of request.exchangeLines) {
+      await tx.productVariant.updateMany({
+        where: { id: line.toVariantId },
+        data: { stock: { increment: line.quantity } },
+      });
+    }
+
     await tx.order.updateMany({
       where: { id: order.id, status: order.status },
       data: { status: nextOrderStatus },
@@ -287,7 +375,7 @@ export async function resolveReturn(
         from: order.status,
         to: nextOrderStatus,
         actor: actor.id,
-        note: `반품 반려 — ${input.rejectReason ?? ''}`,
+        note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} 반려 — ${input.rejectReason ?? ''}`,
       },
     });
   });

@@ -3,13 +3,14 @@ import { getActor } from '@shop/auth/session';
 import { resolveReturnSchema } from '@shop/contract';
 import { receiveReturn, resolveReturn, ReturnError } from '~/lib/orders/return-request';
 import { completeReturn } from '~/lib/orders/complete-return';
+import { completeExchange } from '~/lib/orders/complete-exchange';
 import { revalidateCatalog } from '~/lib/cache';
 import { PaymentError } from '@shop/core';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
 import { unauthorized } from '~/lib/api/respond';
 
-/** 운영진의 반품 승인·반려, 그리고 회수 확인 뒤 환불 */
+/** 운영진·가맹점의 반품·교환 승인·반려, 회수 확인, 반품 환불, 교환 상품 발송 */
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ orderNo: string }> },
@@ -41,6 +42,21 @@ export async function POST(
       // 돌아온 물건이 다시 팔려야 한다
       revalidateCatalog();
       return NextResponse.json(done);
+    }
+
+    if (parsed.data.action === 'SHIP_EXCHANGE') {
+      const shipped = await completeExchange(orderNo, parsed.data, actor);
+      // 재고가 오가고 새 물건이 나간다. 누가 어떤 송장으로 보냈는지가 근거다
+      await recordAudit({
+        actor,
+        action: 'order.shipExchange',
+        targetType: 'order',
+        targetId: orderNo,
+        after: { ...shipped, carrier: parsed.data.carrier, trackingNumber: parsed.data.trackingNumber },
+        request,
+      });
+      revalidateCatalog();
+      return NextResponse.json(shipped);
     }
 
     if (parsed.data.action === 'RECEIVE') {

@@ -16,6 +16,8 @@ vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
 
 const completeReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/complete-return', () => ({ completeReturn }));
+const completeExchange = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/complete-exchange', () => ({ completeExchange }));
 const resolveReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const receiveReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/return-request', async (importOriginal) => ({
@@ -80,5 +82,21 @@ describe('운영 반품 창구', () => {
     expect(recordAudit.mock.calls[0]![0]).toMatchObject({ action: 'order.receiveReturn', actor: merchant });
     // 재고는 환불할 때 돌아온다 — 도착 확인만으로 카탈로그를 털 이유가 없다
     expect(revalidateCatalog).not.toHaveBeenCalled();
+  });
+
+  it('교환 상품 발송은 교환 처리를 부르고 송장을 감사 로그에 남긴다 — 환불은 부르지 않는다', async () => {
+    completeExchange.mockResolvedValue({ orderNo: '20260914-0000002', orderStatus: 'DELIVERED', exchanged: 1 });
+    const response = await call({ action: 'SHIP_EXCHANGE', carrier: 'CJ', trackingNumber: '123456789012' });
+    expect(response.status).toBe(200);
+    expect(completeExchange).toHaveBeenCalledWith('20260914-0000002', { action: 'SHIP_EXCHANGE', carrier: 'CJ', trackingNumber: '123456789012' }, admin);
+    expect(completeReturn).not.toHaveBeenCalled();
+    expect(recordAudit.mock.calls[0]![0]).toMatchObject({ action: 'order.shipExchange', after: { carrier: 'CJ', exchanged: 1 } });
+    expect(revalidateCatalog).toHaveBeenCalled();
+  });
+
+  it('교환 송장 형식이 틀리면 부르지 않는다', async () => {
+    const response = await call({ action: 'SHIP_EXCHANGE', carrier: 'CJ', trackingNumber: '12-34' });
+    expect(response.status).toBe(400);
+    expect(completeExchange).not.toHaveBeenCalled();
   });
 });

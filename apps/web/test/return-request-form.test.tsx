@@ -99,3 +99,57 @@ describe('돌려보낼 상품 고르기', () => {
     expect(body.itemIds).toBeUndefined();
   });
 });
+
+describe('교환은 줄마다 바꿀 옵션을 고른다', () => {
+  const items = [
+    {
+      id: 'i-knit', productName: '메리노 터틀넥', optionLabel: '블랙 / S', quantity: 1, variantId: 'v-s',
+      exchangeOptions: [{ variantId: 'v-s', label: '블랙 / S' }, { variantId: 'v-m', label: '블랙 / M' }],
+    },
+    { id: 'i-coat', productName: '울 코트', optionLabel: '오트 / M', quantity: 1, variantId: 'v-coat', exchangeOptions: [] },
+  ];
+
+  const openExchange = async () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" items={items} />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: /반품|교환/ }));
+    await user.click(screen.getByRole('radio', { name: '교환' }));
+    return { user, fetchMock };
+  };
+
+  it('반품이면 옵션 칸이 없고, 교환이면 이름 붙은 선택 칸이 뜨며 처음에는 다른 옵션이 골라져 있다', async () => {
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" items={items} />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: /반품|교환/ }));
+    expect(screen.queryByRole('group', { name: '바꿀 옵션' })).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: '교환' }));
+
+    const group = screen.getByRole('group', { name: '바꿀 옵션' });
+    const select = screen.getByLabelText<HTMLSelectElement>('메리노 터틀넥 (블랙 / S) — 바꿀 옵션');
+    expect(group).toContainElement(select);
+    expect(select.value).toBe('v-m');
+    expect(screen.getByRole('option', { name: '블랙 / S (같은 옵션으로 새 상품)' })).toBeInTheDocument();
+  });
+
+  it('바꿀 옵션이 없는 줄은 그렇다고 말하고, 그 줄이 들어가면 보내지 않는다', async () => {
+    const { user, fetchMock } = await openExchange();
+    expect(screen.getByText(/울 코트 은\(는\) 바꿀 수 있는 옵션이 없습니다/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '신청하기' }));
+    expect(screen.getByRole('alert').textContent).toContain('울 코트');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('교환할 줄만 고르면 줄마다 고른 옵션을 함께 보낸다', async () => {
+    const { user, fetchMock } = await openExchange();
+    await user.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await user.selectOptions(screen.getByLabelText('메리노 터틀넥 (블랙 / S) — 바꿀 옵션'), 'v-s');
+    await user.click(screen.getByRole('button', { name: '신청하기' }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, { body: string }])[1].body);
+    expect(body).toMatchObject({ type: 'EXCHANGE', itemIds: ['i-knit'], exchanges: [{ itemId: 'i-knit', variantId: 'v-s' }] });
+  });
+});

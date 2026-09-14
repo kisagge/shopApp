@@ -187,6 +187,15 @@ describe('막는 것', () => {
     await expect(completeReturn('20260914-0000002', admin, gateway())).rejects.toMatchObject({ code: 'NOT_APPROVED' });
   });
 
+  it('교환 신청은 환불하지 않는다 — 예전에는 종류를 안 봐서 교환을 승인하고 누르면 돈이 나갔다', async () => {
+    const gw = gateway();
+    useOrder(order({ returnRequests: [{ id: 'rr-1', type: 'EXCHANGE', status: 'APPROVED', reason: 'CHANGED_MIND', itemIds: ['i-knit'] }] }));
+    await expect(completeReturn('20260914-0000002', admin, gw)).rejects.toMatchObject({ code: 'EXCHANGE_NOT_REFUNDABLE' });
+    await expect(previewCompleteReturn('20260914-0000002', admin)).rejects.toMatchObject({ code: 'EXCHANGE_NOT_REFUNDABLE' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+    expect(refundOrder).not.toHaveBeenCalled();
+  });
+
   it('가맹점은 돈을 돌려줄 수 없다', async () => {
     await expect(completeReturn('20260914-0000002', merchant, gateway())).rejects.toMatchObject({ status: 403 });
   });

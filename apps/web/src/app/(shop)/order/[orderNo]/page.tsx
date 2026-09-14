@@ -5,7 +5,7 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
-  isReceiptIssuable, receiptTotals,
+  isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -15,7 +15,7 @@ import { RepayButton } from '~/components/repay-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
-import { getOrderForUser } from '~/lib/queries/orders';
+import { getOrderForUser, getExchangeOptions } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
 import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -133,6 +133,9 @@ export default async function OrderPage({
     deliveredAt: order.deliveredAt,
     now: new Date(),
   });
+  const returnableItems = order.items.filter(isReturnableLine);
+  // 폼을 띄울 때만 읽는다 — 교환으로 바꿀 수 있는 옵션(같은 상품·같은 가격·재고)
+  const exchangeOptions = showReturnForm ? await getExchangeOptions(returnableItems) : {};
 
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
@@ -226,7 +229,7 @@ export default async function OrderPage({
                     <span className="ml-1.5 rounded-full border border-[var(--border-strong)] px-1.5 py-px text-[10px] text-[var(--fg-secondary)]">
                       {t(
                         i.status === 'RETURN_REQUESTED'
-                          ? 'order.lineReturning'
+                          ? activeReturn?.type === 'EXCHANGE' ? 'order.lineExchanging' : 'order.lineReturning'
                           : i.status === 'REFUNDED' && order.status !== 'REFUNDED'
                             ? 'order.lineRefunded'
                             : 'order.lineCanceled',
@@ -328,6 +331,34 @@ export default async function OrderPage({
                   : t('order.borneBySeller')}
               </dd>
             </div>
+            {activeReturn.exchangeLines.length > 0 && (
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                  {t('order.exchangeLines')}
+                </dt>
+                <dd>
+                  {activeReturn.exchangeLines.map((l) => {
+                    const item = order.items.find((i) => i.id === l.orderItemId);
+                    return (
+                      <span key={l.orderItemId} className="block">
+                        {item?.productName} ({l.fromOptionLabel} → {l.toOptionLabel}) × {l.quantity}
+                      </span>
+                    );
+                  })}
+                </dd>
+              </div>
+            )}
+            {activeReturn.reshipTrackingNumber && (
+              <div className="flex gap-3">
+                <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
+                  {t('order.exchangeReship')}
+                </dt>
+                <dd className="tnum">
+                  {carrierOf(activeReturn.reshipCarrier ?? '')?.name ?? activeReturn.reshipCarrier}{' '}
+                  {formatTrackingNumber(activeReturn.reshipTrackingNumber)}
+                </dd>
+              </div>
+            )}
             {activeReturn.detail && (
               <div className="flex gap-3">
                 <dt className="w-16 shrink-0 text-[12px] text-[var(--fg-muted)]">
@@ -373,9 +404,10 @@ export default async function OrderPage({
             orderNo={order.orderNo}
             status={order.status}
             // 받았거나 받는 중인 줄만. 이미 돈이 돌아간 줄은 돌려보낼 것이 아니다
-            items={order.items
-              .filter(isReturnableLine)
-              .map((i) => ({ id: i.id, productName: i.productName, optionLabel: i.optionLabel, quantity: i.quantity }))}
+            items={returnableItems.map((i) => ({
+              id: i.id, productName: i.productName, optionLabel: i.optionLabel, quantity: i.quantity,
+              variantId: i.variant.id, exchangeOptions: exchangeOptions[i.id] ?? [],
+            }))}
           />
         )}
         {isReceiptIssuable(order) && (

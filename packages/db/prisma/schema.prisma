@@ -1277,9 +1277,40 @@ model ReturnRequest {
   /// 처리한 운영자. 배치나 시스템이면 null
   resolvedBy  String?
 
+  /// 교환 — 줄마다 무엇으로 바꾸는지. 반품이면 비어 있다
+  exchangeLines ReturnExchangeLine[]
+
+  /// 교환 상품을 다시 보낸 송장. 주문의 첫 송장(Shipment)과 따로 둔다 — 덮어쓰면 처음 보낸 기록이 사라진다
+  reshipCarrier        String?
+  reshipTrackingNumber String?
+  reshippedAt          DateTime?
+
   @@index([orderId, requestedAt])
   @@index([status, requestedAt])
   @@map("return_requests")
+}
+
+/// 교환 한 줄 — 돌려보내는 줄과 대신 받을 옵션.
+///
+/// **신청할 때 바꿀 옵션의 재고를 잡는다.** 승인·회수를 기다리는 며칠 사이에 그 사이즈가 팔려 나가면 교환해 줄
+/// 물건이 없다. 반려하면 되돌리고, 교환이 끝나면 돌아온 옵션의 재고를 늘린다.
+///
+/// 원래 옵션을 적어 둔다 — 교환이 끝나면 주문 줄은 새 옵션을 가리키고(손님이 가진 물건), 처음에 무엇을 샀는지는 여기 남는다.
+model ReturnExchangeLine {
+  id              String        @id @default(cuid())
+  returnRequestId String
+  returnRequest   ReturnRequest @relation(fields: [returnRequestId], references: [id], onDelete: Cascade)
+
+  orderItemId String
+
+  fromVariantId   String
+  fromOptionLabel String
+  toVariantId     String
+  toOptionLabel   String
+  quantity        Int
+
+  @@index([returnRequestId])
+  @@map("return_exchange_lines")
 }
 
 model RestockNotification {

@@ -2,8 +2,8 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Button } from '@shop/ui';
-import { format, won } from '@shop/core';
+import { Button, Field } from '@shop/ui';
+import { CARRIERS, format, won } from '@shop/core';
 import type { CompleteReturnPreview } from '~/lib/orders/complete-return';
 
 /**
@@ -15,7 +15,7 @@ import type { CompleteReturnPreview } from '~/lib/orders/complete-return';
  * 승인은 돈을 움직이지 않는다. 회수를 기다리는 상태가 될 뿐이고, 환불은
  * order:refund 권한이 따로 있는 동작이다.
  */
-export function ReturnActions({ orderNo }: { orderNo: string }) {
+export function ReturnActions({ orderNo, exchange = false }: { orderNo: string; exchange?: boolean }) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState(false);
   const [pending, setPending] = useState(false);
@@ -97,7 +97,7 @@ export function ReturnActions({ orderNo }: { orderNo: string }) {
             disabled={pending}
             onClick={() => send({ action: 'APPROVE' })}
           >
-            {pending ? '처리 중…' : '반품 승인'}
+            {pending ? '처리 중…' : exchange ? '교환 승인' : '반품 승인'}
           </Button>
           <Button type="button" size="md" variant="secondary" onClick={() => setRejecting(true)}>
             반려
@@ -250,5 +250,82 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * 교환 — 회수 확인 · 교환 상품 발송.
+ *
+ * **돈은 움직이지 않는다.** 그래서 가맹점도 누른다 — 돌아온 물건을 받고 새 물건을 내보내는 곳이 가맹점 창고다. 바꿀
+ * 옵션의 재고는 신청할 때 이미 잡혀 있어, 여기서는 송장만 적는다. 반품의 "환불" 단추는 교환에 뜨지 않는다.
+ */
+export function ShipExchangeForm({ orderNo }: { orderNo: string }) {
+  const router = useRouter();
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const value = (key: string) => {
+      const v = data.get(key);
+      return typeof v === 'string' ? v.trim() : '';
+    };
+    setPending(true);
+    setError(null);
+    setStatus('');
+    try {
+      const response = await fetch(`/api/admin/orders/${orderNo}/return`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'SHIP_EXCHANGE', carrier: value('carrier'), trackingNumber: value('trackingNumber') }),
+      });
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        setError(result.message ?? '교환 상품을 보내지 못했습니다.');
+        return;
+      }
+      setStatus('회수를 확인하고 교환 상품 송장을 등록했습니다.');
+      router.refresh();
+    } catch {
+      setError('네트워크 오류로 처리하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={(e) => onSubmit(e)}
+      aria-labelledby="ship-exchange-title"
+      className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4"
+    >
+      <h3 id="ship-exchange-title" className="text-[13px] font-semibold">교환 상품 발송</h3>
+      <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
+        돌려보낸 물건이 도착했는지 확인한 뒤 바꾼 옵션을 보내고 송장을 적습니다. 돌아온 옵션의 재고가 늘고, 결제는 그대로입니다.
+      </p>
+      {error && <p role="alert" className="text-[13px] text-accent">{error}</p>}
+      <p aria-live="polite" className="text-[12px] text-[var(--fg-muted)]">{status}</p>
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="exchange-carrier" className="text-xs font-medium text-[var(--fg-secondary)]">택배사</label>
+        <select
+          id="exchange-carrier"
+          name="carrier"
+          defaultValue="CJ"
+          className="h-11 rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
+        >
+          {CARRIERS.map((c) => (
+            <option key={c.code} value={c.code}>{c.name}</option>
+          ))}
+        </select>
+      </div>
+      <Field label="교환 송장번호" name="trackingNumber" required inputMode="numeric" maxLength={40} hint="하이픈은 넣어도 됩니다" />
+      <div>
+        <Button type="submit" size="md" disabled={pending}>
+          {pending ? '보내는 중…' : '회수 확인 · 교환 상품 발송'}
+        </Button>
+      </div>
+    </form>
   );
 }

@@ -149,6 +149,8 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
           receivedAt: true,
+          exchangeLines: { select: { orderItemId: true, fromOptionLabel: true, toOptionLabel: true, quantity: true } },
+          reshipCarrier: true, reshipTrackingNumber: true, reshippedAt: true,
         },
       },
       // 돌려준 돈. 가맹점에게는 주문 전체의 환불액이라 내려주지 않는다(아래에서 비운다)

@@ -27,6 +27,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.completeReturn': '반품 회수·환불',
   'order.resolveReturn': '반품 승인·반려',
   'order.receiveReturn': '반품 회수 확인',
+  'order.shipExchange': '교환 상품 발송',
   'order.ship': '송장 등록',
   'order.export': '주문 내려받기',
   'product.image.add': '이미지 추가',
