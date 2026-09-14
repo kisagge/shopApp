@@ -144,6 +144,13 @@ export const RATE_LIMIT = {
    * 송장 일괄 올리기. 한 번에 수백 줄이 들어오므로 호출 자체는 드물다.
    */
   shipmentBulk: { limit: 5, windowMs: MINUTE },
+
+  /**
+   * 재고 내려받기와 일괄 수정. 옵션 수천 개를 한 번에 읽고 쓰는 창구다 — 사람은 파일을 받아
+   * 고치고 올리는 데 분 단위가 걸리고, 그보다 잦으면 누가 되풀이 누르는 것이다.
+   */
+  stockExport: { limit: 10, windowMs: MINUTE },
+  stockBulk: { limit: 5, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

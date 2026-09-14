@@ -9,6 +9,7 @@ import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin/products';
 import { Pager } from '../pager';
+import { StockBulkActions } from './stock-bulk-actions';
 
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
@@ -64,6 +65,8 @@ export default async function AdminProductsPage({
       </header>
 
       <div className="flex flex-col gap-5 p-8">
+        <StockBulkActions canWrite={canWrite} />
+
         <nav aria-label="상품 상태" className="flex gap-1 border-b border-[var(--border)]">
           {([undefined, 'PENDING_REVIEW'] as const).map((tab) => {
             const current = filter === tab;

@@ -139,3 +139,13 @@ export const reviewProductSchema = z.object({
   reason: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
 });
 export type ReviewProductInput = z.infer<typeof reviewProductSchema>;
+
+/**
+ * 재고 일괄 수정 — 내려받은 재고 파일을 고쳐 올린다.
+ *
+ * 1MB 면 옵션 수만 줄이다. 그보다 크면 재고 파일이 아니라 다른 파일을 고른 것이다.
+ */
+export const bulkStockSchema = z.object({
+  csv: z.string().min(1, 'valid.fileRequired').max(1_000_000, 'valid.tooLongChars'),
+});
+export type BulkStockInput = z.infer<typeof bulkStockSchema>;

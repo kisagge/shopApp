@@ -7,6 +7,7 @@ import {
   searchTextFor, sellingPriceOf, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
+import { recordAudit } from '~/lib/audit';
 import {
   PRODUCT_ERROR_MESSAGE,
   type CreateProductInput, type UpdateProductInput, type UpdateStockInput,
@@ -323,6 +324,32 @@ export async function updateStock(actor: Actor, productId: string, input: Update
       stock: v.stock,
     })),
   };
+}
+
+/**
+ * 재고 수정 + 감사 로그.
+ *
+ * **상품 화면의 재고 수정과 일괄 수정이 이것 하나를 쓴다.** 감사 로그를 창구에서 남기면 일괄 창구를
+ * 만들 때 그 줄을 옮겨 적어야 하고, 빠뜨리면 수백 개 옵션의 재고가 **누가 바꿨는지 모르게** 바뀐다.
+ * 송장 일괄 등록이 registerShipmentAudited 를 쓰는 것과 같은 이유다.
+ */
+export async function updateStockAudited(
+  actor: Actor,
+  productId: string,
+  input: UpdateStockInput,
+  request: Request,
+) {
+  const result = await updateStock(actor, productId, input);
+  await recordAudit({
+    actor,
+    action: 'product.stock',
+    targetType: 'product',
+    targetId: productId,
+    before: { variants: result.before },
+    after: { variants: result.after },
+    request,
+  });
+  return result;
 }
 
 /** 상품 등록 폼이 쓰는 선택지. 가맹점에게는 자기 브랜드만 준다. */

@@ -40,6 +40,7 @@ const CATALOG_WRITERS = [
   'app/api/admin/products/route.ts',
   'app/api/admin/products/[id]/route.ts',
   'app/api/admin/products/[id]/stock/route.ts',
+  'app/api/admin/products/stock/bulk/route.ts',
   'app/api/admin/products/[id]/variants/route.ts',
   'app/api/admin/products/[id]/review/route.ts',
   'app/api/admin/products/[id]/images/route.ts',

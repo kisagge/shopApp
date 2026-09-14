@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { updateStockSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateStock, ProductError } from '~/lib/admin/manage-product';
-import { recordAudit } from '~/lib/audit';
+import { updateStockAudited, ProductError } from '~/lib/admin/manage-product';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
@@ -32,17 +31,8 @@ export async function PATCH(
   const { id } = await params;
 
   try {
-    const { before, after } = await updateStock(actor, id, parsed.data);
+    const { after } = await updateStockAudited(actor, id, parsed.data, request);
     revalidateCatalog();
-    await recordAudit({
-      actor,
-      action: 'product.stock',
-      targetType: 'product',
-      targetId: id,
-      before: { variants: before },
-      after: { variants: after },
-      request,
-    });
     return NextResponse.json({ updated: after.length, variants: after });
   } catch (error) {
     if (error instanceof ProductError) {
