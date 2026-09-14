@@ -215,6 +215,7 @@ export const en: Dictionary = {
   'auth.haveAccount': 'Already have an account?',
   'auth.badCredentials': 'That email or password is not right.',
   'auth.tooMany': 'Too many attempts. Please try again in a moment.',
+  'auth.suspended': 'This account has been suspended. Please contact customer support.',
   'auth.emailTaken': 'That email is already registered',
   'auth.signupFailed': 'We could not create your account. Please try again in a moment.',
   'auth.passwordChanged': 'Your password has been changed. Please sign in with the new one.',

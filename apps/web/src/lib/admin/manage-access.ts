@@ -1,11 +1,12 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, canAssignRole, canEditUser, type Actor, type UserRole } from '@shop/core';
+import { assertPermission, canAssignRole, canEditUser, canSuspendUser, type Actor, type UserRole } from '@shop/core';
 import { activateApprovedMerchant } from '~/lib/merchant/apply';
 import {
   ADMIN_ERROR_MESSAGE,
   type AdminErrorCode,
   type AssignRoleInput,
+  type SuspendUserInput,
   type MerchantStatusInput,
   type UpdateMerchantStatusInput,
 } from '@shop/contract';
@@ -167,4 +168,65 @@ export async function assignRole(
     before: { role: target.role, merchantId: target.merchantId },
     after,
   };
+}
+
+export interface SuspensionSnapshot {
+  readonly suspendedAt: Date | null;
+  readonly suspendedReason: string | null;
+}
+
+/**
+ * 회원 이용 정지·해제.
+ *
+ * **정지하면 그 자리에서 로그인 수단을 끊는다.** 상태만 적으면 이미 로그인해 둔 사람은 세션이 끝날 때까지
+ * (30일) 그대로 쓴다. 세션을 지우고, 새로 로그인하려는 순간은 로그인 훅이 막는다(@shop/auth). 탈퇴와 같은
+ * 끊기지만 비밀번호·구글 연결(Account)은 남긴다 — 해제하면 같은 비밀번호로 돌아와야 한다.
+ *
+ * 남는 틈 하나: 세션 쿠키 캐시(5분)는 DB 를 안 보고 통과시킨다. 그래서 **돈이 오가는 주문 창구는 정지를
+ * DB 에서 다시 본다**(getQuoteViewer). 후기·문의 같은 쓰기는 캐시가 끝나는 몇 분 안에 막힌다.
+ */
+export async function suspendUser(
+  actor: Actor,
+  userId: string,
+  input: SuspendUserInput,
+  now: Date = new Date(),
+): Promise<{ before: SuspensionSnapshot; after: SuspensionSnapshot }> {
+  assertPermission(actor, 'user:write');
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, role: true, deletedAt: true, suspendedAt: true, suspendedReason: true },
+  });
+  if (!target) throw new AccessError('USER_NOT_FOUND', 404);
+  // 탈퇴한 계정은 이미 들어올 길이 없다. 정지를 걸면 되살아날 때 이유 모를 잠금이 붙는다
+  if (target.deletedAt !== null) throw new AccessError('USER_CLOSED', 409);
+
+  const verdict = canSuspendUser(actor, target);
+  if (verdict === 'SELF') throw new AccessError('CANNOT_SUSPEND_SELF', 403);
+  if (verdict === 'STAFF') throw new AccessError('CANNOT_SUSPEND_STAFF', 403);
+  if (verdict === 'FORBIDDEN') throw new AccessError('CANNOT_EDIT_SUPER_ADMIN', 403);
+
+  const before = { suspendedAt: target.suspendedAt, suspendedReason: target.suspendedReason };
+
+  if (input.action === 'SUSPEND') {
+    if (target.suspendedAt !== null) throw new AccessError('ALREADY_SUSPENDED', 409);
+    await prisma.$transaction(async (tx) => {
+      // 읽은 상태를 조건에 싣는다 — 그 사이 역할이 바뀌었으면(관리자로 올라갔으면) 위 판단이 무의미하다
+      const { count } = await tx.user.updateMany({
+        where: { id: userId, role: target.role, suspendedAt: null, deletedAt: null },
+        data: { suspendedAt: now, suspendedReason: input.reason, suspendedBy: actor.id },
+      });
+      if (count === 0) throw new AccessError('CHANGED_MEANWHILE', 409);
+      await tx.session.deleteMany({ where: { userId } });
+    });
+    return { before, after: { suspendedAt: now, suspendedReason: input.reason } };
+  }
+
+  if (target.suspendedAt === null) throw new AccessError('NOT_SUSPENDED', 409);
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, role: target.role, suspendedAt: { not: null }, deletedAt: null },
+    data: { suspendedAt: null, suspendedReason: null, suspendedBy: null },
+  });
+  if (count === 0) throw new AccessError('CHANGED_MEANWHILE', 409);
+  return { before, after: { suspendedAt: null, suspendedReason: null } };
 }

@@ -35,6 +35,14 @@ export function LoginForm() {
         setError(t('auth.tooMany'));
         return;
       }
+      /*
+       * 이용 정지. 비밀번호가 맞은 뒤에만 오는 답이라(세션을 만드는 자리에서 막는다) 알려 줘도
+       * 남의 계정 상태가 새지 않는다. "틀렸다" 로 뭉뚱그리면 맞는 비밀번호로 재설정까지 헤맨다.
+       */
+      if (authError.code === 'ACCOUNT_SUSPENDED') {
+        setError(t('auth.suspended'));
+        return;
+      }
       // 어느 쪽이 틀렸는지 알려 주지 않는다. 가입된 이메일을 확인해 주는 셈이 된다.
       setError(t('auth.badCredentials'));
       return;

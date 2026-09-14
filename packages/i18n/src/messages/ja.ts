@@ -211,6 +211,7 @@ export const ja: Dictionary = {
   'auth.haveAccount': 'すでにアカウントをお持ちですか?',
   'auth.badCredentials': 'メールアドレスまたはパスワードが正しくありません。',
   'auth.tooMany': 'リクエストが多すぎます。しばらくしてからお試しください。',
+  'auth.suspended': 'このアカウントは利用停止中です。カスタマーサポートにお問い合わせください。',
   'auth.emailTaken': 'すでに登録されているメールアドレスです',
   'auth.signupFailed': '登録できませんでした。しばらくしてからお試しください。',
   'auth.passwordChanged': 'パスワードを変更しました。新しいパスワードでログインしてください。',

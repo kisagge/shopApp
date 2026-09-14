@@ -255,3 +255,21 @@ export function canResolveReturnOf(
   if (isStaff(actor)) return true;
   return lineMerchantIds.length > 0 && lineMerchantIds.every((id) => id !== null && id === actor.merchantId);
 }
+
+/**
+ * 이 회원의 이용을 정지(또는 해제)할 수 있는가.
+ *
+ * - 회원 관리 권한(user:write)이 있어야 한다.
+ * - **자기 자신은 못 한다.** 스스로를 막으면 풀어 줄 사람을 찾아야 하고, 그건 막으려던 게 아니라 실수다.
+ * - **운영진 계정은 슈퍼관리자만.** 관리자가 다른 관리자를 막을 수 있으면 권한 다툼이 그대로 계정 잠금이
+ *   된다. 가맹점·손님 계정은 관리자도 막는다.
+ */
+export function canSuspendUser(
+  actor: Actor,
+  target: { readonly id: string; readonly role: UserRole },
+): 'OK' | 'FORBIDDEN' | 'SELF' | 'STAFF' {
+  if (!hasPermission(actor, 'user:write')) return 'FORBIDDEN';
+  if (actor.id === target.id) return 'SELF';
+  if ((target.role === 'ADMIN' || target.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN') return 'STAFF';
+  return 'OK';
+}

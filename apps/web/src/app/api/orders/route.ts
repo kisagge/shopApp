@@ -1,4 +1,5 @@
 import { getQuoteViewer } from '~/lib/grade/effective';
+import { isSuspended } from '~/lib/account/suspension';
 import { createOrderRequestSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
@@ -34,6 +35,14 @@ export async function POST(request: Request): Promise<NextResponse> {
    */
   const limited = await enforceRateLimit('order', request, sessionUser.id);
   if (limited) return limited;
+
+  // 정지 직후 쿠키 캐시가 남은 몇 분 — 재고를 묶는 창구라 여기서 한 번 더 본다(lib/account/suspension)
+  if (await isSuspended(sessionUser.id)) {
+    return NextResponse.json(
+      { code: 'ACCOUNT_SUSPENDED', message: '이용이 정지된 계정입니다.' },
+      { status: 403 },
+    );
+  }
 
   let body: unknown;
   try {

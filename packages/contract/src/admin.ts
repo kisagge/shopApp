@@ -50,7 +50,7 @@ export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 export const ADMIN_ERROR = [
   'MERCHANT_NOT_FOUND', 'USER_NOT_FOUND', 'CANNOT_CHANGE_OWN_ROLE',
   'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED', 'USER_CLOSED',
-  'CHANGED_MEANWHILE',
+  'CHANGED_MEANWHILE', 'CANNOT_SUSPEND_SELF', 'CANNOT_SUSPEND_STAFF', 'ALREADY_SUSPENDED', 'NOT_SUSPENDED',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR)[number];
 
@@ -69,4 +69,28 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
    * 그래서 쓸 때 조건을 함께 걸고, 안 맞으면 여기로 온다.
    */
   CHANGED_MEANWHILE: '그 사이 대상이 바뀌었습니다. 다시 확인하고 시도해 주세요',
+  // 스스로를 막으면 풀어 줄 사람을 찾아야 한다. 막으려던 게 아니라 실수다
+  CANNOT_SUSPEND_SELF: '자기 계정은 정지할 수 없습니다',
+  CANNOT_SUSPEND_STAFF: '운영진 계정은 슈퍼관리자만 정지할 수 있습니다',
+  ALREADY_SUSPENDED: '이미 이용이 정지된 계정입니다',
+  NOT_SUSPENDED: '정지되지 않은 계정입니다',
 };
+
+/**
+ * 회원 이용 정지·해제.
+ *
+ * **정지는 사유 없이 못 한다.** 감사 로그에 남고, 당사자가 문의하면 그 사유로 답한다. 해제는 사유를 받지
+ * 않는다 — 막힌 것을 푸는 데 이유를 묻느라 풀어 주지 못하면 안 된다.
+ */
+export const suspendUserSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('SUSPEND'),
+    reason: z
+      .string({ error: 'valid.reasonRequired' })
+      .trim()
+      .min(1, 'valid.reasonRequired')
+      .max(300, 'valid.tooLongChars'),
+  }),
+  z.object({ action: z.literal('RESTORE') }),
+]);
+export type SuspendUserInput = z.infer<typeof suspendUserSchema>;

@@ -73,6 +73,14 @@ export const SEED_ACCOUNT = {
 
   /** 가맹점 상품을 받아 반품한다 — 가맹점이 승인·회수 확인하고 운영진이 환불한다 */
   merchantReturner: 'merchant-return@plain.test',
+
+  /**
+   * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
+   *
+   * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 정지하면 세션이 지워지므로 미리 만든 세션은
+   * 다른 검사에서 쓸 수 없고, 로그인 화면이 막는지가 곧 검사 대상이다.
+   */
+  suspendTarget: 'suspend-target@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */

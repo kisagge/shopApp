@@ -8,6 +8,7 @@ import { verifyEmailMail, resetPasswordMail, localeForUser } from './mail';
 import { resolveLocale } from '@shop/i18n/locale';
 import { getMailer } from '@shop/mail';
 import { prisma } from '@shop/db';
+import { assertNotSuspended } from './suspension';
 
 /**
  * Better Auth 서버 인스턴스.
@@ -241,6 +242,14 @@ const options = {
    */
 
   databaseHooks: {
+    session: {
+      create: {
+        // 이용 정지 — 설명은 suspension.ts
+        async before(session) {
+          await assertNotSuspended(session.userId);
+        },
+      },
+    },
     user: {
       create: {
         /**

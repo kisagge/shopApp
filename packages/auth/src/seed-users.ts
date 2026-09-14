@@ -46,6 +46,8 @@ const USERS: SeedUser[] = [
    * 계정을 나눠 쓰면 한 검사가 비우는 순간 다른 검사의 장바구니가 사라진다.
    * 자세한 사연은 seed-fixtures 의 SEED_ACCOUNT 주석에 적어 두었다.
    */
+  { email: SEED_ACCOUNT.suspendTarget, name: '정지 검사 손님', role: 'CUSTOMER', phone: '010-0000-2001' },
+
   ...CART_ACCOUNTS.map((key, i) => ({
     email: SEED_ACCOUNT[key],
     name: `장바구니 손님 ${i + 1}`,

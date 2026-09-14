@@ -227,6 +227,7 @@ export const ko = {
   'auth.haveAccount': '이미 계정이 있으신가요?',
   'auth.badCredentials': '이메일 또는 비밀번호가 올바르지 않습니다.',
   'auth.tooMany': '요청이 너무 잦습니다. 잠시 후 다시 시도해 주세요.',
+  'auth.suspended': '이용이 정지된 계정입니다. 고객센터로 문의해 주세요.',
   'auth.emailTaken': '이미 가입된 이메일입니다',
   'auth.signupFailed': '가입에 실패했습니다. 잠시 후 다시 시도해 주세요.',
   'auth.passwordChanged': '비밀번호를 바꿨습니다. 새 비밀번호로 로그인해 주세요.',

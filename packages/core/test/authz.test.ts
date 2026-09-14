@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
   hasPermission, assertPermission, ForbiddenError, canManageProduct,
-  canRefundOrder, canAssignRole, canEditUser, merchantScope, canResolveReturnOf,
+  canRefundOrder, canAssignRole, canEditUser, merchantScope, canResolveReturnOf, canSuspendUser,
   type Actor,
 } from '../src/authz';
 
@@ -157,5 +157,30 @@ describe('반품 처리', () => {
 
   it('소속 없는 가맹점 계정은 닫힌다', () => {
     expect(canResolveReturnOf({ id: 'u-x', role: 'MERCHANT', merchantId: null }, [null])).toBe(false);
+  });
+});
+
+describe('이용 정지', () => {
+  const superAdmin = { id: 'u-s', role: 'SUPER_ADMIN' as const, merchantId: null };
+  const admin = { id: 'u-a', role: 'ADMIN' as const, merchantId: null };
+  const merchant = { id: 'u-m', role: 'MERCHANT' as const, merchantId: 'm-a' };
+
+  it('관리자는 손님·가맹점 계정을 정지한다', () => {
+    expect(canSuspendUser(admin, { id: 'u-c', role: 'CUSTOMER' })).toBe('OK');
+    expect(canSuspendUser(admin, { id: 'u-m', role: 'MERCHANT' })).toBe('OK');
+  });
+
+  it('운영진 계정은 슈퍼관리자만 — 권한 다툼이 계정 잠금이 되지 않게', () => {
+    expect(canSuspendUser(admin, { id: 'u-a2', role: 'ADMIN' })).toBe('STAFF');
+    expect(canSuspendUser(admin, { id: 'u-s', role: 'SUPER_ADMIN' })).toBe('STAFF');
+    expect(canSuspendUser(superAdmin, { id: 'u-a', role: 'ADMIN' })).toBe('OK');
+  });
+
+  it('자기 자신은 못 막는다', () => {
+    expect(canSuspendUser(superAdmin, { id: 'u-s', role: 'SUPER_ADMIN' })).toBe('SELF');
+  });
+
+  it('회원 관리 권한이 없으면 못 한다', () => {
+    expect(canSuspendUser(merchant, { id: 'u-c', role: 'CUSTOMER' })).toBe('FORBIDDEN');
   });
 });

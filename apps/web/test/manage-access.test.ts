@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
-import { assignRoleSchema, updateMerchantStatusSchema } from '@shop/contract';
+import { assignRoleSchema, suspendUserSchema, updateMerchantStatusSchema } from '@shop/contract';
 
 const db = vi.hoisted(() => {
   const inner = {
@@ -14,6 +14,9 @@ const db = vi.hoisted(() => {
       findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
       updateMany: vi.fn<(...a: any[]) => any>(),
     },
+    session: {
+      deleteMany: vi.fn<(...a: any[]) => any>(),
+    },
   };
   // $transaction(콜백) 은 같은 클라이언트를 넘겨준다 — 흉내도 그렇게 한다
   return { ...inner, $transaction: vi.fn((fn: any) => fn(inner)) };
@@ -23,7 +26,7 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/merchant/apply', () => ({ activateApprovedMerchant: activate }));
 
-const { updateMerchantStatus, assignRole } = await import('~/lib/admin/manage-access');
+const { updateMerchantStatus, assignRole, suspendUser } = await import('~/lib/admin/manage-access');
 
 const superAdmin: Actor = { id: 'u-super', role: 'SUPER_ADMIN', merchantId: null };
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -299,5 +302,76 @@ describe('입점 승인 — 두 사람이 동시에', () => {
       status({ status: 'SUSPENDED', reason: '정산 서류 미비' }),
     );
     expect(db.merchant.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('이용 정지', () => {
+  const suspend = (reason = '결제 도용 신고') => suspendUserSchema.parse({ action: 'SUSPEND', reason });
+  const restore = () => suspendUserSchema.parse({ action: 'RESTORE' });
+  const NOW = new Date('2026-09-14T10:00:00Z');
+
+  const target = (over: Record<string, unknown> = {}) =>
+    db.user.findUnique.mockResolvedValue({
+      id: 'u-target', role: 'CUSTOMER', deletedAt: null, suspendedAt: null, suspendedReason: null, ...over,
+    });
+
+  it('정지하면 사유·시각·건 사람을 적고, 그 회원의 세션을 전부 지운다 — 이미 로그인한 사람도 끊긴다', async () => {
+    target();
+    const { after } = await suspendUser(admin, 'u-target', suspend(), NOW);
+
+    const write = db.user.updateMany.mock.calls[0]?.[0];
+    expect(write.where).toMatchObject({ id: 'u-target', role: 'CUSTOMER', suspendedAt: null, deletedAt: null });
+    expect(write.data).toEqual({ suspendedAt: NOW, suspendedReason: '결제 도용 신고', suspendedBy: 'u-admin' });
+    expect(db.session.deleteMany).toHaveBeenCalledWith({ where: { userId: 'u-target' } });
+    expect(after).toEqual({ suspendedAt: NOW, suspendedReason: '결제 도용 신고' });
+  });
+
+  it('자기 자신은 정지할 수 없다', async () => {
+    target({ id: 'u-admin', role: 'ADMIN' });
+    await expect(suspendUser(admin, 'u-admin', suspend())).rejects.toMatchObject({ code: 'CANNOT_SUSPEND_SELF' });
+    expect(db.session.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('관리자는 다른 운영진을 정지할 수 없다 — 슈퍼관리자만', async () => {
+    target({ role: 'ADMIN' });
+    await expect(suspendUser(admin, 'u-target', suspend())).rejects.toMatchObject({ code: 'CANNOT_SUSPEND_STAFF' });
+    target({ role: 'ADMIN' });
+    await expect(suspendUser(superAdmin, 'u-target', suspend(), NOW)).resolves.toBeTruthy();
+  });
+
+  it('가맹점은 회원을 정지할 수 없다', async () => {
+    target();
+    await expect(suspendUser(merchant, 'u-target', suspend())).rejects.toThrow();
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('탈퇴한 계정·이미 정지된 계정은 거절한다', async () => {
+    target({ deletedAt: new Date() });
+    await expect(suspendUser(admin, 'u-target', suspend())).rejects.toMatchObject({ code: 'USER_CLOSED' });
+    target({ suspendedAt: new Date() });
+    await expect(suspendUser(admin, 'u-target', suspend())).rejects.toMatchObject({ code: 'ALREADY_SUSPENDED' });
+  });
+
+  it('그 사이 상태가 바뀌어 0건이면 세션을 지우지 않고 실패한다', async () => {
+    target();
+    db.user.updateMany.mockResolvedValue({ count: 0 });
+    await expect(suspendUser(admin, 'u-target', suspend())).rejects.toMatchObject({ code: 'CHANGED_MEANWHILE' });
+    expect(db.session.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it('해제하면 세 칸을 비운다. 정지되지 않은 회원은 거절한다', async () => {
+    target({ suspendedAt: NOW, suspendedReason: '결제 도용 신고' });
+    const { before, after } = await suspendUser(admin, 'u-target', restore());
+    expect(db.user.updateMany.mock.calls[0]?.[0].data).toEqual({ suspendedAt: null, suspendedReason: null, suspendedBy: null });
+    expect(before).toEqual({ suspendedAt: NOW, suspendedReason: '결제 도용 신고' });
+    expect(after).toEqual({ suspendedAt: null, suspendedReason: null });
+
+    target();
+    await expect(suspendUser(admin, 'u-target', restore())).rejects.toMatchObject({ code: 'NOT_SUSPENDED' });
+  });
+
+  it('사유 없는 정지는 계약에서 막는다', () => {
+    expect(suspendUserSchema.safeParse({ action: 'SUSPEND', reason: '  ' }).success).toBe(false);
+    expect(suspendUserSchema.safeParse({ action: 'SUSPEND' }).success).toBe(false);
   });
 });

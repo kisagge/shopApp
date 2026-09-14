@@ -109,6 +109,16 @@ model User {
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   deletedAt      DateTime?
+
+  /// 이용 정지. 운영진이 사유와 함께 건다. 정지 중에는 로그인·주문이 막히고, 해제하면 그대로 돌아온다.
+  ///
+  /// **탈퇴(deletedAt)와 다르다.** 탈퇴는 사람이 떠나며 개인정보를 지우는 되돌릴 수 없는 일이고, 정지는
+  /// 운영이 잠시 막는 되돌릴 수 있는 일이다. 주문·포인트·후기는 그대로 둔다 — 해제하면 이어서 쓴다.
+  suspendedAt     DateTime?
+  suspendedReason String?
+  /// 정지를 건 운영자
+  suspendedBy     String?
+
   reviewHelpfuls ReviewHelpful[]
   notifications  Notification[]
 

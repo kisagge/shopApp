@@ -39,6 +39,8 @@ const ACTION_LABEL: Readonly<Record<string, string>> = {
   'merchant.suspended': '가맹점 정지',
   'merchant.terminated': '가맹점 해지',
   'user.assignRole': '권한 부여',
+  'user.suspend': '이용 정지',
+  'user.restore': '정지 해제',
   'settlement.close': '정산 확정',
   'settlement.pay': '정산 지급',
   'points.reconcile': '포인트 대사',

@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
+import { canSuspendUser, hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
 import type { UserRoleInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin/merchants';
 import { RoleForm } from './role-form';
+import { SuspendForm } from './suspend-form';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '회원' };
@@ -25,6 +26,7 @@ export default async function AdminUsersPage({
   const params = await searchParams;
 
   const canAssign = hasPermission(actor, 'user:assignRole');
+  const canSuspend = hasPermission(actor, 'user:write');
   const [page, merchants] = await Promise.all([
     getAdminUsers(actor, { q: params.q, cursor: params.cursor }),
     canAssign ? getApprovedMerchants(actor) : Promise.resolve([]),
@@ -83,6 +85,11 @@ export default async function AdminUsersPage({
                     <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">소속</th>
                     <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">주문</th>
                     <th scope="col" className="w-24 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">가입</th>
+                    {canSuspend && (
+                      <th scope="col" className="w-64 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
+                        이용 정지
+                      </th>
+                    )}
                     {canAssign && (
                       <th scope="col" className="w-80 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
                         권한 변경
@@ -103,6 +110,9 @@ export default async function AdminUsersPage({
                               · 탈퇴 {dateFormat.format(u.closedAt)}
                             </span>
                           )}
+                          {u.suspendedAt && (
+                            <Badge tone="danger" className="ml-1.5">정지됨</Badge>
+                          )}
                         </span>
                         <span className="block text-[11px] text-[var(--fg-muted)]">{u.email}</span>
                       </td>
@@ -118,6 +128,17 @@ export default async function AdminUsersPage({
                       <td className="px-4 py-3 text-[12px] text-[var(--fg-muted)]">
                         <time dateTime={u.createdAt.toISOString()}>{dateFormat.format(u.createdAt)}</time>
                       </td>
+                      {canSuspend && (
+                        <td className="px-4 py-3">
+                          <SuspendForm
+                            userId={u.id}
+                            userName={u.name}
+                            suspendedAt={u.suspendedAt?.toISOString() ?? null}
+                            suspendedReason={u.suspendedReason}
+                            disabledReason={suspendBlocked(actor, u)}
+                          />
+                        </td>
+                      )}
                       {canAssign && (
                         <td className="px-4 py-3">
                           <RoleForm
@@ -150,4 +171,18 @@ export default async function AdminUsersPage({
       </div>
     </>
   );
+}
+
+/** 정지 폼을 못 여는 이유. 서버도 같은 판정(canSuspendUser)으로 막는다 — 누를 수 있게 두면 왜 안 되는지 모른다 */
+function suspendBlocked(
+  actor: Parameters<typeof canSuspendUser>[0],
+  u: { id: string; role: string; closedAt: Date | null },
+): string | undefined {
+  if (u.closedAt) return '탈퇴한 계정';
+  switch (canSuspendUser(actor, { id: u.id, role: u.role as UserRole })) {
+    case 'SELF': return '본인 계정';
+    case 'STAFF': return '운영진 계정';
+    case 'FORBIDDEN': return '권한 없음';
+    default: return undefined;
+  }
 }
