@@ -90,7 +90,13 @@ export function AdminNav({
         `sticky` 인 이유는 표가 길어도 메뉴를 다시 찾으러 맨 위까지 올라가지
         않게 하기 위해서다.
       */}
-      <div className="sticky top-0 z-30 flex h-14 items-center gap-2 bg-dark-bg px-3 md:hidden">
+      {/*
+        **앱에서는 머리띠가 상태바 밑으로 들어간다.** 웹뷰는 화면 맨 위부터 그리므로(contentInset
+        never) 시계·배터리·카메라 구멍이 메뉴 단추와 겹쳤다. 매장 머리(site-header)는 safe-t 를
+        달고 있었는데 운영 화면을 떼어 내면서 이것만 빠졌다. 높이를 그만큼 늘려야 단추가 눌린다
+        — box-content 로 h-14 를 안쪽 높이로 둔다.
+      */}
+      <div className="safe-t sticky top-0 z-30 box-content flex h-14 items-center gap-2 bg-dark-bg px-3 md:hidden">
         <button
           ref={buttonRef}
           type="button"
@@ -133,7 +139,8 @@ export function AdminNav({
         id={PANEL_ID}
         className={
           'fixed inset-y-0 left-0 z-40 flex w-[264px] max-w-[82vw] flex-col gap-7 overflow-y-auto ' +
-          'bg-dark-bg px-4 py-6 ' +
+          // 서랍도 화면 맨 위부터 덮는다. 닫기 단추가 상태바에 가리지 않게 그만큼 내려 둔다
+          'bg-dark-bg px-4 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] ' +
           'md:sticky md:top-0 md:h-dvh md:w-[232px] md:max-w-none md:shrink-0' +
           /*
            * **`hidden` 속성을 쓰지 않는다.** 처음에는 `hidden={!open}` 에
