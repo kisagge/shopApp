@@ -349,6 +349,16 @@
   .table-scroll { overflow-x: auto; overscroll-behavior-x: contain; }
 
   /*
+   * **밀리기는 하되 막대는 안 보인다.** 머리의 카테고리 줄처럼 한 줄짜리 가로 목록은 좁은 화면에서
+   * 밀려야 하는데, 그러면 글자 바로 밑에 굵은 회색 막대가 붙어 밑줄처럼 보였다. 막대만 감춘다 —
+   * 트랙패드·손가락·휠로 밀리고, 탭으로 옮기면 초점 간 링크가 보이는 자리로 따라 들어온다.
+   *
+   * 표에는 쓰지 않는다. 표는 옆에 칸이 더 있다는 것을 막대가 알려 주는 몇 안 되는 단서다.
+   */
+  .scrollbar-none { scrollbar-width: none; }
+  .scrollbar-none::-webkit-scrollbar { display: none; }
+
+  /*
    * **감싸는 것만으로는 부족했다.**
    *
    * `.data-table` 은 `width: 100%` 다. 스크롤 상자 안에 넣어도 상자 폭에 딱

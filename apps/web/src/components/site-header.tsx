@@ -39,7 +39,7 @@ export async function SiteHeader() {
           줄어들 수 있게 하고, 그래도 모자라면 갈래 줄만 가로로 민다.
         */}
         <nav aria-label={t('nav.categories')} className="hidden min-w-0 flex-1 md:block">
-          <ul className="flex overflow-x-auto">
+          <ul className="scrollbar-none flex overflow-x-auto">
             {categories.map((c) => (
               /*
                 줄어들 수 있게 열어 두면 이번엔 **글자가 줄바꿈된다** — 좁아진

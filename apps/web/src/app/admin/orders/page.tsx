@@ -85,7 +85,7 @@ export default async function AdminOrdersPage({
 
       <div className="p-8">
         <nav aria-label="주문 상태 필터" className="mb-5 border-b border-[var(--border)]">
-          <ul className="flex gap-1 overflow-x-auto">
+          <ul className="scrollbar-none flex gap-1 overflow-x-auto">
             <li className="shrink-0">
               <Link
                 href={{ pathname: '/admin/orders', query: { ...(q ? { q } : {}), ...(from ? { from } : {}), ...(to ? { to } : {}) } }}

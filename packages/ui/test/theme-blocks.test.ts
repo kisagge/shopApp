@@ -97,3 +97,11 @@ describe('문서 끝의 러버밴드', () => {
     expect(rule('body')).toContain('overscroll-behavior-y: none');
   });
 });
+
+describe('가로 목록의 막대', () => {
+  it('scrollbar-none 이 파이어폭스와 웹킷 둘 다에서 막대를 감춘다', () => {
+    // 한쪽만 적으면 그 브라우저에서만 글자 밑에 회색 막대가 다시 붙는다
+    expect(CSS).toMatch(/\.scrollbar-none\s*\{\s*scrollbar-width:\s*none/);
+    expect(CSS).toMatch(/\.scrollbar-none::-webkit-scrollbar\s*\{\s*display:\s*none/);
+  });
+});

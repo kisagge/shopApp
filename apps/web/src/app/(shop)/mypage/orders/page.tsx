@@ -102,7 +102,7 @@ export default async function MyOrdersPage({
       </h1>
 
       <nav aria-label={t('order.statusFilter')} className="mb-6 border-b border-[var(--border)]">
-        <ul className="flex gap-1 overflow-x-auto">
+        <ul className="scrollbar-none flex gap-1 overflow-x-auto">
           <li className="shrink-0">
             <Link
               href={withStatus(undefined)}

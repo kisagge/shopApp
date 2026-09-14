@@ -134,7 +134,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
 
       {category.children.length > 0 && (
         <nav aria-label={t('category.subcategories')} className="border-b border-[var(--border)]">
-          <ul className="flex gap-1 overflow-x-auto">
+          <ul className="scrollbar-none flex gap-1 overflow-x-auto">
             <li className="shrink-0">
               <Link
                 href={`/category/${category.slug}`}
