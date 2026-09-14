@@ -136,6 +136,15 @@ describe('부분 취소 계획', () => {
     expect(plan).toMatchObject({ cash: 27_000, shippingDeducted: 3_000 });
   });
 
+  it('떼지 말라고 하면(판매자 귀책 반품) 기준 아래로 떨어져도 떼지 않는다', () => {
+    const plan = planPartialCancel(input({
+      lines: [line('a', 30_000), line('b', 30_000)],
+      cancelIds: ['b'],
+      chargeShipping: false,
+    }));
+    expect(plan).toMatchObject({ cash: 30_000, shippingDeducted: 0 });
+  });
+
   it('원래 배송비를 냈으면 더 떼지 않는다', () => {
     const plan = planPartialCancel(input({
       lines: [line('a', 10_000), line('b', 20_000)],

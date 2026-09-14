@@ -69,31 +69,26 @@ describe('초안 계산', () => {
    * 정산에 실린 적이 없으므로, 그것을 빼면 가맹점이 **다른 주문으로 번 돈에서**
    * 받은 적 없는 금액만큼 깎인다. 전에는 `paidAt` 만 봐서 실제로 그랬다.
    */
-  it('환불은 정산에 실린 적 있는 주문만 뺀다', async () => {
+  it('차감은 확정 뒤에 돈이 돌아간 줄만 — 줄이 스스로 기억한다', async () => {
+    /*
+     * 예전에는 "환불 상태 주문 + 확정된 적 있음" 이었다. 한 줄만 반품한 구매확정 주문은 환불
+     * 상태가 아니라서 차감에서 빠졌다.
+     */
     await previewSettlements(admin, '2026-08');
     const where = db.orderItem.groupBy.mock.calls[1]?.[0].where;
-    expect(where.order.confirmedAt, '지급된 적 없는 주문을 빼면 안 된다').toEqual({ not: null });
-    expect(where.order.status).toEqual({ in: ['CANCELLED', 'REFUNDED'] });
+    expect(where.refundedAfterConfirm).toBe(true);
+    expect(where.canceledAt.gte.toISOString()).toBe('2026-07-31T15:00:00.000Z');
+    expect(where.order, '주문 상태로 가르면 일부 반품이 빠진다').toBeUndefined();
   });
 
-  it('출고 전에 일부 취소된 줄은 판매에서 빼고, 차감에도 넣지 않는다', async () => {
+  it('판매에서 빼는 것은 확정 전에 돌아간 줄뿐이다', async () => {
     /*
-     * 판매는 취소 안 된 줄만, 차감은 주문째 되돌아간 것만. 차감에서 주문 상태를 빼면 일부
-     * 취소 뒤 구매확정된 주문의 취소 줄이 판매에선 빠지고 차감에만 잡혀 가맹점이 깎인다.
+     * 출고 전 일부 취소는 판 적이 없다. 확정 뒤 반품은 이 달에 판 것이 맞다 — 빼면 이미 지급한
+     * 달의 판매가 줄고, 차감은 영영 안 된다. 같은 돈을 더하고 빼지도, 한쪽만 하지도 않는다.
      */
     await previewSettlements(admin, '2026-08');
     const sale = db.orderItem.groupBy.mock.calls[0]?.[0].where;
-    const refund = db.orderItem.groupBy.mock.calls[1]?.[0].where;
-    expect(sale.canceledAt).toBeNull();
-    expect(refund.canceledAt).toBeDefined();
-    expect(refund.order.status.in).not.toContain('CONFIRMED');
-  });
-
-  it('매출과 차감이 같은 상태를 세지 않는다 — 같은 돈을 더하고 빼게 된다', async () => {
-    await previewSettlements(admin, '2026-08');
-    const sale = db.orderItem.groupBy.mock.calls[0]?.[0].where.order.status;
-    const refund = db.orderItem.groupBy.mock.calls[1]?.[0].where.order.status;
-    expect(refund.in).not.toContain(sale);
+    expect(sale.OR).toEqual([{ canceledAt: null }, { refundedAfterConfirm: true }]);
   });
 
   it('가맹점은 자기 것만 본다', async () => {

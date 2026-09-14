@@ -72,6 +72,17 @@ export function availableReturnReasons(status: OrderStatus): readonly ReturnReas
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * 돌려보낼 수 있는 **줄**의 상태 — 받았거나 받는 중인 것.
+ *
+ * 신청 창구가 고를 수 있는 줄을 거르고, 화면이 체크박스로 내미는 줄도 이것으로 거른다. 둘이
+ * 따로 적으면 화면이 내민 줄을 서버가 거절한다.
+ */
+export const RETURNABLE_LINE_STATUS = ['SHIPPED', 'DELIVERED', 'CONFIRMED'] as const satisfies readonly OrderStatus[];
+
+export const isReturnableLine = (line: { readonly status: OrderStatus; readonly canceledAt: Date | null }): boolean =>
+  line.canceledAt === null && (RETURNABLE_LINE_STATUS as readonly OrderStatus[]).includes(line.status);
+
 export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const;
 export type ReturnStatus = (typeof RETURN_STATUS)[number];
 

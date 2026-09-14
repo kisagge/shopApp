@@ -326,6 +326,8 @@ export const ja: Dictionary = {
   'order.payInfo': 'お支払い情報',
   'order.payable': 'お支払い金額',
   'order.lineCanceled': 'キャンセル済み',
+  'order.lineRefunded': '返品返金済み',
+  'order.lineReturning': '返品手続き中',
   'order.refundedCash': '返金額',
   'order.refundedPoints': '戻ったポイント',
   'order.shippingDeducted': '一部キャンセルで差し引いた送料',
@@ -397,6 +399,9 @@ export const ja: Dictionary = {
   'ret.submitting': '申請中…',
   'ret.submit': '申請する',
   'ret.failed': '申請できませんでした。',
+  'ret.items': '返送する商品',
+  'ret.itemsNote': '選ばなかった商品はそのままお手元に残ります。',
+  'ret.pickItems': '返送する商品を選んでください。',
 
   'cancel.button': '注文キャンセル',
   'cancel.confirm': 'この注文をキャンセルしますか?',

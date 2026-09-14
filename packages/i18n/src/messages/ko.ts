@@ -343,6 +343,8 @@ export const ko = {
   'order.payInfo': '결제 정보',
   'order.payable': '결제 금액',
   'order.lineCanceled': '취소됨',
+  'order.lineRefunded': '반품 환불',
+  'order.lineReturning': '반품 진행 중',
   'order.refundedCash': '돌려받은 금액',
   'order.refundedPoints': '돌려받은 포인트',
   'order.shippingDeducted': '일부 취소로 뺀 배송비',
@@ -417,6 +419,9 @@ export const ko = {
   'ret.submitting': '신청하는 중…',
   'ret.submit': '신청하기',
   'ret.failed': '신청하지 못했습니다.',
+  'ret.items': '돌려보낼 상품',
+  'ret.itemsNote': '고르지 않은 상품은 받은 그대로 둡니다.',
+  'ret.pickItems': '돌려보낼 상품을 골라 주세요.',
 
   'cancel.button': '주문 취소',
   'cancel.confirm': '주문을 취소할까요?',

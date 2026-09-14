@@ -19,6 +19,7 @@ import 'server-only';
 interface ReclaimTx {
   pointTransaction: {
     findFirst(args: unknown): Promise<{ id: string; amount: number } | null>;
+    findMany(args: unknown): Promise<{ amount: number }[]>;
     create(args: unknown): Promise<unknown>;
   };
   user: {
@@ -33,9 +34,18 @@ export interface RewardReclaim {
   readonly shortfall: number;
 }
 
+/**
+ * @param share 되가져올 몫. **줄 하나만 반품하면 그 줄의 적립 몫만** 가져온다 — 나머지 줄은
+ *   여전히 산 것이다. 비우면 남은 적립 전부(주문째 환불).
+ *
+ * **이미 가져간 만큼은 빼고 센다.** 예전에는 회수 원장이 하나라도 있으면 아무것도 안 했다.
+ * 줄 단위 반품이 생기자 그 원장은 "일부만 가져갔다" 일 수 있게 됐고, 그대로 두면 나중에
+ * 나머지를 반품해도 **남은 적립을 영영 안 가져온다.**
+ */
 export async function reclaimPurchaseReward(
   tx: ReclaimTx,
   order: { id: string; orderNo: string; userId: string },
+  share?: number,
 ): Promise<RewardReclaim> {
   const granted = await tx.pointTransaction.findFirst({
     where: { orderId: order.id, reason: 'EARN_PURCHASE' },
@@ -44,19 +54,22 @@ export async function reclaimPurchaseReward(
   // 확정에 이르지 못한 주문이면 줄 적립도 없었다
   if (granted === null || granted.amount <= 0) return { reclaimed: 0, shortfall: 0 };
 
-  const already = await tx.pointTransaction.findFirst({
+  const earlier = await tx.pointTransaction.findMany({
     where: { orderId: order.id, reason: 'ADMIN_ADJUST', amount: { lt: 0 } },
-    select: { id: true, amount: true },
+    select: { amount: true },
   });
-  if (already !== null) return { reclaimed: 0, shortfall: 0 };
+  const taken = earlier.reduce((sum, row) => sum - row.amount, 0);
+  const left = Math.max(0, granted.amount - taken);
+  const target = Math.min(share ?? left, left);
+  if (target <= 0) return { reclaimed: 0, shortfall: 0 };
 
   const user = await tx.user.findUnique({
     where: { id: order.userId },
     select: { pointBalance: true },
   });
   const balance = user?.pointBalance ?? 0;
-  const take = Math.min(granted.amount, Math.max(balance, 0));
-  const shortfall = granted.amount - take;
+  const take = Math.min(target, Math.max(balance, 0));
+  const shortfall = target - take;
 
   if (take === 0) return { reclaimed: 0, shortfall };
 

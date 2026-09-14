@@ -26,6 +26,8 @@ const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.status.refunded': '환불',
   'order.cancel': '주문 취소',
   'order.cancelItems': '일부 취소',
+  'order.completeReturn': '반품 회수·환불',
+  'order.resolveReturn': '반품 승인·반려',
   'order.ship': '송장 등록',
   'order.export': '주문 내려받기',
   'product.image.add': '이미지 추가',

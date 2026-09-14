@@ -4,11 +4,12 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
-  PAYMENT_STATUS_LABEL,
+  PAYMENT_STATUS_LABEL, isPaidStatus,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
-import { ReturnActions } from './return-actions';
+import { ReturnActions, CompleteReturnButton } from './return-actions';
+import { previewCompleteReturn } from '~/lib/orders/complete-return';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
@@ -58,7 +59,7 @@ export default async function AdminOrderDetail({
   const canCancelItems =
     hasPermission(actor, 'order:refund') &&
     (order.status === 'PAID' || order.status === 'PREPARING') &&
-    (order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED') &&
+    order.payment !== null && isPaidStatus(order.payment.status) &&
     order.payment.method !== 'VIRTUAL_ACCOUNT' &&
     // 남은 줄이 하나여도 세운다 — 부품이 단추를 감추고, 방금 끝난 취소의 안내를 남긴다
     order.items.length >= 2 &&
@@ -70,7 +71,25 @@ export default async function AdminOrderDetail({
   const canResolveReturn = hasPermission(actor, 'order:refund');
 
   // 어떤 전이가 가능한지는 상태머신이 정하고, 그중 권한이 있는 것만 보여 준다.
+  /*
+   * **돌려받을 줄.** 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다.
+   */
+  const returnLines = activeReturn
+    ? order.items.filter((i) =>
+        activeReturn.itemIds.length > 0 ? activeReturn.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED')
+    : [];
+  const returnPreview =
+    activeReturn?.status === 'APPROVED' && canResolveReturn
+      ? await previewCompleteReturn(order.orderNo, actor).catch(() => null)
+      : null;
+
   const options = adminStatusActions(order.status).filter((to) => {
+    /*
+     * 진행 중인 신청이 있으면 반품완료는 **상태 단추로 옮기지 않는다** — 아래 "회수 확인 · 환불" 이
+     * 그 일을 한다. 상태 단추는 주문의 줄 전부를 옮기려 해서, 한 줄만 돌려받는 신청에서는 받은
+     * 그대로인 줄 때문에 거절되고 사람은 이유를 모른다.
+     */
+    if (to === 'RETURNED' && activeReturn && activeReturn.status !== 'REJECTED') return false;
     if (to === 'CANCELLED') return hasPermission(actor, 'order:cancel');
     if (to === 'REFUNDED' || to === 'RETURNED') return hasPermission(actor, 'order:refund');
     return hasPermission(actor, 'order:fulfill');
@@ -193,6 +212,10 @@ export default async function AdminOrderDetail({
                 </span>
               </div>
               <dl className="flex flex-col">
+                <Row
+                  label="돌려받을 상품"
+                  value={returnLines.map((i) => `${i.productName} (${i.optionLabel}) × ${i.quantity}`).join(', ') || '—'}
+                />
                 <Row label="사유" value={t(RETURN_REASON_KEY[activeReturn.reason as ReturnReason])} />
                 <Row
                   label="반송비"
@@ -214,6 +237,10 @@ export default async function AdminOrderDetail({
               */}
               {activeReturn.status === 'REQUESTED' && canResolveReturn && (
                 <ReturnActions orderNo={order.orderNo} />
+              )}
+              {/* 승인한 뒤 물건이 돌아오면 여기서 돌려준다. 금액은 서버가 미리 센 값이다 */}
+              {activeReturn.status === 'APPROVED' && canResolveReturn && (
+                <CompleteReturnButton orderNo={order.orderNo} preview={returnPreview} />
               )}
             </section>
           )}

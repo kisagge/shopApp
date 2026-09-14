@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  checkReturnEligibility, shippingBorneBy, transition, canRefundOrder,
+  checkReturnEligibility, shippingBorneBy, transition, canRefundOrder, isReturnableLine,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type ReturnReason, type ReturnType,
   statusBeforeReturn,
@@ -33,18 +33,28 @@ export interface ReturnRequestResult {
   readonly reason: ReturnReason;
   readonly shippingBorneBy: string;
   readonly orderStatus: string;
+  readonly itemIds: readonly string[];
 }
 
 export async function requestReturn(
   orderNo: string,
-  input: { type: ReturnType; reason: ReturnReason; detail?: string | undefined },
+  input: {
+    type: ReturnType;
+    reason: ReturnReason;
+    detail?: string | undefined;
+    /** 돌려보낼 줄. 비우면 받은 줄 전부 */
+    itemIds?: readonly string[] | undefined;
+  },
   user: { id: string },
   now: Date = new Date(),
 ): Promise<ReturnRequestResult> {
   // 남의 주문에 신청할 수 없다. userId 를 조회에 함께 건다.
   const order = await prisma.order.findFirst({
     where: { orderNo, userId: user.id },
-    select: { id: true, orderNo: true, status: true, deliveredAt: true },
+    select: {
+      id: true, orderNo: true, status: true, deliveredAt: true,
+      items: { select: { id: true, status: true, canceledAt: true } },
+    },
   });
   if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
 
@@ -56,6 +66,23 @@ export async function requestReturn(
   });
   if (!eligibility.ok) {
     throw new ReturnError(eligibility.code, eligibility.message);
+  }
+
+  /*
+   * **고른 줄만 반품접수로 옮긴다.** 나머지 줄은 받은 그대로다 — 반품이 끝나면 주문은 그
+   * 줄들의 상태로 돌아간다. 이미 돈이 돌아간 줄(취소·환불)은 고를 수 없다.
+   */
+  const returnable = order.items.filter(isReturnableLine);
+  const wanted = input.itemIds && input.itemIds.length > 0 ? [...new Set(input.itemIds)] : null;
+  if (wanted) {
+    const known = new Set(returnable.map((i) => i.id));
+    if (wanted.some((id) => !known.has(id))) {
+      throw new ReturnError('ITEM_NOT_RETURNABLE', '돌려보낼 수 없는 상품이 섞여 있습니다.', 400);
+    }
+  }
+  const chosen = wanted ?? returnable.map((i) => i.id);
+  if (chosen.length === 0) {
+    throw new ReturnError('NO_ITEMS', '돌려보낼 상품이 없습니다.', 400);
   }
 
   const borneBy = shippingBorneBy(input.reason);
@@ -70,8 +97,8 @@ export async function requestReturn(
     if (count === 0) throw new ReturnError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
     await tx.orderItem.updateMany({
-      // 취소된 줄은 반품할 물건이 아니다
-      where: { orderId: order.id, canceledAt: null },
+      // 고른 줄만. 취소된 줄은 반품할 물건이 아니다
+      where: { orderId: order.id, canceledAt: null, id: { in: chosen } },
       data: { status: nextStatus },
     });
 
@@ -82,6 +109,7 @@ export async function requestReturn(
         reason: input.reason,
         ...(input.detail ? { detail: input.detail } : {}),
         shippingBorneBy: borneBy,
+        itemIds: chosen,
       },
     });
 
@@ -91,7 +119,7 @@ export async function requestReturn(
         from: order.status,
         to: nextStatus,
         actor: user.id,
-        note: `${RETURN_TYPE_LABEL[input.type]} 신청 — ${RETURN_REASON_LABEL[input.reason]}`,
+        note: `${RETURN_TYPE_LABEL[input.type]} 신청 ${chosen.length}건 — ${RETURN_REASON_LABEL[input.reason]}`,
       },
     });
   });
@@ -102,6 +130,7 @@ export async function requestReturn(
     reason: input.reason,
     shippingBorneBy: borneBy,
     orderStatus: nextStatus,
+    itemIds: chosen,
   };
 }
 
@@ -133,7 +162,7 @@ export async function resolveReturn(
       returnRequests: {
         orderBy: { requestedAt: 'desc' },
         take: 1,
-        select: { id: true, status: true },
+        select: { id: true, status: true, itemIds: true },
       },
     },
   });
@@ -180,7 +209,15 @@ export async function resolveReturn(
       data: { status: nextOrderStatus },
     });
     await tx.orderItem.updateMany({
-      where: { orderId: order.id, canceledAt: null },
+      /*
+       * 신청한 줄만 되돌린다. 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다 — 줄을 고르게
+       * 되기 전에는 그게 곧 신청한 줄이었다.
+       */
+      where: {
+        orderId: order.id,
+        canceledAt: null,
+        ...(request.itemIds.length > 0 ? { id: { in: request.itemIds } } : { status: 'RETURN_REQUESTED' }),
+      },
       data: { status: nextOrderStatus },
     });
     await tx.orderStatusLog.create({

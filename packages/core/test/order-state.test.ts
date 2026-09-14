@@ -113,6 +113,12 @@ describe('orderStatusFromItems — 갈래로 빠진 상태도 답한다', () => 
     expect(orderStatusFromItems(['CANCELLED', 'CANCELLED'])).toBe('CANCELLED');
   });
 
+  it('받은 뒤 한 줄만 반품·환불했으면 남은 줄을 따른다', () => {
+    expect(orderStatusFromItems(['REFUNDED', 'DELIVERED'])).toBe('DELIVERED');
+    expect(orderStatusFromItems(['CONFIRMED', 'REFUNDED', 'CANCELLED'])).toBe('CONFIRMED');
+    expect(orderStatusFromItems(['REFUNDED', 'REFUNDED'])).toBe('REFUNDED');
+  });
+
   it('이행 경로는 예전과 똑같이 답한다', () => {
     expect(orderStatusFromItems(['SHIPPED', 'PREPARING'])).toBe('PREPARING');
     expect(orderStatusFromItems([])).toBeNull();

@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  won, REFUND_STATUS, SETTLEMENT_SALE_STATUS,
+  won, SETTLEMENT_SALE_STATUS,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 
@@ -57,8 +57,12 @@ export async function previewSettlements(
       by: ['merchantId'],
       where: {
         merchantId: { not: null },
-        // 출고 전에 취소된 줄은 판 것이 아니다. 주문은 구매확정이어도 그 줄은 돈이 돌아갔다
-        canceledAt: null,
+        /*
+         * 돈이 돌아간 줄 중 **확정 전에 돌아간 것**(출고 전 일부 취소)은 판 것이 아니다. 확정
+         * 뒤에 돌아간 것(확정 뒤 반품)은 이 달에 판 것이 맞고 돌아간 달에 뺀다 — 여기서 빼면
+         * 이미 지급한 달의 판매가 소리 없이 줄고 차감은 영영 안 된다.
+         */
+        OR: [{ canceledAt: null }, { refundedAfterConfirm: true }],
         order: { status: SETTLEMENT_SALE_STATUS, confirmedAt: { gte: period.start, lt: period.end } },
       },
       _sum: { subtotal: true },
@@ -82,12 +86,11 @@ export async function previewSettlements(
         merchantId: { not: null },
         canceledAt: { gte: period.start, lt: period.end },
         /*
-         * **주문 상태 조건을 지우지 않는다.** 출고 전에 일부 취소한 줄은 위의 판매에서 빠진다
-         * (canceledAt: null). 그 주문이 나중에 구매확정되면 confirmedAt 이 차므로, 여기서
-         * 상태를 안 보면 **판 적 없는 줄을 한 번 더 뺀다** — 가맹점이 두 번 깎인다. 차감은
-         * 정산에 실린 뒤 주문째 되돌아간 것뿐이다.
+         * **확정 뒤에 돌아간 줄만.** 주문 상태로 가르면 둘 다 틀린다: 한 줄만 반품한 주문은
+         * 구매확정인 채로 남아 차감에서 빠지고, 출고 전 일부 취소 뒤 확정된 주문은 confirmedAt
+         * 이 차서 판 적 없는 줄을 뺀다(가맹점이 두 번 깎인다). 줄이 스스로 기억한다.
          */
-        order: { status: { in: [...REFUND_STATUS] }, confirmedAt: { not: null } },
+        refundedAfterConfirm: true,
       },
       _sum: { subtotal: true },
     }),

@@ -47,3 +47,55 @@ describe('고를 수 있는 사유만 보인다', () => {
     expect(screen.getByText(/반송비는 저희가 부담합니다/)).toBeInTheDocument();
   });
 });
+
+describe('돌려보낼 상품 고르기', () => {
+  const ITEMS = [
+    { id: 'i-coat', productName: '울 코트', optionLabel: '오트 / M', quantity: 1 },
+    { id: 'i-knit', productName: '라운드 니트', optionLabel: '블랙 / L', quantity: 1 },
+  ];
+
+  const openWith = async (items = ITEMS) => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ orderNo: 'x' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" items={items} />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: /반품|교환/ }));
+    return { fetchMock, userEvent };
+  };
+
+  it('상품이 둘 이상이면 한 묶음의 체크박스로 보여 주고, 처음엔 전부 골라 둔다', async () => {
+    await openWith();
+    const group = screen.getByRole('group', { name: '돌려보낼 상품' });
+    expect(group).toHaveAccessibleDescription('고르지 않은 상품은 받은 그대로 둡니다.');
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2);
+    expect(boxes.every((b) => (b as HTMLInputElement).checked)).toBe(true);
+  });
+
+  it('고른 상품만 보낸다 — 니트만 작으면 니트만 돌려보낸다', async () => {
+    const { fetchMock, userEvent } = await openWith();
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.itemIds).toEqual(['i-knit']);
+  });
+
+  it('하나도 안 고르면 보내지 않고 이유를 말한다', async () => {
+    const { fetchMock, userEvent } = await openWith();
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('돌려보낼 상품을 골라 주세요.');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('상품이 하나면 고르지 않는다 — 물을 것이 없다', async () => {
+    const { fetchMock, userEvent } = await openWith([ITEMS[0]!]);
+    expect(screen.queryByRole('group', { name: '돌려보낼 상품' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.itemIds).toBeUndefined();
+  });
+});

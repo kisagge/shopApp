@@ -22,7 +22,14 @@ const now = new Date(delivered.getTime() + 2 * DAY);
 
 const order = (over: Record<string, unknown> = {}) => ({
   id: 'o-1', orderNo: '20260901-0000001', status: 'DELIVERED',
-  deliveredAt: delivered, confirmedAt: null, ...over,
+  deliveredAt: delivered, confirmedAt: null,
+  items: [
+    { id: 'i-coat', status: 'DELIVERED', canceledAt: null },
+    { id: 'i-knit', status: 'DELIVERED', canceledAt: null },
+    { id: 'i-sock', status: 'CANCELLED', canceledAt: new Date('2026-08-30') },
+  ],
+  returnRequests: [{ id: 'rr-1', status: 'REQUESTED', itemIds: [] }],
+  ...over,
 });
 
 beforeEach(() => {
@@ -150,7 +157,7 @@ describe('운영진 처리', () => {
     id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
     // Prisma 는 없는 시각을 null 로 준다. 픽스처도 그래야 진짜와 같다.
     confirmedAt: null, deliveredAt: delivered,
-    returnRequests: [{ id: 'r-1', status: 'REQUESTED' }],
+    returnRequests: [{ id: 'r-1', status: 'REQUESTED', itemIds: [] }],
   };
 
   beforeEach(() => {
@@ -198,7 +205,7 @@ describe('운영진 처리', () => {
   it('이미 처리된 신청은 다시 처리하지 않는다', async () => {
     db.order.findFirst.mockResolvedValue({
       ...requested,
-      returnRequests: [{ id: 'r-1', status: 'APPROVED' }],
+      returnRequests: [{ id: 'r-1', status: 'APPROVED', itemIds: [] }],
     });
 
     await expect(
@@ -224,7 +231,7 @@ describe('운영진 처리', () => {
  * 달의 매출이 다른 달로 옮겨간다.
  */
 describe('반품을 반려했을 때', () => {
-  const pending = { id: 'rr-1', status: 'REQUESTED' };
+  const pending = { id: 'rr-1', status: 'REQUESTED', itemIds: [] };
 
   const resolveFrom = async (over: Record<string, unknown>) => {
     db.order.findFirst.mockResolvedValue(order({ ...over, returnRequests: [pending] }));
@@ -256,5 +263,46 @@ describe('반품을 반려했을 때', () => {
     const [args] = db.order.updateMany.mock.calls.at(-1) as [{ data: Record<string, unknown> }];
     expect(args.data).not.toHaveProperty('confirmedAt');
     expect(args.data).not.toHaveProperty('deliveredAt');
+  });
+});
+
+describe('줄을 골라 돌려보낸다', () => {
+  it('고른 줄만 반품접수로 옮기고, 신청에 줄을 적는다', async () => {
+    const r = await requestReturn(
+      '20260901-0000001', { type: 'RETURN', reason: 'CHANGED_MIND', itemIds: ['i-knit'] }, user, now,
+    );
+    expect(r.itemIds).toEqual(['i-knit']);
+    expect(db.orderItem.updateMany.mock.calls[0]![0].where).toMatchObject({ id: { in: ['i-knit'] }, canceledAt: null });
+    expect(db.returnRequest.create.mock.calls[0]![0].data.itemIds).toEqual(['i-knit']);
+  });
+
+  it('고르지 않으면 받은 줄 전부 — 취소된 줄은 빼고', async () => {
+    const r = await requestReturn('20260901-0000001', { type: 'RETURN', reason: 'DEFECT' }, user, now);
+    expect(r.itemIds).toEqual(['i-coat', 'i-knit']);
+  });
+
+  it('이미 돈이 돌아간 줄이나 없는 줄은 고를 수 없다', async () => {
+    await expect(requestReturn(
+      '20260901-0000001', { type: 'RETURN', reason: 'DEFECT', itemIds: ['i-sock'] }, user, now,
+    )).rejects.toMatchObject({ code: 'ITEM_NOT_RETURNABLE' });
+    await expect(requestReturn(
+      '20260901-0000001', { type: 'RETURN', reason: 'DEFECT', itemIds: ['zzz'] }, user, now,
+    )).rejects.toMatchObject({ code: 'ITEM_NOT_RETURNABLE' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('반려하면 신청한 줄만 되돌린다 — 나머지 줄은 원래 자리다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      status: 'RETURN_REQUESTED',
+      returnRequests: [{ id: 'rr-1', status: 'REQUESTED', itemIds: ['i-knit'] }],
+    }));
+    await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적' }, admin);
+    expect(db.orderItem.updateMany.mock.calls[0]![0].where).toMatchObject({ id: { in: ['i-knit'] } });
+  });
+
+  it('옛 신청(줄 없음)을 반려하면 반품접수인 줄 전부를 되돌린다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'RETURN_REQUESTED' }));
+    await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적' }, admin);
+    expect(db.orderItem.updateMany.mock.calls[0]![0].where).toMatchObject({ status: 'RETURN_REQUESTED' });
   });
 });

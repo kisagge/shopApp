@@ -162,6 +162,14 @@ export interface PartialCancelInput {
   readonly policy: ShippingPolicy;
   /** 앞선 부분 취소에서 이미 뗀 배송비 */
   readonly shippingDeductedSoFar: number;
+  /**
+   * 무료배송 기준 아래로 떨어질 때 배송비를 떼는가. 기본은 뗀다.
+   *
+   * 반품에서는 **판매자 귀책(불량·오배송·파손)이면 떼지 않는다.** 판매자 잘못으로 돌려보낸
+   * 물건 때문에 손님이 원래 안 내던 배송비를 무는 셈이 된다. 단순 변심이면 뗀다 — 반송비를
+   * 손님이 내는 것과 같은 이유다.
+   */
+  readonly chargeShipping?: boolean | undefined;
 }
 
 export interface PartialCancelPlan {
@@ -222,7 +230,7 @@ export function planPartialCancel(input: PartialCancelInput): PartialCancelPlan 
     policy: input.policy,
   }).fee;
   const owed = Math.max(0, feeForRemaining - input.order.shippingFee);
-  const deduct = Math.max(0, owed - input.shippingDeductedSoFar);
+  const deduct = input.chargeShipping === false ? 0 : Math.max(0, owed - input.shippingDeductedSoFar);
 
   // 현금에서 먼저 떼고, 모자라면 포인트에서 뗀다
   const fromCash = Math.min(cash, deduct);

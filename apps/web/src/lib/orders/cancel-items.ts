@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
-  canRefundOrder, planPartialCancel, remainingRefund, shippingPolicyFrom, PartialCancelError,
+  canRefundOrder, isPaidStatus, planPartialCancel, remainingRefund, shippingPolicyFrom, PartialCancelError,
   ORDER_STATUS_LABEL, won,
   type Actor, type OrderStatus, type PaymentGateway, type ShippingPolicy, type Won,
 } from '@shop/core';
@@ -90,7 +90,7 @@ function loadOrder(db: Pick<typeof prisma, 'order'>, orderNo: string, actor: Act
 }
 
 /** 주문에 박힌 정책. 옛 주문은 지금 정책을 쓴다 — 그때 기준을 남기지 않았다 */
-async function policyOf(json: unknown): Promise<ShippingPolicy> {
+export async function policyOf(json: unknown): Promise<ShippingPolicy> {
   if (json && typeof json === 'object') {
     const row = json as { baseFee?: unknown; freeThreshold?: unknown; remoteSurcharge?: unknown };
     if (typeof row.baseFee === 'number' && typeof row.remoteSurcharge === 'number' &&
@@ -116,7 +116,7 @@ function assertCancellable(loaded: Loaded, itemIds: readonly string[], staff: bo
   }
 
   const payment = order.payment;
-  if (!payment || !['DONE', 'PARTIAL_CANCELED'].includes(payment.status) || !payment.pgPaymentKey) {
+  if (!payment || !isPaidStatus(payment.status) || !payment.pgPaymentKey) {
     throw new CancelItemsError('NOT_PAID', '결제가 끝난 주문만 일부 취소할 수 있습니다.');
   }
   /*

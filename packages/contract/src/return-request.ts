@@ -11,12 +11,29 @@ export const returnRequestSchema = z.object({
   type: z.enum(RETURN_TYPE),
   reason: z.enum(RETURN_REASON),
   detail: z.string().trim().max(500, 'valid.tooLongChars').optional(),
+  /**
+   * 돌려보낼 줄. 비우면 받은 줄 전부다.
+   *
+   * 코트와 니트를 사서 니트만 작으면 니트만 돌려보내는 것이 보통이다. 주문째만 받으면 코트까지
+   * 돌려보내고 다시 사거나, 반품을 포기한다.
+   */
+  itemIds: z
+    .array(z.string().min(1, 'valid.tooShortChars').max(64, 'valid.tooLongChars'))
+    .max(20, 'valid.tooManyItems')
+    .optional(),
 });
 export type ReturnRequestInput = z.infer<typeof returnRequestSchema>;
 
 /** 운영진의 처리 */
 export const resolveReturnSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('APPROVE') }),
+  /**
+   * 회수를 확인하고 돌려준다. 승인한 신청에만 된다.
+   *
+   * 승인과 나눈 이유 — 승인은 "돌려보내도 된다" 이고 이것은 "돌아왔다" 다. 물건이 오기 전에
+   * 돈을 돌려주면 안 오는 물건의 값을 치른다.
+   */
+  z.object({ action: z.literal('COMPLETE') }),
   z.object({
     action: z.literal('REJECT'),
     /**

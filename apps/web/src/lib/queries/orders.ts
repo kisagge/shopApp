@@ -43,13 +43,13 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         take: 1,
         select: {
           type: true, reason: true, detail: true, status: true,
-          shippingBorneBy: true, rejectReason: true, requestedAt: true,
+          shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
         },
       },
       items: {
         orderBy: { id: 'asc' },
         select: {
-          id: true, canceledAt: true,
+          id: true, canceledAt: true, status: true,
           productName: true, brandName: true, optionLabel: true,
           // 주문한 그때의 사진. 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
           imageUrl: true,

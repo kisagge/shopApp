@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
-  isCancellableByCustomer, canRequestReturn, isRepayable,
+  isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -110,7 +110,7 @@ export default async function OrderPage({
   const liveItems = order.items.filter((i) => i.canceledAt === null);
   const canCancelItems =
     order.status === 'PAID' &&
-    (order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED') &&
+    order.payment !== null && isPaidStatus(order.payment.status) &&
     order.payment.method !== 'VIRTUAL_ACCOUNT' &&
     // 남은 줄이 하나여도 세운다 — 부품이 단추를 감추고, 방금 끝난 취소의 안내를 남긴다
     order.items.length >= 2 &&
@@ -222,9 +222,15 @@ export default async function OrderPage({
                 <span className="text-[13px]">
                   {i.productName}
                   {/* 흐리게만 하면 색을 못 보는 사람에게는 취소됐는지 알 길이 없다 */}
-                  {i.canceledAt && (
+                  {(i.canceledAt || i.status === 'RETURN_REQUESTED') && (
                     <span className="ml-1.5 rounded-full border border-[var(--border-strong)] px-1.5 py-px text-[10px] text-[var(--fg-secondary)]">
-                      {t('order.lineCanceled')}
+                      {t(
+                        i.status === 'RETURN_REQUESTED'
+                          ? 'order.lineReturning'
+                          : i.status === 'REFUNDED' && order.status !== 'REFUNDED'
+                            ? 'order.lineRefunded'
+                            : 'order.lineCanceled',
+                      )}
                     </span>
                   )}
                 </span>
@@ -362,7 +368,16 @@ export default async function OrderPage({
         {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}
-        {showReturnForm && <ReturnRequestForm orderNo={order.orderNo} status={order.status} />}
+        {showReturnForm && (
+          <ReturnRequestForm
+            orderNo={order.orderNo}
+            status={order.status}
+            // 받았거나 받는 중인 줄만. 이미 돈이 돌아간 줄은 돌려보낼 것이 아니다
+            items={order.items
+              .filter(isReturnableLine)
+              .map((i) => ({ id: i.id, productName: i.productName, optionLabel: i.optionLabel, quantity: i.quantity }))}
+          />
+        )}
         <div className="flex gap-2">
           <Link
             href="/mypage/orders"

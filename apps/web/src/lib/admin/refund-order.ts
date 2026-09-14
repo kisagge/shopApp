@@ -53,7 +53,7 @@ export async function refundOrder(
     where: { orderNo },
     select: {
       id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
-      pointsUsed: true, payable: true, usedCouponId: true, canceledAt: true,
+      pointsUsed: true, payable: true, usedCouponId: true, canceledAt: true, confirmedAt: true,
       items: { select: { id: true, variantId: true, quantity: true, canceledAt: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
     },
@@ -163,7 +163,8 @@ export async function refundOrder(
 
     await tx.orderItem.updateMany({
       where: { orderId: order.id, canceledAt: null },
-      data: { status: 'REFUNDED', canceledAt: now },
+      // 확정 뒤 반품이면 정산이 돌아간 달에 뺀다(close-settlement)
+      data: { status: 'REFUNDED', canceledAt: now, refundedAfterConfirm: order.confirmedAt !== null },
     });
 
     if (fromReturn) {

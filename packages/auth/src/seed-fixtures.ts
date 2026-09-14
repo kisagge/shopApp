@@ -67,11 +67,14 @@ export const SEED_ACCOUNT = {
 
   /** 두 줄을 사서 한 줄만 취소한다 — 자기 주문과 자기 장바구니가 있어야 한다 */
   partialCanceler: 'partial-cancel@plain.test',
+
+  /** 두 줄을 받고 한 줄만 반품한다 */
+  partialReturner: 'partial-return@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
-  'partialCanceler',
+  'partialCanceler', 'partialReturner',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

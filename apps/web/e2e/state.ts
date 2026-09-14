@@ -34,6 +34,8 @@ export const STATE_FILE = {
   lowStockBuyer: 'test-results/.auth/low-stock-buyer.json',
   /** 두 줄을 사서 한 줄만 취소한다 — partial-cancel */
   partialCanceler: 'test-results/.auth/partial-cancel.json',
+  /** 두 줄을 받고 한 줄만 반품한다 — partial-return */
+  partialReturner: 'test-results/.auth/partial-return.json',
 } as const;
 
 /**
@@ -69,6 +71,8 @@ export const RACE_PRODUCT = {
   lowStock: 'long-goose-down',
   /** 두 사이즈를 한 줄씩 사서 하나를 취소한다 — partial-cancel. 옵션이 둘 이상 있어야 한다 */
   partialCancel: 'light-down-vest',
+  /** 두 사이즈를 받아 하나를 반품한다 — partial-return */
+  partialReturn: 'merino-turtleneck',
 } as const;
 
 export const REVIEW_PRODUCT = {

@@ -12,6 +12,7 @@ import { reclaimPurchaseReward } from '~/lib/orders/reclaim-reward';
 const tx = () => ({
   pointTransaction: {
     findFirst: vi.fn<(...a: any[]) => any>(),
+    findMany: vi.fn<(...a: any[]) => any>(async () => []),
     create: vi.fn<(...a: any[]) => any>(),
   },
   user: {
@@ -24,9 +25,8 @@ const order = { id: 'o-1', orderNo: '20260909-0000001', userId: 'u-1' };
 
 /** 적립 원장은 있고, 회수 원장은 없고, 잔액은 이만큼 */
 function granted(t: ReturnType<typeof tx>, amount: number, balance: number) {
-  t.pointTransaction.findFirst
-    .mockResolvedValueOnce({ id: 'pt-1', amount })
-    .mockResolvedValueOnce(null);
+  t.pointTransaction.findFirst.mockResolvedValueOnce({ id: 'pt-1', amount });
+  t.pointTransaction.findMany.mockResolvedValueOnce([]);
   t.user.findUnique.mockResolvedValue({ pointBalance: balance });
 }
 
@@ -68,9 +68,8 @@ describe('적립 회수', () => {
 
   /** 잔액만 두 번 줄면 아무도 알아채지 못한다 — 적립 지급이 두 번 주지 않는 것과 같은 이유다 */
   it('두 번 부르면 두 번째는 아무것도 하지 않는다', async () => {
-    t.pointTransaction.findFirst
-      .mockResolvedValueOnce({ id: 'pt-1', amount: 2_890 })
-      .mockResolvedValueOnce({ id: 'pt-2', amount: -2_890 });
+    t.pointTransaction.findFirst.mockResolvedValueOnce({ id: 'pt-1', amount: 2_890 });
+    t.pointTransaction.findMany.mockResolvedValueOnce([{ amount: -2_890 }]);
 
     const out = await reclaimPurchaseReward(t, order);
 
@@ -120,5 +119,33 @@ describe('적립 회수', () => {
 
     expect(out.reclaimed).toBe(0);
     expect(t.user.update).not.toHaveBeenCalled();
+  });
+
+  it('줄 하나만 반품하면 그 줄의 몫만 가져온다', async () => {
+    granted(t, 2_890, 10_000);
+    const out = await reclaimPurchaseReward(t, order, 890);
+    expect(out).toEqual({ reclaimed: 890, shortfall: 0 });
+  });
+
+  it('앞서 일부 가져갔으면 나머지만 가져온다 — 일부 회수가 전체 회수를 막지 않는다', async () => {
+    /*
+     * 예전에는 회수 원장이 하나라도 있으면 건너뛰었다. 줄 하나를 반품한 뒤 나머지를 반품하면
+     * 남은 적립을 영영 안 가져왔을 것이다.
+     */
+    t.pointTransaction.findFirst.mockResolvedValueOnce({ id: 'pt-1', amount: 2_890 });
+    t.pointTransaction.findMany.mockResolvedValueOnce([{ amount: -890 }]);
+    t.user.findUnique.mockResolvedValue({ pointBalance: 10_000 });
+
+    const out = await reclaimPurchaseReward(t, order);
+    expect(out).toEqual({ reclaimed: 2_000, shortfall: 0 });
+  });
+
+  it('몫이 남은 적립보다 크면 남은 만큼만 가져온다', async () => {
+    t.pointTransaction.findFirst.mockResolvedValueOnce({ id: 'pt-1', amount: 1_000 });
+    t.pointTransaction.findMany.mockResolvedValueOnce([{ amount: -800 }]);
+    t.user.findUnique.mockResolvedValue({ pointBalance: 10_000 });
+
+    const out = await reclaimPurchaseReward(t, order, 500);
+    expect(out.reclaimed).toBe(200);
   });
 });

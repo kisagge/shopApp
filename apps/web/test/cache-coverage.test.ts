@@ -54,6 +54,7 @@ const CATALOG_WRITERS = [
   'app/api/orders/[orderNo]/cancel/route.ts',
   'app/api/orders/[orderNo]/cancel-items/route.ts',
   'app/api/admin/orders/[orderNo]/status/route.ts',
+  'app/api/admin/orders/[orderNo]/return/route.ts',
 ] as const;
 
 const BANNER_WRITERS = [

@@ -241,11 +241,12 @@ export function orderStatusFromItems(
   all: readonly OrderStatus[],
 ): OrderStatus | null {
   /*
-   * **부분 취소한 줄은 셈에서 뺀다.** 세 줄 중 하나를 출고 전에 취소하고 둘을 보냈으면
-   * 주문은 배송중이다. 빼지 않으면 취소가 갈래라서 "모든 줄이 같은 갈래" 가 아니게 되고,
-   * 주문이 결제완료에 영영 머문다. 전부 취소됐으면 그대로 취소다.
+   * **돈이 돌아간 줄은 셈에서 뺀다.** 세 줄 중 하나를 출고 전에 취소하고(CANCELLED) 둘을
+   * 보냈으면 주문은 배송중이다. 받은 뒤 한 줄만 반품·환불했으면(REFUNDED) 나머지 둘을 따라
+   * 배송완료다. 빼지 않으면 그 줄이 갈래라서 "모든 줄이 같은 갈래" 가 아니게 되고 주문이
+   * 영영 안 움직인다. 전부 그렇다면 그대로 취소·환불이다.
    */
-  const live = all.filter((status) => status !== 'CANCELLED');
+  const live = all.filter((status) => status !== 'CANCELLED' && status !== 'REFUNDED');
   const statuses = live.length === 0 ? all : live;
   const [first] = statuses;
   if (first !== undefined && BRANCH_STATUS.includes(first)) {

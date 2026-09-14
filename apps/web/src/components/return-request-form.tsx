@@ -21,13 +21,26 @@ import { RETURN_TYPE_KEY, RETURN_REASON_KEY } from '~/lib/i18n/enum-labels';
  * 부담 주체를 화면에서 계산해 보여 주지만 **그 값을 서버로 보내지는 않는다.**
  * 서버가 사유에서 다시 정한다 — 보내면 누구나 판매자 부담으로 바꿀 수 있다.
  */
+export interface ReturnableItem {
+  readonly id: string;
+  readonly productName: string;
+  readonly optionLabel: string;
+  readonly quantity: number;
+}
+
 export function ReturnRequestForm({
   orderNo,
   status,
+  items = [],
 }: {
   orderNo: string;
   /** 이 상태에서 고를 수 있는 사유만 내민다. 확정 뒤에는 판매자 귀책뿐이다. */
   status: OrderStatus;
+  /**
+   * 돌려보낼 수 있는 줄. 둘 이상이면 고르게 한다 — 니트만 작은데 코트까지 돌려보내게 하지 않는다.
+   * 처음에는 전부 골라 둔다. 대부분은 받은 것을 통째로 무르러 온다.
+   */
+  items?: readonly ReturnableItem[];
 }) {
   const reasons = availableReturnReasons(status);
   const router = useRouter();
@@ -43,11 +56,16 @@ export function ReturnRequestForm({
   const [reason, setReason] = useState<ReturnReason>(reasons[0]!);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [picked, setPicked] = useState<readonly string[]>(() => items.map((i) => i.id));
 
   const borneBy = shippingBorneBy(reason);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (items.length >= 2 && picked.length === 0) {
+      setError(t('ret.pickItems'));
+      return;
+    }
     setPending(true);
     setError(null);
 
@@ -62,6 +80,7 @@ export function ReturnRequestForm({
           type,
           reason,
           ...(typeof detail === 'string' && detail.trim() ? { detail: detail.trim() } : {}),
+          ...(items.length >= 2 ? { itemIds: picked } : {}),
         }),
       });
       const result = (await response.json()) as { message?: string };
@@ -110,6 +129,30 @@ export function ReturnRequestForm({
         <p role="alert" className="rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[13px] text-accent">
           {error}
         </p>
+      )}
+
+      {items.length >= 2 && (
+        <fieldset className="flex flex-col gap-2" aria-describedby={`${formId}-items-note`}>
+          <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">{t('ret.items')}</legend>
+          <p id={`${formId}-items-note`} className="text-[12px] text-[var(--fg-muted)]">{t('ret.itemsNote')}</p>
+          {items.map((item) => (
+            <label
+              key={item.id}
+              className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-sm border border-[var(--border)] px-3.5 py-2 text-[13px] has-[:checked]:border-[var(--brand)]"
+            >
+              <input
+                type="checkbox"
+                checked={picked.includes(item.id)}
+                onChange={(e) =>
+                  setPicked((current) =>
+                    e.target.checked ? [...current, item.id] : current.filter((id) => id !== item.id))}
+                className="accent-[var(--brand)]"
+              />
+              {item.productName}
+              <span className="ml-auto text-[11px] text-[var(--fg-muted)]">{item.optionLabel} · {item.quantity}</span>
+            </label>
+          ))}
+        </fieldset>
       )}
 
       <fieldset className="flex flex-col gap-2">

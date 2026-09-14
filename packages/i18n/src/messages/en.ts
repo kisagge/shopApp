@@ -330,6 +330,8 @@ export const en: Dictionary = {
   'order.payInfo': 'Payment',
   'order.payable': 'Total paid',
   'order.lineCanceled': 'Cancelled',
+  'order.lineRefunded': 'Returned',
+  'order.lineReturning': 'Return in progress',
   'order.refundedCash': 'Refunded',
   'order.refundedPoints': 'Points returned',
   'order.shippingDeducted': 'Shipping deducted on partial cancel',
@@ -401,6 +403,9 @@ export const en: Dictionary = {
   'ret.submitting': 'Sending…',
   'ret.submit': 'Send request',
   'ret.failed': 'We could not send that request.',
+  'ret.items': 'Items to send back',
+  'ret.itemsNote': 'Items you do not select stay with you.',
+  'ret.pickItems': 'Choose the items to send back.',
 
   'cancel.button': 'Cancel order',
   'cancel.confirm': 'Cancel this order?',
