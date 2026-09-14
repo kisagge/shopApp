@@ -26,8 +26,10 @@ import { formatUnread, type Theme } from '@shop/core';
 export interface AdminNavItem {
   readonly href: string;
   readonly label: string;
-  /** 안 읽은 수. 없거나 0 이면 뱃지를 안 그린다 */
+  /** 처리할 수(안 읽은 알림, 답변 대기 문의). 없거나 0 이면 뱃지를 안 그린다 */
   readonly badge?: number;
+  /** 낭독기가 읽을 뜻 — "안 읽은 알림", "답변 대기 문의" 처럼 무엇의 수인지 */
+  readonly badgeLabel?: string;
 }
 
 const PANEL_ID = 'admin-nav-panel';
@@ -203,7 +205,7 @@ export function AdminNav({
                      */
                     <span className="tnum rounded-full bg-accent px-1.5 py-0.5 text-[11px] font-medium leading-none text-n-0">
                       <span aria-hidden="true">{formatUnread(item.badge)}</span>
-                      <span className="sr-only">안 읽은 알림 {item.badge}건</span>
+                      <span className="sr-only">{item.badgeLabel ?? '안 읽은 알림'} {item.badge}건</span>
                     </span>
                   ) : null}
                 </Link>

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ready } from './state';
+import { STATE_FILE, ready } from './state';
 
 /**
  * 운영 화면에 가게가 붙어 있지 않다.
@@ -114,4 +114,46 @@ test('본문이 길어도 사이드바가 화면 높이를 채운다', async ({ 
    */
   expect(Math.abs(box!.y), '스크롤하자 사이드바가 위로 밀려났다').toBeLessThanOrEqual(0.5);
   expect(box!.height, '사이드바가 화면 아래까지 닿지 않는다').toBeGreaterThanOrEqual(viewport.height - 1);
+});
+
+test('사이드바의 답변 대기 문의 수가 문의 화면과 같다 — 운영진·가맹점', async ({ page, browser }) => {
+  /*
+   * 문의는 들어가 봐야 몇 건인지 알았다. 뱃지를 붙이면서 **세는 조건을 문의 화면과 하나로** 두었다 —
+   * 뱃지는 3 인데 들어가면 2 건이면 뱃지를 믿지 않게 된다. 같은 요청이 그린 두 숫자를 맞대 본다.
+   *
+   * **자기 문의를 하나 만든다.** 시드에는 문의가 없어서 새 DB 에서는 0 건일 수 있고, 그러면 "뱃지가
+   * 없다" 만 보고 아무것도 증명하지 않는다. 가맹점(스튜디오눈) 상품에 손님이 묻고, 끝나면 지운다.
+   */
+  test.setTimeout(60_000);
+  const customer = await browser.newContext({ storageState: STATE_FILE.customer });
+  const merchant = await browser.newContext({ storageState: STATE_FILE.merchant });
+  let inquiryId: string | null = null;
+
+  try {
+    const found = await page.request.get(`/api/admin/products/search?q=${encodeURIComponent('멜톤 싱글')}`);
+    const { products } = (await found.json()) as { products: { id: string; slug: string }[] };
+    const product = products.find((x) => x.slug === 'melton-single-coat');
+    expect(product, '스튜디오눈 상품을 못 찾았다').toBeTruthy();
+
+    const created = await customer.request.post('/api/inquiries', {
+      data: { productId: product!.id, content: '검사가 남긴 문의입니다. 사이즈를 알고 싶어요.' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    inquiryId = ((await created.json()) as { id: string }).id;
+
+    for (const p of [page, await merchant.newPage()]) {
+      await p.goto('/admin/inquiries');
+      await ready(p);
+
+      const header = await p.locator('main header').first().innerText();
+      const hit = /답변 대기 (\d+)건/.exec(header);
+      expect(hit, `문의를 만들었는데 답변 대기가 없다 — ${header}`).not.toBeNull();
+
+      const nav = p.getByRole('navigation', { name: '관리자 메뉴' });
+      await expect(nav.getByRole('link', { name: new RegExp(`답변 대기 문의 ${hit![1]}건`) })).toBeVisible();
+    }
+  } finally {
+    if (inquiryId) await customer.request.delete(`/api/inquiries/${inquiryId}`, { failOnStatusCode: false });
+    await Promise.all([customer.close(), merchant.close()]);
+  }
 });

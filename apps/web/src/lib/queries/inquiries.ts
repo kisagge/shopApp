@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
+  hasPermission,
   canReadInquiry, canAnswerInquiry, assertPermission,
   type Actor, type InquiryTopic,
 } from '@shop/core';
@@ -109,21 +110,37 @@ export interface AdminInquiryRow {
  * 가맹점은 자기 브랜드 상품의 문의만 본다 — 답할 수 있는 것만 보여야
  * 목록이 할 일 목록이 된다.
  */
+/**
+ * 답할 사람에게 보이는 문의.
+ *
+ * 가맹점에게는 **자기 상품의 문의만** 보인다. 고객센터로 들어온 문의는 상품이 없어 이 조건에 걸리지
+ * 않으므로 자연히 빠진다 — 배송·환불은 플랫폼이 답할 몫이라 그것이 맞다.
+ */
+function inquiryScope(actor: Actor) {
+  return {
+    deletedAt: null,
+    ...(actor.merchantId ? { product: { brand: { merchantId: actor.merchantId } } } : {}),
+  };
+}
+
+/**
+ * 답변을 기다리는 문의 수 — 사이드바 뱃지.
+ *
+ * **문의 화면의 "답변 대기" 와 같은 조건이다**(inquiryScope + answeredAt: null). 따로 세면 뱃지는 3 인데
+ * 들어가 보면 2 건인 날이 오고, 그러면 뱃지를 믿지 않게 된다. 답할 권한이 없으면 0 이다.
+ */
+export async function countPendingInquiries(actor: Actor): Promise<number> {
+  if (!hasPermission(actor, 'inquiry:answer')) return 0;
+  return prisma.inquiry.count({ where: { ...inquiryScope(actor), answeredAt: null } });
+}
+
 export async function getAdminInquiries(
   actor: Actor,
   query: { unanswered?: boolean; cursor?: string | undefined } = {},
 ): Promise<{ rows: AdminInquiryRow[]; nextCursor: string | null; pending: number }> {
   assertPermission(actor, 'inquiry:answer');
 
-  /*
-   * 가맹점에게는 **자기 상품의 문의만** 보인다. 고객센터로 들어온 문의는
-   * 상품이 없어 이 조건에 걸리지 않으므로 자연히 빠진다 — 배송·환불은
-   * 플랫폼이 답할 몫이라 그것이 맞다.
-   */
-  const scoped = {
-    deletedAt: null,
-    ...(actor.merchantId ? { product: { brand: { merchantId: actor.merchantId } } } : {}),
-  };
+  const scoped = inquiryScope(actor);
   const where = { ...scoped, ...(query.unanswered ? { answeredAt: null } : {}) };
 
   const [rows, pending] = await Promise.all([

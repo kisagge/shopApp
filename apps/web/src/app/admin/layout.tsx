@@ -6,6 +6,7 @@ import { AdminNav } from '~/components/admin/admin-nav';
 import { NO_INDEX } from '~/lib/no-index';
 import { getTheme } from '~/lib/theme';
 import { countUnread } from '~/lib/queries/notifications';
+import { countPendingInquiries } from '~/lib/queries/inquiries';
 
 /** 운영 화면은 검색 결과에 뜰 일이 없다 */
 export const metadata: Metadata = NO_INDEX;
@@ -56,7 +57,15 @@ export default async function AdminLayout({ children }: { children: ReactNode })
    * 것은 대시보드의 재고 부족 수와 다를 바가 없다. 운영 알림함만 센다 — 매장
    * 알림(배송·쿠폰)이 섞이면 가맹점에게 할 일이 아닌 것이 뱃지를 채운다.
    */
-  const unread = await countUnread(actor.id, 'console');
+  /*
+   * **답변 대기 문의도 메뉴에 붙인다.** 문의는 손님이 답을 기다리는 일감인데, 들어가 봐야 몇 건인지
+   * 알았다 — 가맹점은 문의 메뉴를 매일 열어 보지 않고, 그 사이 손님은 답 없는 문의를 보고 떠난다.
+   * 세는 조건은 문의 화면의 "답변 대기" 탭과 하나다(countPendingInquiries).
+   */
+  const [unread, pendingInquiries] = await Promise.all([
+    countUnread(actor.id, 'console'),
+    countPendingInquiries(actor),
+  ]);
 
   return (
     /*
@@ -72,7 +81,10 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           // 권한 없는 메뉴는 아예 그리지 않는다. 눌러 보고 튕기는 것보다 낫다.
           href: n.href,
           label: n.label,
-          ...(n.href === '/admin/notifications' && unread > 0 ? { badge: unread } : {}),
+          ...(n.href === '/admin/notifications' && unread > 0 ? { badge: unread, badgeLabel: '안 읽은 알림' } : {}),
+          ...(n.href === '/admin/inquiries' && pendingInquiries > 0
+            ? { badge: pendingInquiries, badgeLabel: '답변 대기 문의' }
+            : {}),
         }))}
         roleLabel={USER_ROLE_LABEL[actor.role]}
         merchant={actor.merchantId !== null}
