@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { SEED_ACCOUNT, SEED_PASSWORD } from '@shop/auth/seed-fixtures';
+import { REWARD_VALID_DAYS, SIGNUP_POINTS } from '@shop/core';
 import { ready } from './state';
 
 /**
@@ -72,6 +73,22 @@ test('처음 온 사람이 가입하고 바로 로그인된 상태가 된다', a
   // 가입 포인트가 원장으로 들어갔는지는 화면에서 확인한다
   await page.goto('/mypage/points');
   await expect(page.locator('#main')).toContainText('가입');
+
+  /*
+   * 가입 포인트는 1년 뒤 소멸한다 — 날짜별 표에 그 한 줄이 있다. 새 계정이라 원장이 이것뿐이어서 숫자가 정해져
+   * 있다(공유 계정은 다른 검사가 포인트를 써서 흔들린다). 날짜는 KST 달력으로 센다.
+   */
+  const expiry = page.getByRole('table', { name: '날짜별 소멸 예정 포인트' });
+  const rows = expiry.getByRole('row').filter({ has: page.getByRole('rowheader') });
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first().getByRole('cell')).toHaveText([`${REWARD_VALID_DAYS}일 남음`, `${SIGNUP_POINTS.toLocaleString('ko-KR')}P`]);
+  const kstDate = (ms: number) => new Date(ms + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const expected = kstDate(Date.now() + REWARD_VALID_DAYS * 24 * 60 * 60 * 1000);
+  // 자정을 걸친 실행이면 하루 앞일 수 있다
+  expect([expected, kstDate(Date.now() + (REWARD_VALID_DAYS - 1) * 24 * 60 * 60 * 1000)])
+    .toContain(await rows.first().locator('time').getAttribute('datetime'));
+  // 1년 뒤라 "곧 사라진다" 는 말은 없다
+  await expect(page.getByText(/일 안에 사라집니다/)).toHaveCount(0);
 });
 
 test('이미 가입된 주소는 그 칸에서 알려 준다', async ({ page }) => {

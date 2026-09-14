@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { expirableAmount, expiringSoonAmount, EXPIRY_NOTICE_DAYS } from '../src/point-expiry';
+import { expirableAmount, expiringSoonAmount, pointExpirySchedule, EXPIRY_NOTICE_DAYS } from '../src/point-expiry';
 
 const NOW = new Date('2026-09-04T00:00:00Z');
 const day = (n: number) => new Date(NOW.getTime() + n * 24 * 60 * 60 * 1000);
@@ -106,5 +106,63 @@ describe('곧 사라질 포인트', () => {
 
   it('기간 밖이면 0', () => {
     expect(expiringSoonAmount([earn(1000, -10, EXPIRY_NOTICE_DAYS + 5)], NOW)).toBe(0);
+  });
+});
+
+describe('날짜별 소멸 예정', () => {
+  // NOW 는 KST 2026-09-04 09:00
+  const at = (iso: string) => new Date(iso);
+  const earnAt = (amount: number, expiresIso: string | null) => ({
+    amount, createdAt: day(-100), expiresAt: expiresIso === null ? null : at(expiresIso),
+  });
+
+  it('남은 적립을 날짜별로 묶어 가까운 날부터 적는다', () => {
+    const schedule = pointExpirySchedule([
+      earnAt(300, '2026-10-01T03:00:00Z'),
+      earnAt(200, '2026-09-10T03:00:00Z'),
+      earnAt(100, '2026-10-01T05:00:00Z'),
+    ], NOW);
+    expect(schedule.map(({ date, amount, daysLeft }) => ({ date, amount, daysLeft }))).toEqual([
+      { date: '2026-09-10', amount: 200, daysLeft: 6 },
+      { date: '2026-10-01', amount: 400, daysLeft: 27 },
+    ]);
+    // 같은 날 둘이면 이른 기한을 대표로
+    expect(schedule[1]!.expiresAt.toISOString()).toBe('2026-10-01T03:00:00.000Z');
+  });
+
+  it('날짜는 KST 로 자른다 — UTC 로 자르면 하루 앞 날짜에 묶인다', () => {
+    // UTC 9월 9일 16:00 = KST 9월 10일 01:00
+    const [only] = pointExpirySchedule([earnAt(500, '2026-09-09T16:00:00Z')], NOW);
+    expect(only!.date).toBe('2026-09-10');
+    expect(only!.daysLeft).toBe(6);
+  });
+
+  it('오늘 안에 사라지는 몫은 D-0, 이미 지난 몫과 기한 없는 몫은 넣지 않는다', () => {
+    const schedule = pointExpirySchedule([
+      earnAt(100, '2026-09-04T10:00:00Z'), // KST 오늘 19:00
+      earnAt(200, '2026-09-03T00:00:00Z'), // 지남
+      earnAt(300, null),
+    ], NOW);
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]).toMatchObject({ date: '2026-09-04', amount: 100, daysLeft: 0 });
+  });
+
+  it('쓴 만큼은 기한이 가까운 적립에서 먼저 뺀다 — 소멸 배치와 같은 짝짓기', () => {
+    const schedule = pointExpirySchedule([
+      earnAt(1000, '2026-09-20T00:00:00Z'),
+      earnAt(1000, '2026-12-01T00:00:00Z'),
+      spend(1500, -5),
+    ], NOW);
+    expect(schedule.map((d) => d.amount)).toEqual([500]);
+    expect(schedule[0]!.date).toBe('2026-12-01');
+  });
+
+  it('기간 안의 합이 "N일 안에 사라진다" 는 한 줄과 같다', () => {
+    const entries = [
+      earn(700, -300, 3), earn(400, -200, 29), earn(900, -100, 31), earn(250, -50, 12), spend(500, -10),
+    ];
+    const within = pointExpirySchedule(entries, NOW, EXPIRY_NOTICE_DAYS);
+    expect(within.reduce((s, d) => s + d.amount, 0)).toBe(expiringSoonAmount(entries, NOW));
+    expect(within.every((d) => d.daysLeft <= EXPIRY_NOTICE_DAYS)).toBe(true);
   });
 });

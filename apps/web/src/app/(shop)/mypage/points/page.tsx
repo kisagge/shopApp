@@ -3,7 +3,8 @@ import { getViewer } from '~/lib/viewer';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { EXPIRY_NOTICE_DAYS, isPointReason } from '@shop/core';
-import { getPointHistory, getMyPageSummary, getExpiringPoints } from '~/lib/queries/mypage';
+import { getPointHistory, getMyPageSummary, getPointExpiry } from '~/lib/queries/mypage';
+import { PointExpirySchedule } from '~/components/point-expiry-schedule';
 import { formatDate, formatNumber } from '@shop/i18n';
 import { POINT_REASON_KEY } from '~/lib/i18n/enum-labels';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -14,16 +15,14 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = 'force-dynamic';
 
-
-
 export default async function PointsPage() {
   const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/points');
 
-  const [summary, history, expiring, locale, t] = await Promise.all([
+  const [summary, history, expiry, locale, t] = await Promise.all([
     getMyPageSummary(session.id),
     getPointHistory(session.id),
-    getExpiringPoints(session.id),
+    getPointExpiry(session.id),
     getLocale(),
     getT(),
   ]);
@@ -44,16 +43,18 @@ export default async function PointsPage() {
           {formatNumber(locale, summary.pointBalance)}
           <span className="ml-1 text-lg">P</span>
         </span>
-        {expiring > 0 && (
+        {expiry.soon > 0 && (
           // 말없이 사라지면 잔액이 왜 줄었는지 알 수 없다
           <span className="mt-2 block text-[12px] text-accent">
             {t('my.pointsExpiring', {
-              amount: `${formatNumber(locale, expiring)}P`,
+              amount: `${formatNumber(locale, expiry.soon)}P`,
               days: EXPIRY_NOTICE_DAYS,
             })}
           </span>
         )}
       </p>
+
+      <PointExpirySchedule schedule={expiry.schedule} noticeDays={EXPIRY_NOTICE_DAYS} locale={locale} t={t} />
 
       <section aria-labelledby="history-title" className="mt-8">
         <h2 id="history-title" className="mb-3.5 text-[15px] font-semibold">{t('my.pointsHistory')}</h2>

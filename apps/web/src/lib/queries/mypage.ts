@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
-  gradeProgress, won, ORDER_STATUS, expiringSoonAmount, REVIEWABLE_STATUS,
+  gradeProgress, won, ORDER_STATUS, expiringSoonAmount, pointExpirySchedule, REVIEWABLE_STATUS,
+  type PointExpiryDay,
   type DateRange, type MemberGrade, type MyOrderSearchTerm, type OrderStatus, type Won,
 } from '@shop/core';
 
@@ -193,19 +194,19 @@ export async function getPointHistory(userId: string, take = 30): Promise<PointE
 }
 
 /**
- * 곧 사라질 포인트.
+ * 곧 사라질 포인트와 날짜별 소멸 예정.
  *
- * **말없이 사라지면 잔액이 왜 줄었는지 알 수 없다.** 소멸 배치가 도는 것과
- * 별개로, 화면이 미리 알려 줘야 쓸 기회가 생긴다.
- *
- * 짝을 지으려면 원장 전체를 봐야 한다 — 어떤 사용이 어떤 적립을 썼는지
- * 원장에 적혀 있지 않아서 core 가 기한이 가까운 것부터 소진했다고 본다.
+ * 어떤 사용이 어떤 적립을 썼는지는 원장에 적혀 있지 않아서 core 가 기한이 가까운 것부터 소진했다고 본다.
+ * 원장을 **한 번** 읽어 둘 다 낸다 — 한 줄 요약과 날짜별 표가 같은 원장에서 나와야 합이 맞는다.
  */
-export async function getExpiringPoints(userId: string, now = new Date()): Promise<number> {
+export async function getPointExpiry(
+  userId: string,
+  now = new Date(),
+): Promise<{ soon: number; schedule: PointExpiryDay[] }> {
   const entries = await prisma.pointTransaction.findMany({
     where: { userId },
     orderBy: { createdAt: 'asc' },
     select: { amount: true, createdAt: true, expiresAt: true },
   });
-  return expiringSoonAmount(entries, now);
+  return { soon: expiringSoonAmount(entries, now), schedule: pointExpirySchedule(entries, now) };
 }
