@@ -5,7 +5,11 @@ const quoteCart = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/queries/cart', () => ({ quoteCart }));
 
 const tx = vi.hoisted(() => ({
-  productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
+  productVariant: {
+    updateMany: vi.fn<(...a: any[]) => any>(),
+    /** 깎은 직후의 재고. 기준을 넘겼는지 트랜잭션 안에서 본다 */
+    findUnique: vi.fn<(...a: any[]) => any>(),
+  },
   user: { updateMany: vi.fn<(...a: any[]) => any>() },
   userCoupon: { updateMany: vi.fn<(...a: any[]) => any>() },
   order: { create: vi.fn<(...a: any[]) => any>() },
@@ -30,6 +34,16 @@ vi.mock('@shop/db', () => ({ prisma: db }));
  */
 const cancelOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/cancel-order', () => ({ cancelOrder }));
+
+/*
+ * 재고 부족 알림. **응답 뒤에 도는 일**이라 여기서는 곧바로 돌려 누가
+ * 불렸는지만 본다.
+ */
+const notifyLowStock = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/low-stock', () => ({ notifyLowStock }));
+vi.mock('~/lib/api/after-response', () => ({
+  afterResponse: (fn: () => unknown) => Promise.resolve(fn()),
+}));
 
 const { createOrder, OrderError } = await import('~/lib/orders/create-order');
 
@@ -76,6 +90,9 @@ beforeEach(() => {
   db.order.findMany.mockResolvedValue([]);
   cancelOrder.mockResolvedValue(undefined);
   tx.productVariant.updateMany.mockResolvedValue({ count: 1 });
+  // 기본은 넉넉하다 — 기준을 안 넘는다
+  tx.productVariant.findUnique.mockResolvedValue({ stock: 50 });
+  notifyLowStock.mockResolvedValue(undefined);
   tx.user.updateMany.mockResolvedValue({ count: 1 });
   tx.userCoupon.updateMany.mockResolvedValue({ count: 1 });
   tx.order.create.mockResolvedValue({
@@ -560,3 +577,74 @@ describe('서로 모르는 조회는 함께 나간다', () => {
   });
 });
 
+/**
+ * 재고가 기준을 넘어 내려가면 가맹점에게 알린다.
+ *
+ * **넘는 순간 한 번만.** 기준 이하일 때마다 알리면 품절까지 주문마다 쌓인다.
+ * 그리고 **트랜잭션 안에서 본다** — 커밋 뒤에 읽으면 그 사이 다른 주문이 깎은
+ * 것까지 섞여서, 넘긴 주문이 아니라 엉뚱한 주문이 알림을 보낸다.
+ */
+describe('재고 부족 알림', () => {
+  it('이 주문이 기준을 넘기면 알린다', async () => {
+    // 1 개를 사서 6 → 5
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 5 });
+
+    await createOrder(request(), user);
+
+    expect(notifyLowStock).toHaveBeenCalledWith(['v-coat-m']);
+  });
+
+  it('이미 기준 아래였으면 또 알리지 않는다', async () => {
+    /*
+     * **여기가 이 묶음의 요점이다.** 5 → 4 에서 또 보내면 가맹점 알림함이
+     * 같은 소식으로 찬다. 다섯 통째에는 아무도 안 읽는다.
+     */
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 4 });
+
+    await createOrder(request(), user);
+
+    expect(notifyLowStock, '이미 알린 옵션에 또 보냈다').not.toHaveBeenCalled();
+  });
+
+  it('기준 위면 조용하다', async () => {
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 30 });
+    await createOrder(request(), user);
+    expect(notifyLowStock).not.toHaveBeenCalled();
+  });
+
+  it('깎기 전 값은 이번 주문이 깎은 만큼 더해 되짚는다', async () => {
+    // 세 개를 사서 7 → 4. 되묻지 않고 더하면 된다 — 조건부 UPDATE 가 정확히 그만큼 깎았다
+    quoteCart.mockResolvedValue(
+      quote({
+        lines: [{ ...quote().lines[0]!, quantity: 3, requestedQuantity: 3, subtotal: 867_000 }],
+      }),
+    );
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 4 });
+
+    await createOrder(request({ lines: [{ variantId: 'v-coat-m', quantity: 3 }] }), user);
+
+    expect(notifyLowStock).toHaveBeenCalledWith(['v-coat-m']);
+  });
+
+  it('주문이 실패하면 알리지 않는다', async () => {
+    /*
+     * 트랜잭션이 되돌아가면 재고 차감도 없던 일이 된다. 그때 모은 것을 들고
+     * 가면 **일어나지 않은 일로** 알림이 간다.
+     */
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 5 });
+    tx.order.create.mockRejectedValue(new Error('DB 가 흔들렸다'));
+
+    await expect(createOrder(request(), user)).rejects.toThrow();
+    expect(notifyLowStock, '만들어지지 않은 주문으로 알림이 갔다').not.toHaveBeenCalled();
+  });
+
+  it('알림이 실패해도 주문은 성립한다', async () => {
+    // 알림을 못 보냈다고 주문을 무를 수는 없고, 무르는 편이 더 나쁘다
+    tx.productVariant.findUnique.mockResolvedValue({ stock: 5 });
+    notifyLowStock.mockRejectedValue(new Error('알림 저장 실패'));
+
+    await expect(createOrder(request(), user)).resolves.toMatchObject({
+      orderNo: '20260831-1234567',
+    });
+  });
+});

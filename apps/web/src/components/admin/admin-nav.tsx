@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSignOut } from '~/components/admin-sign-out';
 import { ThemeSwitcher } from '~/components/theme-switcher';
-import type { Theme } from '@shop/core';
+import { formatUnread, type Theme } from '@shop/core';
 
 /**
  * 운영 화면의 메뉴.
@@ -26,6 +26,8 @@ import type { Theme } from '@shop/core';
 export interface AdminNavItem {
   readonly href: string;
   readonly label: string;
+  /** 안 읽은 수. 없거나 0 이면 뱃지를 안 그린다 */
+  readonly badge?: number;
 }
 
 const PANEL_ID = 'admin-nav-panel';
@@ -179,9 +181,19 @@ export function AdminNav({
                 <Link
                   // 목록은 서버가 권한을 보고 만든다 — 타입은 그쪽이 지킨다
                   href={item.href as never}
-                  className="flex min-h-11 items-center rounded-[5px] px-3.5 text-sm text-dark-muted no-underline hover:bg-dark-surface hover:text-n-0"
+                  className="flex min-h-11 items-center justify-between gap-2 rounded-[5px] px-3.5 text-sm text-dark-muted no-underline hover:bg-dark-surface hover:text-n-0"
                 >
                   {item.label}
+                  {item.badge ? (
+                    /*
+                     * **숫자만 두지 않는다.** 낭독기는 "알림 3" 이라고만 읽어 무엇이
+                     * 3 인지 말하지 않는다. 눈에 보이는 숫자는 가리고 뜻을 적는다.
+                     */
+                    <span className="tnum rounded-full bg-accent px-1.5 py-0.5 text-[11px] font-medium leading-none text-n-0">
+                      <span aria-hidden="true">{formatUnread(item.badge)}</span>
+                      <span className="sr-only">안 읽은 알림 {item.badge}건</span>
+                    </span>
+                  ) : null}
                 </Link>
               </li>
             ))}

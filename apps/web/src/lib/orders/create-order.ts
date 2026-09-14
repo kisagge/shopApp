@@ -4,7 +4,7 @@ import { DEFAULT_LOCALE, type Locale } from '@shop/i18n';
 import {
   generateOrderNumber, INITIAL_ORDER_STATUS, won,
   type OrderItemDraft, type ShippingSnapshot, type Won,
-  isRemoteAreaPostalCode,
+  isRemoteAreaPostalCode, crossedLowStock,
 } from '@shop/core';
 import type {
   CreateOrderRequest, CreateOrderResponse, OrderErrorCode,
@@ -12,6 +12,8 @@ import type {
 import { ORDER_ERROR_MESSAGE } from '@shop/contract';
 import { quoteCart } from '~/lib/queries/cart';
 import { releaseAbandonedHolds } from './release-holds';
+import { afterResponse } from '~/lib/api/after-response';
+import { notifyLowStock } from '~/lib/notifications/low-stock';
 
 /**
  * 품절에 막혔을 때 한 번에 풀어 볼 주문 수.
@@ -188,9 +190,17 @@ export async function createOrder(
     throw error;
   }
 
-  function createWithRetry(): Promise<CreateOrderResponse> {
-    return withOrderNumberRetry(async (orderNo) =>
-      prisma.$transaction(async (tx) => {
+  async function createWithRetry(): Promise<CreateOrderResponse> {
+    /*
+     * 기준을 넘긴 옵션. **시도마다 새로 비운다** — 주문번호가 부딪혀 트랜잭션이
+     * 되돌아가면 그 시도의 재고 차감도 없던 일이 되므로, 그때 모은 것을 들고
+     * 가면 일어나지 않은 일로 알림이 간다.
+     */
+    let lowStock: string[] = [];
+
+    const created = await withOrderNumberRetry(async (orderNo) => {
+      lowStock = [];
+      return prisma.$transaction(async (tx) => {
         // ── 1) 재고 차감. 조건부 UPDATE 로 경쟁을 막는다.
         //    읽고 나서 쓰면 두 주문이 같은 재고를 보고 둘 다 성공한다.
         for (const item of items) {
@@ -199,6 +209,25 @@ export async function createOrder(
             data: { stock: { decrement: item.quantity } },
           });
           if (count === 0) throw new OrderError('OUT_OF_STOCK', [item.variantId]);
+
+          /*
+           * **이 주문이 기준을 넘겼는지 트랜잭션 안에서 본다.**
+           *
+           * 방금 깎은 줄은 이 트랜잭션이 잠그고 있어서, 여기서 읽으면 **이 주문이
+           * 깎은 직후의 값**이 나온다. 커밋 뒤에 읽으면 그 사이 다른 주문이 깎은
+           * 것까지 섞여서, 6→5 를 넘긴 주문이 아니라 5→4 를 만든 주문이 알림을
+           * 보내거나 둘 다 안 보낸다.
+           *
+           * 깎기 전 값은 되묻지 않는다 — 조건부 UPDATE 가 정확히 quantity 만큼
+           * 깎았으므로 더하면 된다.
+           */
+          const after = await tx.productVariant.findUnique({
+            where: { id: item.variantId },
+            select: { stock: true },
+          });
+          if (after && crossedLowStock(after.stock + item.quantity, after.stock)) {
+            lowStock.push(item.variantId);
+          }
         }
 
         // ── 2) 포인트 차감. 같은 이유로 조건부 UPDATE.
@@ -286,8 +315,31 @@ export async function createOrder(
           payable: order.payable as Won,
           status: order.status,
         };
-      }),
-    );
+      });
+    });
+
+    /*
+     * **커밋된 뒤에, 응답을 막지 않고** 알린다. 알림을 못 보냈다고 주문을 무를
+     * 수는 없고, 사람이 그걸 기다릴 이유도 없다.
+     */
+    if (lowStock.length > 0) {
+      const crossed = lowStock;
+      /*
+       * **부르는 자리에서도 삼킨다.** notifyLowStock 가 안에서 이미 삼키지만,
+       * afterResponse 는 요청 밖(검사·배치)에서는 그 자리에서 돌리고 약속을
+       * 돌려준다 — 그때 알림이 던지면 기다리던 **주문이 실패한다.** 알림 쪽이
+       * 언제나 조용할 거라는 약속에 주문을 걸지 않는다.
+       */
+      await afterResponse(async () => {
+        try {
+          await notifyLowStock(crossed);
+        } catch (error) {
+          console.error('[order] 재고 부족 알림 실패 — 주문은 성립했다', { crossed }, error);
+        }
+      });
+    }
+
+    return created;
   }
 }
 

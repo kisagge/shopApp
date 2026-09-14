@@ -22,6 +22,7 @@ const PAGES = [
   ['회원', '/admin/users'],
   ['공지·FAQ', '/admin/support'],
   ['배송비', '/admin/shipping'],
+  ['알림', '/admin/notifications'],
   ['감사 로그', '/admin/audit'],
 ] as const;
 

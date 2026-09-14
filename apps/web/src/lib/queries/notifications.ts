@@ -1,6 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import type { NotificationKind } from '@shop/core';
+import {
+  CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND, type NotificationKind,
+} from '@shop/core';
 
 /**
  * 내 알림.
@@ -44,9 +46,24 @@ function paramsOf(value: unknown): Record<string, string> {
   return out;
 }
 
-export async function getMyNotifications(userId: string): Promise<NotificationView[]> {
+/**
+ * 어느 알림함인가. 매장은 손님 알림만, 운영 화면은 운영 알림만 본다.
+ *
+ * **가르지 않으면 가맹점 계정이 매장에 들어왔을 때 머리의 뱃지에 "재고 부족" 이
+ * 뜬다.** 손님으로 온 자리에서 들을 말이 아니고, 무엇보다 누르면 운영 화면으로
+ * 튕겨 나간다. 무엇이 어디에 속하는지는 core 가 정한다.
+ */
+export type NotificationBox = 'customer' | 'console';
+
+const kindsOf = (box: NotificationBox): NotificationKind[] =>
+  box === 'console' ? [...CONSOLE_NOTIFICATION_KIND] : [...CUSTOMER_NOTIFICATION_KIND];
+
+export async function getMyNotifications(
+  userId: string,
+  box: NotificationBox = 'customer',
+): Promise<NotificationView[]> {
   const rows = await prisma.notification.findMany({
-    where: { userId },
+    where: { userId, kind: { in: kindsOf(box) } },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: PAGE_SIZE,
     select: { id: true, kind: true, params: true, linkPath: true, readAt: true, createdAt: true },
@@ -63,6 +80,9 @@ export async function getMyNotifications(userId: string): Promise<NotificationVi
 }
 
 /** 머리의 뱃지가 쓴다. 세는 것뿐이라 목록을 읽지 않는다. */
-export async function countUnread(userId: string): Promise<number> {
-  return prisma.notification.count({ where: { userId, readAt: null } });
+export async function countUnread(
+  userId: string,
+  box: NotificationBox = 'customer',
+): Promise<number> {
+  return prisma.notification.count({ where: { userId, readAt: null, kind: { in: kindsOf(box) } } });
 }

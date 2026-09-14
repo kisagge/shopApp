@@ -879,4 +879,5 @@ export const ja: Dictionary = {
   'mail.inquiry.viewList': 'お問い合わせ履歴を見る',
   'mail.inquiry.support': 'カスタマーサービス',
   'notif.COUPON_ISSUED': '{couponName} クーポンが届きました',
+  'notif.STOCK_LOW': '{productName} · {optionLabel} の在庫が残り{stock}点です',
 };

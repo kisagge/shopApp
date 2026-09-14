@@ -5,6 +5,7 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { AdminNav } from '~/components/admin/admin-nav';
 import { NO_INDEX } from '~/lib/no-index';
 import { getTheme } from '~/lib/theme';
+import { countUnread } from '~/lib/queries/notifications';
 
 /** 운영 화면은 검색 결과에 뜰 일이 없다 */
 export const metadata: Metadata = NO_INDEX;
@@ -12,7 +13,7 @@ export const metadata: Metadata = NO_INDEX;
 export const dynamic = 'force-dynamic';
 
 interface NavItem {
-  readonly href: '/admin' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
+  readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
@@ -23,6 +24,8 @@ interface NavItem {
 
 const NAV: readonly NavItem[] = [
   { href: '/admin', label: '대시보드', permission: 'admin:access' },
+  // 운영 알림함. 지금은 재고 부족뿐이라 가맹점에게 가장 쓸모가 있다
+  { href: '/admin/notifications', label: '알림', permission: 'admin:access' },
   // 전체 트래픽이라 가맹점에게는 보이지 않는다
   { href: '/admin/traffic', label: '트래픽', permission: 'analytics:all' },
   { href: '/admin/orders', label: '주문', permission: 'order:read' },
@@ -48,6 +51,12 @@ const NAV: readonly NavItem[] = [
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {
   const actor = await requireAdmin();
+  /*
+   * **메뉴에 안 읽은 수를 붙인다.** 알림함은 열어야 보이는데, 열어야 알 수 있는
+   * 것은 대시보드의 재고 부족 수와 다를 바가 없다. 운영 알림함만 센다 — 매장
+   * 알림(배송·쿠폰)이 섞이면 가맹점에게 할 일이 아닌 것이 뱃지를 채운다.
+   */
+  const unread = await countUnread(actor.id, 'console');
 
   return (
     /*
@@ -63,6 +72,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           // 권한 없는 메뉴는 아예 그리지 않는다. 눌러 보고 튕기는 것보다 낫다.
           href: n.href,
           label: n.label,
+          ...(n.href === '/admin/notifications' && unread > 0 ? { badge: unread } : {}),
         }))}
         roleLabel={USER_ROLE_LABEL[actor.role]}
         merchant={actor.merchantId !== null}

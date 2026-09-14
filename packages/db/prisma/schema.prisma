@@ -1443,6 +1443,8 @@ enum NotificationKind {
   RESTOCKED
   /// 운영진이 지급한 쿠폰. 받은 줄 모르면 쿠폰은 없는 것과 같다.
   COUPON_ISSUED
+  /// 가맹점 상품의 옵션 재고가 기준 아래로 내려갔다 — 운영 알림함에만 뜬다
+  STOCK_LOW
 }
 
 model Notification {

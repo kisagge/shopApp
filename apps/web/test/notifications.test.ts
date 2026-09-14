@@ -62,7 +62,12 @@ describe('알림 남기기', () => {
 describe('내 알림 읽기', () => {
   it('내 것만 본다', async () => {
     await getMyNotifications('u-1');
-    expect(db.notification.findMany.mock.calls[0]![0].where).toEqual({ userId: 'u-1' });
+    /*
+     * 알림함이 둘로 갈린 뒤로 조건에 **종류**가 붙는다(매장은 손님 알림만).
+     * 여기서 지키는 것은 여전히 "남의 것을 안 본다" 이므로 userId 를 본다 —
+     * 종류 쪽은 notification-box 가 지킨다.
+     */
+    expect(db.notification.findMany.mock.calls[0]![0].where.userId).toBe('u-1');
   });
 
   it('최근 것이 먼저다', async () => {
@@ -78,7 +83,10 @@ describe('내 알림 읽기', () => {
 
   it('세는 것은 안 읽은 것만이다', async () => {
     await countUnread('u-1');
-    expect(db.notification.count.mock.calls[0]![0].where).toEqual({ userId: 'u-1', readAt: null });
+    expect(db.notification.count.mock.calls[0]![0].where).toMatchObject({
+      userId: 'u-1',
+      readAt: null,
+    });
   });
 
   describe('저장된 값을 그대로 믿지 않는다', () => {

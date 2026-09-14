@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { won, type Actor, type Won, type ProductStatus } from '@shop/core';
+import { won, type Actor, type Won, type ProductStatus, LOW_STOCK_THRESHOLD,
+} from '@shop/core';
 import {
   assertAdminQuery, scopeOf, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
 } from './scope';
@@ -75,7 +76,7 @@ export async function getAdminProducts(
       salePrice: p.salePrice === null ? null : won(p.salePrice),
       status: p.status,
       totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
-      lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= 5),
+      lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD),
       createdAt: p.createdAt,
       reviewRequestedAt: p.reviewRequestedAt,
       publishRejection: p.publishRejection,

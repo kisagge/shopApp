@@ -913,6 +913,7 @@ export const ko = {
   'mail.inquiry.viewList': '문의 내역 보기',
   'mail.inquiry.support': '고객센터',
   'notif.COUPON_ISSUED': '{couponName} 쿠폰이 도착했습니다',
+  'notif.STOCK_LOW': '{productName} · {optionLabel} 재고가 {stock}개 남았습니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

@@ -61,10 +61,13 @@ export const SEED_ACCOUNT = {
 
   /** 주문 내역을 검색·기간으로 좁혀 본다 — 자기 주문을 만들고 찾는다 */
   orderSearch: 'order-search@plain.test',
+
+  /** 재고를 기준 너머로 내려 가맹점 알림을 부른다 */
+  lowStockBuyer: 'low-stock-buyer@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch',
+  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

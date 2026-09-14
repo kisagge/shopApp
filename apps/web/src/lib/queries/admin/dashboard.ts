@@ -4,7 +4,7 @@ import {
   funnelFromCounts, computeFunnel, won, FUNNEL_STEP, MERCHANT_FUNNEL_STEP,
   rangeStart, DASHBOARD_RANGE_LABEL, netRevenue, REFUND_STATUS,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
-  type EventName,
+  type EventName, LOW_STOCK_THRESHOLD,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 
@@ -172,7 +172,7 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
     prisma.productVariant.count({
       where: {
         isActive: true,
-        stock: { lte: 5 },
+        stock: { lte: LOW_STOCK_THRESHOLD },
         ...(scope ? { product: { brand: { merchantId: scope } } } : {}),
       },
     }),

@@ -30,6 +30,8 @@ export const STATE_FILE = {
   doubleSpender: 'test-results/.auth/double-spend.json',
   /** 주문 내역 검색 — order-search */
   orderSearch: 'test-results/.auth/order-search.json',
+  /** 재고를 기준 너머로 내리는 손님 — low-stock-alert */
+  lowStockBuyer: 'test-results/.auth/low-stock-buyer.json',
 } as const;
 
 /**
@@ -58,6 +60,11 @@ export const RACE_PRODUCT = {
   stock: 'washed-denim-straight',
   /** 여섯을 한꺼번에 산다 — double-spend. 쿠폰 최소 금액을 한 개로 넘겨야 한다 */
   coupon: 'heavy-cotton-hoodie',
+  /**
+   * 재고를 기준 바로 위(6)로 세우고 사서 알림을 부른다 — low-stock-alert.
+   * **스튜디오눈 상품이어야 한다** — 가맹점 계정(merchant)이 그 가맹점이다.
+   */
+  lowStock: 'long-goose-down',
 } as const;
 
 export const REVIEW_PRODUCT = {

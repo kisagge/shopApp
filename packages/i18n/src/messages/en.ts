@@ -883,4 +883,5 @@ export const en: Dictionary = {
   'mail.inquiry.viewList': 'View your questions',
   'mail.inquiry.support': 'Customer service',
   'notif.COUPON_ISSUED': 'You received a coupon: {couponName}',
+  'notif.STOCK_LOW': 'Low stock: {productName} · {optionLabel} has {stock} left',
 };

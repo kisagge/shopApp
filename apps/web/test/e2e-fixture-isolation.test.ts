@@ -127,19 +127,28 @@ describe('재고를 흔드는 명세', () => {
 
   const shakers = specs.filter((s) => s.source.includes('RACE_PRODUCT.'));
 
+  /** RACE_PRODUCT 의 열쇠들. 손으로 적지 않고 블록에서 읽는다 */
+  const raceKeys = [...raceBlock.matchAll(/^\s*(\w+): '[a-z0-9-]+'/gm)].map((m) => m[1]!);
+
   it('상품과 명세를 실제로 찾아냈다 — 못 찾으면 아래가 헛돈다', () => {
-    expect(slugOf('stock'), 'state.ts 에서 stock 상품을 못 찾았다').not.toBeNull();
-    expect(slugOf('coupon'), 'state.ts 에서 coupon 상품을 못 찾았다').not.toBeNull();
+    expect(raceKeys.length, 'RACE_PRODUCT 에서 열쇠를 못 읽었다').toBeGreaterThanOrEqual(3);
+    for (const key of raceKeys) {
+      expect(slugOf(key), `state.ts 에서 ${key} 상품을 못 찾았다`).not.toBeNull();
+    }
     /*
      * **줄어드는 것도 회귀다.** 자기 상품을 쓰던 명세가 홈의 첫 상품으로
      * 돌아가면 여기서 개수가 준다 — 그러면 아래의 "첫 상품을 집지 않는다"
      * 검사는 그 명세를 아예 안 보게 된다. 실제로 한 줄을 되돌려 보고
      * 이 자리에서 걸리는 것을 확인했다.
      */
+    /*
+     * 열쇠마다 명세 하나다. 열쇠 수와 어긋나면 누군가 자기 상품을 버리고 홈의
+     * 첫 상품으로 돌아갔거나, 상품을 정해 두고 아무도 안 쓰는 것이다.
+     */
     expect(
       shakers.map((s) => s.name),
-      'RACE_PRODUCT 를 쓰는 명세가 둘보다 적다 — 재고를 흔드는 명세가 홈의 첫 상품으로 돌아갔는지 본다',
-    ).toHaveLength(2);
+      'RACE_PRODUCT 를 쓰는 명세 수가 열쇠 수와 다르다 — 재고를 흔드는 명세가 홈의 첫 상품으로 돌아갔는지 본다',
+    ).toHaveLength(raceKeys.length);
   });
 
   it('재고를 손으로 세우는 곳은 그 둘뿐이다', () => {
@@ -154,9 +163,10 @@ describe('재고를 흔드는 명세', () => {
     ).toEqual([]);
   });
 
-  it('둘이 다른 상품이다', () => {
-    expect(slugOf('coupon'), '재고를 흔드는 두 명세가 같은 상품을 쥐고 있다').not.toBe(
-      slugOf('stock'),
+  it('서로 다른 상품이다', () => {
+    const slugs = raceKeys.map(slugOf);
+    expect(new Set(slugs).size, `재고를 흔드는 명세들이 같은 상품을 나눠 쥐고 있다: ${slugs.join(', ')}`).toBe(
+      slugs.length,
     );
   });
 
@@ -167,7 +177,7 @@ describe('재고를 흔드는 명세', () => {
         .map((key) => new RegExp(`${key}: '([a-z0-9-]+)'`).exec(state)?.[1])
         .filter((v): v is string => v !== undefined),
     );
-    for (const key of ['stock', 'coupon']) {
+    for (const key of raceKeys) {
       expect(review.has(slugOf(key)!), `${key} 상품이 리뷰 명세와 겹친다`).toBe(false);
     }
   });
