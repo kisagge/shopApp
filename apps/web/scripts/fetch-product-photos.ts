@@ -246,21 +246,34 @@ async function main(): Promise<void> {
 
   /** 이미 쓴 사진. 여러 상품에 같은 사진이 붙으면 목록이 이상해진다. */
   const used = new Set<string>();
+  /**
+   * 검색어마다 앞 상품이 이미 가져간 수.
+   *
+   * **다시 돌릴 때를 위해서다.** 데모 키는 시간당 50회라 상품 마흔일곱을 한 번에 못 채우고
+   * 중간에 멈춘다(운영에서 열여섯이 비었다). 다시 돌리면 채운 상품은 건너뛰는데, 그 상품이
+   * 받은 사진의 id 는 남아 있지 않다 — 검색어가 같은 다음 상품이 **같은 사진**을 받는다.
+   * 검색 결과 순서는 같으므로, 건너뛴 상품이 쓴 만큼 앞에서 잘라 낸다.
+   */
+  const consumed = new Map<string, number>();
   let created = 0;
 
   for (const product of products) {
+    const query = QUERY[product.slug];
+
     if (product.images.length > 0) {
+      if (query) consumed.set(query, (consumed.get(query) ?? 0) + product.images.length);
       console.log(`건너뜀 ${product.name} — 이미 ${product.images.length}장`);
       continue;
     }
 
-    const query = QUERY[product.slug];
     if (!query) {
       console.warn(`검색어 없음 ${product.slug} — QUERY 표에 한 줄을 더해 주세요`);
       continue;
     }
 
-    const candidates = (await search(query)).filter((p) => !used.has(p.id));
+    const candidates = (await search(query))
+      .slice(consumed.get(query) ?? 0)
+      .filter((p) => !used.has(p.id));
     if (candidates.length < PER_PRODUCT) {
       console.warn(`후보 부족 ${product.name} (${candidates.length}장)`);
     }
@@ -303,6 +316,7 @@ async function main(): Promise<void> {
 
       await reportDownload(photo);
       used.add(photo.id);
+      consumed.set(query, (consumed.get(query) ?? 0) + 1);
       created += 1;
       console.log(`  ${product.name} ${i + 1}/${PER_PRODUCT} — ${photo.user.name}`);
     }
