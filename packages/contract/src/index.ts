@@ -30,3 +30,4 @@ export * from './inquiry';
 export * from './rich-text';
 export * from './support';
 export * from './shipping';
+export * from './notification-template';

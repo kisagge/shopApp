@@ -87,6 +87,11 @@ export const PERMISSION = [
    * 공지와 FAQ 를 플랫폼이 쓰는 것과 같은 이유다.
    */
   'shipping:write',
+  /*
+   * 알림 문구. **가맹점에게 주지 않는다** — 손님에게 가는 알림은 가게 전체의 말투이고, 재고 부족 알림은 가맹점이
+   * 받는 쪽이다. 받는 사람이 자기에게 오는 문구를 고칠 까닭이 없다.
+   */
+  'notification:write',
   // 전체 트래픽 지표. 가맹점은 자기 매출만 보고 플랫폼 전체 방문·전환은 못 본다 —
   // 다른 가맹점의 성과를 역산할 수 있는 값이다.
   'analytics:all',
@@ -138,7 +143,7 @@ const ADMIN: readonly Permission[] = [
   'collection:read', 'collection:write',
   'settlement:read', 'settlement:confirm',
   'review:write', 'review:read', 'review:moderate',
-  'inquiry:answer', 'support:write', 'shipping:write',
+  'inquiry:answer', 'support:write', 'shipping:write', 'notification:write',
   'analytics:all',
 ];
 

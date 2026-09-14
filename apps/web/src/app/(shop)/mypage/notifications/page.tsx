@@ -6,6 +6,7 @@ import { formatDateTime } from '@shop/i18n';
 import { getMyNotifications } from '~/lib/queries/notifications';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
+import { getNotificationTemplates } from '~/lib/notifications/templates';
 import { MarkNotificationsRead } from '~/components/mark-notifications-read';
 import { NO_INDEX } from '~/lib/no-index';
 
@@ -24,6 +25,8 @@ export default async function NotificationsPage() {
     getLocale(),
     getT(),
   ]);
+  // 운영이 고친 문구. 이미 온 알림도 이것으로 읽힌다 — 알림에는 문장이 아니라 값만 저장한다
+  const templates = await getNotificationTemplates(locale);
 
   const hadUnread = items.some((n) => n.unread);
 
@@ -60,7 +63,7 @@ export default async function NotificationsPage() {
       ) : (
         <ul aria-labelledby="notif-heading" className="flex flex-col">
           {items.map((n) => {
-            const text = notificationText(t, n.kind, n.params);
+            const text = notificationText(t, n.kind, n.params, templates.get(n.kind));
             const when = (
               <time
                 dateTime={n.createdAt.toISOString()}

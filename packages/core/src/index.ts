@@ -56,4 +56,5 @@ export * from './csv';
 export * from './shipment-upload';
 export * from './partial-cancel';
 export * from './receipt';
+export * from './notification-template';
 export * from './stock-upload';

@@ -1,4 +1,4 @@
-import type { NotificationKind } from '@shop/core';
+import { renderTemplate, type NotificationKind } from '@shop/core';
 import type { MessageKey, Translator } from '@shop/i18n';
 
 /**
@@ -15,7 +15,13 @@ export function notificationText(
   t: Translator,
   kind: NotificationKind,
   params: Record<string, string>,
+  /** 운영이 고친 문구(`getNotificationTemplates`). 없거나 끼울 값이 빠졌으면 사전의 기본 문구로 간다 */
+  template?: string,
 ): string {
+  if (template !== undefined) {
+    const rendered = renderTemplate(template, params);
+    if (rendered !== null) return rendered;
+  }
   if (kind === 'INQUIRY_ANSWERED' && !params['productName']) {
     return t('notif.INQUIRY_ANSWERED_GENERIC');
   }

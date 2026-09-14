@@ -18,7 +18,7 @@ interface NavItem {
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
-    | '/admin/traffic' | '/admin/coupons' | '/admin/shipping';
+    | '/admin/traffic' | '/admin/coupons' | '/admin/shipping' | '/admin/notification-templates';
   readonly label: string;
   readonly permission: Permission;
 }
@@ -42,6 +42,8 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/support', label: '공지·FAQ', permission: 'support:write' },
   { href: '/admin/shipping', label: '배송비', permission: 'shipping:write' },
+  // 손님에게 가는 말투라 가맹점에게는 보이지 않는다(authz 의 notification:write)
+  { href: '/admin/notification-templates', label: '알림 문구', permission: 'notification:write' },
   { href: '/admin/settlements', label: '정산', permission: 'settlement:read' },
   { href: '/admin/merchants', label: '가맹점', permission: 'merchant:read' },
   { href: '/admin/users', label: '회원', permission: 'user:read' },

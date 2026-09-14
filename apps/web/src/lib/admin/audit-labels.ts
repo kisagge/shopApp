@@ -67,6 +67,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'shipping.update': '배송비 정책 변경',
   'event.prune': '이벤트 기록 정리',
   'audit.export': '감사 로그 내려받기',
+  'notification.template.update': '알림 문구 수정',
+  'notification.template.reset': '알림 문구 기본으로',
 };
 
 /**
@@ -88,6 +90,7 @@ export const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
   shipping: '배송비',
   event_log: '이벤트 기록',
   audit: '감사 로그',
+  notification_template: '알림 문구',
 };
 
 export const actionLabel = (action: string): string => ACTION_LABEL[action] ?? action;

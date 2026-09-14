@@ -6,6 +6,7 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getMyNotifications } from '~/lib/queries/notifications';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
+import { getNotificationTemplates } from '~/lib/notifications/templates';
 import { MarkNotificationsRead } from '~/components/mark-notifications-read';
 
 export const metadata: Metadata = { title: '알림' };
@@ -29,6 +30,8 @@ export default async function AdminNotificationsPage() {
     getLocale(),
     getT(),
   ]);
+  // 운영이 고친 문구. 이미 온 알림도 이것으로 읽힌다 — 알림에는 문장이 아니라 값만 저장한다
+  const templates = await getNotificationTemplates(locale);
   const hadUnread = items.some((n) => n.unread);
 
   return (
@@ -60,7 +63,7 @@ export default async function AdminNotificationsPage() {
             className="flex flex-col rounded-md border border-[var(--border)] bg-[var(--bg)]"
           >
             {items.map((n) => {
-              const text = notificationText(t, n.kind, n.params);
+              const text = notificationText(t, n.kind, n.params, templates.get(n.kind));
               const body = (
                 <>
                   {/*
