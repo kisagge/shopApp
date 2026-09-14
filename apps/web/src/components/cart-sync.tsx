@@ -24,6 +24,47 @@ function toLines(items: readonly CartItem[]): CartLineState[] {
   }));
 }
 
+/**
+ * 병합을 기다리는 사이에 손님이 바꾼 것을 병합 결과 위에 다시 얹는다.
+ *
+ * **통째로 갈아 끼우면 방금 담은 것이 사라진다.** 병합 요청에는 보낸 순간의
+ * 장바구니만 실려 있고, 그 뒤에 누른 담기·빼기는 서버가 모른다. 실제로 로그인한
+ * 손님이 화면이 뜨자마자 담은 상품이 조용히 없어지고 있었다.
+ *
+ * 보낸 것(`sent`)과 지금(`now`)의 차이만 손님의 새 뜻으로 본다. 차이가 없는 줄은
+ * 서버 것을 따른다 — 다른 기기에서 바꾼 수량이 거기 들어 있다.
+ */
+function replayPending(
+  server: readonly CartItem[],
+  sent: readonly CartItem[],
+  now: readonly CartItem[],
+): CartItem[] {
+  const before = new Map(sent.map((i) => [i.variantId, i]));
+  const after = new Map(now.map((i) => [i.variantId, i]));
+  const touched = (variantId: string): boolean => {
+    const a = before.get(variantId);
+    const b = after.get(variantId);
+    return a?.quantity !== b?.quantity || a?.selected !== b?.selected;
+  };
+
+  const result = server
+    // 기다리는 사이 뺀 줄
+    .filter((i) => !(before.has(i.variantId) && !after.has(i.variantId)))
+    .map((i) => {
+      const mine = after.get(i.variantId);
+      return mine && touched(i.variantId)
+        ? { ...i, quantity: mine.quantity, selected: mine.selected }
+        : { ...i };
+    });
+
+  // 기다리는 사이 새로 담은 줄
+  const known = new Set(result.map((i) => i.variantId));
+  for (const item of now) {
+    if (!before.has(item.variantId) && !known.has(item.variantId)) result.push({ ...item });
+  }
+  return result;
+}
+
 /** 저장 요청을 몰아서 보낸다. 수량 버튼을 연타할 때 요청이 줄줄이 나가면 안 된다. */
 const SAVE_DELAY_MS = 600;
 
@@ -47,7 +88,8 @@ export function CartSync({ userId }: { userId: string | null }) {
     if (!userId || mergedForRef.current === userId) return;
     mergedForRef.current = userId;
 
-    const local = toLines(useCartStore.getState().items);
+    const sent = useCartStore.getState().items;
+    const local = toLines(sent);
 
     void (async () => {
       try {
@@ -59,10 +101,15 @@ export function CartSync({ userId }: { userId: string | null }) {
         if (!response.ok) return;
 
         const data = (await response.json()) as { items: CartItem[] };
-        // 서버가 돌려준 것으로 갈아 끼운다. 다른 기기에서 담아 둔 것이
-        // 여기 화면에도 나타나야 한다.
-        useCartStore.setState({ items: data.items.map((i) => ({ ...i })) });
+        /*
+         * 서버가 돌려준 것을 바탕으로 한다 — 다른 기기에서 담아 둔 것이 여기 화면에도
+         * 나타나야 한다. 그 위에 기다리는 사이의 변경을 얹는다.
+         *
+         * **서버에 반영된 값을 먼저 적는다.** 스토어를 먼저 바꾸면 저장 구독이 아직
+         * 병합 전(null)인 줄 알고 건너뛰어, 얹은 변경이 서버에 안 남는다.
+         */
         savedRef.current = toLines(data.items);
+        useCartStore.setState({ items: replayPending(data.items, sent, useCartStore.getState().items) });
       } catch {
         // 병합에 실패해도 로컬 장바구니는 그대로다. 다음 방문에 다시 시도한다.
         mergedForRef.current = null;

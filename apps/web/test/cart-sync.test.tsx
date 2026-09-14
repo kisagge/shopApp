@@ -79,6 +79,52 @@ describe('장바구니 서버 맞추기', () => {
     expect(calls('PUT')).toHaveLength(0);
   });
 
+  it('병합을 기다리는 사이 담은 것은 병합 결과에 묻히지 않는다', async () => {
+    /*
+     * **실제로 사라지고 있었다.** 로그인한 손님이 화면이 뜨자마자 담기를 누르면
+     * 병합 전이라 저장은 건너뛰고(위 검사), 곧 도착한 병합 응답이 스토어를 서버
+     * 것으로 통째로 갈아 끼웠다 — 방금 담은 상품이 아무 말 없이 없어진다. 느린
+     * 기계일수록 병합이 늦어 틈이 벌어지고, 새 DB 에서 도는 문지기가 그렇게 잡았다.
+     */
+    let finish!: (r: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(asUser('u1'));
+
+    act(() => {
+      useCartStore.setState({ items: [line('v-new')] });
+    });
+    await act(async () => {
+      // 다른 기기에서 담아 둔 것이 서버에 있었다
+      finish(new Response(JSON.stringify({ items: [line('v-other', 2)] }), { status: 200 }));
+    });
+
+    const kept = useCartStore.getState().items.map((i) => [i.variantId, i.quantity]);
+    expect(kept).toEqual([['v-other', 2], ['v-new', 1]]);
+
+    // 합친 것은 서버에도 남아야 한다 — 새로고침하면 다시 사라지면 안 된다
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+    });
+    const saved = JSON.parse(calls('PUT').at(-1)![1]!.body as string) as { lines: { variantId: string }[] };
+    expect(saved.lines.map((l) => l.variantId)).toEqual(['v-other', 'v-new']);
+  });
+
+  it('병합을 기다리는 사이 뺀 것은 병합 결과에서도 빠진다', async () => {
+    useCartStore.setState({ items: [line('v1')] });
+    let finish!: (r: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(asUser('u1'));
+
+    act(() => {
+      useCartStore.setState({ items: [] });
+    });
+    await act(async () => {
+      finish(new Response(JSON.stringify({ items: [line('v1')] }), { status: 200 }));
+    });
+
+    expect(useCartStore.getState().items).toEqual([]);
+  });
+
   it('연타는 한 번으로 몰아서 보낸다', async () => {
     render(asUser('u1'));
     await act(async () => {});

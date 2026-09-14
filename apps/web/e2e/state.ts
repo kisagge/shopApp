@@ -210,6 +210,11 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
       .poll(() => addToCart.getAttribute('aria-disabled'), { timeout: 5_000 })
       .not.toBe('true');
   } catch {
+    // **왜 null 인지 남긴다.** 두 갈래가 같은 null 이라, 문지기 로그만으로는 어느 쪽인지 알 수 없었다
+    const radios = await page.locator('[role="radio"]').evaluateAll((els) =>
+      els.map((e) => `${e.getAttribute('aria-label') ?? e.textContent?.trim()}:${e.getAttribute('aria-checked')}/${e.getAttribute('aria-disabled')}`),
+    );
+    console.warn(`[pickAndAdd] 담기 단추가 안 열렸다 ${page.url()} radios=${radios.join(' ')}`);
     return null;
   }
   await addToCart.click();
@@ -240,5 +245,6 @@ async function pickAndAdd(page: import('@playwright/test').Page): Promise<string
     }
     if (!variantId) await page.waitForTimeout(200);
   }
+  if (!variantId) console.warn(`[pickAndAdd] 담았는데 장바구니에 줄이 안 생겼다 ${page.url()}`);
   return variantId ?? null;
 }
