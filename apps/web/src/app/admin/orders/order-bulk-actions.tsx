@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import type { BulkShipmentResult } from '@shop/contract';
 import { decodeUpload } from '~/lib/csv/decode-upload';
+import { saveResponseAsFile } from '~/lib/csv/save-download';
 
 export interface OrderExportFilter {
   readonly status?: string | undefined;
@@ -59,18 +60,7 @@ function ExportOrders({ filter }: { filter: OrderExportFilter }) {
         setError(body.message ?? '내려받지 못했습니다.');
         return;
       }
-      const blob = await response.blob();
-      const name = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? 'orders.csv';
-
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = href;
-      anchor.download = name;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      // 클릭 직후 끊으면 일부 브라우저가 받기를 시작하기 전에 주소가 사라진다
-      setTimeout(() => URL.revokeObjectURL(href), 1_000);
+      await saveResponseAsFile(response, 'orders.csv');
 
       setStatus('주문 파일을 내려받았습니다.');
     } catch {

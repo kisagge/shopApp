@@ -1,66 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { USER_ROLE_LABEL } from '@shop/core';
+import { OrderSearchError, USER_ROLE_LABEL } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAuditLogs } from '~/lib/queries/audit-log';
+import { getAuditLogs, type AuditLogPage } from '~/lib/queries/audit-log';
+import { actionLabel as labelOf, targetLabel } from '~/lib/admin/audit-labels';
+import { AuditExport } from './audit-export';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '감사 로그' };
 export const dynamic = 'force-dynamic';
-
-/** 사람이 읽는 이름. 없는 동작은 원래 키를 그대로 보여 준다 — 숨기는 것보다 낫다. */
-const ACTION_LABEL: Readonly<Record<string, string>> = {
-  'product.create': '상품 등록',
-  'product.update': '상품 수정',
-  'product.stock': '재고 조정',
-  'product.publish.approve': '게시 승인',
-  'product.publish.reject': '게시 반려',
-  'review.delete': '리뷰 삭제',
-  'review.restore': '리뷰 복구',
-  'review.reports.dismiss': '리뷰 신고 처리',
-  'product.variant.create': '옵션 추가',
-  'order.status.preparing': '배송 준비',
-  'order.status.shipped': '출고',
-  'order.status.delivered': '배송 완료',
-  'order.status.cancelled': '주문 취소',
-  'order.status.refunded': '환불',
-  'order.cancel': '주문 취소',
-  'order.cancelItems': '일부 취소',
-  'order.completeReturn': '반품 회수·환불',
-  'order.resolveReturn': '반품 승인·반려',
-  'order.receiveReturn': '반품 회수 확인',
-  'order.ship': '송장 등록',
-  'order.export': '주문 내려받기',
-  'product.image.add': '이미지 추가',
-  'product.image.delete': '이미지 삭제',
-  'product.image.reorder': '이미지 순서 변경',
-  'product.image.alt': '대체 텍스트 수정',
-  'merchant.approved': '입점 승인',
-  'merchant.suspended': '가맹점 정지',
-  'merchant.terminated': '가맹점 해지',
-  'user.assignRole': '권한 부여',
-  'user.suspend': '이용 정지',
-  'user.restore': '정지 해제',
-  'settlement.close': '정산 확정',
-  'settlement.pay': '정산 지급',
-  'points.reconcile': '포인트 대사',
-  'points.expire': '포인트 소멸',
-  'banner.create': '배너 등록',
-  'banner.update': '배너 수정',
-  'banner.delete': '배너 삭제',
-  'banner.reorder': '배너 순서 변경',
-  'banner.image': '배너 이미지 교체',
-};
-
-const TARGET_LABEL: Readonly<Record<string, string>> = {
-  product: '상품',
-  order: '주문',
-  user: '회원',
-  merchant: '가맹점',
-  settlement: '정산',
-  banner: '배너',
-  review: '리뷰',
-};
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', {
   dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul',
@@ -75,8 +23,14 @@ function preview(value: unknown): string | null {
 interface SearchParams {
   readonly action?: string;
   readonly targetType?: string;
+  readonly actor?: string;
+  readonly from?: string;
+  readonly to?: string;
   readonly cursor?: string;
 }
+
+const FIELD = 'h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]';
+const LABEL = 'text-[11px] font-medium text-[var(--fg-secondary)]';
 
 export default async function AdminAuditPage({
   searchParams,
@@ -86,26 +40,33 @@ export default async function AdminAuditPage({
   const actor = await requireAdmin('user:read');
   const params = await searchParams;
 
-  const page = await getAuditLogs(actor, {
-    action: params.action || undefined,
-    targetType: params.targetType || undefined,
-    cursor: params.cursor || undefined,
-  });
+  /** 목록·다음 쪽·내려받기가 함께 쓰는 조건. 빈 값은 싣지 않는다 */
+  const filter = {
+    ...(params.action ? { action: params.action } : {}),
+    ...(params.targetType ? { targetType: params.targetType } : {}),
+    ...(params.actor ? { actor: params.actor } : {}),
+    ...(params.from ? { from: params.from } : {}),
+    ...(params.to ? { to: params.to } : {}),
+  };
+
+  let page: AuditLogPage;
+  let rangeError: string | null = null;
+  try {
+    page = await getAuditLogs(actor, { ...filter, cursor: params.cursor || undefined });
+  } catch (error) {
+    if (!(error instanceof OrderSearchError)) throw error;
+    // 날짜가 틀리면 기간 없이 보여 주지 않는다 — 조건이 빠진 목록을 조건대로 본 것으로 읽는다
+    rangeError = error.message;
+    page = await getAuditLogs(actor, { action: filter.action, targetType: filter.targetType, actor: filter.actor, take: 0 });
+  }
 
   // 쿼리는 객체로 넘긴다. 문자열로 붙이면 typedRoutes 가 검사할 수 없고
   // 값에 들어간 특수문자를 인코딩하는 것도 직접 챙겨야 한다.
   const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/audit' as const,
-        query: {
-          ...(params.action ? { action: params.action } : {}),
-          ...(params.targetType ? { targetType: params.targetType } : {}),
-          cursor: page.nextCursor,
-        },
-      }
+    ? { pathname: '/admin/audit' as const, query: { ...filter, cursor: page.nextCursor } }
     : null;
 
-  const filtered = Boolean(params.action || params.targetType);
+  const filtered = Object.keys(filter).length > 0;
 
   return (
     <>
@@ -114,6 +75,7 @@ export default async function AdminAuditPage({
           <h1 className="text-[19px] font-semibold tracking-tight">감사 로그</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">운영진의 쓰기 동작 기록</p>
         </div>
+        {!rangeError && <AuditExport filter={filter} />}
       </header>
 
       <div className="flex flex-col gap-5 p-8">
@@ -124,38 +86,62 @@ export default async function AdminAuditPage({
           className="flex flex-wrap items-end gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)] px-5 py-4"
         >
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="filter-action" className="text-[11px] font-medium text-[var(--fg-secondary)]">
+            <label htmlFor="filter-action" className={LABEL}>
               동작
             </label>
-            <select
-              id="filter-action"
-              name="action"
-              defaultValue={params.action ?? ''}
-              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
-            >
+            <select id="filter-action" name="action" defaultValue={params.action ?? ''} className={FIELD}>
               <option value="">전체</option>
               {page.filters.actions.map((a) => (
-                <option key={a} value={a}>{ACTION_LABEL[a] ?? a}</option>
+                <option key={a} value={a}>{labelOf(a)}</option>
               ))}
             </select>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="filter-target" className="text-[11px] font-medium text-[var(--fg-secondary)]">
+            <label htmlFor="filter-target" className={LABEL}>
               대상
             </label>
-            <select
-              id="filter-target"
-              name="targetType"
-              defaultValue={params.targetType ?? ''}
-              className="h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
-            >
+            <select id="filter-target" name="targetType" defaultValue={params.targetType ?? ''} className={FIELD}>
               <option value="">전체</option>
               {page.filters.targetTypes.map((t) => (
-                <option key={t} value={t}>{TARGET_LABEL[t] ?? t}</option>
+                <option key={t} value={t}>{targetLabel(t)}</option>
               ))}
             </select>
           </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="filter-actor" className={LABEL}>
+              행위자
+            </label>
+            <select id="filter-actor" name="actor" defaultValue={params.actor ?? ''} className={FIELD}>
+              <option value="">전체</option>
+              {page.filters.actors.map((a) => (
+                <option key={a.value} value={a.value}>{a.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* 기간은 한 묶음이다 — 두 칸이 무엇의 시작·끝인지 묶어 읽혀야 한다 */}
+          <fieldset className="flex items-end gap-2">
+            <legend className={`${LABEL} mb-1.5`}>기간 (한국 시각, 끝날 포함)</legend>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-from" className="sr-only">시작일</label>
+              <input
+                id="filter-from" name="from" type="date" defaultValue={params.from ?? ''} className={FIELD}
+                aria-invalid={rangeError ? true : undefined}
+                aria-describedby={rangeError ? 'filter-range-error' : undefined}
+              />
+            </div>
+            <span aria-hidden="true" className="pb-2.5 text-[13px] text-[var(--fg-muted)]">~</span>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="filter-to" className="sr-only">종료일</label>
+              <input
+                id="filter-to" name="to" type="date" defaultValue={params.to ?? ''} className={FIELD}
+                aria-invalid={rangeError ? true : undefined}
+                aria-describedby={rangeError ? 'filter-range-error' : undefined}
+              />
+            </div>
+          </fieldset>
 
           <button
             type="submit"
@@ -170,6 +156,11 @@ export default async function AdminAuditPage({
             >
               필터 해제
             </Link>
+          )}
+          {rangeError && (
+            <p id="filter-range-error" role="alert" className="w-full text-[13px] text-accent">
+              {rangeError}
+            </p>
           )}
         </form>
 
@@ -208,10 +199,10 @@ export default async function AdminAuditPage({
                           {row.actorEmail ? ` · ${row.actorEmail}` : ' · 자동 실행'}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-[13px]">{ACTION_LABEL[row.action] ?? row.action}</td>
+                      <td className="px-4 py-3 text-[13px]">{labelOf(row.action)}</td>
                       <td className="px-4 py-3">
                         <span className="block text-[12px]">
-                          {TARGET_LABEL[row.targetType] ?? row.targetType}{' '}
+                          {targetLabel(row.targetType)}{' '}
                           <span className="text-[var(--fg-muted)]">{row.targetId}</span>
                         </span>
                         {(row.before !== null || row.after !== null) && (

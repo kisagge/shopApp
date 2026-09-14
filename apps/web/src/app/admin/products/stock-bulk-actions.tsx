@@ -3,6 +3,7 @@
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { decodeUpload } from '~/lib/csv/decode-upload';
+import { saveResponseAsFile } from '~/lib/csv/save-download';
 
 interface Failure {
   readonly sku: string;
@@ -48,16 +49,7 @@ export function StockBulkActions({ canWrite }: { canWrite: boolean }) {
         setError(body.message ?? '내려받지 못했습니다.');
         return;
       }
-      const blob = await response.blob();
-      const name = /filename="([^"]+)"/.exec(response.headers.get('content-disposition') ?? '')?.[1] ?? 'stock.csv';
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = href;
-      anchor.download = name;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(href), 1_000);
+      await saveResponseAsFile(response, 'stock.csv');
       setStatus('재고 파일을 내려받았습니다.');
     } catch {
       setError('네트워크 오류로 내려받지 못했습니다.');

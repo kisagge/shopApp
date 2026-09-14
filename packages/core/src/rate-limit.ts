@@ -154,6 +154,12 @@ export const RATE_LIMIT = {
 
   /** 정산 내역 내려받기. 기간·가맹점마다 한 번씩 받는 창구라 이보다 잦을 일이 없다 */
   settlementExport: { limit: 20, windowMs: MINUTE },
+
+  /**
+   * 감사 로그 내려받기. 운영진의 행적과 변경 전후 값(회원 권한·정지 사유 등)이 한 파일에 담긴다 — 주문 내려받기와
+   * 같은 선으로 막는다.
+   */
+  auditExport: { limit: 5, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;

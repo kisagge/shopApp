@@ -1,0 +1,95 @@
+import type { AuditTargetType } from '~/lib/audit';
+
+/**
+ * 감사 로그의 이름표 — 화면과 내려받은 파일이 같이 쓴다.
+ *
+ * 파일에는 이름표와 **원래 코드를 둘 다** 싣는다. 이름표는 바뀔 수 있고, 나중에 파일끼리 맞춰 볼 때 기준이 되는 것은
+ * 코드다. 기록하는 동작이 늘면 audit-labels 검사가 여기 빠진 이름을 잡는다.
+ */
+/** 사람이 읽는 이름. 없는 동작은 원래 키를 그대로 보여 준다 — 숨기는 것보다 낫다. */
+export const ACTION_LABEL: Readonly<Record<string, string>> = {
+  'product.create': '상품 등록',
+  'product.update': '상품 수정',
+  'product.stock': '재고 조정',
+  'product.publish.approve': '게시 승인',
+  'product.publish.reject': '게시 반려',
+  'review.delete': '리뷰 삭제',
+  'review.restore': '리뷰 복구',
+  'review.reports.dismiss': '리뷰 신고 처리',
+  'product.variant.create': '옵션 추가',
+  'order.status.preparing': '배송 준비',
+  'order.status.shipped': '출고',
+  'order.status.delivered': '배송 완료',
+  'order.status.cancelled': '주문 취소',
+  'order.status.refunded': '환불',
+  'order.cancel': '주문 취소',
+  'order.cancelItems': '일부 취소',
+  'order.completeReturn': '반품 회수·환불',
+  'order.resolveReturn': '반품 승인·반려',
+  'order.receiveReturn': '반품 회수 확인',
+  'order.ship': '송장 등록',
+  'order.export': '주문 내려받기',
+  'product.image.add': '이미지 추가',
+  'product.image.delete': '이미지 삭제',
+  'product.image.reorder': '이미지 순서 변경',
+  'product.image.alt': '대체 텍스트 수정',
+  'merchant.approved': '입점 승인',
+  'merchant.suspended': '가맹점 정지',
+  'merchant.terminated': '가맹점 해지',
+  'user.assignRole': '권한 부여',
+  'user.suspend': '이용 정지',
+  'user.restore': '정지 해제',
+  'settlement.close': '정산 확정',
+  'settlement.pay': '정산 지급',
+  'points.reconcile': '포인트 대사',
+  'points.expire': '포인트 소멸',
+  'banner.create': '배너 등록',
+  'banner.update': '배너 수정',
+  'banner.delete': '배너 삭제',
+  'banner.reorder': '배너 순서 변경',
+  'banner.image': '배너 이미지 교체',
+  'order.refund': '환불',
+  'order.autoConfirm': '구매 자동 확정',
+  'order.releaseHold': '재고 잠금 해제',
+  'collection.create': '기획전 등록',
+  'collection.update': '기획전 수정',
+  'collection.delete': '기획전 삭제',
+  'collection.image': '기획전 이미지 교체',
+  'collection.items': '기획전 상품 구성',
+  'collection.reorder': '기획전 순서 변경',
+  'coupon.create': '쿠폰 등록',
+  'coupon.update': '쿠폰 수정',
+  'coupon.issue': '쿠폰 발급',
+  'support.create': '공지·FAQ 등록',
+  'support.update': '공지·FAQ 수정',
+  'support.delete': '공지·FAQ 삭제',
+  'inquiry.delete': '문의 삭제',
+  'shipping.update': '배송비 정책 변경',
+  'event.prune': '이벤트 기록 정리',
+  'audit.export': '감사 로그 내려받기',
+};
+
+/**
+ * 대상 이름표. **기록할 수 있는 대상 전부**를 타입으로 강제한다 — 대상 종류를 늘리면 여기가 컴파일에서 걸린다.
+ * 이미 쌓인 옛 값(목록에 없는 문자열)은 targetLabel 이 코드 그대로 보여 준다.
+ */
+export const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
+  product: '상품',
+  order: '주문',
+  user: '회원',
+  merchant: '가맹점',
+  settlement: '정산',
+  banner: '배너',
+  review: '리뷰',
+  collection: '기획전',
+  coupon: '쿠폰',
+  support_post: '공지·FAQ',
+  inquiry: '문의',
+  shipping: '배송비',
+  event_log: '이벤트 기록',
+  audit: '감사 로그',
+};
+
+export const actionLabel = (action: string): string => ACTION_LABEL[action] ?? action;
+export const targetLabel = (targetType: string): string =>
+  (TARGET_LABEL as Readonly<Record<string, string>>)[targetType] ?? targetType;

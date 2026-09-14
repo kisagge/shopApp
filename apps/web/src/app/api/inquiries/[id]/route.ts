@@ -23,7 +23,7 @@ export async function DELETE(
     // 남의 글을 내린 경우만 남긴다. 본인 삭제는 감사 대상이 아니다.
     if (hasPermission(actor, 'review:moderate')) {
       await recordAudit({
-        actor, action: 'inquiry.delete', targetType: 'review', targetId: id, request,
+        actor, action: 'inquiry.delete', targetType: 'inquiry', targetId: id, request,
       });
     }
     return NextResponse.json({ deleted: true });

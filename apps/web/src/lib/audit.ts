@@ -17,6 +17,10 @@ export type AuditTargetType =
   | 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon' | 'banner'
   | 'collection'
   | 'event_log' | 'review' | 'support_post'
+  /** 운영진이 내린 문의. 예전에는 'review' 로 적혀 대상 필터에서 리뷰로 묶였다 */
+  | 'inquiry'
+  /** 감사 로그 자체 — 내려받기. 가져간 사람도 기록에 남는다 */
+  | 'audit'
   /*
    * 배송비 정책. 대상이 하나뿐이라 id 는 늘 'default' 다 — 그래도 target 을
    * 두는 이유는 **전후 값**을 남기기 위해서다. 무료 기준 하나가 모든 주문의

@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, type Actor, type UserRole } from '@shop/core';
+import { assertPermission, readDateRange, type Actor, type UserRole } from '@shop/core';
 
 /**
  * 감사 로그 조회.
@@ -35,14 +35,51 @@ export interface AuditLogPage {
   readonly filters: {
     readonly actions: readonly string[];
     readonly targetTypes: readonly string[];
+    /** 기록을 남긴 적이 있는 사람. 배치(사용자 없음)는 `SYSTEM_ACTOR` 한 칸으로 묶는다 */
+    readonly actors: readonly { readonly value: string; readonly label: string }[];
   };
 }
 
-export interface AuditLogQuery {
+/** 행위자 필터에서 "자동 실행(배치)" 을 가리키는 값. 사용자 id(cuid)와 겹칠 수 없다 */
+export const SYSTEM_ACTOR = 'system';
+
+export interface AuditLogFilter {
   readonly action?: string | undefined;
   readonly targetType?: string | undefined;
+  /** 사용자 id, 또는 SYSTEM_ACTOR */
+  readonly actor?: string | undefined;
+  /** 'YYYY-MM-DD' (KST, 그날 포함) */
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+}
+
+export interface AuditLogQuery extends AuditLogFilter {
   readonly cursor?: string | undefined;
   readonly take?: number;
+}
+
+/**
+ * 감사 로그의 조회 조건.
+ *
+ * **목록과 내려받기가 이것 하나를 쓴다.** 둘로 적으면 화면에 보이는 기록과 파일에 담긴 기록이 갈리고, 감사 로그는
+ * 그 차이를 설명할 사람이 없는 문서다. 기간은 주문 검색과 같은 함수로 읽는다 — KST 로 자르고 끝날을 포함한다.
+ * 날짜가 틀리면 OrderSearchError 를 던진다(화면이 그 말을 보여 준다).
+ */
+export function auditLogWhere(filter: AuditLogFilter) {
+  const range = readDateRange(filter.from || undefined, filter.to || undefined);
+  return {
+    ...(filter.action ? { action: filter.action } : {}),
+    ...(filter.targetType ? { targetType: filter.targetType } : {}),
+    ...(filter.actor ? { actorId: filter.actor === SYSTEM_ACTOR ? null : filter.actor } : {}),
+    ...(range.from || range.until
+      ? {
+          createdAt: {
+            ...(range.from ? { gte: range.from } : {}),
+            ...(range.until ? { lt: range.until } : {}),
+          },
+        }
+      : {}),
+  };
 }
 
 const MAX_TAKE = 50;
@@ -52,10 +89,7 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
 
   const take = Math.min(query.take ?? 25, MAX_TAKE);
 
-  const where = {
-    ...(query.action ? { action: query.action } : {}),
-    ...(query.targetType ? { targetType: query.targetType } : {}),
-  };
+  const where = auditLogWhere(query);
 
   const rows = await prisma.adminAuditLog.findMany({
     where,
@@ -76,34 +110,98 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
 
   // 필터 선택지는 실제로 쌓인 값에서 뽑는다. 상수로 두면 새 동작을 추가할 때
   // 목록에 넣는 것을 잊는다.
-  const [actions, targetTypes] = await Promise.all([
+  const [actions, targetTypes, actors] = await Promise.all([
     prisma.adminAuditLog.findMany({
       distinct: ['action'], select: { action: true }, orderBy: { action: 'asc' }, take: 100,
     }),
     prisma.adminAuditLog.findMany({
       distinct: ['targetType'], select: { targetType: true }, orderBy: { targetType: 'asc' }, take: 50,
     }),
+    prisma.adminAuditLog.findMany({
+      distinct: ['actorId'], select: { actorId: true, actor: { select: { name: true, email: true } } }, take: 200,
+    }),
   ]);
 
   return {
-    rows: page.map((r) => ({
-      id: r.id,
-      // 배치는 사용자가 없으므로 남겨 둔 이름을 쓴다
-      actorName: r.actor?.name ?? r.actorLabel ?? '(알 수 없음)',
-      actorEmail: r.actor?.email ?? null,
-      isSystem: r.actor === null,
-      actorRole: r.actorRole,
-      action: r.action,
-      targetType: r.targetType,
-      targetId: r.targetId,
-      before: r.before,
-      after: r.after,
-      createdAt: r.createdAt,
-    })),
+    rows: page.map(toRow),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     filters: {
       actions: actions.map((a) => a.action),
       targetTypes: targetTypes.map((t) => t.targetType),
+      actors: actorOptions(actors),
     },
+  };
+}
+
+/**
+ * 행위자 선택지. 이메일을 함께 적는다 — 운영진끼리 이름이 겹치면 누구를 고른 것인지 모른다.
+ * 배치는 사용자가 없어 한 칸("자동 실행")으로 묶어 맨 뒤에 둔다.
+ */
+function actorOptions(
+  rows: readonly { actorId: string | null; actor: { name: string; email: string } | null }[],
+): { value: string; label: string }[] {
+  const people = rows
+    .filter((r): r is { actorId: string; actor: { name: string; email: string } } => r.actorId !== null && r.actor !== null)
+    .map((r) => ({ value: r.actorId, label: `${r.actor.name} · ${r.actor.email}` }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'ko'));
+  return rows.some((r) => r.actorId === null) ? [...people, { value: SYSTEM_ACTOR, label: '자동 실행' }] : people;
+}
+
+/** 한 번에 내려받을 수 있는 기록 수. 넘으면 기간이나 행위자로 좁히라고 답한다 */
+export const AUDIT_EXPORT_MAX_ROWS = 5_000;
+
+export class AuditExportTooLargeError extends Error {
+  constructor(readonly rows: number) {
+    super(
+      `내려받을 기록이 ${rows.toLocaleString('ko-KR')}건으로 한도(${AUDIT_EXPORT_MAX_ROWS.toLocaleString('ko-KR')})를 넘습니다. 기간이나 행위자로 좁혀 주세요.`,
+    );
+    this.name = 'AuditExportTooLargeError';
+  }
+}
+
+export type AuditLogExportRow = AuditLogRow;
+
+/**
+ * 감사 로그 내려받기. 목록과 같은 조건(auditLogWhere), 같은 순서(최근 것부터)다.
+ *
+ * 한도를 넘으면 **잘라서 주지 않는다.** 앞 5,000건만 담긴 파일은 "이 기간의 기록 전부" 로 읽힌다.
+ */
+export async function exportAuditLogs(actor: Actor, filter: AuditLogFilter): Promise<AuditLogExportRow[]> {
+  assertPermission(actor, 'user:read');
+  const where = auditLogWhere(filter);
+
+  const count = await prisma.adminAuditLog.count({ where });
+  if (count > AUDIT_EXPORT_MAX_ROWS) throw new AuditExportTooLargeError(count);
+
+  const rows = await prisma.adminAuditLog.findMany({
+    where,
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    select: {
+      id: true, actorRole: true, action: true, targetType: true, targetId: true,
+      before: true, after: true, createdAt: true, actorLabel: true,
+      actor: { select: { name: true, email: true } },
+    },
+  });
+  return rows.map(toRow);
+}
+
+function toRow(r: {
+  id: string; actorRole: UserRole; action: string; targetType: string; targetId: string;
+  before: unknown; after: unknown; createdAt: Date; actorLabel: string | null;
+  actor: { name: string; email: string } | null;
+}): AuditLogRow {
+  return {
+    id: r.id,
+    // 배치는 사용자가 없으므로 남겨 둔 이름을 쓴다
+    actorName: r.actor?.name ?? r.actorLabel ?? '(알 수 없음)',
+    actorEmail: r.actor?.email ?? null,
+    isSystem: r.actor === null,
+    actorRole: r.actorRole,
+    action: r.action,
+    targetType: r.targetType,
+    targetId: r.targetId,
+    before: r.before,
+    after: r.after,
+    createdAt: r.createdAt,
   };
 }
