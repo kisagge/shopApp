@@ -150,6 +150,27 @@ describe('장바구니 사진', () => {
     expect(screen.getByRole('img', { name: '오트밀 코트' })).toBeInTheDocument();
   });
 
+  it('견적이 오기 전에도 담을 때 본 사진이 뜬다 — "IMG" 칸이 먼저 뜨지 않는다', () => {
+    /*
+     * 예전에는 사진 주소를 견적에서만 받아서, 견적이 오기 전까지 "IMG" 라고 적힌 칸이 먼저 떴다.
+     * 담을 때 본 사진인데.
+     */
+    useCartQuote.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    useCartStore.setState({ items: [item({ imageUrl: 'https://cdn.test/coat.jpg', blurDataUrl: null })] });
+    render(<CartView />);
+
+    expect(screen.getByRole('img', { name: /오버사이즈 울 블렌드 코트/ }).getAttribute('src')).toContain('coat.jpg');
+    expect(screen.queryByText('IMG')).toBeNull();
+  });
+
+  it('사진을 모르는 채 견적을 기다리면 글자 없는 빈 자리다', () => {
+    useCartQuote.mockReturnValue({ data: undefined, isPending: true, isError: false });
+    useCartStore.setState({ items: [item()] });
+    render(<CartView />);
+
+    expect(screen.queryByText('IMG')).toBeNull();
+  });
+
   it('사진이 없으면 자리표시가 남는다 — 자리가 비지 않는다', () => {
     useCartQuote.mockReturnValue(ok(quote()));
     useCartStore.setState({ items: [item()] });

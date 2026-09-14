@@ -20,6 +20,9 @@ export interface ServerCartItem {
   readonly salePrice: number;
   readonly quantity: number;
   readonly selected: boolean;
+  /** 첫 사진과 흐린 미리보기 — 다른 기기에서 담은 줄도 열자마자 사진이 보이게 */
+  readonly imageUrl: string | null;
+  readonly blurDataUrl: string | null;
 }
 
 /**
@@ -48,6 +51,7 @@ export async function getServerCart(userId: string): Promise<ServerCartItem[]> {
               listPrice: true,
               salePrice: true,
               brand: { select: { name: true } },
+              images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
             },
           },
         },
@@ -67,6 +71,8 @@ export async function getServerCart(userId: string): Promise<ServerCartItem[]> {
       salePrice: row.variant.priceOverride ?? product.salePrice ?? product.listPrice,
       quantity: row.quantity,
       selected: row.selected,
+      imageUrl: product.images[0]?.url ?? null,
+      blurDataUrl: product.images[0]?.blurDataUrl ?? null,
     };
   });
 }

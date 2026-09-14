@@ -175,36 +175,46 @@ function CartRow({
       </button>
 
       {/*
-        담은 것이 무엇인지 눈으로 확인할 수 있어야 한다. 예전에는 "IMG" 라고
-        적힌 회색 칸이었는데, 옵션이 비슷한 상품을 여럿 담으면 무엇이 무엇인지
-        구별할 방법이 없었다.
+        담은 것이 무엇인지 눈으로 확인할 수 있어야 한다. 옵션이 비슷한 상품을 여럿 담으면 사진
+        말고는 구별할 방법이 없다.
 
-        **사진이 없을 수도 있다.** 아직 사진을 안 올린 상품이 있고, 그때는
-        지금까지처럼 톤 블록이 남는다.
+        **사진은 견적이 먼저, 없으면 담을 때 적어 둔 것.** 예전에는 견적만 봐서, 견적이 오기
+        전까지 "IMG" 라고 적힌 칸이 먼저 떴다. 담을 때 본 사진과 흐린 미리보기를 스토어가 들고
+        있으니 열자마자 흐린 사진이 뜨고 선명해진다.
+
+        그래도 모르면: 견적을 기다리는 중이면 글자 없는 빈 자리, 사진이 정말 없는 상품이면 톤
+        블록이다. 둘 다 "IMG" 같은 글자는 넣지 않는다 — 읽는 사람에게 뜻이 없다.
       */}
-      {line?.imageUrl ? (
-        <div className="relative h-[95px] w-[76px] shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
-          <Image
-            src={line.imageUrl}
-            alt={line.imageAlt ?? t('cart.itemImage', { name: item.productName })}
-            fill
-            // 크기가 고정이라 기기 크기 목록 전체로 후보를 만들 이유가 없다
-            sizes="76px"
-            {...(isBlurDataUrl(line.blurDataUrl)
-              ? { placeholder: 'blur' as const, blurDataURL: line.blurDataUrl }
-              : {})}
-            className="object-cover"
+      {(() => {
+        const imageUrl = line?.imageUrl ?? item.imageUrl ?? null;
+        const blur = line ? line.blurDataUrl : (item.blurDataUrl ?? null);
+        const label = line?.imageAlt ?? t('cart.itemImage', { name: item.productName });
+        if (imageUrl) {
+          return (
+            <div className="relative h-[95px] w-[76px] shrink-0 overflow-hidden rounded-sm bg-[var(--surface-2)]">
+              <Image
+                src={imageUrl}
+                alt={label}
+                fill
+                // 크기가 고정이라 기기 크기 목록 전체로 후보를 만들 이유가 없다
+                sizes="76px"
+                {...(isBlurDataUrl(blur) ? { placeholder: 'blur' as const, blurDataURL: blur } : {})}
+                className="object-cover"
+              />
+            </div>
+          );
+        }
+        return (
+          <div
+            role="img"
+            aria-label={label}
+            {...(loading && !line ? { 'aria-busy': true } : {})}
+            className={`h-[95px] w-[76px] shrink-0 rounded-sm ${
+              loading && !line ? 'bg-[var(--surface-2)] motion-safe:animate-pulse' : 'bg-ph-sand'
+            }`}
           />
-        </div>
-      ) : (
-        <div
-          role="img"
-          aria-label={t('cart.itemImage', { name: item.productName })}
-          className="flex h-[95px] w-[76px] shrink-0 items-center justify-center rounded-sm bg-ph-sand text-[10px] tracking-widest text-n-700"
-        >
-          IMG
-        </div>
-      )}
+        );
+      })()}
 
       <div className="flex flex-1 flex-col gap-1.5">
         <div className="flex items-start justify-between gap-2">

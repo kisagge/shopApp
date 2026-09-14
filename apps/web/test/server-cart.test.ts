@@ -33,6 +33,7 @@ const row = (variantId: string, quantity = 1, selected = true) => ({
     product: {
       id: 'p-1', name: '코트', listPrice: 413_000, salePrice: 289_000,
       brand: { name: 'STUDIO NOON' },
+      images: [{ url: 'https://cdn.test/coat.jpg', blurDataUrl: 'data:image/webp;base64,AAAA' }],
     },
   },
 });
@@ -53,6 +54,13 @@ describe('읽기', () => {
     expect(item).toMatchObject({
       variantId: V1, quantity: 2, productName: '코트',
       brand: 'STUDIO NOON', listPrice: 413_000, salePrice: 289_000,
+    });
+  });
+
+  it('첫 사진과 흐린 미리보기를 함께 준다 — 다른 기기에서 담은 줄도 열자마자 사진이 보인다', async () => {
+    db.cartItem.findMany.mockResolvedValue([row(V1)]);
+    expect((await getServerCart(USER))[0]).toMatchObject({
+      imageUrl: 'https://cdn.test/coat.jpg', blurDataUrl: 'data:image/webp;base64,AAAA',
     });
   });
 

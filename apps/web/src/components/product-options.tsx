@@ -163,6 +163,9 @@ export function ProductOptions({
                 listPrice: product.listPrice,
                 // 금액은 서버(/api/cart/quote)가 다시 계산한다. 여기 값은 화면 표시용이다.
                 salePrice: selected.price,
+                // 장바구니를 열자마자 흐린 사진부터 보이게. 견적이 오면 그 값으로 바뀐다
+                imageUrl: product.images[0]?.url ?? null,
+                blurDataUrl: product.images[0]?.blurDataUrl ?? null,
               },
               quantity,
             );

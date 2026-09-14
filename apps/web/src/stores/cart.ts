@@ -14,6 +14,16 @@ export interface CartItem {
   readonly salePrice: number;
   quantity: number;
   selected: boolean;
+  /**
+   * 담을 때 본 첫 사진과 그 흐린 미리보기. **화면 표시용이다.**
+   *
+   * 장바구니를 열면 사진 주소는 서버 견적이 알려 준다. 그런데 견적이 도착하기 전까지는 사진을
+   * 몰라서 "IMG" 라고 적힌 회색 칸이 먼저 떴다 — 담을 때 이미 본 사진인데. 담을 때 함께 적어
+   * 두면 열자마자 흐린 사진부터 보이고, 견적이 오면 그 값이 이긴다(상품 사진이 바뀌었을 수 있다).
+   * 옛 장바구니에는 없다.
+   */
+  imageUrl?: string | null | undefined;
+  blurDataUrl?: string | null | undefined;
 }
 
 // 상한은 core 에 있다. 서버 병합도 같은 값을 써야 두 곳이 어긋나지 않는다.
