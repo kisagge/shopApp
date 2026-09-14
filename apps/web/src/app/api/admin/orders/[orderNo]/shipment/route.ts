@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { registerShipmentSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { registerShipment, ShipmentError } from '~/lib/admin/manage-shipment';
-import { recordAudit } from '~/lib/audit';
+import { registerShipmentAudited, ShipmentError } from '~/lib/admin/manage-shipment';
 import { validationFailed } from '~/lib/i18n/validation';
 import { unauthorized } from '~/lib/api/respond';
 
@@ -23,19 +22,9 @@ export async function POST(
   const { orderNo } = await params;
 
   try {
-    const result = await registerShipment(orderNo, parsed.data, actor);
-
     // 송장은 고객에게 나가는 정보이고 잘못 넣으면 남의 택배를 조회하게 된다.
-    // 누가 언제 무엇을 넣었는지 남긴다.
-    await recordAudit({
-      actor,
-      action: 'order.ship',
-      targetType: 'order',
-      targetId: result.orderNo,
-      after: { carrier: result.carrier, trackingNumber: result.trackingNumber },
-      request,
-    });
-
+    // 누가 언제 무엇을 넣었는지 남긴다 — 일괄 등록과 같은 함수로.
+    const result = await registerShipmentAudited(orderNo, parsed.data, actor, request);
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ShipmentError) {

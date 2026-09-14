@@ -20,24 +20,24 @@ export interface AdminOrderRow {
   readonly firstItemName: string;
 }
 
-export async function getAdminOrders(
-  actor: Actor,
-  query: {
-    status?: OrderStatus | undefined;
-    cursor?: string | undefined;
-    take?: number;
-    /** 주문번호이거나 주문자 이름. 어느 쪽인지는 core 가 판단한다 */
-    q?: string | undefined;
-    from?: string | undefined;
-    to?: string | undefined;
-  } = {},
-): Promise<Paged<AdminOrderRow>> {
-  assertAdminQuery(actor, 'order:read');
-  const scope = scopeOf(actor);
-  const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
+export interface AdminOrderFilter {
+  readonly status?: OrderStatus | undefined;
+  /** 주문번호이거나 주문자 이름. 어느 쪽인지는 core 가 판단한다 */
+  readonly q?: string | undefined;
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+}
 
-  const term = readOrderSearch(query.q);
-  const range = readDateRange(query.from, query.to);
+/**
+ * 운영 주문의 조회 조건.
+ *
+ * **목록과 내보내기가 이것 하나를 쓴다.** 둘로 적으면 반드시 갈린다 — 그리고 갈리는
+ * 순간이 하필 가맹점 범위일 수 있다. 화면에는 자기 주문만 보이는데 내려받은
+ * 파일에는 남의 가맹점 주문과 그 수령인·주소가 들어 있는 상태다.
+ */
+export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) {
+  const term = readOrderSearch(filter.q);
+  const range = readDateRange(filter.from, filter.to);
 
   /**
    * 검색 조건은 **범위 제한과 AND 로 묶인다.**
@@ -64,12 +64,25 @@ export async function getAdminOrders(
         }
       : {};
 
-  const where = {
-    ...(query.status ? { status: query.status } : {}),
+  return {
+    ...(filter.status ? { status: filter.status } : {}),
     ...(scope ? { items: { some: { merchantId: scope } } } : {}),
     ...search,
     ...placedAt,
   };
+}
+
+export async function getAdminOrders(
+  actor: Actor,
+  query: AdminOrderFilter & {
+    cursor?: string | undefined;
+    take?: number;
+  } = {},
+): Promise<Paged<AdminOrderRow>> {
+  assertAdminQuery(actor, 'order:read');
+  const scope = scopeOf(actor);
+  const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
+  const where = adminOrderWhere(scope, query);
 
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
@@ -171,3 +184,100 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
   };
 }
 
+// ── 내보내기 ──────────────────────────────────────────────────
+
+/**
+ * 한 번에 내려받을 수 있는 줄 수.
+ *
+ * **끊어서 말한다.** 넘치면 조용히 잘라서 주면 운영자는 그게 전부인 줄 알고 그만큼만
+ * 보낸다 — 나머지 주문은 아무도 모르게 발송이 안 된다. 넘으면 조건을 좁히라고
+ * 돌려보낸다.
+ */
+export const EXPORT_MAX_ROWS = 5_000;
+
+export class ExportTooLargeError extends Error {
+  constructor(readonly rows: number) {
+    super(`내려받을 줄이 ${rows.toLocaleString('ko-KR')}개로 한도(${EXPORT_MAX_ROWS.toLocaleString('ko-KR')})를 넘습니다. 기간이나 상태로 좁혀 주세요.`);
+    this.name = 'ExportTooLargeError';
+  }
+}
+
+export interface AdminOrderExportRow {
+  readonly orderNo: string;
+  readonly placedAt: Date;
+  readonly status: OrderStatus;
+  /** 받는 사람. **배송에 필요한 값이라 가맹점에게도 준다** — 주문 상세와 같은 선이다 */
+  readonly recipient: string;
+  readonly recipientPhone: string;
+  readonly postalCode: string;
+  readonly address: string;
+  readonly deliveryMemo: string | null;
+  readonly productName: string;
+  readonly optionLabel: string;
+  readonly quantity: number;
+  readonly subtotal: Won;
+  readonly carrier: string | null;
+  readonly trackingNumber: string | null;
+}
+
+/**
+ * 주문 **항목** 하나당 한 줄로 내려준다.
+ *
+ * 포장과 출고는 상품 단위로 한다. 주문 하나를 한 줄로 접으면 "코트 외 2건" 이 되고,
+ * 그걸 받아 든 사람은 무엇을 박스에 넣어야 할지 모른다.
+ *
+ * **손님 계정의 값은 없다.** 주문자 이름·이메일·등급은 배송에 필요 없고, 가맹점에게
+ * 나가면 안 되는 값이다(admin-privacy). 받는 사람의 이름·연락처·주소는 그 일을
+ * 하려면 반드시 있어야 하므로 준다.
+ *
+ * **가맹점에게는 자기 항목만.** 한 주문에 여러 가맹점이 섞이면, 남의 줄까지 내려주면
+ * 남의 상품을 포장하게 된다.
+ */
+export async function exportAdminOrders(
+  actor: Actor,
+  filter: AdminOrderFilter,
+): Promise<AdminOrderExportRow[]> {
+  assertAdminQuery(actor, 'order:read');
+  const scope = scopeOf(actor);
+  const where = adminOrderWhere(scope, filter);
+
+  const itemWhere = scope ? { merchantId: scope } : {};
+
+  const rows = await prisma.orderItem.count({ where: { order: where, ...itemWhere } });
+  if (rows > EXPORT_MAX_ROWS) throw new ExportTooLargeError(rows);
+
+  const orders = await prisma.order.findMany({
+    where,
+    orderBy: [{ placedAt: 'desc' }, { id: 'desc' }],
+    select: {
+      orderNo: true, placedAt: true, status: true,
+      recipient: true, recipientPhone: true, postalCode: true,
+      address1: true, address2: true, deliveryMemo: true,
+      shipment: { select: { carrier: true, trackingNumber: true } },
+      items: {
+        where: itemWhere,
+        orderBy: { id: 'asc' },
+        select: { productName: true, optionLabel: true, quantity: true, subtotal: true },
+      },
+    },
+  });
+
+  return orders.flatMap((o) =>
+    o.items.map((i) => ({
+      orderNo: o.orderNo,
+      placedAt: o.placedAt,
+      status: o.status,
+      recipient: o.recipient,
+      recipientPhone: o.recipientPhone,
+      postalCode: o.postalCode,
+      address: [o.address1, o.address2].filter(Boolean).join(' '),
+      deliveryMemo: o.deliveryMemo,
+      productName: i.productName,
+      optionLabel: i.optionLabel,
+      quantity: i.quantity,
+      subtotal: won(i.subtotal),
+      carrier: o.shipment?.carrier ?? null,
+      trackingNumber: o.shipment?.trackingNumber ?? null,
+    })),
+  );
+}

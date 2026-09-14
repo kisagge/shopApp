@@ -6,6 +6,7 @@ import {
   type Actor,
 } from '@shop/core';
 import { transitionOrder, TransitionError } from './transition-order';
+import { recordAudit } from '~/lib/audit';
 
 /**
  * 송장 등록.
@@ -147,4 +148,71 @@ export async function registerShipment(
     }
     throw error;
   }
+}
+
+/**
+ * 송장 등록 + 감사 로그.
+ *
+ * **한 건 등록과 일괄 등록이 이것 하나를 쓴다.** 감사 로그를 라우트에서 남기면
+ * 일괄 창구를 새로 만들 때 그 줄을 옮겨 적어야 하고, 빠뜨리면 **수백 건의 송장이
+ * 누가 넣었는지 모르게** 들어간다. 송장은 손님에게 나가는 정보이고, 잘못 넣으면
+ * 남의 택배를 조회하게 된다.
+ */
+export async function registerShipmentAudited(
+  orderNo: string,
+  input: ShipmentInput,
+  actor: Actor,
+  request: Request,
+): Promise<ShipmentResult> {
+  const result = await registerShipment(orderNo, input, actor);
+  await recordAudit({
+    actor,
+    action: 'order.ship',
+    targetType: 'order',
+    targetId: result.orderNo,
+    after: { carrier: result.carrier, trackingNumber: result.trackingNumber },
+    request,
+  });
+  return result;
+}
+
+/**
+ * 이미 **같은 송장**이 붙어 있는 주문번호.
+ *
+ * 일괄 올리기의 자연스러운 사용법은 "내려받은 파일을 채워 통째로 올리기" 다. 그 파일에는
+ * 지난번에 올린 주문도 송장이 찬 채로 들어 있다. 그걸 다시 등록하면 값은 그대로인데
+ * **수백 줄의 감사 로그가 "송장 등록" 으로 쌓이고**, 결과는 "300건 등록" 이라고 거짓말을
+ * 한다 — 운영자는 이번에 몇 건을 새로 보냈는지 알 수 없다. e2e 가 이렇게 잡았다.
+ *
+ * 가맹점 범위를 건다. 걸지 않으면 남의 주문번호를 넣어 보는 것으로 "같다/다르다" 가
+ * 새어 나간다 — 범위 밖 주문은 여기서 빠지고, 등록 단계에서 "주문을 찾을 수 없습니다" 가 된다.
+ */
+export async function findUnchangedShipments(
+  entries: readonly { orderNo: string; carrier: string; trackingNumber: string }[],
+  actor: Actor,
+): Promise<Set<string>> {
+  const scope = merchantScope(actor);
+  if (scope === undefined || entries.length === 0) return new Set();
+
+  const orders = await prisma.order.findMany({
+    where: {
+      orderNo: { in: entries.map((e) => e.orderNo) },
+      ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    },
+    select: { orderNo: true, shipment: { select: { carrier: true, trackingNumber: true } } },
+  });
+  const current = new Map(orders.map((o) => [o.orderNo, o.shipment]));
+
+  return new Set(
+    entries
+      .filter((e) => {
+        const shipment = current.get(e.orderNo);
+        return (
+          shipment != null &&
+          shipment.carrier === e.carrier &&
+          shipment.trackingNumber === normalizeTrackingNumber(e.trackingNumber)
+        );
+      })
+      .map((e) => e.orderNo),
+  );
 }

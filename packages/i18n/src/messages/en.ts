@@ -693,6 +693,7 @@ export const en: Dictionary = {
   'valid.upperSlugFormat': 'Only uppercase letters, digits and hyphens',
   'valid.stockMin': 'Stock cannot be negative',
   'valid.freeThresholdTooLow': 'The free-shipping threshold must be higher than the base fee.',
+  'valid.fileRequired': 'Please choose a file.',
   'valid.salePriceOverList': 'The sale price cannot be above the list price',
   'valid.suspendNeedsReason': 'Suspending or ending needs a reason',
   'valid.merchantNeedsScope': 'A merchant account needs a merchant to belong to',

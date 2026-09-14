@@ -1,13 +1,14 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { format, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
+import { format, hasPermission, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin/orders';
 import { ORDER_STATUS } from '@shop/core';
 import { isOrderStatus } from '~/lib/queries/mypage';
 import { Pager } from '../pager';
+import { OrderBulkActions } from './order-bulk-actions';
 
 export const metadata: Metadata = { title: '주문 관리' };
 export const dynamic = 'force-dynamic';
@@ -171,6 +172,14 @@ export default async function AdminOrdersPage({
             </Link>
           )}
         </form>
+
+        {/*
+          조건이 틀려 목록을 조건 없이 보여 주는 중이면, 파일도 조건 없이 나가야 화면과 맞는다
+        */}
+        <OrderBulkActions
+          filter={searchError ? { status: filter } : { status: filter, q, from, to }}
+          canFulfill={hasPermission(actor, 'order:fulfill')}
+        />
 
         {searchError && (
           <p role="alert" className="mb-5 rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">

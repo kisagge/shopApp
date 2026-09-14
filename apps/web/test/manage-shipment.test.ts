@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
-  order: { findFirst: vi.fn<(...a: any[]) => any>(), findUniqueOrThrow: vi.fn<(...a: any[]) => any>() },
+  order: { findFirst: vi.fn<(...a: any[]) => any>(), findUniqueOrThrow: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   shipment: { upsert: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -18,7 +18,7 @@ vi.mock('~/lib/admin/transition-order', () => ({
   TransitionError: FakeTransitionError,
 }));
 
-const { registerShipment, ShipmentError } = await import('~/lib/admin/manage-shipment');
+const { registerShipment, findUnchangedShipments, ShipmentError } = await import('~/lib/admin/manage-shipment');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -220,3 +220,37 @@ describe('보낼 수 없는 주문에는 붙지 않는다', () => {
   });
 });
 
+
+describe('이미 같은 송장인 주문 (일괄 올리기)', () => {
+  const entries = [
+    { orderNo: 'A', carrier: 'CJ', trackingNumber: '1234-5678-9012' },
+    { orderNo: 'B', carrier: 'CJ', trackingNumber: '999999999999' },
+    { orderNo: 'C', carrier: 'HANJIN', trackingNumber: '123456789012' },
+    { orderNo: 'D', carrier: 'CJ', trackingNumber: '123456789012' },
+  ];
+
+  beforeEach(() => {
+    db.order.findMany.mockResolvedValue([
+      { orderNo: 'A', shipment: { carrier: 'CJ', trackingNumber: '123456789012' } },
+      { orderNo: 'B', shipment: { carrier: 'CJ', trackingNumber: '123456789012' } },
+      { orderNo: 'C', shipment: { carrier: 'CJ', trackingNumber: '123456789012' } },
+      { orderNo: 'D', shipment: null },
+    ]);
+  });
+
+  it('택배사와 (하이픈을 뗀) 송장번호가 모두 같아야 같다', async () => {
+    expect([...(await findUnchangedShipments(entries, admin))]).toEqual(['A']);
+  });
+
+  it('가맹점은 자기 주문 안에서만 비교한다', async () => {
+    // 범위를 안 걸면 남의 주문번호를 넣어 보는 것으로 송장이 같은지가 새어 나간다
+    await findUnchangedShipments(entries, merchant);
+    expect(db.order.findMany.mock.calls[0]![0].where.items).toEqual({ some: { merchantId: 'm-a' } });
+  });
+
+  it('소속 없는 가맹점 계정은 아무것도 비교하지 않는다', async () => {
+    const orphan: Actor = { id: 'u-x', role: 'MERCHANT', merchantId: null };
+    expect((await findUnchangedShipments(entries, orphan)).size).toBe(0);
+    expect(db.order.findMany).not.toHaveBeenCalled();
+  });
+});

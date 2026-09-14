@@ -130,6 +130,20 @@ export const RATE_LIMIT = {
    * 막을 것은 사람이 아니라 줄을 불리는 스크립트다.
    */
   write: { limit: 60, windowMs: MINUTE },
+
+  /**
+   * 주문 내려받기.
+   *
+   * **개인정보를 한 번에 가장 많이 가져가는 창구다** — 한 파일에 수천 명의 이름·
+   * 연락처·주소가 들어 있다. 사람이 누르는 속도로는 분당 몇 번이면 충분하고, 그보다
+   * 잦으면 사람이 아니거나 계정이 넘어간 것이다.
+   */
+  orderExport: { limit: 5, windowMs: MINUTE },
+
+  /**
+   * 송장 일괄 올리기. 한 번에 수백 줄이 들어오므로 호출 자체는 드물다.
+   */
+  shipmentBulk: { limit: 5, windowMs: MINUTE },
 } as const satisfies Record<string, RateLimitPolicy>;
 
 export type RateLimitSurface = keyof typeof RATE_LIMIT;
