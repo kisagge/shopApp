@@ -1,16 +1,9 @@
 'use client';
 
 import type { PaymentMethodInput } from '@shop/contract';
-import type { MessageKey } from '@shop/i18n';
+import { PAY_METHOD_KEY as METHOD_KEY } from '~/lib/i18n/pay-method-key';
 import { useRadioGroup } from '~/lib/a11y/use-radio-group';
 import { useT } from '~/lib/i18n/client';
-
-const METHOD_KEY: Record<PaymentMethodInput, MessageKey> = {
-  CARD: 'payMethod.CARD',
-  TRANSFER: 'payMethod.TRANSFER',
-  VIRTUAL_ACCOUNT: 'payMethod.VIRTUAL_ACCOUNT',
-  EASY_PAY: 'payMethod.EASY_PAY',
-};
 
 /**
  * 결제 수단.

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
+  isReceiptIssuable, receiptTotals,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -116,9 +117,8 @@ export default async function OrderPage({
     order.items.length >= 2 &&
     liveItems.length >= 1;
 
-  const refundedCash = order.refunds.reduce((sum, r) => sum + r.amount, 0);
-  const refundedPoints = order.refunds.reduce((sum, r) => sum + r.points, 0);
-  const shippingDeducted = order.refunds.reduce((sum, r) => sum + r.shippingDeducted, 0);
+  // 영수증과 같은 함수로 더한다 — 따로 더하면 두 화면의 환불 합이 갈린다
+  const { refundedCash, refundedPoints, shippingDeducted } = receiptTotals(order.payable, order.refunds);
 
   const activeReturn = order.returnRequests[0] ?? null;
   /**
@@ -377,6 +377,14 @@ export default async function OrderPage({
               .filter(isReturnableLine)
               .map((i) => ({ id: i.id, productName: i.productName, optionLabel: i.optionLabel, quantity: i.quantity }))}
           />
+        )}
+        {isReceiptIssuable(order) && (
+          <Link
+            href={`/order/${encodeURIComponent(order.orderNo)}/receipt`}
+            className="inline-flex h-12 items-center justify-center rounded-sm border border-[var(--border-strong)] text-sm font-medium no-underline"
+          >
+            {t('receipt.link')}
+          </Link>
         )}
         <div className="flex gap-2">
           <Link

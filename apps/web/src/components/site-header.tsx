@@ -22,7 +22,7 @@ export async function SiteHeader() {
    * 배경을 명시한다 — 투명하면 밑으로 지나가는 본문이 비친다.
    */
   return (
-    <header className="safe-t relative sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
+    <header className="safe-t relative sticky print:hidden top-0 z-20 border-b border-[var(--border)] bg-[var(--bg)]">
       <div className="mx-auto flex h-13 w-full max-w-[1280px] items-center gap-3 px-4 md:h-19 md:gap-6 md:px-10">
         {/* 좁은 화면에서 카테고리·검색·계정으로 가는 유일한 통로 */}
         <MobileMenu categories={categories} user={viewer} />

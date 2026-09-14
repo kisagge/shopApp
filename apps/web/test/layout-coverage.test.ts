@@ -42,6 +42,7 @@ const DYNAMIC: Readonly<Record<string, string>> = {
   '/collection/[slug]': '시드 기획전 주소를 그대로 연다',
   '/support/notice/[id]': '시드 공지 주소를 그대로 연다',
   '/order/[orderNo]': '주문 목록에서 첫 줄을 눌러 들어간다',
+  '/order/[orderNo]/receipt': 'partial-cancel 이 결제한 주문의 영수증을 네 폭으로 잰다',
   '/admin/orders/[orderNo]': '운영 주문 표에서 첫 줄을 눌러 들어간다',
   '/admin/products/[id]': '운영 상품 표에서 첫 줄을 눌러 들어간다',
 };

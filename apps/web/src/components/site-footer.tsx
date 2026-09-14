@@ -9,7 +9,7 @@ export async function SiteFooter() {
   const [categories, t, theme] = await Promise.all([getTopCategories(), getT(), getTheme()]);
 
   return (
-    <footer className="safe-b mt-20 border-t border-[var(--border)] bg-[var(--surface)]">
+    <footer className="safe-b mt-20 print:hidden border-t border-[var(--border)] bg-[var(--surface)]">
       <div className="mx-auto w-full max-w-[1280px] px-4 py-10 md:px-10">
         {/*
           헤더의 카테고리 내비게이션은 좁은 화면에서 메뉴 버튼 뒤로 들어간다.

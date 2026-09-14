@@ -249,6 +249,31 @@
     --color-warning-soft: var(--color-dark-warning-soft);
   }
 
+  /*
+   * **인쇄는 늘 밝은 종이다.**
+   *
+   * 어두운 테마를 고른 사람이 영수증을 인쇄하면 밝은 글자가 그대로 나가는데, 브라우저는 배경색을 기본으로
+   * 찍지 않는다 — 흰 종이에 흰 글자가 찍힌다. 그래서 인쇄할 때는 테마와 상관없이 밝은 값으로 되돌린다.
+   * 셀렉터를 위 두 어두운 블록과 같게 적어 나중에 온 이쪽이 이긴다.
+   */
+  @media print {
+    :root,
+    :root:not([data-theme="light"]),
+    :root[data-theme="dark"] {
+      color-scheme: light;
+
+      --bg: var(--color-n-0);
+      --surface: var(--color-n-50);
+      --surface-2: var(--color-n-100);
+      --border: var(--color-n-200);
+      --border-strong: var(--color-n-300);
+      --fg: var(--color-n-900);
+      --fg-secondary: var(--color-n-700);
+      --fg-muted: var(--color-n-500);
+      --brand: var(--color-n-900);
+    }
+  }
+
   html {
     /* iOS 사파리에서 가로 회전 시 글자가 커지는 것을 막는다 */
     -webkit-text-size-adjust: 100%;

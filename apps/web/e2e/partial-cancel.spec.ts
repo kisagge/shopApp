@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { layoutProblems, WIDTHS } from './layout';
 
 /**
  * 일부 상품 취소 — 두 줄을 사서 한 줄만 무른다.
@@ -97,6 +98,41 @@ test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금
 
   // 취소한 줄 하나의 재고만 돌아왔다 — 남은 줄은 여전히 주문이 물고 있다
   expect(await stockSum(), '일부 취소가 재고를 안 돌려줬거나 남은 줄까지 돌려줬다').toBe(stockBefore - 1);
+
+  // ── 영수증: 주문 상세와 같은 숫자. 결제 금액은 그대로, 돌려받은 금액과 실제 낸 돈이 따로
+  await page.getByRole('link', { name: '영수증 보기' }).click();
+  await page.waitForURL(/\/receipt$/);
+  await ready(page);
+  const receipt = page.getByRole('article', { name: '주문 영수증' });
+  const receiptValue = (label: string) =>
+    receipt.getByRole('term').filter({ hasText: new RegExp(`^${label}$`) }).locator('xpath=following-sibling::dd');
+  await expect(receipt.getByRole('table', { name: '주문 상품' }).getByRole('row', { name: /\(취소됨\)/ })).toHaveCount(1);
+  await expect(receiptValue('결제 금액')).toHaveText(payable);
+  await expect(receiptValue('돌려받은 금액')).toHaveText(`-${shown}`);
+  const won = (text: string) => Number(text.replace(/[^\d]/g, ''));
+  expect(won((await receiptValue('실제 결제 금액').textContent())!), '영수증의 실제 낸 돈이 결제 − 환불과 다르다')
+    .toBe(won(payable) - won(shown));
+
+  // 인쇄하면 가게 머리·발과 단추가 빠진다 — 종이에는 영수증만
+  await expect(page.getByRole('banner')).toBeVisible();
+  await page.emulateMedia({ media: 'print' });
+  await expect(page.getByRole('banner')).toBeHidden();
+  await expect(page.getByRole('button', { name: '인쇄하기' })).toBeHidden();
+  await expect(receipt).toBeVisible();
+  await page.emulateMedia({ media: 'screen' });
+
+  // 영수증의 자리 — 표가 좁은 폭에서 본문을 밀어내지 않는다(layout-coverage 의 DYNAMIC 이 여기를 가리킨다)
+  const viewport = page.viewportSize();
+  for (const width of WIDTHS) {
+    await page.setViewportSize({ width, height: 800 });
+    const problems = await layoutProblems(page);
+    expect(problems, `영수증 ${width}px 에서 자리가 어긋났다.\n` + problems.map((p) => `  · ${p.kind}: ${p.detail}`).join('\n')).toEqual([]);
+  }
+  if (viewport) await page.setViewportSize(viewport);
+
+  await page.getByRole('link', { name: '주문 상세로' }).click();
+  await page.waitForURL(/\/order\/[^/]+$/);
+  await ready(page);
 
   // ── 두 번째 검사이자 뒷정리: 남은 줄까지 취소하면 결제한 돈이 **정확히 한 번씩** 다 돌아온다
   await page.getByRole('button', { name: '주문 취소' }).click();

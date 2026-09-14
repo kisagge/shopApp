@@ -24,6 +24,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
     where: { orderNo, userId },
     select: {
       orderNo: true, status: true, placedAt: true,
+      // 영수증을 낼 수 있는지와 결제 일시. 결제대기 주문에는 영수증이 없다
+      paidAt: true,
       listTotal: true, productDiscount: true, couponDiscount: true,
       pointsUsed: true, shippingFee: true, payable: true, rewardPoints: true,
       recipient: true, recipientPhone: true, postalCode: true,

@@ -78,6 +78,13 @@ test('주문 상세는 어느 폭에서도 자리가 무너지지 않는다', as
           problems.map((p) => `  · ${p.kind}: ${p.detail}`).join('\n'),
       ).toEqual([]);
     }
+
+    // 결제 전 주문에는 영수증을 내지 않는다 — 내지 않은 돈의 증빙이 된다. 결제된 영수증의 자리는 partial-cancel 이 잰다
+    await page.goto(`/order/${orderNo}/receipt`);
+    await expect(page.getByText('결제가 끝난 주문만 영수증을 볼 수 있습니다.')).toBeVisible();
+    await expect(page.getByRole('article', { name: '주문 영수증' })).toHaveCount(0);
+    await page.goto(`/order/${orderNo}`);
+    await expect(page.getByRole('link', { name: '영수증 보기' }), '결제 전 주문에 영수증 링크가 있다').toHaveCount(0);
   } finally {
     await page.request.post(`/api/orders/${orderNo}/cancel`, {
       data: { reason: '검사가 만든 주문을 되돌립니다' },

@@ -48,10 +48,10 @@ export function CompareTray() {
         띠가 화면 아래에 고정되어 있어 그대로 두면 마지막 줄과 바닥글을 덮는다.
         같은 높이의 빈 자리를 흐름 안에 둬서 밀어 올린다.
       */}
-      <div aria-hidden="true" className="h-16" />
+      <div aria-hidden="true" className="h-16 print:hidden" />
       <aside
       aria-label={t('compare.tray')}
-      className="safe-b fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur"
+      className="safe-b fixed inset-x-0 bottom-0 z-40 print:hidden border-t border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur"
     >
       <div className="mx-auto flex max-w-[1200px] items-center gap-3 px-4 py-3">
         <p className="text-xs text-[var(--fg-secondary)]">
