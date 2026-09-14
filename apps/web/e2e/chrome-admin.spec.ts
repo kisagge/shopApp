@@ -75,3 +75,43 @@ test('매장 화면에는 그대로 붙어 있다', async ({ page }) => {
   await expect(page.getByRole('contentinfo')).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);
 });
+
+test('운영 화면에서 매장으로 건너갈 수 있다', async ({ page }) => {
+  /*
+   * **머리를 떼면서 매장으로 가는 길도 같이 떼었다.** 매장 로고가 그 길이었다.
+   * 올린 상품이 매장에 어떻게 보이는지 보려면 주소창에 직접 적어야 했다.
+   */
+  await page.goto('/admin/orders');
+  await ready(page);
+
+  const link = page.getByRole('link', { name: '매장 보기' });
+  await expect(link).toBeVisible();
+  await link.click();
+
+  await page.waitForURL((url) => url.pathname === '/');
+  await expect(page.getByRole('banner'), '매장에 도착하지 못했다').toBeVisible();
+});
+
+test('본문이 길어도 사이드바가 화면 높이를 채운다', async ({ page }) => {
+  /*
+   * 사이드바가 메뉴 높이만큼만 어두워서, 본문이 긴 화면에서는 **메뉴 아래가
+   * 비어** 본문 바탕이 드러났다. 스크롤해도 메뉴는 제자리에 있어야 한다.
+   */
+  await page.goto('/admin/support');
+  await ready(page);
+
+  const panel = page.locator('#admin-nav-panel');
+  const viewport = page.viewportSize()!;
+  const bodyHeight = await page.evaluate(() => document.documentElement.scrollHeight);
+  expect(bodyHeight, '본문이 짧아 이 검사가 아무것도 증명하지 않는다').toBeGreaterThan(viewport.height);
+
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  const box = await panel.boundingBox();
+  expect(box, '사이드바가 없다').not.toBeNull();
+  /*
+   * 위치를 양쪽으로 본다. 예전 사이드바는 바깥 틀이 본문만큼 늘어나 있었고
+   * 어두운 면만 메뉴 높이에서 멈춰 있어서, 높이만 재면 틀을 잰 셈이 된다.
+   */
+  expect(Math.abs(box!.y), '스크롤하자 사이드바가 위로 밀려났다').toBeLessThanOrEqual(0.5);
+  expect(box!.height, '사이드바가 화면 아래까지 닿지 않는다').toBeGreaterThanOrEqual(viewport.height - 1);
+});

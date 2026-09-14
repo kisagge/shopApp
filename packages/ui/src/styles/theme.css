@@ -177,6 +177,11 @@
     --brand: var(--color-n-900);
     --brand-hover: var(--color-n-950);
     --ring: var(--color-n-900);
+    /*
+     * 드롭다운 화살표. 그림 안의 색은 CSS 변수를 못 읽어서 값을 직접 적는다 —
+     * n-500 과 dark-muted 를 sRGB 로 옮긴 것이다. 아래 select 규칙이 쓴다.
+     */
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23726e69' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   @media (prefers-color-scheme: dark) {
@@ -197,6 +202,7 @@
       --brand: var(--color-dark-fg);
       --brand-hover: oklch(1 0 0);
       --ring: var(--color-dark-fg);
+      --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2395918c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
       /* 뜻을 가진 색도 테마를 탄다 — 값과 이유는 @theme 의 dark-* 주석에 */
       --color-accent: var(--color-dark-accent);
@@ -228,6 +234,7 @@
     --brand: var(--color-dark-fg);
     --brand-hover: oklch(1 0 0);
     --ring: var(--color-dark-fg);
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%2395918c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 
     /* 뜻을 가진 색도 테마를 탄다 — 값과 이유는 @theme 의 dark-* 주석에 */
     --color-accent: var(--color-dark-accent);
@@ -454,4 +461,24 @@
   textarea {
     font-size: 1rem;
   }
+}
+
+/*
+ * **드롭다운 화살표를 우리가 그린다.**
+ *
+ * 브라우저 기본 화살표는 안쪽 여백 안에 붙는다. 여백이 px-2 인 칸에서는
+ * 화살표가 테두리에서 8px 떨어져 **선에 붙어 보였고**, 브라우저마다 크기와
+ * 자리도 달랐다. 기본 모양을 끄고 테두리에서 12px 떨어진 자리에 그린다.
+ *
+ * 레이어 밖에 둔다 — px-2 같은 유틸리티가 오른쪽 여백을 되돌리면 글자가
+ * 화살표 밑으로 파고든다. 여러 줄 목록(multiple, size)은 화살표가 없는
+ * 위젯이라 건드리지 않는다.
+ */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.75rem;
+  padding-right: 2.25rem;
 }

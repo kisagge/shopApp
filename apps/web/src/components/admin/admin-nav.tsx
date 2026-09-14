@@ -120,6 +120,11 @@ export function AdminNav({
         **좁은 화면에서는 본문 위에 뜬다.** 자리를 차지하며 밀어내면 본문이
         다시 143px 이 된다. 넓은 화면에서는 흐름 안으로 돌아와 옆에 선다.
 
+        넓은 화면에서 **화면 높이에 붙여 둔다.** 내용 높이로 두었더니 본문이
+        긴 화면에서 어두운 면이 메뉴 끝에서 끊기고 그 아래가 비었다. 늘이기만
+        하면 스크롤할 때 메뉴가 위로 사라지므로 sticky 로 세우고, 메뉴가 화면보다
+        길면 그 안에서 스크롤한다(위의 overflow-y-auto).
+
         `hidden` 을 쓰는 이유 — `display:none` 이라야 접힌 메뉴의 링크가
         낭독기와 탭 이동에서 빠진다. 투명도로만 숨기면 안 보이는 링크에
         포커스가 들어간다.
@@ -129,7 +134,7 @@ export function AdminNav({
         className={
           'fixed inset-y-0 left-0 z-40 flex w-[264px] max-w-[82vw] flex-col gap-7 overflow-y-auto ' +
           'bg-dark-bg px-4 py-6 ' +
-          'md:static md:h-auto md:w-[232px] md:max-w-none md:shrink-0 md:overflow-visible' +
+          'md:sticky md:top-0 md:h-dvh md:w-[232px] md:max-w-none md:shrink-0' +
           /*
            * **`hidden` 속성을 쓰지 않는다.** 처음에는 `hidden={!open}` 에
            * `md:!block` 으로 되살리려 했는데, 그 느낌표 문법은 Tailwind 3 의
@@ -218,6 +223,24 @@ export function AdminNav({
             <span className="block text-[13px] font-medium text-n-0">{roleLabel}</span>
             {merchant && <span className="block text-[11px] text-dark-muted">가맹점 계정</span>}
           </p>
+          {/*
+            **매장으로 가는 길.** 한동안 없었다 — 운영 화면에서 매장의 머리와 발을
+            떼면서, 거기 있던 PLAIN 로고(매장으로 가는 링크)도 함께 사라졌고 대신할
+            길을 두지 않았다. 올린 상품이 매장에 어떻게 보이는지 확인하려면 주소창에
+            직접 적어야 했다.
+
+            로고에 걸지 않고 이름을 붙인 링크로 둔다. 운영 화면의 로고는 보통 운영
+            첫 화면으로 가는데, 거기에 매장을 걸면 누르는 사람마다 기대가 갈린다.
+
+            **같은 탭으로 간다.** 새 탭은 웹에서는 편하지만 앱 셸에서는 바깥 브라우저로
+            튕겨 나가 로그인이 풀린다.
+          */}
+          <Link
+            href="/"
+            className="flex min-h-10 w-full items-center rounded-[5px] px-3.5 text-[13px] text-dark-muted no-underline hover:bg-dark-surface hover:text-n-0"
+          >
+            매장 보기
+          </Link>
           <AdminSignOut />
         </div>
       </div>
