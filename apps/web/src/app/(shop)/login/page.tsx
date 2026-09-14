@@ -37,10 +37,30 @@ export default async function LoginPage({
     <div className="mx-auto flex w-full max-w-[420px] flex-col gap-6 px-4 py-16">
       <div className="flex flex-col gap-2">
         <h1 className="font-serif text-3xl font-medium tracking-tight">{t('auth.login')}</h1>
-        <p className="text-[13px] text-[var(--fg-muted)]">
-          {t('auth.devAccount')} — <code className="tnum">demo@plain.test</code> /{' '}
-          <code className="tnum">plain1234!</code>
-        </p>
+        {/*
+          **가맹점 계정도 적는다.** 구매자 계정만 있으면 둘러보러 온 사람은 가맹점 화면(자기
+          상품만 보이는 범위, 송장 일괄 등록, 재고 알림)을 볼 길이 없다 — 이 저장소에서 가장
+          공들인 자리가 로그인 벽 뒤에 숨는다.
+
+          운영진 계정은 적지 않는다. 권한 부여·환불·정산 지급을 누구나 누를 수 있게 되면
+          다음에 온 사람이 망가진 가게를 본다. 가맹점은 자기 상품만 건드린다.
+
+          비밀번호는 비밀이 아니다 — 시드에 그대로 적혀 있고 README 에도 있다.
+        */}
+        <section aria-labelledby="demo-accounts" className="rounded-sm bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--fg-muted)]">
+          <h2 id="demo-accounts" className="font-medium text-[var(--fg-secondary)]">{t('auth.devAccount')}</h2>
+          <dl className="mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+            <dt>{t('auth.devCustomer')}</dt>
+            <dd className="min-w-0 break-all">
+              <code className="tnum">demo@plain.test</code> / <code className="tnum">plain1234!</code>
+            </dd>
+            <dt>{t('auth.devMerchant')}</dt>
+            <dd className="min-w-0 break-all">
+              <code className="tnum">contact@moor.test</code> / <code className="tnum">plain1234!</code>
+            </dd>
+          </dl>
+          <p className="mt-1.5 text-[12px]">{t('auth.devMerchantHint')}</p>
+        </section>
       </div>
 
       {reset === '1' && (

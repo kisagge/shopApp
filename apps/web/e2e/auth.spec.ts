@@ -141,3 +141,32 @@ test('로그인 화면에서 비밀번호 찾기로 갈 수 있다', async ({ pa
 
   await expect(page).toHaveURL(/\/forgot-password$/);
 });
+
+test('로그인 화면에 적힌 가맹점 계정으로 가맹점 화면에 들어간다', async ({ page }) => {
+  /*
+   * 둘러보러 온 사람이 **적힌 그대로 넣어 보는** 길이다. 시드에서 계정을 바꾸거나
+   * 가맹점을 떼면 화면의 안내만 남고 로그인이 안 되거나, 되더라도 손님으로 들어간다.
+   * 값을 여기 다시 적지 않고 화면에서 읽는다 — 화면이 거짓말하는지를 보려는 것이다.
+   */
+  await page.goto('/login');
+  await ready(page);
+
+  const demo = page.getByRole('region', { name: '체험용 계정' });
+  // 운영진 계정은 적지 않는다 — 누구나 권한을 주고 환불을 누를 수 있게 된다
+  await expect(demo).not.toContainText('admin@');
+  await expect(demo).not.toContainText('super@');
+
+  const merchant = demo.getByRole('definition').nth(1).getByRole('code');
+  const email = (await merchant.nth(0).textContent())!.trim();
+  const password = (await merchant.nth(1).textContent())!.trim();
+
+  await page.getByLabel('이메일').fill(email);
+  await page.getByLabel('비밀번호').fill(password);
+  await page.getByRole('button', { name: '로그인' }).click();
+
+  await page.getByRole('link', { name: '가맹점 페이지' }).first().click();
+  await page.waitForURL(/\/admin/);
+  await ready(page);
+  await expect(page.getByRole('navigation', { name: '관리자 메뉴' })).toBeVisible();
+  await expect(page.getByText('가맹점 계정')).toBeVisible();
+});
