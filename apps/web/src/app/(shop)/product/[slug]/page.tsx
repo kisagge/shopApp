@@ -78,7 +78,9 @@ export default async function ProductPage({ params, searchParams }: Params) {
    * **상품과 세션은 서로를 기다릴 이유가 없다.** 예전에는 상품을 받고 나서야
    * 세션을 물어, 왕복 한 번이 그냥 더 붙었다.
    */
-  const [product, viewer, locale, t, shipping] = await Promise.all([
+  const [movedTo, product, viewer, locale, t, shipping] = await Promise.all([
+    // 옮겨진 주소인지는 캐시 없이 먼저 본다 — 이유는 getProductSlugMovedTo 주석에
+    getProductSlugMovedTo(slug),
     getProductBySlug(slug),
     // 내가 쓴 리뷰인지 표시하려면 세션이 필요하다. 없어도 페이지는 그려진다.
     headers().then((h) => getSessionUser(h)),
@@ -92,13 +94,10 @@ export default async function ProductPage({ params, searchParams }: Params) {
    * 순간 그때까지 나간 링크가 전부 이 자리로 온다. 옛 주소면 새 주소로
    * 넘긴다 — 308 이라 검색엔진이 색인을 옮기고, 사람도 찾던 상품을 본다.
    *
-   * 찾은 뒤에 물어보므로 평소에는 조회가 늘지 않는다.
+   * **캐시에서 옛 상품이 나와도 넘긴다.** 이름을 바꾼 직후에는 캐시가 옛 상품을 들고 있을 수 있다.
    */
-  if (!product) {
-    const movedTo = await getProductSlugMovedTo(slug);
-    if (movedTo) permanentRedirect(`/product/${movedTo}`);
-    notFound();
-  }
+  if (movedTo) permanentRedirect(`/product/${movedTo}`);
+  if (!product) notFound();
 
   /**
    * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**

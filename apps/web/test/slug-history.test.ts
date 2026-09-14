@@ -1,4 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Actor } from '@shop/core';
 import { updateProductSchema, createProductSchema } from '@shop/contract';
 
@@ -130,5 +132,30 @@ describe('버리고 간 주소를 남이 집어 가지 못한다', () => {
     db.productSlug.findUnique.mockResolvedValue({ productId: 'p-1' });
 
     await expect(updateProduct(admin, 'p-1', patch({ slug: 'was-mine' }))).resolves.toBeDefined();
+  });
+});
+
+describe('옮겨진 주소 판단은 캐시를 거치지 않는다', () => {
+  /*
+   * 이름을 바꾼 직후 **데이터 캐시에서 옛 상품이 나와** 옛 주소가 넘어가지 않고 200 으로 열렸다
+   * (slug-history e2e 의 trace — 바꾸기가 끝나고 13ms 뒤). 무효화 직전에 시작된 요청이 옛 값을 되써
+   * 넣는 경쟁이라 타이밍으로는 못 막는다. 구조로 막는다: 캐시 없이 묻고, 찾은 상품보다 먼저 넘긴다.
+   */
+  const src = (rel: string) => readFileSync(join(process.cwd(), 'src', rel), 'utf8');
+
+  it('getProductSlugMovedTo 는 cachedRead 로 감싸지 않는다', () => {
+    const products = src('lib/queries/catalog/products.ts');
+    expect(products).toMatch(/export async function getProductSlugMovedTo\(/);
+    expect(products).not.toMatch(/getProductSlugMovedTo\s*=\s*cachedRead/);
+  });
+
+  it('상품 화면은 상품을 찾았는지와 관계없이 옮겨진 주소면 먼저 넘긴다', () => {
+    const page = src('app/(shop)/product/[slug]/page.tsx');
+    const redirectAt = page.indexOf('if (movedTo) permanentRedirect');
+    const notFoundAt = page.indexOf('if (!product) notFound()');
+    expect(redirectAt, '옮겨진 주소를 넘기는 자리가 없다').toBeGreaterThan(-1);
+    expect(notFoundAt).toBeGreaterThan(redirectAt);
+    // "찾지 못했을 때만" 묻는 옛 모양으로 돌아가면 캐시에서 옛 상품이 나온 순간 넘기지 않는다
+    expect(page).not.toMatch(/if \(!product\) \{\s*const movedTo/);
   });
 });
