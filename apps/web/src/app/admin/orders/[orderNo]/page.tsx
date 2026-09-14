@@ -12,6 +12,7 @@ import { ReturnActions } from './return-actions';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
+import { CancelItemsForm } from '~/components/cancel-items-form';
 import { getT } from '~/lib/i18n/server';
 import { GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
@@ -48,6 +49,21 @@ export default async function AdminOrderDetail({
     hasPermission(actor, 'order:fulfill') && canRegisterShipment(order.status);
 
   const activeReturn = order.returnRequests[0] ?? null;
+
+  /*
+   * 일부 상품 취소. 돈이 나가는 동작이라 환불 권한이 있어야 하고(가맹점은 없다), 출고 전
+   * 상태여야 한다. 서버가 같은 조건으로 다시 막는다.
+   */
+  const liveItems = order.items.filter((i) => !i.canceledAt);
+  const canCancelItems =
+    hasPermission(actor, 'order:refund') &&
+    (order.status === 'PAID' || order.status === 'PREPARING') &&
+    (order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED') &&
+    order.payment.method !== 'VIRTUAL_ACCOUNT' &&
+    liveItems.length >= 2;
+  const refundedCash = order.refunds.reduce((sum, r) => sum + r.amount, 0);
+  const refundedPoints = order.refunds.reduce((sum, r) => sum + r.points, 0);
+  const shippingDeducted = order.refunds.reduce((sum, r) => sum + r.shippingDeducted, 0);
   // 반품 처리는 환불로 이어지는 판단이라 order:refund 를 요구한다
   const canResolveReturn = hasPermission(actor, 'order:refund');
 
@@ -95,8 +111,8 @@ export default async function AdminOrderDetail({
                   </tr>
                 </thead>
                 <tbody>
-                  {order.items.map((i, idx) => (
-                    <tr key={idx} className="border-b border-[var(--surface-2)]">
+                  {order.items.map((i) => (
+                    <tr key={i.id} className="border-b border-[var(--surface-2)]">
                       <td className="py-3.5">
                         <span className="block text-[13px]">{i.productName}</span>
                         <span className="block text-[11px] text-[var(--fg-muted)]">
@@ -262,6 +278,9 @@ export default async function AdminOrderDetail({
                     <dt className="text-sm font-semibold">결제 금액</dt>
                     <dd className="tnum text-xl font-semibold">{format(won(order.payable))}원</dd>
                   </div>
+                  {refundedCash > 0 && <Amount label="환불한 금액" value={won(refundedCash)} negative />}
+                  {refundedPoints > 0 && <Amount label="돌려준 포인트" value={won(refundedPoints)} />}
+                  {shippingDeducted > 0 && <Amount label="일부 취소로 뗀 배송비" value={won(shippingDeducted)} />}
                 </dl>
                 {order.payment && (
                   <dl className="mt-4 flex flex-col gap-2 border-t border-[var(--surface-2)] pt-3.5">
@@ -291,6 +310,17 @@ export default async function AdminOrderDetail({
                 : '가능한 전이는 주문 상태머신이 정합니다.'}
             </p>
             <OrderStatusActions orderNo={order.orderNo} options={options} />
+            {canCancelItems && (
+              <div className="mt-4 border-t border-[var(--surface-2)] pt-4">
+                <CancelItemsForm
+                  orderNo={order.orderNo}
+                  items={liveItems.map((i) => ({
+                    id: i.id, productName: i.productName, optionLabel: i.optionLabel,
+                    quantity: i.quantity, subtotal: i.subtotal,
+                  }))}
+                />
+              </div>
+            )}
           </section>
         </div>
       </div>

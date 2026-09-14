@@ -100,12 +100,17 @@ export async function transitionOrder(
       id: true, orderNo: true, status: true,
       // 구매확정 적립에 필요하다
       userId: true, rewardPoints: true,
-      items: { select: { id: true, status: true, merchantId: true } },
+      items: { select: { id: true, status: true, merchantId: true, canceledAt: true } },
     },
   });
   if (!order) throw new TransitionError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
 
-  const mine = scope ? order.items.filter((i) => i.merchantId === scope) : order.items;
+  /*
+   * 출고 전에 취소된 줄은 옮기지 않는다. 넣으면 "취소 상태의 상품은 배송중으로 바꿀 수
+   * 없습니다" 로 **남은 줄까지 못 보낸다.**
+   */
+  const live = order.items.filter((i) => !i.canceledAt);
+  const mine = scope ? live.filter((i) => i.merchantId === scope) : live;
   if (mine.length === 0) {
     throw new TransitionError('NO_ITEMS', '처리할 상품이 없습니다.', 404);
   }

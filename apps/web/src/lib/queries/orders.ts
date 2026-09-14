@@ -29,6 +29,11 @@ export async function getOrderForUser(orderNo: string, userId: string) {
       recipient: true, recipientPhone: true, postalCode: true,
       address1: true, address2: true, deliveryMemo: true,
       payment: { select: { method: true, status: true } },
+      // 돌려준 돈. 일부 취소한 주문은 결제완료인 채로 남으므로 상태만으로는 안 보인다
+      refunds: {
+        orderBy: { createdAt: 'asc' },
+        select: { kind: true, amount: true, points: true, shippingDeducted: true, createdAt: true },
+      },
       // 배송 조회. 송장이 없으면 null 이고 화면은 그 절을 통째로 감춘다.
       shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
       deliveredAt: true,
@@ -42,7 +47,9 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         },
       },
       items: {
+        orderBy: { id: 'asc' },
         select: {
+          id: true, canceledAt: true,
           productName: true, brandName: true, optionLabel: true,
           // 주문한 그때의 사진. 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
           imageUrl: true,

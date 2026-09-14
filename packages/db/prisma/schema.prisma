@@ -725,7 +725,15 @@ model Order {
   usedCouponId String?
   usedCoupon   UserCoupon? @relation(fields: [usedCouponId], references: [id])
 
+  /// 주문한 그때의 배송비 정책(baseFee·freeThreshold·remoteSurcharge).
+  ///
+  /// 부분 취소로 남은 상품이 무료배송 기준 아래로 떨어지면 배송비를 뗀다. 그 기준은
+  /// **주문한 날의 것**이어야 한다 — 운영이 오늘 기준을 3만원에서 5만원으로 올렸다고
+  /// 지난주 주문의 취소에서 배송비를 더 떼면 안 된다. 옛 주문은 null 이고 지금 정책을 쓴다.
+  shippingPolicy Json?
+
   items          OrderItem[]
+  refunds        OrderRefund[]
   payment        Payment?
   shipment       Shipment?
   statusLogs     OrderStatusLog[]
@@ -797,12 +805,64 @@ model OrderItem {
   /// 부분 취소·부분 반품을 지원하려면 줄 단위 상태가 필요하다.
   status OrderStatus @default(PENDING)
 
+  /// 이 줄에 붙은 쿠폰 할인·포인트 사용·구매확정 적립의 몫. 주문을 만들 때 core 가 나눠 박는다.
+  ///
+  /// 줄 하나를 취소할 때 그 줄 몫의 할인은 돌려줄 돈에서 빠져야 한다. 취소하는 날 나누면
+  /// **어느 줄이 쿠폰 대상이었는지 알 수 없다** — 상품의 브랜드·분류는 그 사이 바뀐다.
+  /// 옛 주문은 null 이고, 그때는 전 줄을 판매가 비율로 나눈다(core 의 sharesOf).
+  couponShare Int?
+  pointsShare Int?
+  rewardShare Int?
+
+  /// 이 줄의 돈이 되돌아간 시각. 가맹점 매출·정산이 줄 단위로 환불을 세는 축이다.
+  ///
+  /// 주문의 `canceledAt` 만으로는 부분 취소를 못 센다 — 주문은 결제완료인 채로 남고
+  /// 줄 하나만 돈이 나갔다.
+  canceledAt DateTime?
+
   review Review?
 
   @@index([orderId])
   @@index([variantId])
   @@index([merchantId, status])
+  @@index([merchantId, canceledAt])
   @@map("order_items")
+}
+
+/// 돈이 되돌아간 사건 하나. 전액 취소·부분 취소·반품 환불이 모두 한 줄씩 남긴다.
+///
+/// **주문 상태로는 환불을 셀 수 없게 됐다.** 부분 취소한 주문은 결제완료인 채로 남는데
+/// 돈은 일부 나갔다. 매출은 "환불 상태인 주문의 결제액" 이 아니라 이 표의 합으로 뺀다.
+///
+/// 옛 환불(전액)은 마이그레이션이 주문에서 옮겨 적었다.
+model OrderRefund {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// 결제 수단으로 돌려준 돈
+  amount           Int
+  /// 포인트로 돌려준 몫
+  points           Int @default(0)
+  /// 이 취소로 뗀 배송비. 마지막에 전부 취소하면 음수로 돌려준다
+  shippingDeducted Int @default(0)
+  /// 되돌린 줄. 전액 취소면 그때 남아 있던 줄 전부
+  itemIds          String[]
+
+  /// PARTIAL_CANCEL · CANCEL · REFUND
+  kind    String
+  reason  String
+  /// 운영진 id 이거나 손님 자신, 배치면 "system"
+  actorId String
+
+  /// PG 에 보낸 멱등 키. 같은 취소가 두 번 기록되지 않게 한다
+  idempotencyKey String? @unique
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+  @@index([createdAt])
+  @@map("order_refunds")
 }
 
 model OrderStatusLog {

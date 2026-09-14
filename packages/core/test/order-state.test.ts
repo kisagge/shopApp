@@ -98,10 +98,19 @@ describe('orderStatusFromItems — 갈래로 빠진 상태도 답한다', () => 
     expect(orderStatusFromItems(['CANCELLED'])).toBe('CANCELLED');
   });
 
-  it('일부만 빠졌으면 여전히 판단하지 않는다', () => {
-    // 부분 취소는 별도 정책이 필요한 이야기지 여기서 고를 문제가 아니다
+  it('일부만 반품됐으면 여전히 판단하지 않는다', () => {
     expect(orderStatusFromItems(['RETURNED', 'SHIPPED'])).toBeNull();
-    expect(orderStatusFromItems(['SHIPPED', 'CANCELLED'])).toBeNull();
+  });
+
+  it('부분 취소한 줄은 셈에서 빠진다', () => {
+    /*
+     * 예전에는 이것도 null 이었다 — "부분 취소는 별도 정책이 필요하다" 고 미뤄 둔 자리다.
+     * 정책이 생겼으므로 답한다. null 로 두면 한 줄을 취소하고 나머지를 보낸 주문이
+     * 결제완료에 영영 머문다.
+     */
+    expect(orderStatusFromItems(['SHIPPED', 'CANCELLED'])).toBe('SHIPPED');
+    expect(orderStatusFromItems(['CANCELLED', 'PREPARING', 'SHIPPED'])).toBe('PREPARING');
+    expect(orderStatusFromItems(['CANCELLED', 'CANCELLED'])).toBe('CANCELLED');
   });
 
   it('이행 경로는 예전과 똑같이 답한다', () => {

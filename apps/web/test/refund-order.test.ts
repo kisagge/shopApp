@@ -12,6 +12,7 @@ const tx = vi.hoisted(() => ({
   productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
   user: { update: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
+  orderRefund: { create: vi.fn<(...a: any[]) => any>() },
   userCoupon: { update: vi.fn<(...a: any[]) => any>() },
   payment: { update: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
@@ -19,6 +20,7 @@ const tx = vi.hoisted(() => ({
 const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { findFirst: vi.fn<(...a: any[]) => any>() },
+  orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -56,6 +58,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.order.findFirst.mockResolvedValue(order());
   db.pointTransaction.findFirst.mockResolvedValue(null);
+  db.orderRefund.aggregate.mockResolvedValue({
+    _sum: { amount: null, points: null, shippingDeducted: null }, _count: { _all: 0 },
+  });
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.order.updateMany.mockResolvedValue({ count: 1 });
   cancel.mockResolvedValue({ status: 'CANCELED' });
@@ -270,5 +275,21 @@ describe('구매확정 적립', () => {
     const out = await refundOrder('20260904-1234567', admin, '취소 환불', gateway);
 
     expect(out.rewardReclaimed).toBe(0);
+  });
+});
+
+describe('일부 취소한 뒤의 환불', () => {
+  it('포인트 원장에 일부 돌려준 흔적이 있어도 남은 포인트를 돌려준다', async () => {
+    /*
+     * 예전에는 원장에 CANCEL_REFUND 가 하나라도 있으면 건너뛰었다. 일부 취소가 그 흔적을 남기면
+     * **남은 포인트를 영영 안 돌려준다.** 이제 환불 기록의 합으로 센다.
+     */
+    db.pointTransaction.findFirst.mockResolvedValue({ id: 'pt-partial' });
+    db.orderRefund.aggregate.mockResolvedValue({
+      _sum: { amount: 10_000, points: 1_000, shippingDeducted: 0 }, _count: { _all: 1 },
+    });
+    const result = await refundOrder('20260904-1234567', admin, '반품', gateway);
+    expect(result.pointsReturned).toBe(order().pointsUsed - 1_000);
+    expect(result.refunded).toBe(order().payable - 10_000);
   });
 });

@@ -19,6 +19,10 @@ export interface OrderItemDraft {
   readonly unitPrice: Won;
   readonly quantity: number;
   readonly subtotal: Won;
+  /** 이 줄 몫의 쿠폰·포인트·적립. 부분 취소가 쓴다(partial-cancel) */
+  readonly couponShare: Won;
+  readonly pointsShare: Won;
+  readonly rewardShare: Won;
 }
 
 export interface ShippingSnapshot {

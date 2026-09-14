@@ -9,6 +9,7 @@ import {
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
+import { CancelItemsForm } from '~/components/cancel-items-form';
 import { RepayButton } from '~/components/repay-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
@@ -101,6 +102,22 @@ export default async function OrderPage({
   const nextStepKey = NEXT_STEP[order.status];
   const nextStep = nextStepKey ? t(nextStepKey) : null;
 
+  /*
+   * **일부 상품 취소를 열어 주는 조건.** 서버가 같은 조건으로 다시 막는다(cancel-items) —
+   * 여기서는 눌러 봐야 거절될 단추를 세우지 않으려는 것뿐이다. 남은 상품이 하나면 그건
+   * 주문 취소다.
+   */
+  const liveItems = order.items.filter((i) => i.canceledAt === null);
+  const canCancelItems =
+    order.status === 'PAID' &&
+    (order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED') &&
+    order.payment.method !== 'VIRTUAL_ACCOUNT' &&
+    liveItems.length >= 2;
+
+  const refundedCash = order.refunds.reduce((sum, r) => sum + r.amount, 0);
+  const refundedPoints = order.refunds.reduce((sum, r) => sum + r.points, 0);
+  const shippingDeducted = order.refunds.reduce((sum, r) => sum + r.shippingDeducted, 0);
+
   const activeReturn = order.returnRequests[0] ?? null;
   /**
    * 신청 버튼은 신청할 수 있을 때만.
@@ -177,8 +194,8 @@ export default async function OrderPage({
           {t('checkout.items')} <span className="tnum text-[var(--fg-muted)]">{order.items.length}</span>
         </h2>
         <ul className="flex flex-col gap-3">
-          {order.items.map((i, idx) => (
-            <li key={idx} className="flex items-center justify-between gap-3">
+          {order.items.map((i) => (
+            <li key={i.id} className={`flex items-center justify-between gap-3 ${i.canceledAt ? 'opacity-60' : ''}`}>
               {/*
                 **주문에 박아 둔 사진이다.** 살아 있는 상품에서 다시 읽지
                 않는다 — 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
@@ -200,7 +217,15 @@ export default async function OrderPage({
               )}
               <span className="flex flex-1 flex-col gap-0.5">
                 <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brandName}</span>
-                <span className="text-[13px]">{i.productName}</span>
+                <span className="text-[13px]">
+                  {i.productName}
+                  {/* 흐리게만 하면 색을 못 보는 사람에게는 취소됐는지 알 길이 없다 */}
+                  {i.canceledAt && (
+                    <span className="ml-1.5 rounded-full border border-[var(--border-strong)] px-1.5 py-px text-[10px] text-[var(--fg-secondary)]">
+                      {t('order.lineCanceled')}
+                    </span>
+                  )}
+                </span>
                 <span className="text-[11px] text-[var(--fg-muted)]">
                   {i.optionLabel} · <span className="tnum">{i.quantity}</span>
                 </span>
@@ -228,6 +253,13 @@ export default async function OrderPage({
             <dt className="text-[15px] font-semibold">{t('order.payable')}</dt>
             <dd className="tnum text-xl font-semibold">{money(order.payable)}</dd>
           </div>
+          {/*
+            **돌려준 것을 결제 금액 아래에 따로 적는다.** 결제 금액을 줄여 보여 주면 카드 명세서와
+            안 맞는다 — 결제는 그 금액으로 됐고, 그중 일부가 돌아왔다.
+          */}
+          {refundedCash > 0 && row(t('order.refundedCash'), `-${money(refundedCash)}`, true)}
+          {refundedPoints > 0 && row(t('order.refundedPoints'), `${formatNumber(locale, refundedPoints)}P`)}
+          {shippingDeducted > 0 && row(t('order.shippingDeducted'), money(shippingDeducted))}
         </dl>
         <p className="mt-2.5 text-right text-[11px] text-[var(--fg-muted)]">
           {t('order.rewardOnConfirm', { points: formatNumber(locale, order.rewardPoints) })}
@@ -314,6 +346,15 @@ export default async function OrderPage({
             method={order.payment?.method ?? 'CARD'}
             orderName={orderNameOf(order.items, t)}
             paymentMode={repayMode}
+          />
+        )}
+        {canCancelItems && (
+          <CancelItemsForm
+            orderNo={order.orderNo}
+            items={liveItems.map((i) => ({
+              id: i.id, productName: i.productName, optionLabel: i.optionLabel,
+              quantity: i.quantity, subtotal: i.subtotal,
+            }))}
           />
         )}
         {isCancellableByCustomer(order.status) && (

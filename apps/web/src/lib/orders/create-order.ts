@@ -10,7 +10,7 @@ import type {
   CreateOrderRequest, CreateOrderResponse, OrderErrorCode,
 } from '@shop/contract';
 import { ORDER_ERROR_MESSAGE } from '@shop/contract';
-import { quoteCart } from '~/lib/queries/cart';
+import { quoteCartDetailed } from '~/lib/queries/cart';
 import { releaseAbandonedHolds } from './release-holds';
 import { afterResponse } from '~/lib/api/after-response';
 import { notifyLowStock } from '~/lib/notifications/low-stock';
@@ -98,7 +98,7 @@ export async function createOrder(
   if (shippingRead.status === 'rejected') throw shippingRead.reason;
   const shipping = shippingRead.value;
 
-  const quote = await quoteCart(
+  const { quote, allocations, shippingPolicy } = await quoteCartDetailed(
     {
       lines: input.lines,
       ...(input.couponCode ? { couponCode: input.couponCode } : {}),
@@ -129,8 +129,18 @@ export async function createOrder(
   if (detailsRead.status === 'rejected') throw detailsRead.reason;
   const details = detailsRead.value;
 
-  const items: OrderItemDraft[] = buyable.map((l) => {
+  /*
+   * 견적의 몫은 **살 수 있는 줄의 순서**로 온다(수량 0 인 줄은 계산에 안 들어간다) —
+   * 여기 `buyable` 과 같은 거름이다. 순서가 어긋나면 쿠폰 몫이 엉뚱한 줄에 박히므로
+   * 길이부터 맞춰 본다.
+   */
+  if (allocations.length !== buyable.length) {
+    throw new Error(`줄 몫(${allocations.length})과 살 수 있는 줄(${buyable.length})의 수가 다르다`);
+  }
+
+  const items: OrderItemDraft[] = buyable.map((l, index) => {
     const d = details.get(l.variantId);
+    const share = allocations[index]!;
     return {
       variantId: l.variantId,
       merchantId: d?.merchantId ?? null,
@@ -142,6 +152,9 @@ export async function createOrder(
       unitPrice: won(l.unitPrice),
       quantity: l.quantity,
       subtotal: won(l.subtotal),
+      couponShare: share.couponShare,
+      pointsShare: share.pointsShare,
+      rewardShare: share.rewardShare,
     };
   });
 
@@ -272,6 +285,8 @@ export async function createOrder(
             locale,
             idempotencyKey: input.idempotencyKey ?? null,
             usedCouponId,
+            // 부분 취소가 배송비를 뗄 때 **주문한 날의 기준**을 쓴다
+            shippingPolicy: { ...shippingPolicy },
             items: {
               create: items.map((i) => ({
                 variantId: i.variantId,
@@ -284,6 +299,9 @@ export async function createOrder(
                 unitPrice: i.unitPrice,
                 quantity: i.quantity,
                 subtotal: i.subtotal,
+                couponShare: i.couponShare,
+                pointsShare: i.pointsShare,
+                rewardShare: i.rewardShare,
                 status: INITIAL_ORDER_STATUS,
               })),
             },

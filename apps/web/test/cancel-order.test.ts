@@ -10,11 +10,18 @@ const tx = vi.hoisted(() => ({
   productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
   user: { update: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
+  orderRefund: { create: vi.fn<(...a: any[]) => any>() },
   userCoupon: { update: vi.fn<(...a: any[]) => any>() },
   payment: { update: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
 }));
-const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
+const db = vi.hoisted(() => ({
+  order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  // 앞서 돌려준 것 — 기본은 없다(부분 취소가 없던 주문)
+  orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
+  pointTransaction: { findFirst: vi.fn<(...a: any[]) => any>() },
+  $transaction: vi.fn<(...a: any[]) => any>(),
+}));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 /** 게이트웨이를 언제 만드는지 보려고 가로챈다 */
@@ -50,6 +57,10 @@ const gateway = (): PaymentGateway => ({
 beforeEach(() => {
   vi.clearAllMocks();
   db.order.findFirst.mockResolvedValue(order());
+  db.orderRefund.aggregate.mockResolvedValue({
+    _sum: { amount: null, points: null, shippingDeducted: null }, _count: { _all: 0 },
+  });
+  db.pointTransaction.findFirst.mockResolvedValue(null);
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.order.updateMany.mockResolvedValue({ count: 1 });
 });
@@ -226,5 +237,45 @@ describe('결제가 잡히지 않은 주문', () => {
 
     expect(result.refunded).toBe(0);
     expect(result.status).toBe('CANCELLED');
+  });
+});
+
+describe('일부 취소한 뒤의 전액 취소', () => {
+  /*
+   * 한 줄을 먼저 취소한 주문을 나중에 전부 취소할 때, 주문에 적힌 결제액·포인트를 통째로
+   * 돌려주면 그 줄 몫이 **두 번** 나간다. 이미 돌아온 재고도 다시 올리면 없는 물건이 생긴다.
+   */
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(order({
+      items: [
+        { id: 'i-1', variantId: 'v-coat-m', quantity: 2, canceledAt: null },
+        { id: 'i-2', variantId: 'v-knit-l', quantity: 1, canceledAt: new Date('2026-09-10') },
+      ],
+      payment: { id: 'p-1', status: 'PARTIAL_CANCELED', pgPaymentKey: 'pk_1', refundedAmount: 40_000 },
+    }));
+    db.orderRefund.aggregate.mockResolvedValue({
+      _sum: { amount: 40_000, points: 1_000, shippingDeducted: 3_000 }, _count: { _all: 1 },
+    });
+  });
+
+  it('남은 돈과 남은 포인트만 돌려준다', async () => {
+    const result = await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(result).toMatchObject({ refunded: 286_000 - 40_000, pointsReturned: 2_000 });
+    expect(tx.payment.update.mock.calls[0]![0].data.refundedAmount).toBe(286_000);
+  });
+
+  it('이미 취소된 줄의 재고는 다시 올리지 않는다', async () => {
+    await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(tx.productVariant.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-coat-m' }, data: { stock: { increment: 2 } },
+    });
+  });
+
+  it('환불 기록을 남기고, 앞서 뗀 배송비는 돌려준 것으로 적는다', async () => {
+    await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(tx.orderRefund.create.mock.calls[0]![0].data).toMatchObject({
+      amount: 246_000, points: 2_000, shippingDeducted: -3_000, kind: 'CANCEL', itemIds: ['i-1'],
+    });
   });
 });

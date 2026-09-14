@@ -3,6 +3,7 @@ import {
 } from './money';
 import { calculateShipping, type ShippingPolicy, type ShippingResult } from './shipping';
 import { GRADE_REWARD_PERCENT } from './grade';
+import { allocateOrderLines, type LineShare } from './partial-cancel';
 
 export interface CartLine {
   readonly variantId: string;
@@ -81,6 +82,13 @@ export interface CartTotals {
   readonly payable: Won;
   /** 구매 확정 시 적립 예정 포인트 */
   readonly rewardPoints: Won;
+  /**
+   * 줄마다 나눈 쿠폰·포인트·적립. `lines` 와 같은 순서다.
+   *
+   * 주문을 만들 때 줄에 박아 둔다. 나중에 줄 하나를 취소할 때 그 줄 몫을 알아야 하는데,
+   * 그때 가서 나누면 어느 줄이 쿠폰 대상이었는지 이미 알 수 없다(상품의 분류가 바뀐다).
+   */
+  readonly allocations: readonly LineShare[];
 }
 
 /** 포인트 최소 사용 단위 */
@@ -107,7 +115,7 @@ export function calculateCart(input: CartInput): CartTotals {
       lines: [], listTotal: ZERO, productDiscount: ZERO, merchandiseTotal: ZERO,
       couponDiscount: ZERO, pointsUsed: ZERO,
       shipping: { ...shipping, fee: ZERO, remainingForFree: ZERO },
-      payable: ZERO, rewardPoints: ZERO,
+      payable: ZERO, rewardPoints: ZERO, allocations: [],
     };
   }
 
@@ -159,10 +167,42 @@ export function calculateCart(input: CartInput): CartTotals {
   const rewardBase = afterPoints;
   const rewardPoints = percentOf(rewardBase, input.rewardPercent ?? DEFAULT_REWARD_PERCENT);
 
+  const eligible = couponEligibility(input.coupon, input.lines);
+  const allocations = allocateOrderLines(
+    lines.map((l, i) => ({ subtotal: l.subtotal, couponEligible: eligible[i]! })),
+    { couponDiscount, pointsUsed, rewardPoints },
+  );
+
   return {
     lines, listTotal, productDiscount, merchandiseTotal,
-    couponDiscount, pointsUsed, shipping, payable, rewardPoints,
+    couponDiscount, pointsUsed, shipping, payable, rewardPoints, allocations,
   };
+}
+
+/**
+ * 줄마다 쿠폰 대상인가. 대상이 정해지지 않은 쿠폰(또는 쿠폰 없음)이면 모든 줄이다.
+ *
+ * 합계를 내는 곳(couponBaseOf)과 줄마다 할인을 나누는 곳(allocateOrderLines)이 같은 판정을
+ * 써야 한다 — 따로 판정하면 나눈 할인의 합이 실제 할인과 어긋난다.
+ */
+function couponEligibility(
+  coupon: Coupon | undefined,
+  inputLines: readonly CartLine[],
+): boolean[] {
+  const scope = coupon?.scope;
+  if (!scope) return inputLines.map(() => true);
+
+  const has = (list: readonly string[] | undefined, value: string | undefined) =>
+    list !== undefined && list.length > 0 && value !== undefined && list.includes(value);
+
+  // 셋 중 하나라도 걸리면 대상이다. 브랜드 전체를 열어 두고 그중 한 상품을
+  // 따로 지정하는 식으로 겹쳐 쓸 수 있어야 한다.
+  return inputLines.map(
+    (line) =>
+      has(scope.productIds, line.productId) ||
+      has(scope.brandIds, line.brandId) ||
+      has(scope.categoryIds, line.categoryId),
+  );
 }
 
 /** 쿠폰 대상 줄들의 판매가 합계. 대상이 없으면 전체 합계. */
@@ -171,26 +211,8 @@ function couponBaseOf(
   inputLines: readonly CartLine[],
   totals: readonly CartLineTotal[],
 ): Won {
-  const all = add(...totals.map((l) => l.subtotal));
-  const scope = coupon?.scope;
-  if (!scope) return all;
-
-  const has = (list: readonly string[] | undefined, value: string | undefined) =>
-    list !== undefined && list.length > 0 && value !== undefined && list.includes(value);
-
-  // 셋 중 하나라도 걸리면 대상이다. 브랜드 전체를 열어 두고 그중 한 상품을
-  // 따로 지정하는 식으로 겹쳐 쓸 수 있어야 한다.
-  const eligible = totals.filter((_, i) => {
-    const line = inputLines[i];
-    if (!line) return false;
-    return (
-      has(scope.productIds, line.productId) ||
-      has(scope.brandIds, line.brandId) ||
-      has(scope.categoryIds, line.categoryId)
-    );
-  });
-
-  return add(...eligible.map((l) => l.subtotal));
+  const eligible = couponEligibility(coupon, inputLines);
+  return add(...totals.filter((_, i) => eligible[i]).map((l) => l.subtotal));
 }
 
 function couponDiscountOf(coupon: Coupon | undefined, base: Won): Won {

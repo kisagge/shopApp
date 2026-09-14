@@ -195,11 +195,38 @@ describe('주문 상태는 가장 뒤처진 줄을 따른다', () => {
 
   it('이행 경로 밖의 상태가 섞이면 주문을 옮기지 않는다', async () => {
     db.order.findFirst.mockResolvedValue(mixedOrder('PAID'));
-    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'CANCELLED' }]);
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'RETURNED' }]);
 
     const r = await transitionOrder('20260831-1234567', 'PREPARING', merchantA);
     expect(r.waitingForOthers).toBe(true);
     expect(tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('출고 전에 취소된 줄은 기다리지 않는다 — 남은 줄이 주문을 옮긴다', async () => {
+    /*
+     * 예전에는 위와 같은 결과(안 옮김)였다. 부분 취소가 생기자 그러면 한 줄을 취소하고
+     * 나머지를 준비한 주문이 결제완료에 영영 머문다.
+     */
+    db.order.findFirst.mockResolvedValue(mixedOrder('PAID'));
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'CANCELLED' }]);
+
+    const r = await transitionOrder('20260831-1234567', 'PREPARING', merchantA);
+    expect(r.orderStatus).toBe('PREPARING');
+    expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('PREPARING');
+  });
+
+  it('취소된 줄은 옮기지 않는다 — 넣으면 남은 줄까지 못 보낸다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...mixedOrder('PAID'),
+      items: [
+        { id: 'i-a', status: 'PAID', merchantId: 'm-a', canceledAt: null },
+        { id: 'i-x', status: 'CANCELLED', merchantId: 'm-a', canceledAt: new Date() },
+      ],
+    });
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'CANCELLED' }]);
+
+    await transitionOrder('20260831-1234567', 'PREPARING', merchantA);
+    expect(tx.orderItem.updateMany.mock.calls[0]![0].where.id).toEqual({ in: ['i-a'] });
   });
 
   it('주문이 뒤처져 있으면 한 홉을 건너뛰어서라도 따라간다', async () => {

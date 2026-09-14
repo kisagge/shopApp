@@ -57,6 +57,8 @@ export async function previewSettlements(
       by: ['merchantId'],
       where: {
         merchantId: { not: null },
+        // 출고 전에 취소된 줄은 판 것이 아니다. 주문은 구매확정이어도 그 줄은 돈이 돌아갔다
+        canceledAt: null,
         order: { status: SETTLEMENT_SALE_STATUS, confirmedAt: { gte: period.start, lt: period.end } },
       },
       _sum: { subtotal: true },
@@ -78,11 +80,14 @@ export async function previewSettlements(
       by: ['merchantId'],
       where: {
         merchantId: { not: null },
-        order: {
-          status: { in: [...REFUND_STATUS] },
-          confirmedAt: { not: null },
-          canceledAt: { gte: period.start, lt: period.end },
-        },
+        canceledAt: { gte: period.start, lt: period.end },
+        /*
+         * **주문 상태 조건을 지우지 않는다.** 출고 전에 일부 취소한 줄은 위의 판매에서 빠진다
+         * (canceledAt: null). 그 주문이 나중에 구매확정되면 confirmedAt 이 차므로, 여기서
+         * 상태를 안 보면 **판 적 없는 줄을 한 번 더 뺀다** — 가맹점이 두 번 깎인다. 차감은
+         * 정산에 실린 뒤 주문째 되돌아간 것뿐이다.
+         */
+        order: { status: { in: [...REFUND_STATUS] }, confirmedAt: { not: null } },
       },
       _sum: { subtotal: true },
     }),

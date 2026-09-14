@@ -238,8 +238,15 @@ const BRANCH_STATUS: readonly OrderStatus[] = ORDER_STATUS.filter(
  * 취소라는 별도 정책이 필요한 이야기지, 여기서 고를 문제가 아니다.
  */
 export function orderStatusFromItems(
-  statuses: readonly OrderStatus[],
+  all: readonly OrderStatus[],
 ): OrderStatus | null {
+  /*
+   * **부분 취소한 줄은 셈에서 뺀다.** 세 줄 중 하나를 출고 전에 취소하고 둘을 보냈으면
+   * 주문은 배송중이다. 빼지 않으면 취소가 갈래라서 "모든 줄이 같은 갈래" 가 아니게 되고,
+   * 주문이 결제완료에 영영 머문다. 전부 취소됐으면 그대로 취소다.
+   */
+  const live = all.filter((status) => status !== 'CANCELLED');
+  const statuses = live.length === 0 ? all : live;
   const [first] = statuses;
   if (first !== undefined && BRANCH_STATUS.includes(first)) {
     return statuses.every((status) => status === first) ? first : null;

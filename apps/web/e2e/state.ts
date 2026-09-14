@@ -32,6 +32,8 @@ export const STATE_FILE = {
   orderSearch: 'test-results/.auth/order-search.json',
   /** 재고를 기준 너머로 내리는 손님 — low-stock-alert */
   lowStockBuyer: 'test-results/.auth/low-stock-buyer.json',
+  /** 두 줄을 사서 한 줄만 취소한다 — partial-cancel */
+  partialCanceler: 'test-results/.auth/partial-cancel.json',
 } as const;
 
 /**
@@ -65,6 +67,8 @@ export const RACE_PRODUCT = {
    * **스튜디오눈 상품이어야 한다** — 가맹점 계정(merchant)이 그 가맹점이다.
    */
   lowStock: 'long-goose-down',
+  /** 두 사이즈를 한 줄씩 사서 하나를 취소한다 — partial-cancel. 옵션이 둘 이상 있어야 한다 */
+  partialCancel: 'light-down-vest',
 } as const;
 
 export const REVIEW_PRODUCT = {

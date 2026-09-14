@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   calculateCart, discountRateOf, won, ZERO,
-  type CartLine, type Coupon,
+  type CartLine, type Coupon, type LineShare, type ShippingPolicy,
   couponOffers, bestCoupon,
 } from '@shop/core';
 import {
@@ -27,6 +27,21 @@ type QuoteInput = Omit<CartQuoteRequest, 'useCoupon'> & { readonly useCoupon?: b
 
 export async function quoteCart(
   input: QuoteInput,
+  viewer: { id: string; pointBalance: number; rewardPercent?: number } | null,
+): Promise<CartQuoteResponse> {
+  return (await quoteCartDetailed(input, viewer)).quote;
+}
+
+/**
+ * 견적과 함께, **화면에는 안 내려가는** 주문용 값을 준다.
+ *
+ * - `allocations`: 살 수 있는 줄(수량 > 0)마다 나눈 쿠폰·포인트·적립. 주문이 줄에 박는다.
+ * - `shippingPolicy`: 이 견적을 계산한 배송비 정책. 주문이 스냅샷으로 남긴다.
+ *
+ * 응답에 얹지 않는 이유 — 브라우저가 알 필요가 없고, 견적 응답 모양이 계약이다.
+ */
+export async function quoteCartDetailed(
+  input: QuoteInput,
   /**
    * 보는 사람. **적립률을 함께 받는다.**
    *
@@ -37,7 +52,11 @@ export async function quoteCart(
    * 비회원은 null 이고, 그때는 기본 적립률이 적용된다.
    */
   viewer: { id: string; pointBalance: number; rewardPercent?: number } | null,
-): Promise<CartQuoteResponse> {
+): Promise<{
+  quote: CartQuoteResponse;
+  allocations: readonly LineShare[];
+  shippingPolicy: ShippingPolicy;
+}> {
   const requested = new Map(input.lines.map((l) => [l.variantId, l.quantity]));
 
   const variants = await prisma.productVariant.findMany({
@@ -149,8 +168,10 @@ export async function quoteCart(
 
   const pointsAvailable = won(viewer?.pointBalance ?? 0);
 
+  const shippingPolicy = await getShippingPolicy();
+
   if (payableLines.length === 0) {
-    return {
+    return { allocations: [], shippingPolicy, quote: {
       lines,
       listTotal: ZERO, productDiscount: ZERO, merchandiseTotal: ZERO,
       couponDiscount: ZERO, couponName: null, couponCode: null,
@@ -159,7 +180,7 @@ export async function quoteCart(
       pointsUsed: ZERO, pointsAvailable,
       shippingFee: ZERO, isFreeShipping: false, remainingForFreeShipping: ZERO,
       payable: ZERO, rewardPoints: ZERO,
-    };
+    } };
   }
 
   /*
@@ -202,12 +223,12 @@ export async function quoteCart(
      * 바닥값을 쓰고, 운영이 바꿔 둔 무료 기준이 **견적에만 반영되지 않는다** —
      * 상품 화면은 3만원이라고 적어 놓고 결제는 5만원으로 계산하는 상태다.
      */
-    shippingPolicy: await getShippingPolicy(),
+    shippingPolicy,
     // 등급별 적립률. 없으면 calculateCart 가 기본값을 쓴다.
     ...(viewer?.rewardPercent === undefined ? {} : { rewardPercent: viewer.rewardPercent }),
   });
 
-  return {
+  return { allocations: totals.allocations, shippingPolicy, quote: {
     lines,
     listTotal: totals.listTotal,
     productDiscount: totals.productDiscount,
@@ -238,7 +259,7 @@ export async function quoteCart(
     remainingForFreeShipping: totals.shipping.remainingForFree,
     payable: totals.payable,
     rewardPoints: totals.rewardPoints,
-  };
+  } };
 }
 
 function emptyLine(

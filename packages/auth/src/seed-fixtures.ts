@@ -64,10 +64,14 @@ export const SEED_ACCOUNT = {
 
   /** 재고를 기준 너머로 내려 가맹점 알림을 부른다 */
   lowStockBuyer: 'low-stock-buyer@plain.test',
+
+  /** 두 줄을 사서 한 줄만 취소한다 — 자기 주문과 자기 장바구니가 있어야 한다 */
+  partialCanceler: 'partial-cancel@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
+  'partialCanceler',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

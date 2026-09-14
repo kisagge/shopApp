@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
   funnelFromCounts, computeFunnel, won, FUNNEL_STEP, MERCHANT_FUNNEL_STEP,
-  rangeStart, DASHBOARD_RANGE_LABEL, netRevenue, REFUND_STATUS,
+  rangeStart, DASHBOARD_RANGE_LABEL, netRevenue,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
   type EventName, LOW_STOCK_THRESHOLD,
 } from '@shop/core';
@@ -21,12 +21,12 @@ import { assertAdminQuery, scopeOf, maskName } from './scope';
 /** 결제가 성립한 주문 — 돈이 들어온 시각이 있는 것 */
 const paidIn = (from: Date) => ({ paidAt: { gte: from } });
 
-/** 돈이 되돌아간 주문 — 결제된 적 있고, 이 기간에 환불된 것 */
-const refundedIn = (from: Date) => ({
-  status: { in: [...REFUND_STATUS] },
-  paidAt: { not: null },
-  canceledAt: { gte: from },
-});
+/*
+ * **환불은 주문 상태로 세지 않는다.** 예전에는 "환불 상태이고 결제된 적 있는 주문의 결제액"
+ * 이었는데, 일부만 취소한 주문은 결제완료인 채로 남는다 — 돈은 나갔는데 어디서도 안
+ * 빠진다. 플랫폼은 환불 기록(order_refunds)의 합으로, 가맹점은 자기 줄의 취소 시각으로 뺀다.
+ * 옛 환불은 마이그레이션이 같은 조건으로 옮겨 적었다.
+ */
 
 export interface DashboardKpi {
   /** 들어온 돈 */
@@ -106,7 +106,6 @@ export async function getDashboard(
 
   const mine = scope ? { items: { some: { merchantId: scope } } } : {};
   const soldWhere = { ...paidIn(since), ...mine };
-  const backWhere = { ...refundedIn(since), ...mine };
 
   const [soldAgg, soldItems, backAgg, backItems, todo, topRows, recent, daily, funnel] =
     await Promise.all([
@@ -122,10 +121,11 @@ export async function getDashboard(
             _sum: { subtotal: true },
           })
         : Promise.resolve(null),
-      prisma.order.aggregate({ where: backWhere, _sum: { payable: true } }),
+      prisma.orderRefund.aggregate({ where: { createdAt: { gte: since } }, _sum: { amount: true } }),
       scope
         ? prisma.orderItem.aggregate({
-            where: { merchantId: scope, order: backWhere },
+            // 결제된 적 없는 주문의 줄은 매출에 들어간 적도 없다
+            where: { merchantId: scope, canceledAt: { gte: since }, order: { paidAt: { not: null } } },
             _sum: { subtotal: true },
           })
         : Promise.resolve(null),
@@ -138,7 +138,7 @@ export async function getDashboard(
 
   const totals = netRevenue(
     scope ? (soldItems?._sum.subtotal ?? 0) : (soldAgg._sum.payable ?? 0),
-    scope ? (backItems?._sum.subtotal ?? 0) : (backAgg._sum.payable ?? 0),
+    scope ? (backItems?._sum.subtotal ?? 0) : (backAgg._sum.amount ?? 0),
   );
   const revenue = totals.gross;
   const orderCount = soldAgg._count._all;
@@ -185,7 +185,9 @@ async function loadTopProducts(scope: string | null, since: Date): Promise<TopPr
     by: ['productName', 'brandName'],
     where: {
       ...(scope ? { merchantId: scope } : {}),
-      order: { ...paidIn(since), NOT: { status: { in: [...REFUND_STATUS] } } },
+      // 취소된 줄은 빼고 센다. 주문 상태로 거르면 일부 취소한 주문의 취소 줄이 남는다
+      canceledAt: null,
+      order: paidIn(since),
     },
     _sum: { quantity: true, subtotal: true },
     orderBy: { _sum: { subtotal: 'desc' } },
@@ -244,12 +246,11 @@ async function loadDailyRevenue(scope: string | null, since: Date): Promise<Dail
           from orders o join order_items i on i."orderId" = o.id
           where i."merchantId" = ${scope} and o."paidAt" >= ${since}
           union all
-          select to_char((o."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+          select to_char((i."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
                  -i.subtotal as amount
           from orders o join order_items i on i."orderId" = o.id
           where i."merchantId" = ${scope}
-            and o.status = any(${REFUND_STATUS}::"OrderStatus"[])
-            and o."paidAt" is not null and o."canceledAt" >= ${since}
+            and o."paidAt" is not null and i."canceledAt" >= ${since}
         ) t group by 1 order by 1`
     : await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
         select date, sum(amount)::bigint as revenue from (
@@ -257,11 +258,10 @@ async function loadDailyRevenue(scope: string | null, since: Date): Promise<Dail
                  o.payable as amount
           from orders o where o."paidAt" >= ${since}
           union all
-          select to_char((o."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
-                 -o.payable as amount
-          from orders o
-          where o.status = any(${REFUND_STATUS}::"OrderStatus"[])
-            and o."paidAt" is not null and o."canceledAt" >= ${since}
+          select to_char((r."createdAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
+                 -r.amount as amount
+          from order_refunds r
+          where r."createdAt" >= ${since}
         ) t group by 1 order by 1`;
 
   return rows.map((r) => ({ date: r.date, revenue: Number(r.revenue) }));

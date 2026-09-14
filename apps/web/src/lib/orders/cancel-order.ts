@@ -1,11 +1,12 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  isCancellableByCustomer, transition, canRefundOrder, ORDER_STATUS_LABEL,
+  isCancellableByCustomer, transition, canRefundOrder, remainingRefund, ORDER_STATUS_LABEL,
   type Actor, type PaymentGateway,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { refundedSoFar } from './refund-ledger';
 
 export class CancelError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -18,6 +19,7 @@ export interface CancelResult {
   readonly orderNo: string;
   readonly status: string;
   readonly refunded: number;
+  readonly pointsReturned: number;
 }
 
 /**
@@ -54,7 +56,7 @@ export async function cancelOrder(
     select: {
       id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
       pointsUsed: true, payable: true, usedCouponId: true,
-      items: { select: { variantId: true, quantity: true } },
+      items: { select: { id: true, variantId: true, quantity: true, canceledAt: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
     },
   });
@@ -83,6 +85,18 @@ export async function cancelOrder(
   // 상태머신이 허용하지 않는 전이는 여기서 막힌다
   const nextStatus = transition(order.status, 'CANCELLED');
 
+  /*
+   * **돌려줄 것은 받은 것 − 이미 돌려준 것이다.** 한 줄을 먼저 취소한 주문을 전부 취소할 때
+   * 주문에 적힌 결제액을 통째로 돌려주면 그 줄 몫이 두 번 나간다. 이미 취소된 줄의 재고도
+   * 이미 돌아와 있다 — 남은 줄만 푼다.
+   */
+  const soFar = await refundedSoFar(prisma, order);
+  const rest = remainingRefund({
+    payable: order.payable, cashRefunded: soFar.cash,
+    pointsUsed: order.pointsUsed, pointsReturned: soFar.points,
+  });
+  const live = order.items.filter((i) => !i.canceledAt);
+
   // ── PG 취소는 트랜잭션 밖에서. 실제로 돈이 나간 경우에만 부른다.
   let refunded = 0;
   const captured = order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED';
@@ -90,13 +104,13 @@ export async function cancelOrder(
     // 여기서야 필요하다. 여기까지 오지 않으면 만들지 않는다.
     const result = await (gateway ?? getPaymentGateway()).cancel({
       paymentKey: order.payment.pgPaymentKey,
-      amount: null, // 전액 취소
+      amount: null, // 남은 금액 전부 — PG 는 이미 부분 취소된 몫을 빼고 돌려준다
       reason,
       // 같은 취소를 두 번 보내도 한 번만 처리되게 한다. 재시도로 두 번
       // 환불되는 사고를 막는 유일한 장치다.
       idempotencyKey: `cancel-${order.orderNo}`,
     });
-    refunded = order.payable;
+    refunded = rest.cash;
     void result;
   }
 
@@ -108,10 +122,14 @@ export async function cancelOrder(
     });
     if (count === 0) throw new CancelError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
-    await tx.orderItem.updateMany({ where: { orderId: order.id }, data: { status: nextStatus } });
+    const now = new Date();
+    await tx.orderItem.updateMany({
+      where: { orderId: order.id, canceledAt: null },
+      data: { status: nextStatus, canceledAt: now },
+    });
 
     // ── 재고 복원. 잠긴 재고를 풀지 않으면 팔 수 있는 물건이 영영 묶인다.
-    for (const item of order.items) {
+    for (const item of live) {
       await tx.productVariant.updateMany({
         where: { id: item.variantId },
         data: { stock: { increment: item.quantity } },
@@ -119,15 +137,15 @@ export async function cancelOrder(
     }
 
     // ── 포인트 복원. 잔액만 올리지 않고 원장에도 남긴다.
-    if (order.pointsUsed > 0) {
+    if (rest.points > 0) {
       await tx.user.update({
         where: { id: order.userId },
-        data: { pointBalance: { increment: order.pointsUsed } },
+        data: { pointBalance: { increment: rest.points } },
       });
       await tx.pointTransaction.create({
         data: {
           userId: order.userId,
-          amount: order.pointsUsed,
+          amount: rest.points,
           reason: 'CANCEL_REFUND',
           orderId: order.id,
           note: `주문 ${order.orderNo} 취소`,
@@ -149,7 +167,25 @@ export async function cancelOrder(
         data: {
           status: captured ? 'CANCELED' : 'ABORTED',
           refundedAmount: order.payment.refundedAmount + refunded,
-          canceledAt: new Date(),
+          canceledAt: now,
+        },
+      });
+    }
+
+    // 돈이나 포인트가 돌아갔으면 한 줄 남긴다. 매출은 이 표의 합으로 환불을 뺀다
+    if (refunded > 0 || rest.points > 0) {
+      await tx.orderRefund.create({
+        data: {
+          orderId: order.id,
+          amount: refunded,
+          points: rest.points,
+          // 앞선 부분 취소에서 뗀 배송비는 돌려준다 — 보낸 물건이 없다
+          shippingDeducted: -soFar.shippingDeducted,
+          itemIds: live.map((i) => i.id),
+          kind: 'CANCEL',
+          reason,
+          actorId: actor.id,
+          idempotencyKey: `cancel-${order.orderNo}`,
         },
       });
     }
@@ -183,7 +219,7 @@ export async function cancelOrder(
       orderId: order.orderNo,
       merchantId: null,
       value: refunded,
-      quantity: order.items.reduce((sum, i) => sum + i.quantity, 0),
+      quantity: live.reduce((sum, i) => sum + i.quantity, 0),
       props: { reason, byStaff: isStaff },
     });
   }
@@ -192,5 +228,6 @@ export async function cancelOrder(
     orderNo: order.orderNo,
     status: refunded > 0 ? 'REFUNDED' : nextStatus,
     refunded,
+    pointsReturned: rest.points,
   };
 }

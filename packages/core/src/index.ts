@@ -54,3 +54,4 @@ export * from './rate-limit';
 export * from './order-blocker';
 export * from './csv';
 export * from './shipment-upload';
+export * from './partial-cancel';

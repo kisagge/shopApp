@@ -76,6 +76,19 @@ describe('초안 계산', () => {
     expect(where.order.status).toEqual({ in: ['CANCELLED', 'REFUNDED'] });
   });
 
+  it('출고 전에 일부 취소된 줄은 판매에서 빼고, 차감에도 넣지 않는다', async () => {
+    /*
+     * 판매는 취소 안 된 줄만, 차감은 주문째 되돌아간 것만. 차감에서 주문 상태를 빼면 일부
+     * 취소 뒤 구매확정된 주문의 취소 줄이 판매에선 빠지고 차감에만 잡혀 가맹점이 깎인다.
+     */
+    await previewSettlements(admin, '2026-08');
+    const sale = db.orderItem.groupBy.mock.calls[0]?.[0].where;
+    const refund = db.orderItem.groupBy.mock.calls[1]?.[0].where;
+    expect(sale.canceledAt).toBeNull();
+    expect(refund.canceledAt).toBeDefined();
+    expect(refund.order.status.in).not.toContain('CONFIRMED');
+  });
+
   it('매출과 차감이 같은 상태를 세지 않는다 — 같은 돈을 더하고 빼게 된다', async () => {
     await previewSettlements(admin, '2026-08');
     const sale = db.orderItem.groupBy.mock.calls[0]?.[0].where.order.status;

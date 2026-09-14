@@ -2,11 +2,12 @@ import 'server-only';
 import { reclaimPurchaseReward } from '~/lib/orders/reclaim-reward';
 import { prisma } from '@shop/db';
 import {
-  transition, canRefundOrder, ORDER_STATUS_LABEL,
+  transition, canRefundOrder, remainingRefund, ORDER_STATUS_LABEL,
   type Actor, type PaymentGateway,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { refundedSoFar } from '~/lib/orders/refund-ledger';
 
 export class RefundError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -53,7 +54,7 @@ export async function refundOrder(
     select: {
       id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
       pointsUsed: true, payable: true, usedCouponId: true, canceledAt: true,
-      items: { select: { id: true, variantId: true, quantity: true } },
+      items: { select: { id: true, variantId: true, quantity: true, canceledAt: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
     },
   });
@@ -114,14 +115,23 @@ export async function refundOrder(
    * 외부 호출은 롤백할 수 없다. 실패하면 아무것도 바꾸지 않은 채로 끝나는
    * 것이 맞고, 성공한 뒤 DB 가 실패하면 같은 키로 다시 시도하면 된다.
    */
-  const before = await prisma.pointTransaction.findFirst({
-    where: { orderId: order.id, reason: 'CANCEL_REFUND' },
-    select: { id: true },
+  /*
+   * **돌려줄 것은 받은 것 − 이미 돌려준 것이다.** 예전에는 포인트 원장에 돌려준 흔적이
+   * 하나라도 있으면 건너뛰었다. 부분 취소가 생기자 그 흔적은 "일부만 돌려줬다" 일 수 있게
+   * 됐고, 그대로 두면 **남은 포인트를 영영 안 돌려준다.** 환불 기록의 합으로 센다(옛 주문은
+   * refundedSoFar 가 원장으로 판단한다).
+   */
+  const soFar = await refundedSoFar(prisma, order);
+  const rest = remainingRefund({
+    payable: order.payable, cashRefunded: soFar.cash,
+    pointsUsed: order.pointsUsed, pointsReturned: soFar.points,
   });
+  // 출고 전에 일부 취소된 줄은 재고가 이미 돌아와 있다
+  const live = order.items.filter((i) => !i.canceledAt);
 
   await gateway.cancel({
     paymentKey: order.payment.pgPaymentKey,
-    amount: null, // 전액 환불. 부분 환불은 아직 다루지 않는다.
+    amount: null, // 남은 금액 전부. 앞선 부분 취소 몫은 PG 가 이미 빼고 있다
     reason,
     // 같은 환불을 두 번 보내도 한 번만 처리되게 한다. 재시도로 두 번 돈이
     // 나가는 사고를 막는 유일한 장치다.
@@ -129,7 +139,7 @@ export async function refundOrder(
   });
 
   const now = new Date();
-  const refunded = order.payable;
+  const refunded = rest.cash;
   let stockRestored = 0;
   let pointsReturned = 0;
   let rewardReclaimed = 0;
@@ -151,10 +161,13 @@ export async function refundOrder(
     });
     if (count === 0) throw new RefundError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
-    await tx.orderItem.updateMany({ where: { orderId: order.id }, data: { status: 'REFUNDED' } });
+    await tx.orderItem.updateMany({
+      where: { orderId: order.id, canceledAt: null },
+      data: { status: 'REFUNDED', canceledAt: now },
+    });
 
     if (fromReturn) {
-      for (const item of order.items) {
+      for (const item of live) {
         await tx.productVariant.updateMany({
           where: { id: item.variantId },
           data: { stock: { increment: item.quantity } },
@@ -170,21 +183,21 @@ export async function refundOrder(
      * 이유는, 잔액만 두 번 올라가면 아무도 알아채지 못하기 때문이다 —
      * 적립 지급이 같은 이유로 같은 방식을 쓴다.
      */
-    if (order.pointsUsed > 0 && !before) {
+    if (rest.points > 0) {
       await tx.user.update({
         where: { id: order.userId },
-        data: { pointBalance: { increment: order.pointsUsed } },
+        data: { pointBalance: { increment: rest.points } },
       });
       await tx.pointTransaction.create({
         data: {
           userId: order.userId,
-          amount: order.pointsUsed,
+          amount: rest.points,
           reason: 'CANCEL_REFUND',
           orderId: order.id,
           note: `주문 ${order.orderNo} 환불`,
         },
       });
-      pointsReturned = order.pointsUsed;
+      pointsReturned = rest.points;
     }
 
     /*
@@ -205,6 +218,20 @@ export async function refundOrder(
         status: 'CANCELED',
         refundedAmount: order.payment!.refundedAmount + refunded,
         canceledAt: now,
+      },
+    });
+
+    await tx.orderRefund.create({
+      data: {
+        orderId: order.id,
+        amount: refunded,
+        points: rest.points,
+        shippingDeducted: 0,
+        itemIds: live.map((i) => i.id),
+        kind: 'REFUND',
+        reason,
+        actorId: actor.id,
+        idempotencyKey: `refund-${order.orderNo}`,
       },
     });
 
@@ -232,7 +259,7 @@ export async function refundOrder(
     orderId: order.orderNo,
     merchantId: null,
     value: refunded,
-    quantity: order.items.reduce((sum, i) => sum + i.quantity, 0),
+    quantity: live.reduce((sum, i) => sum + i.quantity, 0),
     props: { reason, fromReturn },
   });
 

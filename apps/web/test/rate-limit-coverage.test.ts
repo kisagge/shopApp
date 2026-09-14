@@ -52,6 +52,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
     '심사 중인 신청이 있으면 ALREADY_APPLIED 로 막힌다 — 한 사람이 여러 건을 쌓을 수 없다.',
   'api/orders/[orderNo]/cancel/route.ts':
     '주문 하나의 상태를 옮긴다. 이미 취소된 주문은 상태 검사에서 걸린다.',
+  'api/orders/[orderNo]/cancel-items/route.ts':
+    '줄 하나는 한 번만 취소된다(이미 취소된 줄은 거절). 미리보기는 자기 주문 하나를 읽을 뿐이다.',
   'api/orders/[orderNo]/confirm/route.ts': '같은 이유 — 상태 기계가 반복을 막는다.',
   'api/orders/[orderNo]/return/route.ts': '같은 이유 — 상태 기계가 반복을 막는다.',
 };

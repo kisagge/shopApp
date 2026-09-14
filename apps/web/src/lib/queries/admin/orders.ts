@@ -149,9 +149,16 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
           shippingBorneBy: true, rejectReason: true, requestedAt: true,
         },
       },
+      // 돌려준 돈. 가맹점에게는 주문 전체의 환불액이라 내려주지 않는다(아래에서 비운다)
+      refunds: {
+        orderBy: { createdAt: 'asc' },
+        select: { kind: true, amount: true, points: true, shippingDeducted: true, reason: true, createdAt: true },
+      },
       items: {
         ...(scope ? { where: { merchantId: scope } } : {}),
+        orderBy: { id: 'asc' },
         select: {
+          id: true, canceledAt: true,
           productName: true, brandName: true, optionLabel: true,
           listPrice: true, unitPrice: true, quantity: true, subtotal: true, status: true,
         },
@@ -178,8 +185,17 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
     user: scope
       ? { name: maskName(order.user.name), email: null, grade: null }
       : { name: order.user.name, email: order.user.email, grade: order.user.grade },
-    /** 가맹점이 보는 금액은 자기 줄의 합계다 */
-    scopedTotal: won(scope ? order.items.reduce((s, i) => s + i.subtotal, 0) : order.payable),
+    /*
+     * 한 주문에 여러 가맹점이 섞이면 환불액은 남의 줄 몫까지 합친 값이다. 가맹점에게는
+     * 자기 줄이 취소됐는지(줄 상태)만 보인다.
+     */
+    refunds: scope ? [] : order.refunds,
+    /** 가맹점이 보는 금액은 자기 줄의 합계다. 취소된 줄은 판 것이 아니다 */
+    scopedTotal: won(
+      scope
+        ? order.items.filter((i) => !i.canceledAt).reduce((s, i) => s + i.subtotal, 0)
+        : order.payable,
+    ),
     isScoped: scope !== null,
   };
 }

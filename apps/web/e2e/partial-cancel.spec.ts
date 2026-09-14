@@ -1,0 +1,109 @@
+import { test, expect, type Page } from '@playwright/test';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+
+/**
+ * 일부 상품 취소 — 두 줄을 사서 한 줄만 무른다.
+ *
+ * 금액 규칙은 core 가, 장부는 cancel-items 의 단위 검사가 본다. 여기서 보는 것은 **사람이 밟는
+ * 길이 끝까지 이어지는가**다: 결제한 주문 화면에서 줄을 고르면 서버가 센 금액이 뜨고, 누르면 그
+ * 줄이 취소됐다고 적히고 돌려받은 금액이 결제 정보에 남는다. 그리고 그 줄의 재고가 돌아온다.
+ *
+ * **자기 상품과 자기 손님을 쓴다.** 재고를 흔드므로 홈의 첫 상품을 쓰면 남의 명세가 품절을
+ * 만난다(e2e-fixture-isolation). 끝나면 나머지 줄까지 취소해 재고를 되돌린다 — 그 길이 곧
+ * "일부 취소 뒤 전액 취소" 이기도 하다.
+ */
+
+test.use({ storageState: STATE_FILE.partialCanceler });
+test.describe.configure({ mode: 'serial' });
+
+/** 두 번째 옵션을 골라 한 줄 더 담는다. 담긴 줄 수가 둘이 될 때까지 기다린다 */
+async function addSecondLine(page: Page): Promise<void> {
+  const groups = page.locator('[role="radiogroup"]');
+  const last = groups.nth((await groups.count()) - 1);
+  const choices = last.locator('[role="radio"]:not([aria-disabled="true"])');
+  expect(await choices.count(), '두 번째로 고를 옵션이 없다 — 시드의 재고를 본다').toBeGreaterThanOrEqual(2);
+  await choices.nth(1).click();
+
+  const add = page.getByRole('button', { name: '장바구니 담기' });
+  await expect.poll(() => add.getAttribute('aria-disabled')).not.toBe('true');
+  await add.click();
+
+  await expect
+    .poll(async () => {
+      const res = await page.request.get('/api/cart', { failOnStatusCode: false });
+      if (!res.ok()) return 0;
+      return ((await res.json()) as { items?: unknown[] }).items?.length ?? 0;
+    }, { timeout: 15_000 })
+    .toBe(2);
+}
+
+async function stockOf(page: Page, variantId: string): Promise<number> {
+  const res = await page.request.post('/api/cart/quote', { data: { lines: [{ variantId, quantity: 1 }] } });
+  return ((await res.json()) as { lines: { stock: number }[] }).lines[0]!.stock;
+}
+
+test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금액이 남는다', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const first = await addProductToCart(page, RACE_PRODUCT.partialCancel);
+  expect(first, '담을 수 있는 옵션이 없다').not.toBeNull();
+  await addSecondLine(page);
+
+  const cart = (await (await page.request.get('/api/cart')).json()) as { items: { variantId: string }[] };
+  const variants = cart.items.map((i) => i.variantId);
+  expect(variants).toHaveLength(2);
+  const stockSum = async () => (await stockOf(page, variants[0]!)) + (await stockOf(page, variants[1]!));
+  // 담기만으로는 재고가 안 줄어든다. 주문이 한 개씩 둘을 물고, 일부 취소가 하나를 돌려준다
+  const stockBefore = await stockSum();
+
+  // ── 결제
+  await page.goto('/checkout');
+  await ready(page);
+  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
+  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  await expect(page.getByText('결제완료').first()).toBeVisible();
+  const payable = (await page.getByRole('term').filter({ hasText: '결제 금액' })
+    .locator('xpath=following-sibling::dd').textContent())!;
+
+  // ── 한 줄 고르기
+  await page.getByRole('button', { name: '일부 상품만 취소' }).click();
+  const form = page.getByRole('form', { name: '취소할 상품' });
+  await expect(form).toBeFocused();
+
+  const boxes = form.getByRole('checkbox');
+  await expect(boxes).toHaveCount(2);
+  await boxes.first().check();
+
+  // 서버가 센 금액이 뜬다. 판매가 그대로가 아닐 수 있다(배송비 차감)
+  const refund = form.getByRole('region', { name: '돌려받을 금액' });
+  await expect(refund.getByRole('definition').first()).toHaveText(/[\d,]+원/, { timeout: 15_000 });
+  const shown = (await refund.getByRole('definition').first().textContent())!;
+
+  await form.getByRole('button', { name: '고른 상품 취소' }).click();
+  await expect(page.getByText('상품 1개를 취소했습니다.')).toBeVisible({ timeout: 20_000 });
+
+  // ── 그 줄만 취소됐다고 적히고, 돌려받은 금액이 미리 본 금액과 같다
+  await expect(page.getByText('취소됨')).toHaveCount(1);
+  const refundedRow = page.getByRole('term').filter({ hasText: '돌려받은 금액' });
+  await expect(refundedRow).toBeVisible();
+  await expect(refundedRow.locator('xpath=following-sibling::dd')).toHaveText(`-${shown}`);
+
+  // 주문은 결제완료에 머물고, 남은 한 줄로는 일부 취소가 더 열리지 않는다(남은 게 하나면 주문 취소다)
+  await expect(page.getByText('결제완료').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: '일부 상품만 취소' })).toHaveCount(0);
+
+  // 취소한 줄 하나의 재고만 돌아왔다 — 남은 줄은 여전히 주문이 물고 있다
+  expect(await stockSum(), '일부 취소가 재고를 안 돌려줬거나 남은 줄까지 돌려줬다').toBe(stockBefore - 1);
+
+  // ── 두 번째 검사이자 뒷정리: 남은 줄까지 취소하면 결제한 돈이 **정확히 한 번씩** 다 돌아온다
+  await page.getByRole('button', { name: '주문 취소' }).click();
+  await page.getByRole('button', { name: '주문 취소' }).last().click();
+  await expect(page.getByText('환불완료').first()).toBeVisible({ timeout: 20_000 });
+
+  // 일부 취소 몫 + 나머지 = 결제 금액. 전액 취소가 결제액을 통째로 또 돌려주면 여기서 넘친다
+  await expect(refundedRow.locator('xpath=following-sibling::dd')).toHaveText(`-${payable}`);
+  expect(await stockSum(), '전부 취소했는데 재고가 처음으로 안 돌아왔다').toBe(stockBefore);
+});

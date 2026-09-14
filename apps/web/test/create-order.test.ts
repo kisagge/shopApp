@@ -2,7 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CartQuoteResponse } from '@shop/contract';
 
 const quoteCart = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/queries/cart', () => ({ quoteCart }));
+/*
+ * 주문은 몫과 배송비 정책까지 받는 쪽(quoteCartDetailed)을 부른다. 견적만 바꿔 끼우는
+ * 기존 검사들이 그대로 돌도록, 견적 흉내에서 몫을 만들어 붙인다 — 살 수 있는 줄마다 하나.
+ */
+vi.mock('~/lib/queries/cart', () => ({
+  quoteCart,
+  quoteCartDetailed: async (...args: unknown[]) => {
+    const quote = (await quoteCart(...args)) as CartQuoteResponse;
+    const buyable = quote.lines.filter((l) => l.quantity > 0);
+    return {
+      quote,
+      // 줄마다 다른 값이라야 엉뚱한 줄에 박히는 것을 잡는다
+      allocations: buyable.map((_, i) => ({ couponShare: 100 * (i + 1), pointsShare: 10 * (i + 1), rewardShare: i + 1 })),
+      shippingPolicy: { baseFee: 3000, freeThreshold: 50_000, remoteSurcharge: 3000 },
+    };
+  },
+}));
 
 const tx = vi.hoisted(() => ({
   productVariant: {
@@ -131,6 +147,17 @@ describe('주문 생성', () => {
       merchantId: 'm-1',
       imageUrl: '/coat.jpg',
     });
+  });
+
+  it('줄마다 쿠폰·포인트·적립 몫과 그날의 배송비 정책을 박는다 — 일부 취소가 쓴다', async () => {
+    /*
+     * 취소하는 날 나누면 어느 줄이 쿠폰 대상이었는지 알 수 없고(분류가 바뀐다), 배송비 기준도
+     * 오늘 것이 된다. 주문한 순간의 값으로 박는다.
+     */
+    await createOrder(request(), user);
+    const data = tx.order.create.mock.calls[0]![0].data;
+    expect(data.items.create[0]).toMatchObject({ couponShare: 100, pointsShare: 10, rewardShare: 1 });
+    expect(data.shippingPolicy).toEqual({ baseFee: 3000, freeThreshold: 50_000, remoteSurcharge: 3000 });
   });
 
   it('배송지도 스냅샷으로 박는다 — 주소를 고쳐도 과거 주문은 그대로여야 한다', async () => {

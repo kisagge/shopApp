@@ -89,7 +89,8 @@ export async function autoConfirmDelivered(
         if (count === 0) return null;
 
         await tx.orderItem.updateMany({
-          where: { orderId: order.id },
+          // 출고 전에 취소된 줄은 확정하지 않는다 — 취소로 남는다
+          where: { orderId: order.id, canceledAt: null },
           data: { status: 'CONFIRMED' },
         });
         await tx.orderStatusLog.create({

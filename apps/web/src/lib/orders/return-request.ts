@@ -70,7 +70,8 @@ export async function requestReturn(
     if (count === 0) throw new ReturnError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
     await tx.orderItem.updateMany({
-      where: { orderId: order.id },
+      // 취소된 줄은 반품할 물건이 아니다
+      where: { orderId: order.id, canceledAt: null },
       data: { status: nextStatus },
     });
 
@@ -179,7 +180,7 @@ export async function resolveReturn(
       data: { status: nextOrderStatus },
     });
     await tx.orderItem.updateMany({
-      where: { orderId: order.id },
+      where: { orderId: order.id, canceledAt: null },
       data: { status: nextOrderStatus },
     });
     await tx.orderStatusLog.create({
