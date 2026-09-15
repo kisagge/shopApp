@@ -21,6 +21,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   RESTOCKED: '재입고',
   COUPON_ISSUED: '쿠폰 지급',
   STOCK_LOW: '재고 부족',
+  REVIEW_REPLIED: '리뷰 답글',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */

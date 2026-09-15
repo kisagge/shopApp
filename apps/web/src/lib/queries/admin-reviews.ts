@@ -42,6 +42,11 @@ export interface AdminReviewRow {
   readonly state: ModerationState;
   readonly openReports: number;
   readonly reports: readonly ReportRow[];
+  /** 이 상품의 가맹점 — 답글을 달 수 있는지(canReplyToReview) 가린다. 자사 브랜드는 null */
+  readonly merchantId: string | null;
+  readonly reply: string | null;
+  readonly repliedAt: Date | null;
+  readonly replyEditedAt: Date | null;
   /** 처리 순서 점수. 대기줄 정렬에만 쓴다. */
   readonly priority: number;
 }
@@ -88,7 +93,8 @@ const reviewSelect = {
   _count: { select: { images: true } },
   createdAt: true, deletedAt: true, productId: true,
   user: { select: { name: true } },
-  product: { select: { name: true } },
+  product: { select: { name: true, brand: { select: { merchantId: true } } } },
+  reply: true, repliedAt: true, replyEditedAt: true,
   reports: {
     orderBy: { createdAt: 'desc' as const },
     select: {
@@ -103,7 +109,8 @@ type RawReview = {
   id: string; rating: number; content: string; _count: { images: number };
   createdAt: Date; deletedAt: Date | null; productId: string;
   user: { name: string };
-  product: { name: string };
+  product: { name: string; brand: { merchantId: string | null } };
+  reply: string | null; repliedAt: Date | null; replyEditedAt: Date | null;
   reports: {
     id: string; reason: ReportReason; detail: string | null; createdAt: Date;
     resolvedAt: Date | null; resolution: string | null;
@@ -123,6 +130,10 @@ function toRow(raw: RawReview): AdminReviewRow {
     authorName: maskName(raw.user.name),
     productId: raw.productId,
     productName: raw.product.name,
+    merchantId: raw.product.brand.merchantId,
+    reply: raw.reply,
+    repliedAt: raw.repliedAt,
+    replyEditedAt: raw.replyEditedAt,
     state: moderationState({
       removedByModerator: raw.deletedAt !== null,
       openReports: open.length,

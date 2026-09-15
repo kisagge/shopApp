@@ -20,6 +20,8 @@ export const NOTIFICATION_KIND = [
    * 손실이고, 재입고에는 며칠이 걸린다 — 알아채는 시점이 늦을수록 비는 날이 길다.
    */
   'STOCK_LOW',
+  /** 내 리뷰에 판매자가 답했다. 답은 늦게 달리는 일이 많아, 알리지 않으면 쓴 사람은 다시 와서 볼 일이 없다 */
+  'REVIEW_REPLIED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { RATING_MIN, RATING_MAX, SIZE_FIT, REPORT_REASON } from '@shop/core';
+import { RATING_MIN, RATING_MAX, SIZE_FIT, REPORT_REASON, REVIEW_REPLY_MAX } from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -86,3 +86,15 @@ export const dismissReportsSchema = z.object({
   note: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
 });
 export type DismissReportsInput = z.infer<typeof dismissReportsSchema>;
+
+/**
+ * 리뷰 판매자 답글. 앞뒤 공백을 지우고 1~1,000자. 지우기는 따로(DELETE) — 빈 문자열을 "지우기" 로 읽지 않는다.
+ */
+export const replyReviewSchema = z.object({
+  reply: z
+    .string({ error: 'valid.replyRequired' })
+    .trim()
+    .min(1, 'valid.replyRequired')
+    .max(REVIEW_REPLY_MAX, 'valid.tooLongChars'),
+});
+export type ReplyReviewInput = z.infer<typeof replyReviewSchema>;

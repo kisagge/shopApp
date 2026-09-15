@@ -29,6 +29,8 @@ export interface PublicReview {
   readonly isMine: boolean;
   /** 신고할 수 있는가 — 로그인했고 내 글이 아니어야 한다 */
   readonly canReport: boolean;
+  /** 판매자 답글. 없으면 null */
+  readonly reply: { readonly text: string; readonly repliedAt: Date; readonly edited: boolean } | null;
   /** 도움이 됐다고 누른 사람 수 */
   readonly helpfulCount: number;
   /** 내가 이미 눌렀는가 */
@@ -93,6 +95,7 @@ export async function getProductReviews(
       height: true, weight: true, createdAt: true, userId: true,
       images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
       helpfulCount: true,
+      reply: true, repliedAt: true, replyEditedAt: true,
       user: { select: { name: true } },
       // 어떤 옵션을 산 사람의 후기인지가 사이즈 판단에 도움이 된다
       orderItem: { select: { optionLabel: true } },
@@ -147,6 +150,9 @@ export async function getProductReviews(
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
       canReport: options.viewerId !== undefined && r.userId !== options.viewerId,
       reportedByMe: mineReported.has(r.id),
+      reply: r.reply !== null && r.repliedAt !== null
+        ? { text: r.reply, repliedAt: r.repliedAt, edited: r.replyEditedAt !== null }
+        : null,
       helpfulCount: r.helpfulCount,
       helpfulByMe: mineHelpful.has(r.id),
     })),

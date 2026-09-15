@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  MODERATION_STATE_LABEL, hasPermission, type ModerationState,
+  MODERATION_STATE_LABEL, hasPermission, canReplyToReview, type ModerationState,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import {
   getAdminReviews, isReviewTab, REVIEW_TAB, REVIEW_TAB_LABEL, type ReviewTab,
 } from '~/lib/queries/admin-reviews';
 import { ReviewModeration } from '~/components/admin/review-moderation';
+import { ReviewReplyForm } from '~/components/admin/review-reply-form';
 import { Pager } from '../pager';
 import { getT } from '~/lib/i18n/server';
 import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
@@ -82,7 +83,7 @@ export default async function AdminReviewsPage({
               ? page.pending > 0
                 ? `처리 대기 ${page.pending}건`
                 : '처리할 신고 없음'
-              : '내 상품에 달린 평입니다 — 내리는 것은 운영진이 합니다'}
+              : '내 상품에 달린 평입니다 — 답글을 달 수 있고, 내리는 것은 운영진이 합니다'}
           </p>
         </div>
       </header>
@@ -233,6 +234,15 @@ export default async function AdminReviewsPage({
                       </ul>
                     </details>
                   )}
+
+                  {/* 답은 파는 사람이 — 가맹점은 자기 상품(조회가 이미 좁혔다), 운영진은 전부. 내려진 리뷰에는 달지 않는다 */}
+                  {canReplyToReview(actor, { merchantId: row.merchantId, removed: row.state === 'removed' }) ? (
+                    <ReviewReplyForm key={row.id} reviewId={row.id} productName={row.productName} reply={row.reply} />
+                  ) : row.reply !== null ? (
+                    <p className="whitespace-pre-wrap rounded-sm bg-[var(--surface)] px-3 py-2 text-[12px] text-[var(--fg-secondary)]">
+                      판매자 답글: {row.reply}
+                    </p>
+                  ) : null}
 
                   {canModerate && (
                     <ReviewModeration

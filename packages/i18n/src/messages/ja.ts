@@ -532,6 +532,8 @@ export const ja: Dictionary = {
   'review.starCount': '{rating}点',
   'review.sizeHeading': 'サイズ',
   'review.photoAlt': '{name} 様のレビュー写真 {index}',
+  'review.replyEdited': '編集済み',
+  'review.sellerReply': '販売者からの返信',
   'review.reported': '報告済み',
   'review.report': '報告',
   'review.reportReason': '報告の理由',
@@ -720,6 +722,7 @@ export const ja: Dictionary = {
   'valid.passwordTooShort': 'パスワードは{min}文字以上にしてください',
   'valid.passwordTooLong': 'パスワードは{max}文字を超えられません',
   'valid.passwordMismatch': 'パスワードが一致しません',
+  'valid.replyRequired': '返信を入力してください',
   'valid.currentPasswordRequired': '現在のパスワードを入力してください',
   'valid.passwordSameAsCurrent': '現在と異なるパスワードを入力してください',
   'valid.passwordLikeEmail': 'メールアドレスに似すぎたパスワードは使えません',
@@ -965,4 +968,5 @@ export const ja: Dictionary = {
   'mail.inquiry.support': 'カスタマーサービス',
   'notif.COUPON_ISSUED': '{couponName} クーポンが届きました',
   'notif.STOCK_LOW': '{productName} · {optionLabel} の在庫が残り{stock}点です',
+  'notif.REVIEW_REPLIED': '{productName} のレビューに販売者が返信しました。',
 };

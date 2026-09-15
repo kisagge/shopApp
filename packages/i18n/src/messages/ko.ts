@@ -557,6 +557,8 @@ export const ko = {
   'review.starCount': '{rating}점',
   'review.sizeHeading': '사이즈',
   'review.photoAlt': '{name} 님의 후기 사진 {index}',
+  'review.replyEdited': '수정됨',
+  'review.sellerReply': '판매자 답글',
   'review.reported': '신고함',
   'review.report': '신고',
   'review.reportReason': '신고 사유',
@@ -752,6 +754,7 @@ export const ko = {
   'valid.passwordTooShort': '비밀번호는 {min}자 이상이어야 합니다',
   'valid.passwordTooLong': '비밀번호는 {max}자를 넘을 수 없습니다',
   'valid.passwordMismatch': '비밀번호가 일치하지 않습니다',
+  'valid.replyRequired': '답글을 입력해 주세요',
   'valid.currentPasswordRequired': '지금 비밀번호를 입력해 주세요',
   'valid.passwordSameAsCurrent': '지금 비밀번호와 다른 비밀번호를 입력해 주세요',
   'valid.passwordLikeEmail': '이메일과 너무 비슷한 비밀번호는 쓸 수 없습니다',
@@ -999,6 +1002,7 @@ export const ko = {
   'mail.inquiry.support': '고객센터',
   'notif.COUPON_ISSUED': '{couponName} 쿠폰이 도착했습니다',
   'notif.STOCK_LOW': '{productName} · {optionLabel} 재고가 {stock}개 남았습니다',
+  'notif.REVIEW_REPLIED': '{productName} 리뷰에 판매자가 답글을 남겼습니다.',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

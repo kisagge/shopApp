@@ -98,6 +98,7 @@ const REVIEW_WRITERS = [
   'app/api/reviews/route.ts',
   'app/api/reviews/[id]/route.ts',
   'app/api/admin/reviews/[id]/restore/route.ts',
+  'app/api/admin/reviews/[id]/reply/route.ts',
   'app/api/account/close/route.ts',
 ] as const;
 

@@ -15,6 +15,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'product.publish.reject': '게시 반려',
   'review.delete': '리뷰 삭제',
   'review.restore': '리뷰 복구',
+  'review.reply': '리뷰 답글',
+  'review.reply.delete': '리뷰 답글 삭제',
   'review.reports.dismiss': '리뷰 신고 처리',
   'product.variant.create': '옵션 추가',
   'order.status.preparing': '배송 준비',

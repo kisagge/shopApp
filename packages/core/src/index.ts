@@ -38,6 +38,7 @@ export * from './web-vitals';
 export * from './catalog';
 export * from './structured-data';
 export * from './inquiry';
+export * from './review-reply';
 export * from './support';
 export * from './point';
 export * from './recommend';

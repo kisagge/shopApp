@@ -76,6 +76,11 @@ export const PERMISSION = [
    */
   'review:read',
   'review:moderate',
+  /*
+   * 리뷰에 판매자로 답한다. 가맹점은 자기 상품만. **내리는 것(moderate)과 다르다** — 답은 원문을 건드리지 않고 옆에 말을
+   * 더할 뿐이라, 혹평을 지우지 못하는 가맹점에게도 해명할 자리는 준다.
+   */
+  'review:reply',
   // 상품 문의에 답한다. 가맹점은 자기 상품만.
   'inquiry:answer',
   // 공지와 FAQ 를 쓴다. **가맹점에게 주지 않는다** — 고객센터의 글은 한
@@ -123,6 +128,8 @@ const MERCHANT: readonly Permission[] = [
   'settlement:read',
   // 자기 상품의 평을 읽는다. 내리지는 못한다 — review:moderate 주석을 보라.
   'review:read',
+  // 자기 상품의 평에 답한다 — review:reply 주석을 보라.
+  'review:reply',
   // 자기 상품에 들어온 문의에 답한다. 답할 사람이 파는 사람인 것이 맞다.
   'inquiry:answer',
 ];
@@ -142,7 +149,7 @@ const ADMIN: readonly Permission[] = [
   'banner:read', 'banner:write',
   'collection:read', 'collection:write',
   'settlement:read', 'settlement:confirm',
-  'review:write', 'review:read', 'review:moderate',
+  'review:write', 'review:read', 'review:moderate', 'review:reply',
   'inquiry:answer', 'support:write', 'shipping:write', 'notification:write',
   'analytics:all',
 ];

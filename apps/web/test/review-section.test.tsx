@@ -18,7 +18,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   authorName: '데****자', optionLabel: '오트밀 / M',
   createdAt: new Date('2026-09-01T00:00:00Z'), images: [], isMine: false,
   canReport: false, reportedByMe: false,
-  helpfulCount: 0, helpfulByMe: false,
+  helpfulCount: 0, helpfulByMe: false, reply: null,
   ...over,
 });
 
@@ -208,5 +208,34 @@ describe('리뷰 사진', () => {
 
     const img = screen.getByRole('img', { name: /후기 사진 1/ });
     expect(img.getAttribute('style') ?? '').not.toContain('background-image');
+  });
+});
+
+describe('판매자 답글', () => {
+  it('답글은 그 리뷰 안에 제목과 날짜를 달고 보인다 — 어느 글에 한 답인지 떨어져 있으면 모른다', () => {
+    render(
+      <ReviewSection t={ko} summary={summary()}
+        reviews={[review({ reply: { text: '불편을 드려 죄송합니다. 교환 도와드릴게요.', repliedAt: new Date('2026-09-10T00:00:00Z'), edited: false } })]}
+      />,
+    );
+    const article = screen.getByRole('article');
+    const reply = within(article).getByRole('region', { name: /판매자 답글/ });
+    expect(reply.textContent).toContain('교환 도와드릴게요');
+    expect(reply.querySelector('time')?.getAttribute('dateTime')).toBe('2026-09-10T00:00:00.000Z');
+    expect(within(reply).queryByText('수정됨')).toBeNull();
+  });
+
+  it('고쳐진 답글은 글로 "수정됨" 을 적는다', () => {
+    render(
+      <ReviewSection t={ko} summary={summary()}
+        reviews={[review({ reply: { text: '고친 답', repliedAt: new Date('2026-09-10T00:00:00Z'), edited: true } })]}
+      />,
+    );
+    expect(within(screen.getByRole('region', { name: /판매자 답글/ })).getByText('수정됨')).toBeDefined();
+  });
+
+  it('답글이 없으면 그 자리를 그리지 않는다', () => {
+    render(<ReviewSection t={ko} summary={summary()} reviews={[review()]} />);
+    expect(screen.queryByRole('region', { name: /판매자 답글/ })).toBeNull();
   });
 });

@@ -153,6 +153,30 @@ export function ReviewSection({
                     {review.content}
                   </p>
 
+                  {/*
+                    판매자 답글은 리뷰 **안에** 둔다 — 어느 글에 한 답인지 떨어져 있으면 모른다. 제목으로 누구의 말인지
+                    밝히고, 고쳐졌으면 글로 적는다.
+                  */}
+                  {review.reply && (
+                    <section
+                      aria-labelledby={`reply-${review.id}`}
+                      className="mt-3 rounded-sm border-l-2 border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5"
+                    >
+                      <h4 id={`reply-${review.id}`} className="flex flex-wrap items-baseline gap-x-2 text-[12px] font-semibold">
+                        {t('review.sellerReply')}
+                        <time dateTime={review.reply.repliedAt.toISOString()} className="text-[11px] font-normal text-[var(--fg-muted)]">
+                          {formatDate(t.locale, review.reply.repliedAt)}
+                        </time>
+                        {review.reply.edited && (
+                          <span className="text-[11px] font-normal text-[var(--fg-muted)]">{t('review.replyEdited')}</span>
+                        )}
+                      </h4>
+                      <p className="mt-1 text-[13px] leading-relaxed whitespace-pre-line text-[var(--fg-secondary)]">
+                        {review.reply.text}
+                      </p>
+                    </section>
+                  )}
+
                   {review.images.length > 0 && (
                     <ul className="mt-3 flex flex-wrap gap-2">
                       {review.images.map((image, i) => (

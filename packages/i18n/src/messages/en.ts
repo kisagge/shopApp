@@ -536,6 +536,8 @@ export const en: Dictionary = {
   'review.starCount': '{rating} stars',
   'review.sizeHeading': 'Sizing',
   'review.photoAlt': "Photo {index} from {name}'s review",
+  'review.replyEdited': 'Edited',
+  'review.sellerReply': 'Seller reply',
   'review.reported': 'Reported',
   'review.report': 'Report',
   'review.reportReason': 'Reason',
@@ -724,6 +726,7 @@ export const en: Dictionary = {
   'valid.passwordTooShort': 'Your password must be at least {min} characters',
   'valid.passwordTooLong': 'Your password cannot be longer than {max} characters',
   'valid.passwordMismatch': 'The passwords do not match',
+  'valid.replyRequired': 'Enter a reply',
   'valid.currentPasswordRequired': 'Enter your current password',
   'valid.passwordSameAsCurrent': 'Choose a password different from your current one',
   'valid.passwordLikeEmail': 'Your password is too close to your email address',
@@ -969,4 +972,5 @@ export const en: Dictionary = {
   'mail.inquiry.support': 'Customer service',
   'notif.COUPON_ISSUED': 'You received a coupon: {couponName}',
   'notif.STOCK_LOW': 'Low stock: {productName} · {optionLabel} has {stock} left',
+  'notif.REVIEW_REPLIED': 'The seller replied to your review of {productName}.',
 };
