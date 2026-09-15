@@ -44,6 +44,8 @@ export const STATE_FILE = {
   exchanger: 'test-results/.auth/exchange.json',
   /** 받은 주문을 스스로 구매확정한다 — purchase-confirm */
   purchaseConfirmer: 'test-results/.auth/purchase-confirm.json',
+  /** 운영진이 적립금을 손으로 지급·차감하는 손님 — point-adjust-admin */
+  pointAdjustTarget: 'test-results/.auth/point-adjust.json',
 } as const;
 
 /**

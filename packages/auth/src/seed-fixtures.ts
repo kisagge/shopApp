@@ -84,6 +84,12 @@ export const SEED_ACCOUNT = {
   purchaseConfirmer: 'purchase-confirm@plain.test',
 
   /**
+   * 운영진이 적립금을 손으로 지급·차감한다 — point-adjust-admin. 장바구니를 쥐지 않는다(결제에 포인트를 안 쓴다).
+   * 저장된 세션은 손님 적립금 내역에 사유가 보이는지 보는 데 쓴다.
+   */
+  pointAdjustTarget: 'point-adjust@plain.test',
+
+  /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *
    * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 정지하면 세션이 지워지므로 미리 만든 세션은

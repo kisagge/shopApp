@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { MERCHANT_STATUS, type MerchantStatus } from '@shop/core';
+import {
+  MERCHANT_STATUS, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
+} from '@shop/core';
 import { cuidSchema } from './common';
 
 /**
@@ -51,6 +53,7 @@ export const ADMIN_ERROR = [
   'MERCHANT_NOT_FOUND', 'USER_NOT_FOUND', 'CANNOT_CHANGE_OWN_ROLE',
   'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED', 'USER_CLOSED',
   'CHANGED_MEANWHILE', 'CANNOT_SUSPEND_SELF', 'CANNOT_SUSPEND_STAFF', 'ALREADY_SUSPENDED', 'NOT_SUSPENDED',
+  'POINTS_USER_CLOSED', 'INSUFFICIENT_POINTS',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR)[number];
 
@@ -74,7 +77,26 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
   CANNOT_SUSPEND_STAFF: '운영진 계정은 슈퍼관리자만 정지할 수 있습니다',
   ALREADY_SUSPENDED: '이미 이용이 정지된 계정입니다',
   NOT_SUSPENDED: '정지되지 않은 계정입니다',
+  POINTS_USER_CLOSED: '탈퇴한 계정의 포인트는 조정할 수 없습니다',
+  INSUFFICIENT_POINTS: '차감할 포인트가 지금 잔액보다 많습니다',
 };
+
+/**
+ * 적립금 수동 지급·차감.
+ *
+ * `key` 는 화면이 폼마다 하나 만들어 보낸다 — 지급을 두 번 누르거나 응답을 못 받고 다시 보내도 **한 번만** 나간다.
+ */
+export const adjustPointsSchema = z.object({
+  direction: z.enum(POINT_ADJUST_DIRECTION),
+  amount: z.int('valid.integerOnly').min(1, 'valid.tooSmall').max(POINT_ADJUST_MAX, 'valid.tooBig'),
+  note: z
+    .string({ error: 'valid.reasonRequired' })
+    .trim()
+    .min(1, 'valid.reasonRequired')
+    .max(POINT_ADJUST_NOTE_MAX, 'valid.tooLongChars'),
+  key: z.string().regex(/^[A-Za-z0-9-]{16,64}$/, 'valid.idFormat'),
+});
+export type AdjustPointsInput = z.infer<typeof adjustPointsSchema>;
 
 /**
  * 회원 이용 정지·해제.

@@ -80,6 +80,8 @@ export interface AdminUserRow {
   /** 이용 정지 시각과 사유. 정지를 건 사람은 감사 로그에 있다 */
   readonly suspendedAt: Date | null;
   readonly suspendedReason: string | null;
+  /** 적립금 잔액. 누르면 수동 지급·차감 화면으로 간다 */
+  readonly pointBalance: number;
 }
 
 export interface AdminUserPage {
@@ -110,7 +112,7 @@ export async function getAdminUsers(
     ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
     select: {
       id: true, name: true, email: true, role: true, createdAt: true, deletedAt: true,
-      suspendedAt: true, suspendedReason: true,
+      suspendedAt: true, suspendedReason: true, pointBalance: true,
       merchant: { select: { id: true, name: true } },
       _count: { select: { orders: true } },
     },
@@ -129,6 +131,7 @@ export async function getAdminUsers(
       closedAt: u.deletedAt,
       suspendedAt: u.suspendedAt,
       suspendedReason: u.suspendedReason,
+      pointBalance: u.pointBalance,
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };

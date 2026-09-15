@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Badge } from '@shop/ui';
 import { canSuspendUser, hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
 import type { UserRoleInput } from '@shop/contract';
@@ -84,6 +85,7 @@ export default async function AdminUsersPage({
                     <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">권한</th>
                     <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">소속</th>
                     <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">주문</th>
+                    <th scope="col" className="w-24 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">포인트</th>
                     <th scope="col" className="w-24 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">가입</th>
                     {canSuspend && (
                       <th scope="col" className="w-64 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
@@ -125,6 +127,16 @@ export default async function AdminUsersPage({
                         {u.merchantName ?? '—'}
                       </td>
                       <td className="tnum px-4 py-3 text-right text-[13px]">{u.orderCount}</td>
+                      <td className="tnum px-4 py-3 text-right text-[13px]">
+                        {/* 숫자만 읽히면 어디로 가는지 모른다 — 누구의 포인트 내역인지 이름으로 말한다 */}
+                        <Link
+                          href={`/admin/users/${u.id}/points`}
+                          aria-label={`${u.name} 포인트 ${u.pointBalance.toLocaleString('ko-KR')}P`}
+                          className="text-[var(--fg)] underline-offset-2 hover:underline"
+                        >
+                          {u.pointBalance.toLocaleString('ko-KR')}P
+                        </Link>
+                      </td>
                       <td className="px-4 py-3 text-[12px] text-[var(--fg-muted)]">
                         <time dateTime={u.createdAt.toISOString()}>{dateFormat.format(u.createdAt)}</time>
                       </td>

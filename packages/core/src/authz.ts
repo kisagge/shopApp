@@ -51,6 +51,11 @@ export const PERMISSION = [
   'user:read',
   'user:write',
   'user:assignRole',    // 권한 부여
+  /*
+   * **적립금을 손으로 지급·차감한다.** 포인트는 돈이라 user:write 에 얹지 않고 따로 둔다 — 회원 정보를 고치는 사람이
+   * 곧 돈을 주는 사람이 되면 안 된다. 가맹점에게는 없다: 남의 가게에서 쓸 돈을 한 가맹점이 찍어 낼 수 없다.
+   */
+  'point:adjust',
   'coupon:read',
   'coupon:write',
   // 홈 배너는 플랫폼 진열이다. 가맹점이 만지면 남의 매대를 바꾸는 셈이 된다.
@@ -144,7 +149,7 @@ const ADMIN: readonly Permission[] = [
   'product:read', 'product:write', 'product:publish',
   'order:read', 'order:fulfill', 'order:cancel', 'order:refund', 'return:resolve',
   'merchant:read', 'merchant:write',
-  'user:read', 'user:write',
+  'user:read', 'user:write', 'point:adjust',
   'coupon:read', 'coupon:write',
   'banner:read', 'banner:write',
   'collection:read', 'collection:write',

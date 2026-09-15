@@ -61,5 +61,7 @@ layoutTests(test, expect, [
    */
   ['주문 상세', '/admin/orders', openFirstRow],
   ['상품 상세', '/admin/products', openFirstRow],
+  // 회원 표의 줄 안 링크는 포인트 잔액 하나다 — 원장 표와 조정 폼이 나란히 선다
+  ['회원 포인트', '/admin/users', openFirstRow],
   ['공지 편집기 — 링크 줄', '/admin/support', openLinkRow],
 ], ADMIN_WIDTHS);

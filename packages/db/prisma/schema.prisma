@@ -1087,6 +1087,10 @@ model PointTransaction {
   /// 적립 포인트의 소멸 예정일. 사용/소멸 건은 null.
   expiresAt DateTime?
 
+  /// 운영진이 손으로 지급·차감할 때 화면이 보낸 열쇠. 같은 열쇠로 두 번 오면 두 번째는 원장에 못 들어간다 —
+  /// 지급을 두 번 눌러도 한 번만 나간다. 누가 했는지는 감사 로그가 갖는다.
+  adjustKey String? @unique
+
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
