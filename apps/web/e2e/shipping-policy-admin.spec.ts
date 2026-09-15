@@ -22,9 +22,25 @@ test.describe.configure({ mode: 'serial' });
 const ORIGINAL = { baseFee: 3000, freeThreshold: 50_000, remoteSurcharge: 3000 } as const;
 const CHANGED = { baseFee: 2500, freeThreshold: 30_000, remoteSurcharge: 4500 } as const;
 
+/**
+ * 배송비 정책을 저장한다.
+ *
+ * **응답이 아예 없을 때만 다시 보낸다.** 정책 저장은 통째로 덮어쓰므로 두 번 가도 결과가 같다. 연결이 한 번 끊긴
+ * (ECONNRESET) 것으로 "말이 안 되는 값" 검사가 진 적이 있고, 그 뒤의 되돌려 놓기가 돌지 않아 다음 명세가 바뀐 배송비를
+ * 봤다. 응답이 오면 그 답으로 판정한다 — 400 을 다시 보내 200 을 기다리지 않는다.
+ */
 async function save(page: Page, body: Record<string, number | null>) {
-  const res = await page.request.patch('/api/admin/shipping', { data: body, failOnStatusCode: false });
-  return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const res = await page.request.patch('/api/admin/shipping', { data: body, failOnStatusCode: false });
+      return { status: res.status(), body: (await res.json()) as Record<string, unknown> };
+    } catch (error) {
+      lastError = error;
+      await page.waitForTimeout(300);
+    }
+  }
+  throw lastError;
 }
 
 test('운영 화면에서 바꾸면 값이 남는다', async ({ page }) => {

@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Badge } from '@shop/ui';
-import { canSuspendUser, hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
+import { hasPermission, USER_ROLE_LABEL, type UserRole } from '@shop/core';
 import type { UserRoleInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin/merchants';
 import { RoleForm } from './role-form';
 import { SuspendForm } from './suspend-form';
+import { suspendBlocked } from './suspend-blocked';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '회원' };
@@ -104,7 +105,9 @@ export default async function AdminUsersPage({
                     <tr key={u.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
                       <td className="px-4 py-3">
                         <span className="block text-[13px]">
-                          {u.name}
+                          <Link href={`/admin/users/${u.id}`} className="text-[var(--fg)] underline-offset-2 hover:underline">
+                            {u.name}
+                          </Link>
                           {u.closedAt && (
                             // 행은 남으므로 목록에서 구분되지 않으면 살아 있는
                             // 계정으로 읽힌다
@@ -183,18 +186,4 @@ export default async function AdminUsersPage({
       </div>
     </>
   );
-}
-
-/** 정지 폼을 못 여는 이유. 서버도 같은 판정(canSuspendUser)으로 막는다 — 누를 수 있게 두면 왜 안 되는지 모른다 */
-function suspendBlocked(
-  actor: Parameters<typeof canSuspendUser>[0],
-  u: { id: string; role: string; closedAt: Date | null },
-): string | undefined {
-  if (u.closedAt) return '탈퇴한 계정';
-  switch (canSuspendUser(actor, { id: u.id, role: u.role as UserRole })) {
-    case 'SELF': return '본인 계정';
-    case 'STAFF': return '운영진 계정';
-    case 'FORBIDDEN': return '권한 없음';
-    default: return undefined;
-  }
 }

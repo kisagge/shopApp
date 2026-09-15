@@ -45,6 +45,7 @@ const DYNAMIC: Readonly<Record<string, string>> = {
   '/order/[orderNo]/receipt': 'partial-cancel 이 결제한 주문의 영수증을 네 폭으로 잰다',
   '/admin/orders/[orderNo]': '운영 주문 표에서 첫 줄을 눌러 들어간다',
   '/admin/products/[id]': '운영 상품 표에서 첫 줄을 눌러 들어간다',
+  '/admin/users/[id]': '회원 표에서 첫 줄의 이름을 눌러 들어간다',
   '/admin/users/[id]/points': '회원 표에서 첫 줄의 포인트 잔액을 눌러 들어간다',
 };
 

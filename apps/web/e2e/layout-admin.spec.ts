@@ -15,6 +15,12 @@ const openFirstRow = async (page: Page): Promise<void> => {
   await page.waitForLoadState('domcontentloaded');
 };
 
+/** 회원 표에서 포인트 잔액 링크를 누른다 — 이름 링크가 먼저라 첫 링크로는 닿지 않는다 */
+const openPointsLink = async (page: Page): Promise<void> => {
+  await page.locator('table a[href$="/points"]').first().click();
+  await page.waitForLoadState('domcontentloaded');
+};
+
 /**
  * 운영 화면의 자리.
  *
@@ -61,7 +67,9 @@ layoutTests(test, expect, [
    */
   ['주문 상세', '/admin/orders', openFirstRow],
   ['상품 상세', '/admin/products', openFirstRow],
-  // 회원 표의 줄 안 링크는 포인트 잔액 하나다 — 원장 표와 조정 폼이 나란히 선다
-  ['회원 포인트', '/admin/users', openFirstRow],
+  // 회원 표의 첫 링크는 이름 — 요약 칸들과 최근 주문 표가 두 줄로 선다
+  ['회원 상세', '/admin/users', openFirstRow],
+  // 원장 표와 조정 폼이 나란히 선다
+  ['회원 포인트', '/admin/users', openPointsLink],
   ['공지 편집기 — 링크 줄', '/admin/support', openLinkRow],
 ], ADMIN_WIDTHS);
