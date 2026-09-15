@@ -49,6 +49,7 @@ layoutTests(test, expect, [
   ['고객센터 글', '/admin/support'],
   ['배송비', '/admin/shipping'],
   ['알림 문구', '/admin/notification-templates'],
+  ['메일 문구', '/admin/mail-templates'],
   ['알림', '/admin/notifications'],
   ['포인트', '/admin/points'],
   ['트래픽', '/admin/traffic'],

@@ -1,5 +1,6 @@
 import 'server-only';
 import { inquiryAnswerMail } from '~/lib/mail/notices';
+import { getMailWording } from '~/lib/mail/templates';
 import { localeOf } from '~/lib/mail/recipient';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
@@ -18,11 +19,13 @@ import { recordNotification } from '~/lib/notifications/record';
  */
 export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<void> {
   try {
+    // **답변을 쓴 운영자의 말이 아니라 물어본 사람의 말이다.**
+    const locale = localeOf(inquiry.authorLocale);
+    const wording = await getMailWording('INQUIRY_ANSWERED', locale);
     await getMailer().send(
       inquiryAnswerMail({
         to: inquiry.authorEmail,
-        // **답변을 쓴 운영자의 말이 아니라 물어본 사람의 말이다.**
-        locale: localeOf(inquiry.authorLocale),
+        locale,
         ...(inquiry.productName ? { productName: inquiry.productName } : {}),
         question: inquiry.question,
         answer: inquiry.answer,
@@ -33,7 +36,7 @@ export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<v
         url: inquiry.productSlug
           ? absoluteUrl(`/product/${inquiry.productSlug}`)
           : absoluteUrl('/mypage/inquiries'),
-      }),
+      }, wording),
     );
   } catch (error) {
     console.error('[inquiry] 답변 알림 메일 실패', inquiry.id, error);

@@ -2,6 +2,7 @@ import 'server-only';
 import { escapeHtml, mailShell, mailButton, type MailMessage } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { createTranslator } from '@shop/i18n/all';
+import { wordOf, type MailWording } from './templates';
 
 /**
  * 재입고 · 문의 답변 문안.
@@ -22,19 +23,20 @@ export interface RestockMailInput {
   readonly locale: Locale;
 }
 
-export function restockMail(input: RestockMailInput): MailMessage {
+export function restockMail(input: RestockMailInput, wording?: MailWording): MailMessage {
   const t = createTranslator(input.locale);
   const item = `${input.productName} (${input.optionLabel})`;
+  const lead = wordOf(t, wording, 'lead', 'mail.restock.lead', { item });
 
   return {
     to: input.to,
     // 제목에 상품명을 넣는다 — 여러 개를 신청해 뒀다면 어느 것인지가 먼저다
-    subject: t('mail.restock.subject', { item }),
-    text: [t('mail.restock.lead', { item }), '', input.url, '', t('mail.restock.hurry')].join('\n'),
+    subject: wordOf(t, wording, 'subject', 'mail.restock.subject', { item }),
+    text: [lead, '', input.url, '', t('mail.restock.hurry')].join('\n'),
     html: mailShell({
-      heading: t('mail.restock.heading'),
+      heading: wordOf(t, wording, 'heading', 'mail.restock.heading'),
       bodyHtml: [
-        `<p style="margin:0">${escapeHtml(t('mail.restock.lead', { item }))}</p>`,
+        `<p style="margin:0">${escapeHtml(lead)}</p>`,
         mailButton(input.url, t('mail.restock.view')),
         `<p style="color:#6f6a63;font-size:13px;margin:0">${escapeHtml(t('mail.restock.hurry'))}</p>`,
       ].join(''),
@@ -65,7 +67,7 @@ export interface InquiryAnswerMailInput {
  * 너무 길면 자른다 — 메일 미리보기에 본문이 통째로 밀려 들어가면 제목
  * 옆이 지저분해진다.
  */
-export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
+export function inquiryAnswerMail(input: InquiryAnswerMailInput, wording?: MailWording): MailMessage {
   const t = createTranslator(input.locale);
   const clip = (value: string, max: number) =>
     value.length > max ? `${value.slice(0, max)}…` : value;
@@ -73,12 +75,13 @@ export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
   const answer = clip(input.answer, 400);
   // 상품 없는 문의도 온다. 이름 자리를 비워 두면 "undefined 문의" 가 나간다.
   const about = input.productName ?? t('mail.inquiry.support');
+  const lead = wordOf(t, wording, 'lead', 'mail.inquiry.lead', { about });
 
   return {
     to: input.to,
-    subject: t('mail.inquiry.subject', { about }),
+    subject: wordOf(t, wording, 'subject', 'mail.inquiry.subject', { about }),
     text: [
-      t('mail.inquiry.lead', { about }),
+      lead,
       '',
       `${t('mail.inquiry.question')}: ${question}`,
       `${t('mail.inquiry.answer')}: ${answer}`,
@@ -86,9 +89,9 @@ export function inquiryAnswerMail(input: InquiryAnswerMailInput): MailMessage {
       input.url,
     ].join('\n'),
     html: mailShell({
-      heading: t('mail.inquiry.heading'),
+      heading: wordOf(t, wording, 'heading', 'mail.inquiry.heading'),
       bodyHtml: [
-        `<p style="margin:0">${escapeHtml(t('mail.inquiry.lead', { about }))}</p>`,
+        `<p style="margin:0">${escapeHtml(lead)}</p>`,
         `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">${escapeHtml(t('mail.inquiry.question'))}</p>`,
         `<p style="margin:4px 0 0">${escapeHtml(question)}</p>`,
         `<p style="color:#6f6a63;font-size:13px;margin:16px 0 0">${escapeHtml(t('mail.inquiry.answer'))}</p>`,

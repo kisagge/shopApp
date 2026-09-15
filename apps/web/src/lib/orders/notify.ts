@@ -6,6 +6,8 @@ import {
 import { createTranslator } from '@shop/i18n/all';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
+import { getMailWording, wordOf, type MailWording } from '~/lib/mail/templates';
+import type { MailTemplateKind } from '@shop/core';
 
 /**
  * 주문 안내 메일.
@@ -52,8 +54,17 @@ function row(label: string, value: string): string {
   ].join('');
 }
 
-export function orderMail(kind: Kind, input: OrderMailInput): MailMessage {
+/** 주문 메일 종류와 문구 템플릿 종류 */
+export const ORDER_MAIL_TEMPLATE: Readonly<Record<Kind, MailTemplateKind>> = {
+  paid: 'ORDER_PAID',
+  pending: 'ORDER_PENDING',
+  deposited: 'ORDER_DEPOSITED',
+};
+
+export function orderMail(kind: Kind, input: OrderMailInput, wording?: MailWording): MailMessage {
   const t = createTranslator(input.locale);
+  // 입금 확인 첫 문장에는 이름이 없다 — 템플릿 값 목록도 그렇다(core MAIL_TEMPLATE_PARAMS)
+  const lead = wordOf(t, wording, 'lead', `mail.order.${kind}Lead`, kind === 'deposited' ? {} : { name: input.buyerName });
   const money = (won: number): string => formatMoney(input.locale, won);
 
   const lines = input.items
@@ -78,7 +89,7 @@ export function orderMail(kind: Kind, input: OrderMailInput): MailMessage {
       : '';
 
   const bodyHtml = [
-    `<p style="margin:0 0 20px">${escapeHtml(t(`mail.order.${kind}Lead`, { name: input.buyerName }))}</p>`,
+    `<p style="margin:0 0 20px">${escapeHtml(lead)}</p>`,
     row(t('mail.order.orderNo'), input.orderNo),
     account,
     `<p style="margin:20px 0 6px;color:#6f6a63">${escapeHtml(t('mail.order.items'))}</p>`,
@@ -90,7 +101,7 @@ export function orderMail(kind: Kind, input: OrderMailInput): MailMessage {
 
   /** 본문 없는 클라이언트를 위한 순수 텍스트. 스팸 판정에도 유리하다. */
   const text = [
-    t(`mail.order.${kind}Lead`, { name: input.buyerName }),
+    lead,
     '',
     `${t('mail.order.orderNo')} ${input.orderNo}`,
     ...(kind === 'pending' && input.virtualAccount
@@ -117,10 +128,10 @@ export function orderMail(kind: Kind, input: OrderMailInput): MailMessage {
 
   return {
     to: input.to,
-    subject: t(`mail.order.${kind}Subject`, { orderNo: input.orderNo }),
+    subject: wordOf(t, wording, 'subject', `mail.order.${kind}Subject`, { orderNo: input.orderNo }),
     text,
     html: mailShell({
-      heading: t(`mail.order.${kind}Heading`),
+      heading: wordOf(t, wording, 'heading', `mail.order.${kind}Heading`),
       bodyHtml,
       footer: t('mail.footer'),
     }),
@@ -136,7 +147,9 @@ export function orderMail(kind: Kind, input: OrderMailInput): MailMessage {
  */
 export async function sendOrderMail(kind: Kind, input: OrderMailInput): Promise<void> {
   try {
-    await getMailer().send(orderMail(kind, input));
+    // 운영이 고친 문구 — 못 읽으면 기본 문구(getMailWording 이 삼킨다)
+    const wording = await getMailWording(ORDER_MAIL_TEMPLATE[kind], input.locale);
+    await getMailer().send(orderMail(kind, input, wording));
   } catch (error) {
     console.error('[order] 안내 메일 발송 실패', {
       kind, orderNo: input.orderNo, to: input.to,

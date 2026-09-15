@@ -48,16 +48,22 @@ export function placeholdersOf(body: string): string[] {
 }
 
 export function checkTemplate(kind: NotificationKind, body: string): TemplateProblem[] {
+  return checkTemplateText(body, NOTIFICATION_PARAMS[kind], NOTIFICATION_TEMPLATE_MAX);
+}
+
+/**
+ * 템플릿 한 칸의 검사 — 비었나, 너무 긴가, 중괄호 짝, 쓸 수 없는 이름. 알림 문구와 메일 문구가 같은 규칙을 쓴다.
+ */
+export function checkTemplateText(body: string, allowed: readonly string[], max: number): TemplateProblem[] {
   const text = body.trim();
   if (text === '') return [{ kind: 'EMPTY' }];
 
   const problems: TemplateProblem[] = [];
-  if (text.length > NOTIFICATION_TEMPLATE_MAX) problems.push({ kind: 'TOO_LONG', max: NOTIFICATION_TEMPLATE_MAX });
+  if (text.length > max) problems.push({ kind: 'TOO_LONG', max });
 
   // 올바른 자리를 지우고 나서도 중괄호가 남으면 짝이 안 맞는 것이다
   if (/[{}]/.test(text.replace(PLACEHOLDER, ''))) problems.push({ kind: 'BROKEN_BRACE' });
 
-  const allowed: readonly string[] = NOTIFICATION_PARAMS[kind];
   const unknown = placeholdersOf(text).filter((name) => !allowed.includes(name));
   if (unknown.length > 0) problems.push({ kind: 'UNKNOWN_PLACEHOLDER', names: unknown });
 

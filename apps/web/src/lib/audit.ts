@@ -23,6 +23,8 @@ export type AuditTargetType =
   | 'audit'
   /** 알림 문구 템플릿. id 는 '<종류>:<말>' */
   | 'notification_template'
+  /** 메일 문구 템플릿. id 는 '<종류>:<말>' */
+  | 'mail_template'
   /*
    * 배송비 정책. 대상이 하나뿐이라 id 는 늘 'default' 다 — 그래도 target 을
    * 두는 이유는 **전후 값**을 남기기 위해서다. 무료 기준 하나가 모든 주문의

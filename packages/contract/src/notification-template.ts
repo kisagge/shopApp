@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { NOTIFICATION_KIND } from '@shop/core';
+import { NOTIFICATION_KIND, MAIL_TEMPLATE_KIND } from '@shop/core';
 
 /**
  * 알림 문구 템플릿 저장.
@@ -19,3 +19,18 @@ export const updateNotificationTemplateSchema = z.object({
 });
 
 export type UpdateNotificationTemplateInput = z.infer<typeof updateNotificationTemplateSchema>;
+
+/**
+ * 메일 문구 템플릿 저장·미리보기. 칸이 null 이면 그 칸은 기본 문구. 칸 규칙(쓸 수 있는 값·상한)은 종류를 알아야 해서 서버가
+ * core 로 본다 — 여기서는 모양만.
+ */
+const mailField = z.string().max(1_000, 'valid.tooLongChars').nullable();
+
+export const updateMailTemplateSchema = z.object({
+  kind: z.enum(MAIL_TEMPLATE_KIND),
+  locale: z.enum(TEMPLATE_LOCALES),
+  subject: mailField,
+  heading: mailField,
+  lead: mailField,
+});
+export type UpdateMailTemplateInput = z.infer<typeof updateMailTemplateSchema>;

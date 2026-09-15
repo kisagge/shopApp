@@ -1627,6 +1627,24 @@ model NotificationTemplate {
   @@map("notification_templates")
 }
 
+/// 메일 문구 템플릿 — 메일 종류·말마다 한 줄, 칸(제목·머리말·첫 문장)마다 비어 있으면 사전의 기본 문구.
+///
+/// 종류는 enum 이 아니라 글자로 둔다 — 고칠 수 있는 메일 목록은 코드(@shop/core MAIL_TEMPLATE_KIND)가 정하고, 목록이
+/// 줄어도 옛 줄이 마이그레이션을 막지 않는다. 읽을 때 모르는 종류는 버린다.
+model MailTemplate {
+  kind    String
+  locale  String
+  subject String?
+  heading String?
+  lead    String?
+
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+
+  @@id([kind, locale])
+  @@map("mail_templates")
+}
+
 /// 고객센터 글의 종류.
 ///
 /// 공지와 FAQ 를 **한 표에 둔다.** 둘 다 "운영진이 쓰는 공개 글" 이고 담는

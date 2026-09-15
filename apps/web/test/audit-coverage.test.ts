@@ -70,13 +70,22 @@ function reachesAudit(file: string, seen = new Set<string>(), depth = 0): boolea
   return false;
 }
 
+/**
+ * 쓰기 메서드를 쓰지만 **아무것도 바꾸지 않는** 창구와 그 이유. 이름만 적는 것은 목록으로 되돌아가는 것과 같다 —
+ * 나중에 그 창구가 무언가를 쓰게 되면 이 이유가 거짓이 되므로, 이유를 읽고 판단할 수 있어야 한다.
+ */
+const READ_ONLY_WRITE_METHOD: Readonly<Record<string, string>> = {
+  'app/api/admin/mail-templates/preview/route.ts':
+    '저장하지 않은 문구로 메일을 만들어 돌려주기만 한다. 문구가 길고 한글이라 주소 대신 본문으로 받으려고 POST 다.',
+};
+
 const writers = routeFiles(ADMIN_API)
   .map((file) => ({
     file,
     rel: file.slice(SRC.length + 1),
     methods: WRITE.filter((m) => new RegExp(`export async function ${m}\\b`).test(readFileSync(file, 'utf8'))),
   }))
-  .filter((r) => r.methods.length > 0);
+  .filter((r) => r.methods.length > 0 && !(r.rel in READ_ONLY_WRITE_METHOD));
 
 describe('운영진의 쓰기는 전부 감사 로그에 닿는다', () => {
   it('쓰기 창구를 실제로 찾아낸다 — 못 찾으면 이 검사는 아무것도 지키지 못한다', () => {
@@ -99,6 +108,16 @@ describe('운영진의 쓰기는 전부 감사 로그에 닿는다', () => {
       ).toBe(true);
     },
   );
+
+  it('읽기만 하는 쓰기 메서드 목록은 이유가 있고, 적힌 창구가 실제로 있으며 정말로 기록·저장을 부르지 않는다', () => {
+    for (const [rel, why] of Object.entries(READ_ONLY_WRITE_METHOD)) {
+      expect(why.trim().length, `${rel} 의 이유가 비었다`).toBeGreaterThan(20);
+      const source = readFileSync(join(SRC, rel), 'utf8');
+      expect(source.includes('recordAudit'), `${rel} 이 기록을 남기면 목록에서 뺀다`).toBe(false);
+      // 저장하는 lib 함수를 부르면 더 이상 읽기만이 아니다
+      expect(/\bsave[A-Z]\w*\(|prisma\.\w+\.(create|update|upsert|delete)/.test(source), `${rel} 이 무언가를 저장한다`).toBe(false);
+    }
+  });
 
   it('창구가 아니라 lib 에서 남기는 쪽도 읽어 낸다', () => {
     /*

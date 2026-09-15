@@ -22,6 +22,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['공지·FAQ', '/admin/support'],
   ['배송비', '/admin/shipping'],
   ['알림 문구', '/admin/notification-templates'],
+  ['메일 문구', '/admin/mail-templates'],
   ['알림', '/admin/notifications'],
   ['정산', '/admin/settlements'],
   ['가맹점', '/admin/merchants'],

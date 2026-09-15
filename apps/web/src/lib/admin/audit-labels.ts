@@ -73,6 +73,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'audit.export': '감사 로그 내려받기',
   'notification.template.update': '알림 문구 수정',
   'notification.template.reset': '알림 문구 기본으로',
+  'mail.template.update': '메일 문구 수정',
+  'mail.template.reset': '메일 문구 기본으로',
 };
 
 /**
@@ -95,6 +97,7 @@ export const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
   event_log: '이벤트 기록',
   audit: '감사 로그',
   notification_template: '알림 문구',
+  mail_template: '메일 문구',
 };
 
 export const actionLabel = (action: string): string => ACTION_LABEL[action] ?? action;

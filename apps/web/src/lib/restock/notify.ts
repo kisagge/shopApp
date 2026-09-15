@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { restockMail } from '~/lib/mail/notices';
+import { getMailWording, type MailWording } from '~/lib/mail/templates';
 import { localeOf } from '~/lib/mail/recipient';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
@@ -53,6 +54,11 @@ const mailNotifier: RestockNotifier = {
   name: 'mail',
   async send(notices) {
     const mailer = getMailer();
+    // 말마다 한 번씩 읽는다 — 받는 사람마다 물으면 한 번의 재입고에 수백 번 조회가 나간다
+    const wordings = new Map<Locale, MailWording>();
+    for (const locale of new Set(notices.map((n) => n.locale))) {
+      wordings.set(locale, await getMailWording('RESTOCK', locale));
+    }
     const results = await Promise.allSettled(
       notices.map((n) =>
         mailer.send(
@@ -62,7 +68,7 @@ const mailNotifier: RestockNotifier = {
             optionLabel: n.optionLabel,
             url: absoluteUrl(`/product/${n.productSlug}`),
             locale: n.locale,
-          }),
+          }, wordings.get(n.locale)),
         ),
       ),
     );
