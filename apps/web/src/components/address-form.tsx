@@ -35,8 +35,14 @@ export function AddressForm({
   onCancel,
   submitLabel,
   remoteSurcharge,
+  editing,
 }: {
   onSaved: (address: SavedAddress) => void;
+  /**
+   * 고칠 배송지. 있으면 칸을 그 값으로 채우고 그 배송지를 고친다(PUT). 기본 여부는 여기서 바꾸지 않는다 — 목록의
+   * "기본으로" 단추가 한다.
+   */
+  editing?: SavedAddress | undefined;
   onCancel?: () => void;
   submitLabel?: string;
   /**
@@ -54,8 +60,8 @@ export function AddressForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [postalCode, setPostalCode] = useState('');
-  const [address1, setAddress1] = useState('');
+  const [postalCode, setPostalCode] = useState(editing?.postalCode ?? '');
+  const [address1, setAddress1] = useState(editing?.address1 ?? '');
 
   // 주소 검색 상태. searchable 이 false 면 스크립트를 못 불러온 것이라
   // 버튼을 감추고 손 입력만 남긴다.
@@ -146,16 +152,18 @@ export function AddressForm({
       postalCode: text('postalCode'),
       address1: text('address1'),
       ...(text('address2') ? { address2: text('address2') } : {}),
-      isDefault: true,
+      // 새로 넣는 것은 기본이 된다. 고칠 때는 지금 상태를 그대로 보낸다(서버도 고치는 창구에서는 무시한다)
+      isDefault: editing ? editing.isDefault : true,
     };
 
     try {
-      const response = await fetch('/api/addresses', {
-        method: 'POST',
+      const response = await fetch(editing ? `/api/addresses/${editing.id}` : '/api/addresses', {
+        method: editing ? 'PUT' : 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as {
+      // 앞단이 JSON 이 아닌 오류를 주면 던지지 않고 기본 문구로 — 네트워크 오류로 오해하게 두지 않는다
+      const result = (await response.json().catch(() => ({}))) as {
         address?: SavedAddress;
         message?: string;
         fields?: Record<string, string>;
@@ -196,6 +204,7 @@ export function AddressForm({
           required
           maxLength={50}
           autoComplete="name"
+          defaultValue={editing?.recipient}
           error={fieldErrors['recipient']}
         />
         <Field
@@ -205,6 +214,7 @@ export function AddressForm({
           inputMode="tel"
           autoComplete="tel"
           placeholder="010-0000-0000"
+          defaultValue={editing?.phone}
           error={fieldErrors['phone']}
         />
       </div>
@@ -296,6 +306,7 @@ export function AddressForm({
         ref={detailRef}
         maxLength={200}
         hint={t('addr.detailHint')}
+        defaultValue={editing?.address2 ?? undefined}
         error={fieldErrors['address2']}
       />
 
@@ -304,7 +315,13 @@ export function AddressForm({
         name="label"
         maxLength={20}
         hint={t('addr.labelHint')}
+        defaultValue={editing?.label ?? undefined}
       />
+
+      {editing && (
+        // 고친 주소로 이미 한 주문까지 바뀌는 줄 알면, 배송 중인 주문을 옮기려고 여기를 고친다
+        <p className="text-[12px] text-[var(--fg-muted)]">{t('addr.pastOrdersNote')}</p>
+      )}
 
       <div className="mt-1 flex items-center gap-2">
         <Button type="submit" disabled={pending}>

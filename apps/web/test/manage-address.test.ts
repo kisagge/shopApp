@@ -9,12 +9,13 @@ const db = vi.hoisted(() => ({
     delete: vi.fn<(...a: any[]) => any>(),
     findFirst: vi.fn<(...a: any[]) => any>(),
     findMany: vi.fn<(...a: any[]) => any>(),
+    findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
   },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { createAddress, setDefaultAddress, deleteAddress, AddressError } = await import(
+const { createAddress, setDefaultAddress, deleteAddress, updateAddress, AddressError } = await import(
   '~/lib/addresses/manage-address'
 );
 
@@ -153,5 +154,26 @@ describe('삭제', () => {
     await deleteAddress('u-1', 'a-1');
 
     expect(db.address.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('배송지 고치기', () => {
+  it('자기 배송지만, 도서산간은 우편번호로 다시 정하고, 기본 여부는 건드리지 않는다', async () => {
+    db.address.updateMany.mockResolvedValue({ count: 1 });
+    db.address.findUniqueOrThrow.mockResolvedValue({ id: 'a-1', isDefault: true });
+
+    await updateAddress('u-1', 'a-1', input({ postalCode: '63309', phone: '01012345678', label: '  ', isDefault: false }));
+
+    const call = db.address.updateMany.mock.calls[0]?.[0];
+    expect(call.where).toEqual({ id: 'a-1', userId: 'u-1' });
+    expect(call.data).toMatchObject({ isRemoteArea: true, phone: '010-1234-5678', label: null, address2: null });
+    // 고치는 폼이 기본을 내리면 기본이 하나도 없는 상태가 된다
+    expect(call.data).not.toHaveProperty('isDefault');
+  });
+
+  it('남의 배송지(또는 없는 것)는 없는 배송지다', async () => {
+    db.address.updateMany.mockResolvedValue({ count: 0 });
+    await expect(updateAddress('u-2', 'a-1', input())).rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(db.address.findUniqueOrThrow).not.toHaveBeenCalled();
   });
 });

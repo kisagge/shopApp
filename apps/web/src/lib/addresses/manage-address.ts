@@ -82,6 +82,36 @@ export async function createAddress(userId: string, input: AddressInput): Promis
   });
 }
 
+/**
+ * 배송지를 고친다.
+ *
+ * 받는 분·번호·주소 오타 하나에 지우고 다시 넣게 하면, 기본 배송지였던 것이 지워지며 다른 주소가 기본으로 올라가고 새로
+ * 넣은 것은 맨 위로 간다 — 고치려던 한 칸 말고 두 가지가 더 바뀐다.
+ *
+ * - **도서산간은 다시 판정한다.** 우편번호를 고쳤으면 추가 배송비도 따라 바뀌어야 한다(만들 때와 같은 이유).
+ * - **기본 여부는 여기서 바꾸지 않는다.** 고치는 폼이 기본을 내리게 두면 기본이 하나도 없는 상태가 된다. 올리는 것은
+ *   "기본으로" 단추(setDefaultAddress)가 한다.
+ * - **이미 한 주문의 배송지는 바뀌지 않는다.** 주문은 배송지를 복사해 들고 있다 — 보낸 뒤에 주소록을 고쳤다고 송장의 주소가
+ *   바뀌면 안 된다.
+ */
+export async function updateAddress(userId: string, addressId: string, input: AddressInput): Promise<SavedAddress> {
+  // 남의 배송지를 고칠 수 없다. userId 를 조건에 함께 건다
+  const { count } = await prisma.address.updateMany({
+    where: { id: addressId, userId },
+    data: {
+      label: input.label?.trim() || null,
+      recipient: input.recipient,
+      phone: normalizePhone(input.phone),
+      postalCode: input.postalCode,
+      address1: input.address1,
+      address2: input.address2?.trim() || null,
+      isRemoteArea: isRemoteAreaPostalCode(input.postalCode),
+    },
+  });
+  if (count === 0) throw new AddressError('NOT_FOUND', 404);
+  return prisma.address.findUniqueOrThrow({ where: { id: addressId }, select: SELECT });
+}
+
 export async function setDefaultAddress(userId: string, addressId: string): Promise<void> {
   // 남의 배송지를 기본으로 만들 수 없다. userId 를 함께 건다.
   const target = await prisma.address.findFirst({

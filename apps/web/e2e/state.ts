@@ -46,6 +46,8 @@ export const STATE_FILE = {
   purchaseConfirmer: 'test-results/.auth/purchase-confirm.json',
   /** 운영진이 적립금을 손으로 지급·차감하는 손님 — point-adjust-admin */
   pointAdjustTarget: 'test-results/.auth/point-adjust.json',
+  /** 배송지를 넣고 고치고 지운다 — address-edit */
+  addressEditor: 'test-results/.auth/address-edit.json',
 } as const;
 
 /**

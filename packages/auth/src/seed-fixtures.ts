@@ -89,6 +89,9 @@ export const SEED_ACCOUNT = {
    */
   pointAdjustTarget: 'point-adjust@plain.test',
 
+  /** 배송지를 넣고 고치고 지운다 — address-edit. 장바구니를 쥐지 않는다 */
+  addressEditor: 'address-edit@plain.test',
+
   /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *

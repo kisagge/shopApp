@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge, Button } from '@shop/ui';
 import { MAX_ADDRESSES } from '@shop/core';
 import { AddressForm, type SavedAddress } from '~/components/address-form';
@@ -46,6 +46,22 @@ export function AddressBook({
   const [error, setError] = useState<string | null>(null);
   /** 스크린리더에 결과를 알린다. 목록만 바뀌면 무슨 일이 일어났는지 모른다. */
   const [status, setStatus] = useState('');
+  /** 고치는 중인 배송지. 그 줄이 폼으로 바뀐다 — 한 번에 하나만 */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  /** 고치기를 끝내면(저장·취소) 초점을 돌려줄 줄. 폼이 사라지며 초점이 문서 처음으로 튀지 않게 */
+  const returnFocusTo = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (editingId !== null || returnFocusTo.current === null) return;
+    const id = returnFocusTo.current;
+    returnFocusTo.current = null;
+    document.querySelector<HTMLButtonElement>(`[data-edit-address="${CSS.escape(id)}"]`)?.focus();
+  }, [editingId]);
+
+  function finishEditing(id: string) {
+    returnFocusTo.current = id;
+    setEditingId(null);
+  }
 
   async function makeDefault(target: SavedAddress) {
     setBusy(target.id);
@@ -111,7 +127,23 @@ export function AddressBook({
 
       {addresses.length > 0 && (
         <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-col gap-2.5">
-          {addresses.map((a, index) => (
+          {addresses.map((a, index) => editingId === a.id ? (
+            <li key={a.id} className="rounded-sm border border-[var(--border)] p-4">
+              <section aria-label={t('addr.editNamed', { name: a.recipient })}>
+                <AddressForm
+                  editing={a}
+                  remoteSurcharge={remoteSurcharge}
+                  submitLabel={t('addr.saveEdit')}
+                  onSaved={(saved) => {
+                    setAddresses((list) => list.map((x) => (x.id === saved.id ? saved : x)));
+                    setStatus(t('addr.updated', { name: saved.recipient }));
+                    finishEditing(saved.id);
+                  }}
+                  onCancel={() => finishEditing(a.id)}
+                />
+              </section>
+            </li>
+          ) : (
             <li
               key={a.id}
               className="flex flex-wrap items-start justify-between gap-4 rounded-sm border border-[var(--border)] p-4"
@@ -136,6 +168,21 @@ export function AddressBook({
                 )}
               </div>
               <div className="flex items-center gap-1.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={busy !== null || editingId !== null}
+                  aria-label={t('addr.editNamed', { name: a.recipient })}
+                  data-edit-address={a.id}
+                  onClick={() => {
+                    setError(null);
+                    setAdding(false);
+                    setEditingId(a.id);
+                  }}
+                >
+                  {t('addr.edit')}
+                </Button>
                 {!a.isDefault && (
                   <Button
                     type="button"

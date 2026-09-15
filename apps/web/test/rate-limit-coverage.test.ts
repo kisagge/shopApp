@@ -40,7 +40,7 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'api/notifications/read/route.ts':
     '이미 있는 줄의 읽음 표시를 바꾼다. 새로 만드는 것이 없다.',
   'api/addresses/[id]/route.ts':
-    '자기 주소 하나를 고치거나 지운다. 만드는 창구(POST /addresses)에 제한이 있다.',
+    '자기 주소 하나를 고치거나(PUT) 기본으로 삼거나(PATCH) 지운다. 줄이 늘지 않고, 만드는 창구(POST /addresses)에 제한이 있다.',
   'api/account/close/route.ts':
     '확인 문구를 정확히 받아야 하고, 한 번 닫히면 두 번째 호출은 상태 검사에서 걸린다.',
   'api/reviews/[id]/route.ts':

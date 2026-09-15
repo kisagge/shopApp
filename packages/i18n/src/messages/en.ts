@@ -448,6 +448,11 @@ export const en: Dictionary = {
   'addr.changeFailed': 'We could not change the address.',
   'addr.defaultFailed': 'We could not change the default address.',
   'addr.deleteFailed': 'We could not delete that address.',
+  'addr.edit': 'Edit',
+  'addr.editNamed': 'Edit address for {name}',
+  'addr.saveEdit': 'Save changes',
+  'addr.updated': 'Updated the address for {name}.',
+  'addr.pastOrdersNote': 'Orders you have already placed keep their original address. To change the address on an order in transit, send us an inquiry.',
   'common.networkError': 'A network error stopped that from going through.',
 
   'ret.request': 'Request a return or exchange',

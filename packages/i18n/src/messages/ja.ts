@@ -444,6 +444,11 @@ export const ja: Dictionary = {
   'addr.changeFailed': 'お届け先を変更できませんでした。',
   'addr.defaultFailed': '既定のお届け先を変更できませんでした。',
   'addr.deleteFailed': 'お届け先を削除できませんでした。',
+  'addr.edit': '編集',
+  'addr.editNamed': '{name} 様の配送先を編集',
+  'addr.saveEdit': '変更を保存',
+  'addr.updated': '{name} 様の配送先を更新しました。',
+  'addr.pastOrdersNote': 'すでにご注文済みの配送先は変わりません。配送中のご注文の住所を変更したい場合はお問い合わせください。',
   'common.networkError': 'ネットワークエラーのため処理できませんでした。',
 
   'ret.request': '返品・交換の申請',

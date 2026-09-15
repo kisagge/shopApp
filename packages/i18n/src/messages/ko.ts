@@ -463,6 +463,11 @@ export const ko = {
   'addr.changeFailed': '배송지를 바꾸지 못했습니다.',
   'addr.defaultFailed': '기본 배송지를 바꾸지 못했습니다.',
   'addr.deleteFailed': '배송지를 지우지 못했습니다.',
+  'addr.edit': '수정',
+  'addr.editNamed': '{name} 님의 배송지 수정',
+  'addr.saveEdit': '고친 내용 저장',
+  'addr.updated': '{name} 님의 배송지를 고쳤습니다.',
+  'addr.pastOrdersNote': '이미 주문한 건의 배송지는 바뀌지 않습니다. 배송 중인 주문의 주소를 바꾸려면 문의해 주세요.',
   'common.networkError': '네트워크 오류로 처리하지 못했습니다.',
 
   // ── 반품 · 취소 ─────────────────────────────────────────
