@@ -13,6 +13,7 @@ export const MAIL_TEMPLATE_KIND = [
   'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
   'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'REFUND_COMPLETED',
   'POINTS_GRANTED', 'POINTS_DEDUCTED', 'ACCOUNT_SUSPENDED', 'ACCOUNT_RESTORED',
+  'COUPON_EXPIRING', 'POINTS_EXPIRING',
 ] as const;
 export type MailTemplateKind = (typeof MAIL_TEMPLATE_KIND)[number];
 
@@ -40,6 +41,8 @@ export const MAIL_TEMPLATE_PARAMS = {
   POINTS_DEDUCTED: { subject: ['points'], heading: [], lead: ['name', 'points'] },
   ACCOUNT_SUSPENDED: { subject: [], heading: [], lead: ['name'] },
   ACCOUNT_RESTORED: { subject: [], heading: [], lead: ['name'] },
+  COUPON_EXPIRING: { subject: ['count'], heading: [], lead: ['name', 'count', 'date'] },
+  POINTS_EXPIRING: { subject: ['points'], heading: [], lead: ['name', 'points', 'date'] },
 } as const satisfies Record<MailTemplateKind, Record<MailTemplateField, readonly string[]>>;
 
 /** 미리보기에 끼울 예시 값 */
@@ -49,6 +52,8 @@ export const MAIL_SAMPLE_PARAMS: Readonly<Record<string, string>> = {
   item: '울 코트 (오트 / M)',
   about: '울 코트',
   points: '3,000',
+  count: '2',
+  date: '2026-09-22',
 };
 
 export const isMailTemplateKind = (value: unknown): value is MailTemplateKind =>

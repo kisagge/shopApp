@@ -235,6 +235,7 @@ SEED_REMOTE=yes DATABASE_URL="<운영 풀링 주소>" pnpm db:seed
 | `/api/cron/rollup-events` | 매일 KST 04:00 | 어제치 이벤트를 일별 집계로 접고, 90일 지난 원본을 지움 |
 | `/api/cron/auto-confirm` | 매일 KST 05:00 | 배송완료 8일 지난 주문을 구매확정하고 적립을 지급 |
 | `/api/cron/release-holds` | 매일 KST 06:00 | 결제까지 안 간 주문이 물고 있던 재고를 푼다 |
+| `/api/cron/expiry-notices` | 매일 KST 10:00 | 한 주 안에 사라질 쿠폰·적립금을 손님에게 한 번 알린다 |
 | `/api/cron/settlements` | 매달 2일 KST 05:00 | 앞 달 정산 확정 |
 
 **정산이 1일이 아니라 2일인 이유.** 표현식 `0 20 1 * *` 은 UTC 1일 20:00 이고,

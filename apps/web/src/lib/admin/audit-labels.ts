@@ -51,6 +51,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'settlement.pay': '정산 지급',
   'points.reconcile': '포인트 대사',
   'points.expire': '포인트 소멸',
+  'notices.expiry': '소멸 임박 알림',
   'points.grant': '포인트 수동 지급',
   'points.deduct': '포인트 수동 차감',
   'banner.create': '배너 등록',

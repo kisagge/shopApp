@@ -27,6 +27,8 @@ export const NOTIFICATION_PARAMS = {
   POINTS_GRANTED: ['points'],
   POINTS_DEDUCTED: ['points'],
   ACCOUNT_RESTORED: [],
+  COUPON_EXPIRING: ['count', 'date'],
+  POINTS_EXPIRING: ['points', 'date'],
 } as const satisfies Record<NotificationKind, readonly string[]>;
 
 /** 미리보기에 끼울 값. 운영자가 고친 문구가 실제로 어떻게 읽히는지 보려고 쓴다 */
@@ -37,6 +39,8 @@ export const NOTIFICATION_SAMPLE_PARAMS: Readonly<Record<string, string>> = {
   couponName: '가을 10% 쿠폰',
   stock: '3',
   points: '3,000',
+  count: '2',
+  date: '2026-09-22',
 };
 
 /** 알림 한 줄의 상한. 머리의 알림 목록과 앱 알림에 한눈에 들어가야 한다 */

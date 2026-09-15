@@ -6,6 +6,7 @@ import { restockMail, inquiryAnswerMail } from './notices';
 import { exchangeShippedMail } from '~/lib/orders/notify-exchange';
 import { afterSaleMail } from '~/lib/orders/notify-after-sale';
 import { accountMail } from '~/lib/account/notify-account';
+import { expiringCouponMail, expiringPointsMail } from '~/lib/notifications/expiry-notice';
 import type { MailWording } from './templates';
 
 /**
@@ -70,6 +71,16 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
       return accountMail({
         kind, to: order.to, name: order.buyerName, locale,
         ...(kind === 'ACCOUNT_SUSPENDED' ? { reason: '결제 도용이 의심되어 확인 중입니다.' } : {}),
+      }, wording);
+    case 'COUPON_EXPIRING':
+      return expiringCouponMail({
+        to: order.to, name: order.buyerName, locale,
+        coupons: [{ name: '가을 10% 쿠폰', date: '2026-09-22' }, { name: '무료배송 쿠폰', date: '2026-09-24' }],
+      }, wording);
+    case 'POINTS_EXPIRING':
+      return expiringPointsMail({
+        to: order.to, name: order.buyerName, locale, amount: 4_500,
+        days: [{ date: '2026-09-20', amount: 3_000 }, { date: '2026-09-22', amount: 1_500 }],
       }, wording);
   }
 }

@@ -1051,15 +1051,19 @@ model UserCoupon {
   couponId String
   coupon   Coupon @relation(fields: [couponId], references: [id])
 
-  usedAt    DateTime?
-  expiresAt DateTime
-  orders    Order[]
+  usedAt         DateTime?
+  expiresAt      DateTime
+  /// 곧 사라진다고 알린 때. 한 번만 알린다(core expiry-notice)
+  expiryNoticeAt DateTime?
+  orders         Order[]
 
   issuedAt DateTime @default(now())
 
   /// 같은 쿠폰을 한 사람이 두 번 받지 않는다.
   @@unique([userId, couponId])
   @@index([userId, usedAt])
+  /// 곧 사라질 쿠폰을 매일 찾는다
+  @@index([expiresAt, usedAt])
   @@map("user_coupons")
 }
 
@@ -1088,7 +1092,9 @@ model PointTransaction {
   order   Order?  @relation(fields: [orderId], references: [id])
 
   /// 적립 포인트의 소멸 예정일. 사용/소멸 건은 null.
-  expiresAt DateTime?
+  expiresAt      DateTime?
+  /// 이 적립이 곧 사라진다고 알린 때. 한 번만 알린다(core expiry-notice)
+  expiryNoticeAt DateTime?
 
   /// 운영진이 손으로 지급·차감할 때 화면이 보낸 열쇠. 같은 열쇠로 두 번 오면 두 번째는 원장에 못 들어간다 —
   /// 지급을 두 번 눌러도 한 번만 나간다. 누가 했는지는 감사 로그가 갖는다.
@@ -1637,6 +1643,9 @@ enum NotificationKind {
   POINTS_DEDUCTED
   /// 이용 정지가 풀렸다
   ACCOUNT_RESTORED
+  /// 쿠폰·적립금이 한 주 안에 사라진다
+  COUPON_EXPIRING
+  POINTS_EXPIRING
 }
 
 model Notification {

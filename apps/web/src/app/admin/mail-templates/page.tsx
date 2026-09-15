@@ -28,6 +28,8 @@ const KIND_LABEL: Record<MailTemplateKind, string> = {
   POINTS_DEDUCTED: '적립금 차감',
   ACCOUNT_SUSPENDED: '이용 정지',
   ACCOUNT_RESTORED: '이용 정지 해제',
+  COUPON_EXPIRING: '쿠폰 기한 임박',
+  POINTS_EXPIRING: '적립금 소멸 임박',
 };
 
 /** 기본 문구가 사전의 어느 열쇠인가 — 칸을 비우면 이 말이 나간다 */
@@ -46,9 +48,11 @@ const DEFAULT_KEY: Record<MailTemplateKind, Record<MailTemplateField, string>> =
   POINTS_DEDUCTED: { subject: 'mail.pointsDeducted.subject', heading: 'mail.pointsDeducted.heading', lead: 'mail.pointsDeducted.lead' },
   ACCOUNT_SUSPENDED: { subject: 'mail.suspended.subject', heading: 'mail.suspended.heading', lead: 'mail.suspended.lead' },
   ACCOUNT_RESTORED: { subject: 'mail.restored.subject', heading: 'mail.restored.heading', lead: 'mail.restored.lead' },
+  COUPON_EXPIRING: { subject: 'mail.couponExpiring.subject', heading: 'mail.couponExpiring.heading', lead: 'mail.couponExpiring.lead' },
+  POINTS_EXPIRING: { subject: 'mail.pointsExpiring.subject', heading: 'mail.pointsExpiring.heading', lead: 'mail.pointsExpiring.lead' },
 };
 
-const PARAM_LABEL: Record<string, string> = { orderNo: '주문번호', name: '주문자 이름', item: '상품(옵션)', about: '문의한 상품', points: '포인트(쉼표 포함)' };
+const PARAM_LABEL: Record<string, string> = { orderNo: '주문번호', name: '주문자 이름', item: '상품(옵션)', about: '문의한 상품', points: '포인트(쉼표 포함)', count: '개수', date: '가장 빠른 날(YYYY-MM-DD)' };
 
 /**
  * 메일 문구.

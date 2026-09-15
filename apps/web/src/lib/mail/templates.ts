@@ -41,11 +41,12 @@ export function wordOf(
   wording: MailWording | undefined,
   field: MailTemplateField,
   key: MessageKey,
-  vars: Readonly<Record<string, string>> = {},
+  /** 숫자는 숫자로 넘긴다 — 사전의 복수형(`1 coupon` / `2 coupons`)이 개수로 모양을 고른다 */
+  vars: Readonly<Record<string, string | number>> = {},
 ): string {
   const custom = wording?.[field];
   if (custom !== undefined) {
-    const rendered = renderTemplate(custom, vars);
+    const rendered = renderTemplate(custom, Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, String(v)])));
     if (rendered !== null) return rendered;
   }
   return t(key, vars);

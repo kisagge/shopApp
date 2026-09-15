@@ -40,6 +40,9 @@ export const NOTIFICATION_KIND = [
   'POINTS_DEDUCTED',
   /** 이용 정지가 풀렸다. 정지 자체는 알림함에 남기지 않는다(core account-notice) */
   'ACCOUNT_RESTORED',
+  /** 쿠폰·적립금이 한 주 안에 사라진다 — 들어와야 보이는 것을 미리 알린다 */
+  'COUPON_EXPIRING',
+  'POINTS_EXPIRING',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
