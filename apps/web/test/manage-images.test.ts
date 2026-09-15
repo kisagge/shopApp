@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   productImage: {
     create: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), delete: vi.fn<(...a: any[]) => any>(),
     update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>(), findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
+    count: vi.fn<(...a: any[]) => any>(),
   },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
@@ -174,6 +175,7 @@ describe('삭제', () => {
   beforeEach(() => {
     db.productImage.findFirst.mockResolvedValue({ id: 'i-1', storageKey: 'products/p-1/abc.png' });
     db.productImage.delete.mockResolvedValue({});
+    db.productImage.count.mockResolvedValue(0);
     db.productImage.findMany.mockResolvedValue([
       { id: 'i-2', url: 'u2', alt: 'a2', sortOrder: 1 },
       { id: 'i-3', url: 'u3', alt: 'a3', sortOrder: 2 },
@@ -184,6 +186,14 @@ describe('삭제', () => {
     await deleteProductImage(admin, 'p-1', 'i-1');
     expect(db.productImage.delete).toHaveBeenCalled();
     expect(storage.remove).toHaveBeenCalledWith('products/p-1/abc.png');
+  });
+
+  it('복제한 다른 상품이 같은 파일을 쓰면 파일은 남긴다 — 원본에서 지웠더니 사본 사진이 깨지면 안 된다', async () => {
+    db.productImage.count.mockResolvedValue(1);
+    await deleteProductImage(admin, 'p-1', 'i-1');
+    expect(db.productImage.delete).toHaveBeenCalled();
+    expect(db.productImage.count).toHaveBeenCalledWith({ where: { storageKey: 'products/p-1/abc.png' } });
+    expect(storage.remove).not.toHaveBeenCalled();
   });
 
   it('삭제 뒤 순서를 0부터 다시 매긴다', async () => {

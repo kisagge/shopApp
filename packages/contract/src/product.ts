@@ -3,7 +3,7 @@ import {
   PRODUCT_STATUS as CORE_PRODUCT_STATUS,
   PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL,
   type ProductStatus as CoreProductStatus,
-  PUBLISH_ERROR,
+  PUBLISH_ERROR, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, VARIANT_SKU_MAX,
 } from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
 
@@ -28,7 +28,7 @@ const slugSchema = z
   .string()
   .trim()
   .min(2, 'valid.tooShortChars')
-  .max(80, 'valid.tooLongChars')
+  .max(PRODUCT_SLUG_MAX, 'valid.tooLongChars')
   // URL 에 그대로 들어간다. 한글·공백·대문자를 허용하면 인코딩된 주소가 되고
   // 공유했을 때 읽을 수 없다.
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'valid.slugFormat');
@@ -43,7 +43,7 @@ const slugSchema = z
  */
 const productShape = {
   slug: slugSchema,
-  name: z.string().trim().min(1, 'valid.productNameRequired').max(120, 'valid.tooLongChars'),
+  name: z.string().trim().min(1, 'valid.productNameRequired').max(PRODUCT_NAME_MAX, 'valid.tooLongChars'),
   description: z.string().trim().max(4000, 'valid.tooLongChars'),
   brandId: cuidSchema,
   categoryId: cuidSchema,
@@ -108,7 +108,7 @@ export const createVariantSchema = z.object({
     .string()
     .trim()
     .min(2, 'valid.tooShortChars')
-    .max(64, 'valid.tooLongChars')
+    .max(VARIANT_SKU_MAX, 'valid.tooLongChars')
     .regex(/^[A-Z0-9][A-Z0-9-]*$/, 'valid.upperSlugFormat'),
   optionLabel: z.string().trim().min(1, 'valid.optionNameRequired').max(60, 'valid.tooLongChars'),
   stock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig').default(0),

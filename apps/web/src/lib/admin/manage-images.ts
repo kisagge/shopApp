@@ -141,9 +141,17 @@ export async function deleteProductImage(
 
   await prisma.productImage.delete({ where: { id: image.id } });
 
+  /*
+   * **다른 상품이 같은 파일을 쓰면 파일은 남긴다.** 상품 복제는 사진을 새로 올리지 않고 같은 파일을 가리킨다 — 원본에서
+   * 사진을 지웠더니 사본 사진이 깨지면 안 된다(duplicate-product). 마지막으로 쓰던 상품이 지울 때 파일도 지운다.
+   */
+  const stillUsed = image.storageKey
+    ? await prisma.productImage.count({ where: { storageKey: image.storageKey } })
+    : 0;
+
   // 저장소 삭제는 실패해도 넘어간다. 화면에서 사라지는 것이 우선이고,
   // 남은 객체는 눈에 보이는 피해가 없다. 반대로 DB 만 남기면 깨진 이미지가 뜬다.
-  if (image.storageKey) {
+  if (image.storageKey && stillUsed === 0) {
     try {
       await getStorage().remove(image.storageKey);
     } catch (error) {

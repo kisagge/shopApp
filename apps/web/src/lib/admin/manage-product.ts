@@ -28,7 +28,7 @@ import {
  * 그 주소가 한쪽에서는 새 주인을 가리키고 다른 쪽에서는 옛 주인으로 넘긴다.
  * 만들 때와 고칠 때가 같은 규칙을 쓰도록 한 곳에 둔다.
  */
-async function slugTaken(slug: string, selfId?: string): Promise<boolean> {
+export async function slugTaken(slug: string, selfId?: string): Promise<boolean> {
   const [live, history] = await Promise.all([
     prisma.product.findUnique({ where: { slug }, select: { id: true } }),
     prisma.productSlug.findUnique({ where: { slug }, select: { productId: true } }),

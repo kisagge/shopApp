@@ -13,6 +13,7 @@ import { ProductForm } from '../product-form';
 import { StockForm } from '../stock-form';
 import { VariantForm } from '../variant-form';
 import { ImageManager } from '../image-manager';
+import { DuplicateProductButton } from '../duplicate-button';
 
 export const metadata: Metadata = { title: '상품 수정' };
 export const dynamic = 'force-dynamic';
@@ -52,6 +53,7 @@ export default async function AdminProductDetailPage({
             </li>
           </ol>
         </nav>
+        {canWrite && <DuplicateProductButton productId={product.id} />}
       </header>
 
       <div className="grid gap-6 p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
