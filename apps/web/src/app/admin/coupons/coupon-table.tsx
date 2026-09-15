@@ -14,12 +14,13 @@ const discountText = (c: CouponRow) =>
 
 /** 발행한 쿠폰. 할인 내용은 못 고치므로 여기서 할 수 있는 것은 중지·재개뿐이다. */
 export function CouponTable({
-  coupons, pending, onToggle, onGrant,
+  coupons, pending, onToggle, onGrant, onToggleDownload,
 }: {
   coupons: readonly CouponRow[];
   pending: boolean;
   onToggle: (coupon: CouponRow) => void;
   onGrant: (coupon: CouponRow) => void;
+  onToggleDownload: (coupon: CouponRow) => void;
 }) {
   /*
     **비었을 때 그 이유를 말한다.** 표 머리만 남으면 고장인지 원래 그런 건지
@@ -78,6 +79,7 @@ export function CouponTable({
                 <span className="flex flex-col gap-0.5">
                   <span className="font-medium">{c.name}</span>
                   <span className="tnum text-[11px] text-[var(--fg-muted)]">{c.code}</span>
+                  {c.downloadable && <span className="text-[11px] text-success">누구나 받기 공개</span>}
                 </span>
               </th>
               <td className="px-4 py-3">
@@ -128,6 +130,16 @@ export function CouponTable({
                       지급
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    disabled={pending}
+                    onClick={() => onToggleDownload(c)}
+                    aria-label={`${c.name} 쿠폰 ${c.downloadable ? '받기 내리기' : '받기 공개'}`}
+                  >
+                    {c.downloadable ? '받기 내리기' : '받기 공개'}
+                  </Button>
                   <Button
                     type="button"
                     variant="secondary"

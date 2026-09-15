@@ -3,7 +3,9 @@
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field } from '@shop/ui';
-import { formatMoney, formatPercent } from '@shop/i18n';
+import { formatMoney } from '@shop/i18n';
+import { TrackedLink as Link } from '~/components/tracked-link';
+import { couponDiscountText } from '~/lib/i18n/coupon-text';
 import { useLocale, useT } from '~/lib/i18n/client';
 
 interface WalletCoupon {
@@ -70,15 +72,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
     }
   }
 
-  const discountText = (c: WalletCoupon) =>
-    c.kind === 'AMOUNT'
-      ? t('coupon.amountOff', { amount: money(c.value) })
-      : c.maxDiscount
-        ? t('coupon.percentOffCapped', {
-            percent: formatPercent(locale, c.percent ?? 0),
-            max: money(c.maxDiscount),
-          })
-        : t('coupon.percentOff', { percent: formatPercent(locale, c.percent ?? 0) });
+  const discountText = (c: WalletCoupon) => couponDiscountText(t, locale, c);
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,6 +92,11 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
           {pending ? t('coupon.claiming') : t('coupon.claim')}
         </Button>
       </form>
+
+      {/* 코드가 없어도 받을 수 있는 쿠폰이 있다 — 코드 칸만 두면 그 길을 모른다 */}
+      <p className="-mt-3 text-[13px]">
+        <Link href="/coupons" className="text-[var(--fg)] underline underline-offset-2">{t('coupon.goDownload')}</Link>
+      </p>
 
       <p aria-live="polite" className="text-[13px] text-[var(--fg-secondary)]">
         {status}

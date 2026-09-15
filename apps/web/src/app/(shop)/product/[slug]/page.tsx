@@ -29,6 +29,8 @@ import { getEffectiveGrade } from '~/lib/grade/effective';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { getShippingPolicy } from '~/lib/shipping-policy';
 import { reviewListQuerySchema } from '@shop/contract';
+import { CouponDownloads } from '~/components/coupon-downloads';
+import { listDownloadableCoupons } from '~/lib/coupons/downloadable';
 
 export const dynamic = 'force-dynamic';
 
@@ -115,12 +117,14 @@ export default async function ProductPage({ params, searchParams }: Params) {
    * 준비된 뒤에도 **화면 아래쪽 조회가 끝날 때까지 아무 픽셀도 나가지
    * 않았다.** 아래쪽은 Suspense 로 내려보내고 여기서는 히어로만 챙긴다.
    */
-  const [wishlisted, restockOn] = await Promise.all([
+  const [wishlisted, restockOn, coupons] = await Promise.all([
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
     // 품절 옵션에 이미 알림을 걸어 뒀는지. 옵션마다 물으면 옵션 수만큼 쿼리가 나간다.
     viewer
       ? getSubscribedVariantIds(viewer.id, product.variants.map((v) => v.id))
       : Promise.resolve(new Set<string>()),
+    // 이 상품에 쓸 수 있는, 누구나 받는 쿠폰. 못 쓰는 쿠폰을 내밀면 받고 나서 헛걸음한다
+    listDownloadableCoupons({ userId: viewer?.id ?? null, product: { id: product.id, brandId: product.brandId, categoryId: product.categoryId } }),
   ]);
 
   /*
@@ -307,6 +311,18 @@ export default async function ProductPage({ params, searchParams }: Params) {
               </dd>
             </div>
           </dl>
+
+          {coupons.length > 0 && (
+            <section aria-labelledby="product-coupons" className="flex flex-col gap-2">
+              <h2 id="product-coupons" className="text-[13px] font-semibold">{t('coupon.productHeading')}</h2>
+              <CouponDownloads
+                coupons={coupons.map((c) => ({ ...c, endsAt: c.endsAt.toISOString() }))}
+                loggedIn={viewer !== null}
+                returnTo={`/product/${product.slug}`}
+                headingId="product-coupons"
+              />
+            </section>
+          )}
 
           <ProductOptions
             product={product}

@@ -152,3 +152,38 @@ export const isIssuable = (
  * 바꾸는 것이 아니다(종료일을 **늘리는** 것만 허용한다).
  */
 export const canEditDiscount = (issuedCount: number): boolean => issuedCount === 0;
+
+/**
+ * 받기 단추로 받아 갈 수 있는가 — 운영이 공개했고, 지금 발급할 수 있는 상태(기간 안·중지 안 됨·수량 남음).
+ *
+ * 코드 입력과 달리 **목록에 보인다.** 그래서 공개하지 않은 쿠폰(특정인에게 줄 코드·보상용)은 목록에 절대 올리지 않는다 —
+ * 코드를 모르는 사람이 받아 갈 수 있게 되면 그 쿠폰은 뿌린 것이 된다.
+ */
+export function isDownloadable(
+  c: {
+    readonly downloadable: boolean;
+    readonly isActive: boolean;
+    readonly startsAt: Date;
+    readonly endsAt: Date;
+    readonly issueLimit: number | null;
+    readonly issuedCount: number;
+  },
+  now: Date,
+): boolean {
+  return c.downloadable && isIssuable(c, now);
+}
+
+/**
+ * 이 쿠폰이 이 상품에 쓰이는가 — 상품 화면에 받기 단추를 띄울지. 대상이 없으면 전체, 있으면 상품·브랜드·카테고리 중 하나라도
+ * 맞으면. 장바구니가 할인을 계산할 때의 범위와 같은 뜻이다.
+ */
+export function couponCoversProduct(
+  targets: readonly { readonly targetType: string; readonly targetId: string }[],
+  product: { readonly id: string; readonly brandId: string; readonly categoryId: string },
+): boolean {
+  if (targets.length === 0) return true;
+  return targets.some((t) =>
+    (t.targetType === 'PRODUCT' && t.targetId === product.id) ||
+    (t.targetType === 'BRAND' && t.targetId === product.brandId) ||
+    (t.targetType === 'CATEGORY' && t.targetId === product.categoryId));
+}

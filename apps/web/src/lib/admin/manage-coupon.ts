@@ -42,6 +42,8 @@ export interface CouponRow {
   readonly startsAt: Date;
   readonly endsAt: Date;
   readonly isActive: boolean;
+  /** 누구나 받아 갈 수 있게 공개했는가 */
+  readonly downloadable: boolean;
   readonly status: CouponStatus;
   readonly editable: boolean;
   /** 대상이 정해져 있으면 그 수. 0이면 장바구니 전체. */
@@ -56,7 +58,7 @@ export async function listCoupons(actor: Actor, now = new Date()): Promise<Coupo
     select: {
       id: true, code: true, name: true, kind: true, value: true, percent: true,
       maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
-      startsAt: true, endsAt: true, isActive: true,
+      startsAt: true, endsAt: true, isActive: true, downloadable: true,
       // 발급된 것 중 실제로 쓴 수. 발급 수만으로는 효과를 알 수 없다.
       _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
     },
@@ -101,6 +103,7 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
         ...definition,
         code,
         name: input.name.trim(),
+        downloadable: input.downloadable,
         // 대상이 없으면 행을 안 만든다 = 장바구니 전체
         ...(input.targets.length > 0
           ? { targets: { createMany: { data: [...input.targets] } } }
@@ -109,7 +112,7 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
       select: {
         id: true, code: true, name: true, kind: true, value: true, percent: true,
         maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
-        startsAt: true, endsAt: true, isActive: true,
+        startsAt: true, endsAt: true, isActive: true, downloadable: true,
       },
     });
     return {
@@ -180,11 +183,12 @@ export async function updateCoupon(
       ...(input.name === undefined ? {} : { name: input.name.trim() }),
       ...(input.endsAt === undefined ? {} : { endsAt: new Date(input.endsAt) }),
       ...(input.isActive === undefined ? {} : { isActive: input.isActive }),
+      ...(input.downloadable === undefined ? {} : { downloadable: input.downloadable }),
     },
     select: {
       id: true, code: true, name: true, kind: true, value: true, percent: true,
       maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
-      startsAt: true, endsAt: true, isActive: true,
+      startsAt: true, endsAt: true, isActive: true, downloadable: true,
       _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
     },
   });

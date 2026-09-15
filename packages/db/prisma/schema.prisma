@@ -1015,6 +1015,8 @@ model Coupon {
   startsAt DateTime
   endsAt   DateTime
   isActive Boolean  @default(true)
+  /// 누구나 받아 갈 수 있는가 — 쿠폰 받기 화면과 대상 상품 화면에 받기 단추로 뜬다. 끄면 코드를 아는 사람과 운영 지급만
+  downloadable Boolean @default(false)
 
   issued  UserCoupon[]
   targets CouponTarget[]

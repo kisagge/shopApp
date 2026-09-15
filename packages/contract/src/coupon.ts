@@ -36,6 +36,8 @@ export const createCouponSchema = z.object({
   startsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }),
   endsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }),
   targets: z.array(couponTargetSchema).max(200, 'valid.tooManyItems').default([]),
+  /** 누구나 받아 갈 수 있게 공개하는가(쿠폰 받기). 끄면 코드 입력·운영 지급으로만 */
+  downloadable: z.boolean().default(false),
 });
 export type CreateCouponInput = z.infer<typeof createCouponSchema>;
 
@@ -49,6 +51,8 @@ export const updateCouponSchema = z.object({
   name: z.string().trim().min(1, 'valid.couponNameRequired').max(60, 'valid.tooLongChars').optional(),
   endsAt: z.string().datetime({ offset: true, error: 'valid.dateFormat' }).optional(),
   isActive: z.boolean().optional(),
+  /** 받기 공개·내리기. 내려도 이미 받은 사람은 그대로 쓴다 */
+  downloadable: z.boolean().optional(),
 });
 export type UpdateCouponInput = z.infer<typeof updateCouponSchema>;
 

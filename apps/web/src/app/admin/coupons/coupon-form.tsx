@@ -106,6 +106,7 @@ export function CouponForm({
       startsAt: toIso(text('startsAt')),
       endsAt: toIso(text('endsAt')),
       targets,
+      downloadable: data.get('downloadable') === 'on',
     };
 
     try {
@@ -351,6 +352,16 @@ export function CouponForm({
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="시작" name="startsAt" type="datetime-local" required error={fieldErrors['startsAt']} />
         <Field label="종료" name="endsAt" type="datetime-local" required error={fieldErrors['endsAt']} />
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label className="flex items-center gap-2 text-[13px]">
+          <input type="checkbox" name="downloadable" aria-describedby="coupon-downloadable-hint" />
+          누구나 받기 — 쿠폰 받기 화면과 대상 상품 화면에 받기 단추로 보입니다
+        </label>
+        <p id="coupon-downloadable-hint" className="pl-6 text-[12px] text-[var(--fg-muted)]">
+          끄면 코드를 아는 사람과 운영 지급으로만 받습니다. 보상용·특정인용 쿠폰은 켜지 마세요.
+        </p>
       </div>
 
       <p className="text-[12px] leading-relaxed text-[var(--fg-muted)]">

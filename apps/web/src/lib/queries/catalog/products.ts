@@ -124,6 +124,9 @@ export interface ProductDetail {
   readonly description: string;
   readonly brand: string;
   readonly brandSlug: string;
+  /** 쿠폰 대상(브랜드·카테고리) 판정에 쓴다 */
+  readonly brandId: string;
+  readonly categoryId: string;
   readonly categoryName: string;
   readonly categorySlug: string;
   readonly listPrice: Won;
@@ -152,7 +155,7 @@ const productRow = cachedRead(
       brand: sellableBrand(),
     },
     select: {
-      id: true, slug: true, name: true, description: true,
+      id: true, slug: true, name: true, description: true, brandId: true, categoryId: true,
       listPrice: true, salePrice: true, ratingSum: true, reviewCount: true,
       brand: { select: { name: true, slug: true } },
       category: { select: { name: true, slug: true } },
@@ -201,7 +204,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
 
   return {
     id: p.id, slug: p.slug, name: p.name, description: p.description,
-    brand: p.brand.name, brandSlug: p.brand.slug,
+    brand: p.brand.name, brandSlug: p.brand.slug, brandId: p.brandId, categoryId: p.categoryId,
     categoryName: p.category.name, categorySlug: p.category.slug,
     listPrice,
     price,

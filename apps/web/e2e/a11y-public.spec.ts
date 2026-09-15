@@ -16,6 +16,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['검색 결과', '/search?q=코트'],
   ['검색 결과 없음', '/search?q=zzzznothing'],
   ['기획전 목록', '/collections'],
+  ['쿠폰 받기', '/coupons'],
   ['장바구니', '/cart'],
   ['로그인', '/login'],
   ['회원가입', '/signup'],

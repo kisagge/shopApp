@@ -826,8 +826,10 @@ async function main(): Promise<void> {
   });
   await prisma.coupon.upsert({
     where: { code: 'AUTUMN20' },
-    update: {},
+    // 쿠폰 받기 화면에 보이게 공개한다 — 코드를 몰라도 받는 길이 비어 있으면 화면이 늘 비어 보인다
+    update: { downloadable: true },
     create: {
+      downloadable: true,
       code: 'AUTUMN20', name: '가을 아우터 20% (최대 3만원)', kind: 'PERCENT',
       percent: 20, maxDiscount: 30_000, minimumOrder: 50_000,
       startsAt: new Date('2026-08-01T00:00:00Z'),

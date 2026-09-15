@@ -40,6 +40,7 @@ const input = (over: Record<string, unknown> = {}) => ({
   startsAt: '2026-09-01T00:00:00+09:00',
   endsAt: '2026-09-30T23:59:59+09:00',
   targets: [] as { targetType: 'PRODUCT' | 'BRAND' | 'CATEGORY'; targetId: string }[],
+  downloadable: false,
   ...over,
 });
 

@@ -92,6 +92,9 @@ export const SEED_ACCOUNT = {
   /** 배송지를 넣고 고치고 지운다 — address-edit. 장바구니를 쥐지 않는다 */
   addressEditor: 'address-edit@plain.test',
 
+  /** 쿠폰 받기 화면에서 쿠폰을 받는다 — coupon-download. 결제에 쓰지 않아 다른 명세의 쿠폰 고르기를 흔들지 않는다 */
+  couponCollector: 'coupon-download@plain.test',
+
   /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *

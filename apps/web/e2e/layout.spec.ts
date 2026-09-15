@@ -31,6 +31,7 @@ layoutTests(test, expect, [
   ['검색 결과', '/search?q=코트'],
   ['장바구니', '/cart'],
   ['기획전 목록', '/collections'],
+  ['쿠폰 받기', '/coupons'],
   ['로그인', '/login'],
   ['회원가입', '/signup'],
   ['고객센터', '/support'],

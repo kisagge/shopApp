@@ -36,14 +36,14 @@ export function CouponBoard({
   /** 지금 지급 창구를 연 쿠폰. 한 번에 하나만 연다. */
   const [granting, setGranting] = useState<CouponRow | null>(null);
 
-  async function toggleActive(target: CouponRow) {
+  async function patch(target: CouponRow, body: { isActive: boolean } | { downloadable: boolean }, done: string) {
     setPending(true);
     setError(null);
     try {
       const response = await fetch(`/api/admin/coupons/${target.id}`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ isActive: !target.isActive }),
+        body: JSON.stringify(body),
       });
       const result = (await response.json()) as { coupon?: CouponRow; message?: string };
       if (!response.ok || !result.coupon) {
@@ -51,11 +51,7 @@ export function CouponBoard({
         return;
       }
       setCoupons((list) => list.map((c) => (c.id === target.id ? result.coupon! : c)));
-      setStatus(
-        target.isActive
-          ? `${target.name} 쿠폰을 중지했습니다. 이미 받은 사람은 계속 쓸 수 있습니다.`
-          : `${target.name} 쿠폰을 다시 열었습니다.`,
-      );
+      setStatus(done);
     } catch {
       setError('네트워크 오류로 바꾸지 못했습니다.');
     } finally {
@@ -76,7 +72,12 @@ export function CouponBoard({
         <CouponTable
           coupons={coupons}
           pending={pending}
-          onToggle={toggleActive}
+          onToggle={(c) => void patch(c, { isActive: !c.isActive }, c.isActive
+            ? `${c.name} 쿠폰을 중지했습니다. 이미 받은 사람은 계속 쓸 수 있습니다.`
+            : `${c.name} 쿠폰을 다시 열었습니다.`)}
+          onToggleDownload={(c) => void patch(c, { downloadable: !c.downloadable }, c.downloadable
+            ? `${c.name} 쿠폰을 받기 목록에서 내렸습니다. 이미 받은 사람은 계속 쓸 수 있습니다.`
+            : `${c.name} 쿠폰을 누구나 받을 수 있게 공개했습니다.`)}
           onGrant={(coupon) => {
             setError(null);
             setGranting(coupon);

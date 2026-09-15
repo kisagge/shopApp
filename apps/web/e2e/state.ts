@@ -48,6 +48,8 @@ export const STATE_FILE = {
   pointAdjustTarget: 'test-results/.auth/point-adjust.json',
   /** 배송지를 넣고 고치고 지운다 — address-edit */
   addressEditor: 'test-results/.auth/address-edit.json',
+  /** 쿠폰 받기 화면에서 쿠폰을 받는다 — coupon-download */
+  couponCollector: 'test-results/.auth/coupon-download.json',
 } as const;
 
 /**

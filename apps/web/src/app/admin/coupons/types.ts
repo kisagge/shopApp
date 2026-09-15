@@ -17,6 +17,7 @@ export interface CouponRow {
   startsAt: string | Date;
   endsAt: string | Date;
   isActive: boolean;
+  downloadable: boolean;
   status: CouponStatus;
   editable: boolean;
   targetCount: number;
