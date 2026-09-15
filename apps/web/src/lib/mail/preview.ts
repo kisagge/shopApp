@@ -4,6 +4,7 @@ import type { Locale } from '@shop/i18n';
 import { orderMail } from '~/lib/orders/notify';
 import { restockMail, inquiryAnswerMail } from './notices';
 import { exchangeShippedMail } from '~/lib/orders/notify-exchange';
+import { afterSaleMail } from '~/lib/orders/notify-after-sale';
 import type { MailWording } from './templates';
 
 /**
@@ -43,6 +44,19 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
       return exchangeShippedMail({
         to: order.to, name: order.buyerName, orderNo: order.orderNo, locale, carrier: 'CJ', trackingNumber: '123456789012',
         lines: [{ productName: '울 코트', fromOptionLabel: '오트 / M', toOptionLabel: '오트 / L', quantity: 1 }],
+      }, wording);
+    case 'ORDER_CANCELLED':
+    case 'RETURN_APPROVED':
+    case 'RETURN_REJECTED':
+    case 'REFUND_COMPLETED':
+      return afterSaleMail({
+        kind, to: order.to, name: order.buyerName, orderNo: order.orderNo, locale,
+        items: [{ productName: '울 코트', optionLabel: '오트 / M', quantity: 1 }],
+        ...(kind === 'RETURN_REJECTED' ? { reason: '착용 흔적이 있어 반품을 받을 수 없습니다.' } : {}),
+        ...(kind === 'RETURN_APPROVED' || kind === 'RETURN_REJECTED' ? { returnType: 'RETURN' as const } : {}),
+        ...(kind === 'ORDER_CANCELLED' || kind === 'REFUND_COMPLETED'
+          ? { money: { refunded: 289_000, pointsReturned: 1_000, shippingDeducted: 0 } }
+          : {}),
       }, wording);
   }
 }

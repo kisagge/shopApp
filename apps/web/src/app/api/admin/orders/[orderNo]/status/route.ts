@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { ORDER_STATUS } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
+import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { refundOrder, RefundError } from '~/lib/admin/refund-order';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
@@ -69,6 +70,11 @@ export async function POST(
       // 환불하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
       if (refund.stockRestored) revalidateCatalog();
 
+      await notifyAfterSale({
+        kind: 'REFUND_COMPLETED', orderNo, actorId: actor.id,
+        money: { refunded: refund.refunded, pointsReturned: refund.pointsReturned, shippingDeducted: 0 },
+      });
+
       return NextResponse.json(refund);
     }
 
@@ -94,6 +100,12 @@ export async function POST(
 
       // 취소하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
       revalidateCatalog();
+
+      // 운영 메모(note)는 손님에게 보이지 않는다(core showsReason)
+      await notifyAfterSale({
+        kind: 'ORDER_CANCELLED', orderNo, actorId: actor.id, reason: parsed.data.note,
+        money: { refunded: cancel.refunded, pointsReturned: cancel.pointsReturned, shippingDeducted: 0 },
+      });
 
       return NextResponse.json(cancel);
     }

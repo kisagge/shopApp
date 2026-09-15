@@ -16,6 +16,9 @@ vi.mock('~/lib/audit', () => ({ recordAudit }));
 const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
 
+const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/notify-after-sale', () => ({ notifyAfterSale }));
+
 const lib = vi.hoisted(() => ({
   cancelOrderItems: vi.fn<(...a: any[]) => any>(),
   previewCancelItems: vi.fn<(...a: any[]) => any>(),
@@ -91,6 +94,25 @@ describe('일부 취소 창구', () => {
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ code: 'SHIPPING_EXCEEDS_REFUND', message: '주문 전체를 취소해 주세요.' });
     expect(recordAudit).not.toHaveBeenCalled();
+  });
+
+  it('취소하면 손님에게 알린다 — 일부면 고른 줄을, 전부가 됐으면 줄 전부를(줄을 넘기지 않는다)', async () => {
+    await call({ itemIds: ['i-knit'], reason: '사이즈' });
+    expect(notifyAfterSale).toHaveBeenCalledWith({
+      kind: 'ORDER_CANCELLED', orderNo: '20260914-0000001', actorId: 'u-1', reason: '사이즈',
+      itemIds: ['i-knit'], money: { refunded: 25_500, pointsReturned: 1_500, shippingDeducted: 0 },
+    });
+    notifyAfterSale.mockClear();
+    lib.cancelOrderItems.mockResolvedValue({ orderNo: '20260914-0000001', kind: 'full', refunded: 85_000, pointsReturned: 0, shippingDeducted: 0 });
+    await call({ itemIds: ['a', 'b'], reason: '변심' });
+    expect(notifyAfterSale.mock.calls[0]![0].itemIds).toBeUndefined();
+  });
+
+  it('미리보기·거절이면 알리지 않는다', async () => {
+    await call({ itemIds: ['i-knit'], reason: '변심', preview: true });
+    lib.cancelOrderItems.mockRejectedValue(new CancelItemsError('SHIPPING_EXCEEDS_REFUND', 'x'));
+    await call({ itemIds: ['i-sock'], reason: '변심' });
+    expect(notifyAfterSale).not.toHaveBeenCalled();
   });
 
   it('로그인하지 않으면 401', async () => {

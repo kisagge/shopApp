@@ -11,6 +11,7 @@
 
 export const MAIL_TEMPLATE_KIND = [
   'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
+  'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'REFUND_COMPLETED',
 ] as const;
 export type MailTemplateKind = (typeof MAIL_TEMPLATE_KIND)[number];
 
@@ -30,6 +31,10 @@ export const MAIL_TEMPLATE_PARAMS = {
   RESTOCK: { subject: ['item'], heading: [], lead: ['item'] },
   INQUIRY_ANSWERED: { subject: ['about'], heading: [], lead: ['about'] },
   EXCHANGE_SHIPPED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  ORDER_CANCELLED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  RETURN_APPROVED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  RETURN_REJECTED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  REFUND_COMPLETED: { subject: ['orderNo'], heading: [], lead: ['name'] },
 } as const satisfies Record<MailTemplateKind, Record<MailTemplateField, readonly string[]>>;
 
 /** 미리보기에 끼울 예시 값 */

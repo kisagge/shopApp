@@ -1624,6 +1624,14 @@ enum NotificationKind {
   REVIEW_REPLIED
   /// 교환한 상품을 보냈다
   EXCHANGE_SHIPPED
+  /// 주문(의 일부)이 취소됐다
+  ORDER_CANCELLED
+  /// 반품·교환 신청이 승인됐다
+  RETURN_APPROVED
+  /// 반품·교환 신청이 반려됐다
+  RETURN_REJECTED
+  /// 환불이 끝났다
+  REFUND_COMPLETED
 }
 
 model Notification {

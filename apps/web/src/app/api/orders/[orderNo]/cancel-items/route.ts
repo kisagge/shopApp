@@ -2,6 +2,7 @@ import { cancelItemsRequestSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
+import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
 import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrderItems, previewCancelItems, CancelItemsError } from '~/lib/orders/cancel-items';
 import { CancelError } from '~/lib/orders/cancel-order';
@@ -58,6 +59,13 @@ export async function POST(
 
     // 취소한 줄의 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
     revalidateCatalog();
+
+    // 운영진이 운영 화면에서 줄을 취소해도 이 창구다 — 누가 했는지로 알림함에 남길지 가른다
+    await notifyAfterSale({
+      kind: 'ORDER_CANCELLED', orderNo, actorId: actor.id, reason,
+      itemIds: result.kind === 'full' ? undefined : itemIds,
+      money: { refunded: result.refunded, pointsReturned: result.pointsReturned, shippingDeducted: result.shippingDeducted },
+    });
 
     return NextResponse.json(result);
   } catch (error) {

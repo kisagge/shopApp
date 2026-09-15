@@ -20,6 +20,10 @@ const KIND_LABEL: Record<MailTemplateKind, string> = {
   RESTOCK: '재입고',
   INQUIRY_ANSWERED: '문의 답변',
   EXCHANGE_SHIPPED: '교환 상품 발송',
+  ORDER_CANCELLED: '주문 취소',
+  RETURN_APPROVED: '반품·교환 승인',
+  RETURN_REJECTED: '반품·교환 반려',
+  REFUND_COMPLETED: '환불 완료',
 };
 
 /** 기본 문구가 사전의 어느 열쇠인가 — 칸을 비우면 이 말이 나간다 */
@@ -30,6 +34,10 @@ const DEFAULT_KEY: Record<MailTemplateKind, Record<MailTemplateField, string>> =
   RESTOCK: { subject: 'mail.restock.subject', heading: 'mail.restock.heading', lead: 'mail.restock.lead' },
   INQUIRY_ANSWERED: { subject: 'mail.inquiry.subject', heading: 'mail.inquiry.heading', lead: 'mail.inquiry.lead' },
   EXCHANGE_SHIPPED: { subject: 'mail.exchange.subject', heading: 'mail.exchange.heading', lead: 'mail.exchange.lead' },
+  ORDER_CANCELLED: { subject: 'mail.cancelled.subject', heading: 'mail.cancelled.heading', lead: 'mail.cancelled.lead' },
+  RETURN_APPROVED: { subject: 'mail.returnApproved.subject', heading: 'mail.returnApproved.heading', lead: 'mail.returnApproved.lead' },
+  RETURN_REJECTED: { subject: 'mail.returnRejected.subject', heading: 'mail.returnRejected.heading', lead: 'mail.returnRejected.lead' },
+  REFUND_COMPLETED: { subject: 'mail.refunded.subject', heading: 'mail.refunded.heading', lead: 'mail.refunded.lead' },
 };
 
 const PARAM_LABEL: Record<string, string> = { orderNo: '주문번호', name: '주문자 이름', item: '상품(옵션)', about: '문의한 상품' };

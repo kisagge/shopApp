@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
 import { getActor } from '@shop/auth/session';
 import { resolveReturnSchema } from '@shop/contract';
 import { receiveReturn, resolveReturn, ReturnError } from '~/lib/orders/return-request';
@@ -41,6 +42,11 @@ export async function POST(
       });
       // 돌아온 물건이 다시 팔려야 한다
       revalidateCatalog();
+      // 전부 반품이면 안에서 환불(refundOrder)을 타지만 알림은 여기서 한 번이다
+      await notifyAfterSale({
+        kind: 'REFUND_COMPLETED', orderNo, actorId: actor.id,
+        money: { refunded: done.refunded, pointsReturned: done.pointsReturned, shippingDeducted: done.shippingDeducted },
+      });
       return NextResponse.json(done);
     }
 
@@ -83,6 +89,12 @@ export async function POST(
       targetId: result.orderNo,
       after: result,
       request,
+    });
+
+    await notifyAfterSale({
+      kind: parsed.data.action === 'APPROVE' ? 'RETURN_APPROVED' : 'RETURN_REJECTED',
+      orderNo: result.orderNo,
+      actorId: actor.id,
     });
 
     return NextResponse.json(result);

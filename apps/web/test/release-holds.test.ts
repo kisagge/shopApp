@@ -7,6 +7,9 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 
 const cancelOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/cancel-order', () => ({ cancelOrder }));
+const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/notify-after-sale', () => ({ notifyAfterSale }));
+vi.mock('~/lib/cron', () => ({ CRON_ACTOR: { id: 'system:cron', role: 'SUPER_ADMIN', merchantId: null } }));
 
 const { releaseAbandonedHolds } = await import('~/lib/orders/release-holds');
 
@@ -83,6 +86,17 @@ describe('결제 대기 주문 풀기', () => {
 
     expect(result.orderNos).toEqual(['A', 'C']);
     expect(result.skipped).toBe(1);
+  });
+
+  it('푼 주문마다 손님에게 알린다 — 배치가 한 일로(사유는 받는 사람의 말로 적는다), 실패한 주문에는 알리지 않는다', async () => {
+    db.order.findMany.mockResolvedValue([row({ orderNo: 'A' }), row({ orderNo: 'B' })]);
+    cancelOrder.mockImplementation(async (orderNo: string) => {
+      if (orderNo === 'B') throw new Error('이미 처리된 주문입니다');
+      return { orderNo, status: 'CANCELLED', refunded: 0 };
+    });
+    await releaseAbandonedHolds(NOW);
+    expect(notifyAfterSale).toHaveBeenCalledTimes(1);
+    expect(notifyAfterSale).toHaveBeenCalledWith({ kind: 'ORDER_CANCELLED', orderNo: 'A', actorId: 'system:cron' });
   });
 
   it('조회에서도 기한을 건다 — 전부 읽어 와 거르지 않는다', async () => {

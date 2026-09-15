@@ -138,4 +138,10 @@ test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금
   // 일부 취소 몫 + 나머지 = 결제 금액. 전액 취소가 결제액을 통째로 또 돌려주면 여기서 넘친다
   await expect(refundedRow.locator('xpath=following-sibling::dd')).toHaveText(`-${payable}`);
   expect(await stockSum(), '전부 취소했는데 재고가 처음으로 안 돌아왔다').toBe(stockBefore);
+
+  // 스스로 취소한 것은 알림함에 남지 않는다 — 방금 누른 사람에게 "취소되었습니다" 는 소음이다(메일은 간다)
+  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  await page.goto('/mypage/notifications');
+  await ready(page);
+  await expect(page.getByText(`주문 ${orderNo} 의 상품이 취소되었습니다.`)).toHaveCount(0);
 });

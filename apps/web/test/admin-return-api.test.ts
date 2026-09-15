@@ -13,6 +13,8 @@ const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
+const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/notify-after-sale', () => ({ notifyAfterSale }));
 
 const completeReturn = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/complete-return', () => ({ completeReturn }));
@@ -98,5 +100,31 @@ describe('운영 반품 창구', () => {
     const response = await call({ action: 'SHIP_EXCHANGE', carrier: 'CJ', trackingNumber: '12-34' });
     expect(response.status).toBe(400);
     expect(completeExchange).not.toHaveBeenCalled();
+  });
+
+  it('회수 확인·환불이면 손님에게 환불 완료를 한 번 알린다 — 돌려준 돈을 함께', async () => {
+    await call({ action: 'COMPLETE' });
+    expect(notifyAfterSale).toHaveBeenCalledTimes(1);
+    expect(notifyAfterSale).toHaveBeenCalledWith({
+      kind: 'REFUND_COMPLETED', orderNo: '20260914-0000002', actorId: 'u-a',
+      money: { refunded: 24_000, pointsReturned: 0, shippingDeducted: 3_000 },
+    });
+  });
+
+  it('승인·반려는 그 결과를 알리고, 도착 확인은 알리지 않는다(손님이 할 일이 없다)', async () => {
+    await call({ action: 'APPROVE' });
+    expect(notifyAfterSale.mock.calls[0]![0]).toMatchObject({ kind: 'RETURN_APPROVED', orderNo: '20260914-0000002' });
+    notifyAfterSale.mockClear();
+    await call({ action: 'REJECT', rejectReason: '착용 흔적' });
+    expect(notifyAfterSale.mock.calls[0]![0]).toMatchObject({ kind: 'RETURN_REJECTED' });
+    notifyAfterSale.mockClear();
+    await call({ action: 'RECEIVE' });
+    expect(notifyAfterSale).not.toHaveBeenCalled();
+  });
+
+  it('처리가 막히면 알리지 않는다', async () => {
+    completeReturn.mockRejectedValue(new ReturnError('NOT_APPROVED', '승인한 신청만'));
+    await call({ action: 'COMPLETE' });
+    expect(notifyAfterSale).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NOTIFICATION_KIND, NOTIFICATION_PARAMS, type Actor } from '@shop/core';
+import { AFTER_SALE_KIND, NOTIFICATION_KIND, NOTIFICATION_PARAMS, type Actor } from '@shop/core';
 import { LOCALES, translatorFor } from '@shop/i18n';
 import { ko } from '@shop/i18n/messages/ko';
 import { TEMPLATE_LOCALES } from '@shop/contract';
@@ -150,7 +150,14 @@ describe('표가 코드와 맞는다', () => {
       const lines = readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, i) => {
         if (!/\bkind:/.test(line)) return;
-        const kinds = [...line.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]!).filter((k) => (NOTIFICATION_KIND as readonly string[]).includes(k));
+        const literal = [...line.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]!).filter((k) => (NOTIFICATION_KIND as readonly string[]).includes(k));
+        /*
+         * 취소·반품·환불 알림은 한 함수가 종류를 받아 남긴다(notify-after-sale) — 글자로 적힌 종류가 없다. 그 파일의
+         * `kind: input.kind` 는 AfterSaleKind 넷 모두를 싣는 것으로 센다. 넷의 값 목록이 같다는 것은 core 검사가 본다.
+         */
+        const kinds = literal.length === 0 && /kind:\s*input\.kind\b/.test(line) && file.endsWith('notify-after-sale.ts')
+          ? [...AFTER_SALE_KIND]
+          : literal;
         if (kinds.length === 0) return;
         const near = lines.slice(i, i + 8).join('\n');
         const params = /params:\s*\{([\s\S]*?)\}/.exec(near);

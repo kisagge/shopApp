@@ -23,6 +23,10 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   STOCK_LOW: '재고 부족',
   REVIEW_REPLIED: '리뷰 답글',
   EXCHANGE_SHIPPED: '교환 상품 발송',
+  ORDER_CANCELLED: '주문 취소',
+  RETURN_APPROVED: '반품·교환 승인',
+  RETURN_REJECTED: '반품·교환 반려',
+  REFUND_COMPLETED: '환불 완료',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */

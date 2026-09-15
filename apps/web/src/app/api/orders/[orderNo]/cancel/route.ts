@@ -2,6 +2,7 @@ import { cancelOrderRequestSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
+import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
 import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
@@ -47,6 +48,12 @@ export async function POST(
 
     // 취소하면 재고가 돌아온다. 품절로 보이던 것이 다시 팔려야 한다.
     revalidateCatalog();
+
+    // 스스로 취소했으니 알림함에는 남기지 않고 메일만 간다(core recordsNotification)
+    await notifyAfterSale({
+      kind: 'ORDER_CANCELLED', orderNo, actorId: actor.id, reason: parsed.data.reason,
+      money: { refunded: result.refunded, pointsReturned: result.pointsReturned, shippingDeducted: 0 },
+    });
 
     return NextResponse.json(result);
   } catch (error) {

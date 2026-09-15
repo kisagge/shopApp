@@ -114,6 +114,16 @@ test('받은 두 줄 중 한 줄만 반품하면 그 줄만 돌려받고 주문�
 
     // 돌아온 줄 하나만큼 재고가 늘었다 — 남은 줄은 손님이 갖고 있다
     expect(await stockSum(), '반품한 줄의 재고가 안 돌아왔거나 남은 줄까지 돌아왔다').toBe(stockBefore - 1);
+
+    // ── 손님 알림함: 승인과 환불 완료가 각각 한 번씩, 이 주문으로 이어진다(메일은 단위 검사가 본다)
+    await page.goto('/mypage/notifications');
+    await ready(page);
+    const inbox = page.getByRole('list', { name: '알림' }).getByRole('link');
+    for (const text of [`주문 ${orderNo} 의 반품·교환 신청이 승인되었습니다.`, `주문 ${orderNo} 의 환불이 완료되었습니다.`]) {
+      const notice = inbox.filter({ hasText: text });
+      await expect(notice, `"${text}" 알림이 없거나 두 번 왔다`).toHaveCount(1);
+      await expect(notice).toHaveAttribute('href', `/order/${orderNo}`);
+    }
   } finally {
     await admin.close();
   }

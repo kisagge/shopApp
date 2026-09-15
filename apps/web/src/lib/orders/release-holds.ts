@@ -3,6 +3,9 @@ import { prisma } from '@shop/db';
 import { isAbandonedHold, paymentHoldCutoff, PAYMENT_HOLD_MINUTES } from '@shop/core';
 import { CRON_ACTOR } from '~/lib/cron';
 import { cancelOrder } from './cancel-order';
+import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
+
+const HOLD_EXPIRED_REASON = '결제 대기 시간이 지나 자동 취소되었습니다';
 
 /**
  * 결제하지 않고 떠난 주문의 재고를 푼다.
@@ -85,8 +88,10 @@ export async function releaseAbandonedHolds(
     }
 
     try {
-      await cancelOrder(order.orderNo, CRON_ACTOR, '결제 대기 시간이 지나 자동 취소되었습니다');
+      await cancelOrder(order.orderNo, CRON_ACTOR, HOLD_EXPIRED_REASON);
       orderNos.push(order.orderNo);
+      // 손님은 입금하려던 주문이 사라진 것을 모른다 — 배치가 한 일이라 알림함에도 남는다. 실패해도 던지지 않는다
+      await notifyAfterSale({ kind: 'ORDER_CANCELLED', orderNo: order.orderNo, actorId: CRON_ACTOR.id });
     } catch (error) {
       /*
        * 하나가 실패해도 나머지는 푼다. 여기서 던지면 뒤에 밀린 주문의

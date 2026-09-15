@@ -27,6 +27,14 @@ export const NOTIFICATION_KIND = [
    * 교환이 끝났는지 안다 — 그 사이 송장이 움직여도 모른다.
    */
   'EXCHANGE_SHIPPED',
+  /** 주문(의 일부)이 취소됐다 — 운영진·배치가 했을 때. 돈이 돌아가는 일이다 */
+  'ORDER_CANCELLED',
+  /** 반품·교환 신청이 승인됐다 — 이제 물건을 보내면 된다 */
+  'RETURN_APPROVED',
+  /** 반품·교환 신청이 반려됐다 — 사유는 주문 화면에 */
+  'RETURN_REJECTED',
+  /** 환불이 끝났다 */
+  'REFUND_COMPLETED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
