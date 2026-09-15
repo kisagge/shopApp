@@ -5,6 +5,7 @@ import { orderMail } from '~/lib/orders/notify';
 import { restockMail, inquiryAnswerMail } from './notices';
 import { exchangeShippedMail } from '~/lib/orders/notify-exchange';
 import { afterSaleMail } from '~/lib/orders/notify-after-sale';
+import { accountMail } from '~/lib/account/notify-account';
 import type { MailWording } from './templates';
 
 /**
@@ -57,6 +58,18 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
         ...(kind === 'ORDER_CANCELLED' || kind === 'REFUND_COMPLETED'
           ? { money: { refunded: 289_000, pointsReturned: 1_000, shippingDeducted: 0 } }
           : {}),
+      }, wording);
+    case 'POINTS_GRANTED':
+    case 'POINTS_DEDUCTED':
+      return accountMail({
+        kind, to: order.to, name: order.buyerName, locale, points: 3_000, balance: 12_500, reason: '배송 지연 보상',
+        ...(kind === 'POINTS_GRANTED' ? { expiresAt: new Date('2027-09-15T00:00:00Z') } : {}),
+      }, wording);
+    case 'ACCOUNT_SUSPENDED':
+    case 'ACCOUNT_RESTORED':
+      return accountMail({
+        kind, to: order.to, name: order.buyerName, locale,
+        ...(kind === 'ACCOUNT_SUSPENDED' ? { reason: '결제 도용이 의심되어 확인 중입니다.' } : {}),
       }, wording);
   }
 }

@@ -3,6 +3,7 @@ import { adjustPointsSchema } from '@shop/contract';
 import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { adjustPoints } from '~/lib/admin/adjust-points';
+import { notifyPointsAdjusted } from '~/lib/account/notify-account';
 import { AccessError } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
@@ -51,6 +52,8 @@ export async function POST(
         after: { balance: result.balance, amount: result.amount, note: result.note },
         request,
       });
+      // 같은 열쇠로 다시 온 요청이면 알림도 다시 보내지 않는다 — 두 번 받은 줄 안다
+      await notifyPointsAdjusted(result);
     }
     return NextResponse.json(result);
   } catch (error) {

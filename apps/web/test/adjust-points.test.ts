@@ -27,6 +27,8 @@ const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
+const notifyPointsAdjusted = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/account/notify-account', () => ({ notifyPointsAdjusted }));
 
 const { adjustPoints } = await import('~/lib/admin/adjust-points');
 const { POST } = await import('~/app/api/admin/users/[id]/points/route');
@@ -57,7 +59,10 @@ describe('adjustPoints', () => {
     const entry = tx.pointTransaction.create.mock.calls[0]?.[0].data;
     expect(entry).toMatchObject({ userId: 'u-1', amount: 3_000, reason: 'ADMIN_ADJUST', note: '배송 지연 보상', adjustKey: KEY });
     expect(entry.expiresAt).toBeInstanceOf(Date);
-    expect(r).toEqual({ userId: 'u-1', direction: 'GRANT', amount: 3_000, note: '배송 지연 보상', balance: 8_000, replayed: false });
+    expect(r).toEqual({
+      userId: 'u-1', direction: 'GRANT', amount: 3_000, note: '배송 지연 보상', balance: 8_000,
+      expiresAt: entry.expiresAt, replayed: false,
+    });
   });
 
   it('차감은 지금 잔액이 차감액 이상일 때만 깎고, 원장에 음수·기한 없음으로 적는다', async () => {
@@ -143,11 +148,19 @@ describe('POST /api/admin/users/[id]/points', () => {
     });
   });
 
-  it('같은 열쇠로 다시 온 요청은 성공으로 답하되 감사 줄을 더하지 않는다', async () => {
-    db.pointTransaction.findUnique.mockResolvedValue({ userId: 'u-1', amount: 3_000, note: '배송 지연 보상', user: { pointBalance: 8_000 } });
+  it('같은 열쇠로 다시 온 요청은 성공으로 답하되 감사 줄도 알림도 더하지 않는다', async () => {
+    db.pointTransaction.findUnique.mockResolvedValue({ userId: 'u-1', amount: 3_000, note: '배송 지연 보상', expiresAt: null, user: { pointBalance: 8_000 } });
     const res = await call(body);
     expect(res.status).toBe(200);
     expect(recordAudit).not.toHaveBeenCalled();
+    expect(notifyPointsAdjusted, '다시 온 요청에 또 알렸다 — 두 번 받은 줄 안다').not.toHaveBeenCalled();
+  });
+
+  it('새로 처리했으면 손님에게 알린다 — 사유·잔액·소멸일과 함께', async () => {
+    await call(body);
+    expect(notifyPointsAdjusted).toHaveBeenCalledTimes(1);
+    expect(notifyPointsAdjusted.mock.calls[0]![0]).toMatchObject({ userId: 'u-1', direction: 'GRANT', amount: 3_000, note: '배송 지연 보상', balance: 8_000 });
+    expect(notifyPointsAdjusted.mock.calls[0]![0].expiresAt).toBeInstanceOf(Date);
   });
 
   it('권한이 없으면 403, 로그인하지 않았으면 401, 입력이 틀리면 400', async () => {

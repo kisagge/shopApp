@@ -35,6 +35,11 @@ export const NOTIFICATION_KIND = [
   'RETURN_REJECTED',
   /** 환불이 끝났다 */
   'REFUND_COMPLETED',
+  /** 운영진이 적립금을 줬다 / 뺐다 — 잔액이 왜 바뀌었는지 */
+  'POINTS_GRANTED',
+  'POINTS_DEDUCTED',
+  /** 이용 정지가 풀렸다. 정지 자체는 알림함에 남기지 않는다(core account-notice) */
+  'ACCOUNT_RESTORED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 

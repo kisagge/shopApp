@@ -90,6 +90,12 @@ test('정지하면 로그인해 둔 사람은 주문을 못 하고 새 로그인
     const after = await login(browser);
     try {
       await expect(after.page.getByRole('link', { name: '마이페이지' })).toBeVisible({ timeout: 20_000 });
+      // 알림함 맨 위에 해제 알림이 있다. 정지 알림은 남기지 않는다 — 막혀 있던 동안 열 수 없었고, 지금 보면 아직 막힌 줄 안다
+      await after.page.goto('/mypage/notifications');
+      await ready(after.page);
+      const inbox = after.page.getByRole('list', { name: '알림' }).getByRole('listitem');
+      await expect(inbox.first()).toContainText('계정 이용 정지가 풀렸습니다.');
+      await expect(after.page.getByText(/이용이 정지되었습니다/)).toHaveCount(0);
     } finally {
       await after.close();
     }

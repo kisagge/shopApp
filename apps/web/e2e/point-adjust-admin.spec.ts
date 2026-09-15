@@ -82,6 +82,14 @@ test('잔액을 눌러 들어가 지급·차감하면 잔액과 손님 내역이
     await form.getByRole('button', { name: '차감하기' }).click();
     await expect(form.getByRole('status')).toContainText(`잔액 ${start.toLocaleString('ko-KR')}P`, { timeout: 15_000 });
     expect(await customerBalance(cp)).toBe(start);
+
+    // ── 손님 알림함: 잔액이 왜 바뀌었는지 — 차감이 맨 위, 지급도 남아 있다(같은 열쇠 재전송은 알림도 한 번뿐)
+    await cp.goto('/mypage/notifications');
+    await ready(cp);
+    const inbox = cp.getByRole('list', { name: '알림' }).getByRole('listitem');
+    await expect(inbox.first()).toContainText('적립금 1,244P가 차감되었습니다.');
+    await expect(inbox.nth(1)).toContainText('적립금 10P가 지급되었습니다.');
+    await expect(inbox.nth(2)).toContainText('적립금 1,234P가 지급되었습니다.');
   } finally {
     await customer.close();
   }

@@ -3,6 +3,7 @@ import { suspendUserSchema } from '@shop/contract';
 import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { suspendUser, AccessError } from '~/lib/admin/manage-access';
+import { notifySuspension } from '~/lib/account/notify-account';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
 import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
@@ -41,6 +42,12 @@ export async function PATCH(
       before,
       after,
       request,
+    });
+    // 정지된 사람은 로그인이 막혀서야 안다 — "비밀번호가 틀렸나" 로 먼저 읽는다. 사유와 함께 메일로 알린다
+    await notifySuspension({
+      userId: id,
+      action: parsed.data.action,
+      reason: parsed.data.action === 'SUSPEND' ? parsed.data.reason : null,
     });
     return NextResponse.json(after);
   } catch (error) {

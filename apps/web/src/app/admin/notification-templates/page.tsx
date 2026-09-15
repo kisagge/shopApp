@@ -27,6 +27,9 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   RETURN_APPROVED: '반품·교환 승인',
   RETURN_REJECTED: '반품·교환 반려',
   REFUND_COMPLETED: '환불 완료',
+  POINTS_GRANTED: '적립금 지급',
+  POINTS_DEDUCTED: '적립금 차감',
+  ACCOUNT_RESTORED: '이용 정지 해제',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */
@@ -36,6 +39,7 @@ const PARAM_LABEL: Record<string, string> = {
   optionLabel: '옵션',
   couponName: '쿠폰 이름',
   stock: '남은 재고',
+  points: '포인트(쉼표 포함)',
 };
 
 /**

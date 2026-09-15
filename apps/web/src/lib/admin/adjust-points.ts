@@ -11,6 +11,8 @@ export interface PointAdjustResult {
   readonly note: string;
   /** 조정한 뒤 잔액 */
   readonly balance: number;
+  /** 지급한 포인트가 사라지는 때. 차감이면 null */
+  readonly expiresAt: Date | null;
   /** 같은 열쇠로 이미 처리된 요청이었다 — 아무것도 새로 하지 않았다 */
   readonly replayed: boolean;
 }
@@ -83,7 +85,10 @@ export async function adjustPoints(
       return after.pointBalance;
     });
 
-    return { userId, direction: input.direction, amount: input.amount, note: input.note, balance, replayed: false };
+    return {
+      userId, direction: input.direction, amount: input.amount, note: input.note, balance,
+      expiresAt: entry.expiresAt, replayed: false,
+    };
   } catch (error) {
     if (isAdjustKeyConflict(error)) {
       const again = await replayOf(userId, input);
@@ -97,7 +102,7 @@ export async function adjustPoints(
 async function replayOf(userId: string, input: AdjustPointsInput): Promise<PointAdjustResult | null> {
   const done = await prisma.pointTransaction.findUnique({
     where: { adjustKey: input.key },
-    select: { userId: true, amount: true, note: true, user: { select: { pointBalance: true } } },
+    select: { userId: true, amount: true, note: true, expiresAt: true, user: { select: { pointBalance: true } } },
   });
   if (!done) return null;
   if (done.userId !== userId) throw new AccessError('CHANGED_MEANWHILE', 409);
@@ -107,6 +112,7 @@ async function replayOf(userId: string, input: AdjustPointsInput): Promise<Point
     amount: Math.abs(done.amount),
     note: done.note ?? input.note,
     balance: done.user.pointBalance,
+    expiresAt: done.expiresAt,
     replayed: true,
   };
 }

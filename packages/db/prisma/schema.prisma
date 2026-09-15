@@ -1632,6 +1632,11 @@ enum NotificationKind {
   RETURN_REJECTED
   /// 환불이 끝났다
   REFUND_COMPLETED
+  /// 운영진이 적립금을 줬다 / 뺐다
+  POINTS_GRANTED
+  POINTS_DEDUCTED
+  /// 이용 정지가 풀렸다
+  ACCOUNT_RESTORED
 }
 
 model Notification {

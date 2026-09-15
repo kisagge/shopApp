@@ -44,6 +44,7 @@ export * from './product-archive';
 export * from './point-adjust';
 export * from './order-note';
 export * from './after-sale-notice';
+export * from './account-notice';
 export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';
