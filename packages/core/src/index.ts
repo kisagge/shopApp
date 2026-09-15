@@ -42,6 +42,7 @@ export * from './review-reply';
 export * from './product-copy';
 export * from './product-archive';
 export * from './point-adjust';
+export * from './order-note';
 export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';

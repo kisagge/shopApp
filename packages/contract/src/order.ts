@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PAYMENT_METHOD_CODE, type PaymentMethodCode } from '@shop/core';
+import { ORDER_NOTE_MAX, PAYMENT_METHOD_CODE, type PaymentMethodCode } from '@shop/core';
 import { cartLineInputSchema } from './cart';
 import { cuidSchema, wonSchema } from './common';
 
@@ -106,3 +106,9 @@ export const orderErrorSchema = z.object({
   variantIds: z.array(cuidSchema).optional(),
 });
 export type OrderError = z.infer<typeof orderErrorSchema>;
+
+/** 주문 내부 메모 한 줄. 누가·어느 가맹점으로 남기는지는 세션이 정한다 */
+export const orderNoteSchema = z.object({
+  body: z.string({ error: 'valid.required' }).trim().min(1, 'valid.required').max(ORDER_NOTE_MAX, 'valid.tooLongChars'),
+});
+export type OrderNoteInput = z.infer<typeof orderNoteSchema>;

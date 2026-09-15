@@ -103,12 +103,13 @@ model User {
   restockAlerts        RestockNotification[]
   events               EventLog[]
   auditLogs            AdminAuditLog[]       @relation("AuditActor")
+  orderNotes           OrderNote[]
   sessions             Session[]
   accounts             Account[]
 
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  deletedAt      DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   /// 이용 정지. 운영진이 사유와 함께 건다. 정지 중에는 로그인·주문이 막히고, 해제하면 그대로 돌아온다.
   ///
@@ -190,6 +191,7 @@ model Merchant {
   users       User[]
   brands      Brand[]
   settlements Settlement[]
+  orderNotes  OrderNote[]
 
   approvedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -507,14 +509,14 @@ model Product {
   /// 반려 사유. 이유 없이 되돌리면 가맹점은 무엇을 고쳐야 할지 모른다.
   publishRejection  String?
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
   /// 보관한 때. **지우지 않고 보관한다** — 주문 줄이 옵션을 가리키고 있어 행을 지울 수 없고, 지울 수 있더라도
   /// 지난 주문·정산·리뷰가 가리킬 것을 잃는다. 매대·검색·장바구니는 이 칸이 비어 있는 상품만 본다.
-  deletedAt DateTime?
+  deletedAt  DateTime?
   /// 누가 보관했는가. 운영진이 내린 상품을 가맹점이 되살리지 못하게 한다(core product-archive).
   archivedBy ProductArchiver?
-  inquiries Inquiry[]
+  inquiries  Inquiry[]
 
   @@index([status, publishedAt])
   @@index([categoryId, status])
@@ -758,6 +760,7 @@ model Order {
   shipment       Shipment?
   statusLogs     OrderStatusLog[]
   returnRequests ReturnRequest[]
+  notes          OrderNote[]
   pointTxns      PointTransaction[]
 
   placedAt    DateTime  @default(now())
@@ -871,9 +874,9 @@ model OrderRefund {
   /// 결제 수단으로 돌려준 돈
   amount           Int
   /// 포인트로 돌려준 몫
-  points           Int @default(0)
+  points           Int      @default(0)
   /// 이 취소로 뗀 배송비. 마지막에 전부 취소하면 음수로 돌려준다
-  shippingDeducted Int @default(0)
+  shippingDeducted Int      @default(0)
   /// 되돌린 줄. 전액 취소면 그때 남아 있던 줄 전부
   itemIds          String[]
 
@@ -1298,7 +1301,7 @@ model ReturnRequest {
   receivedAt DateTime?
   receivedBy String?
   /// 처리한 운영자. 배치나 시스템이면 null
-  resolvedBy  String?
+  resolvedBy String?
 
   /// 교환 — 줄마다 무엇으로 바꾸는지. 반품이면 비어 있다
   exchangeLines ReturnExchangeLine[]
@@ -1319,6 +1322,32 @@ model ReturnRequest {
 /// 물건이 없다. 반려하면 되돌리고, 교환이 끝나면 돌아온 옵션의 재고를 늘린다.
 ///
 /// 원래 옵션을 적어 둔다 — 교환이 끝나면 주문 줄은 새 옵션을 가리키고(손님이 가진 물건), 처음에 무엇을 샀는지는 여기 남는다.
+/// 주문 내부 메모 — 운영진·가맹점이 주문 곁에 남기는 말. **손님에게는 어디에도 보이지 않는다.**
+///
+/// 가맹점 메모는 그 가맹점과 운영진이, 운영진 메모는 운영진만 본다(core order-note). 운영진이 남기는 상담 내용에는
+/// 손님의 사정이 담기는데, 그 주문에 상품 하나 넣은 가맹점이 읽을 말이 아니다.
+///
+/// 고치지 않는다 — 남긴 말이 나중에 바뀌면 "그때 무엇을 알고 있었나" 를 되짚을 수 없다. 잘못 남겼으면 쓴 사람이
+/// 지우고 다시 쓴다(지운 내용은 감사 로그에 남는다).
+model OrderNote {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  /// 쓴 사람. 계정이 지워져도 메모는 남는다
+  authorId   String?
+  author     User?     @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  /// 가맹점이 남겼으면 그 가맹점. 운영진이면 비어 있다 — 누가 볼 수 있는지가 이것으로 정해진다
+  merchantId String?
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: SetNull)
+
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@map("order_notes")
+}
+
 model ReturnExchangeLine {
   id              String        @id @default(cuid())
   returnRequestId String

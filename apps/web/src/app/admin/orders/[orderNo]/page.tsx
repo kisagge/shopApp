@@ -14,6 +14,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
 import { CancelItemsForm } from '~/components/cancel-items-form';
+import { OrderNotes } from '~/components/admin/order-notes';
+import { listOrderNotes } from '~/lib/orders/order-notes';
 import { getT } from '~/lib/i18n/server';
 import { GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
@@ -30,6 +32,7 @@ export default async function AdminOrderDetail({
   const { orderNo } = await params;
   const order = await getAdminOrder(actor, orderNo);
   if (!order) notFound();
+  const notes = await listOrderNotes(actor, order.id);
 
   /**
    * 송장 입력은 출고 권한이 있을 때만 보여 준다.
@@ -299,6 +302,21 @@ export default async function AdminOrderDetail({
               )}
             </section>
           )}
+
+          <section
+            aria-labelledby="note-title"
+            className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+          >
+            <h2 id="note-title" className="mb-4 text-base font-semibold">
+              내부 메모
+              {notes.length > 0 && <span className="tnum ml-1.5 text-[13px] font-normal text-[var(--fg-muted)]">{notes.length}</span>}
+            </h2>
+            <OrderNotes
+              orderNo={order.orderNo}
+              audience={actor.merchantId ? 'merchant' : 'staff'}
+              notes={notes.map((n) => ({ ...n, createdAt: n.createdAt.toISOString() }))}
+            />
+          </section>
 
           <section
             aria-labelledby="log-title"
