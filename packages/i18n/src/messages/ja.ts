@@ -498,6 +498,7 @@ export const ja: Dictionary = {
 
   'opt.stockLeft': '残り{count}点',
   'opt.selectFirst': 'オプションを選択してください',
+  'opt.soldOutSelected': '{option} は品切れです。再入荷のお知らせを申し込めます。',
   'opt.added': 'カートに入れました',
 
   'track.heading': '配送状況の確認',

@@ -502,6 +502,7 @@ export const en: Dictionary = {
 
   'opt.stockLeft': 'Only {count} left',
   'opt.selectFirst': 'Choose an option',
+  'opt.soldOutSelected': '{option} is sold out. You can ask to be notified when it is back.',
   'opt.added': 'Added to your cart',
 
   'track.heading': 'Track your parcel',

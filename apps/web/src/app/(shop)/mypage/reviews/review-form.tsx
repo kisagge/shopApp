@@ -101,7 +101,12 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
         return;
       }
       setDone(true);
-      router.refresh();
+      /*
+       * **결과를 주소에 싣고 화면을 다시 받는다.** 새로 고치기만 하면 방금 쓴 상품이 목록에서 빠지면서 이 폼과 함께 "리뷰를
+       * 등록했습니다" 가 곧바로 사라진다 — 마지막 한 개였으면 "쓸 수 있는 상품이 없습니다" 만 남아 등록이 된 건지 모른다.
+       * 낭독기는 읽기도 전에 사라진 알림을 말하지 않는다. 화면(page)이 주소를 보고 같은 말을 남긴다.
+       */
+      router.replace('/mypage/reviews?saved=1', { scroll: false });
     } catch {
       setError(t('common.networkError'));
     } finally {
@@ -109,13 +114,8 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
     }
   }
 
-  if (done) {
-    return (
-      <p role="status" className="rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
-        {t('review.saved')}
-      </p>
-    );
-  }
+  // 등록이 끝나면 폼을 거둔다. 결과 문구는 화면이 주소(saved=1)를 보고 한 번만 남긴다 — 둘 다 말하면 낭독기가 두 번 읽는다
+  if (done) return null;
 
   return (
     <form onSubmit={(e) => submit(e)} noValidate className="flex flex-col gap-5">

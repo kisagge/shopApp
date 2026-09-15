@@ -66,6 +66,13 @@ export function ProductOptions({
 
   const canAdd = selected !== null && selected.stock > 0;
 
+  /*
+   * **수량은 고른 옵션의 재고를 넘지 않는다.** 화살표로 옵션을 옮기면 옮기는 순간 골라진다(라디오 규칙) — M 에서 4 개로
+   * 올려 두고 재고 1 개인 L 로 지나가면 "4" 가 그대로 남아 담겼다. 키보드 사용자는 사이즈를 훑기만 해도 이 상태가 된다.
+   * 상태를 고쳐 쓰지 않고 그릴 때 잘라 쓴다 — 다시 재고 많은 옵션으로 돌아가면 올려 둔 수량이 살아 있는 편이 낫다.
+   */
+  const shownQuantity = selected && selected.stock > 0 ? Math.max(1, Math.min(quantity, selected.stock)) : quantity;
+
   return (
     <div className="flex flex-col gap-6">
       {product.optionGroups.map((group) => (
@@ -94,17 +101,17 @@ export function ProductOptions({
           <div className="flex items-center rounded-sm border border-[var(--border-strong)] bg-[var(--bg)]">
             <button
               type="button" aria-label={t('cart.decrease')}
-              onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+              onClick={() => setQuantity(Math.max(1, shownQuantity - 1))}
               className="flex h-9 w-9 items-center justify-center text-[var(--fg-secondary)]"
             >
               −
             </button>
-            <span aria-label={t('cart.quantityOf', { count: quantity })} className="tnum w-8 text-center text-sm font-semibold">
-              {quantity}
+            <span aria-label={t('cart.quantityOf', { count: shownQuantity })} className="tnum w-8 text-center text-sm font-semibold">
+              {shownQuantity}
             </span>
             <button
               type="button" aria-label={t('cart.increase')}
-              onClick={() => setQuantity((q) => Math.min(selected.stock, q + 1))}
+              onClick={() => setQuantity(Math.min(selected.stock, shownQuantity + 1))}
               className="flex h-9 w-9 items-center justify-center"
             >
               ＋
@@ -112,6 +119,15 @@ export function ProductOptions({
           </div>
         </div>
       )}
+
+      {/*
+        **고른 조합이 품절이 되면 말로 알린다.** 색을 화살표로 옮기면 이미 골라 둔 사이즈가 그 색에서는 품절일 수 있다 —
+        담기 단추가 재입고 알림으로 바뀌지만 초점은 색에 있어 낭독기는 아무 말도 하지 않았다. 이 자리는 늘 그려 두고 글만
+        바꾼다: 새로 생긴 알림 영역은 읽히지 않는다.
+      */}
+      <p role="status" className="sr-only">
+        {selected && selected.stock <= 0 ? t('opt.soldOutSelected', { option: selected.label }) : ''}
+      </p>
 
       {/*
         품절된 옵션을 고르면 담기 대신 재입고 알림을 준다.
@@ -168,12 +184,12 @@ export function ProductOptions({
                 imageUrl: product.images[0]?.url ?? null,
                 blurDataUrl: product.images[0]?.blurDataUrl ?? null,
               },
-              quantity,
+              shownQuantity,
             );
             track('add_to_cart', {
               productId: product.id,
               variantId: selected.id,
-              quantity,
+              quantity: shownQuantity,
             });
             setAdded(true);
           }}

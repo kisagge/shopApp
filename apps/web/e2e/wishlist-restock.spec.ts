@@ -114,20 +114,39 @@ test('품절 옵션을 골라 재입고 알림을 걸면, 운영이 재고를 �
     await page.reload();
     await ready(page);
     const [color, size] = optionLabel.split(' / ');
-    const groups = page.getByRole('radiogroup');
-    const pick = async (value: string) => {
-      for (const group of await groups.all()) {
-        const radio = group.getByRole('radio', { name: new RegExp(`^${value}( 품절)?$`) });
-        if (await radio.count()) return radio.click();
+    /*
+     * **키보드만으로 간다.** 품절 옵션을 고를 수 있게 바꾸면서 화살표가 품절 옵션에도 멈춘다 — 실제 브라우저에서 탭으로
+     * 묶음에 들어가 화살표로 옮기면 옮기는 순간 골라지고, 품절이면 이름과 알림 영역이 말하는지 본다.
+     */
+    const pickByKeyboard = async (value: string) => {
+      const target = new RegExp(`^${value}( 품절)?$`);
+      for (const group of await page.getByRole('radiogroup').all()) {
+        if ((await group.getByRole('radio', { name: target }).count()) === 0) continue;
+        // 묶음의 탭 멈춤 칸(고른 것 또는 첫 칸)에 초점을 둔다 — 로빙 tabindex 로 하나만 0 이다
+        await group.locator('[role="radio"][tabindex="0"]').focus();
+        const radio = group.getByRole('radio', { name: target });
+        // 화살표만 누른다 — 옮길 때마다 골라지고 초점이 따라간다. 끝에서는 처음으로 돈다
+        for (let i = 0; i < 10 && !(await radio.evaluate((el) => el === document.activeElement)); i += 1) {
+          await page.keyboard.press('ArrowRight');
+        }
+        await expect(radio).toBeFocused();
+        // 이미 멈춤 칸이면 화살표를 안 눌러 아직 안 골라졌다 — 네이티브 라디오처럼 스페이스로 고른다
+        if ((await radio.getAttribute('aria-checked')) !== 'true') await page.keyboard.press('Space');
+        await expect(radio).toHaveAttribute('aria-checked', 'true');
+        return;
       }
       throw new Error(`옵션 ${value} 를 못 찾았다`);
     };
-    await pick(color!);
-    if (size) await pick(size);
-    await expect(page.getByRole('radio', { checked: true, name: new RegExp(`${size ?? color} 품절`) })).toBeVisible();
+    await pickByKeyboard(color!);
+    if (size) await pickByKeyboard(size);
+    await expect(page.getByRole('radio', { checked: true, name: new RegExp(`${size ?? color} 품절`) })).toBeFocused();
+    await expect(page.getByRole('status').filter({ hasText: `${optionLabel} 은(는) 품절입니다.` })).toHaveCount(1);
     await expect(page.getByRole('button', { name: '장바구니 담기' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: `${optionLabel} 재입고 알림 신청` }).click();
+    // 다음 탭이 재입고 알림 신청 — Enter 로 누른다
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name: `${optionLabel} 재입고 알림 신청` })).toBeFocused();
+    await page.keyboard.press('Enter');
     await expect(page.getByText('재입고되면 알려 드리겠습니다.', { exact: false })).toBeVisible();
     await expect(page.getByRole('button', { name: `${optionLabel} 재입고 알림 해제` })).toBeVisible();
 

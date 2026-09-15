@@ -15,11 +15,17 @@ export const dynamic = 'force-dynamic';
 
 const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
-export default async function WriteReviewsPage() {
+export default async function WriteReviewsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saved?: string }>;
+}) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/reviews');
 
-  const [items, t] = await Promise.all([getReviewableItems(user.id), getT()]);
+  const [items, t, params] = await Promise.all([getReviewableItems(user.id), getT(), searchParams]);
+  // 방금 등록한 뒤 — 폼은 목록에서 빠져 사라지므로 결과는 화면이 남긴다(review-form)
+  const saved = params.saved === '1';
 
   return (
     <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:px-10">
@@ -34,6 +40,12 @@ export default async function WriteReviewsPage() {
           {t('my.reviewLead')}
         </p>
       </header>
+
+      {saved && (
+        <p role="status" className="mb-6 rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+          {t('review.saved')}
+        </p>
+      )}
 
       {items.length === 0 ? (
         <p className="py-24 text-center text-[13px] text-[var(--fg-muted)]">
