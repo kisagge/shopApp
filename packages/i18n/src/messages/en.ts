@@ -307,7 +307,7 @@ export const en: Dictionary = {
   'my.discontinued': 'No longer sold',
 
   'my.restockHeading': 'Back-in-stock alerts',
-  'my.restockLead': 'Restocked items appear in this list. Email and SMS delivery is not connected yet, so please check here yourself.',
+  'my.restockLead': 'When an item is back in stock, we let you know in your notifications and by email, and it is marked "Back in stock" here. We do not send text messages.',
   'my.restockEmpty': 'No alerts set. Choose a sold-out option to set one.',
   'my.restocked': 'Back in stock',
   'my.restockedThenOut': 'It sold out again after the alert. You can set another one on the product page.',

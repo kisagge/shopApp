@@ -96,13 +96,18 @@ test('받은 두 줄 중 한 줄만 반품하면 그 줄만 돌려받고 주문�
     await expect(ap.getByRole('button', { name: '회수 확인 · 환불' })).toHaveCount(0, { timeout: 20_000 });
 
     // ── 손님: 그 줄만 반품 환불, 돌려받은 금액이 운영 화면에서 본 금액과 같고, 주문은 배송완료
+    /*
+     * **줄과 주문 상태를 한 번에 기다린다.** 운영의 환불이 커밋되는 순간에 열면, 주문 행과 딸린 줄은 Prisma 가 따로
+     * 읽어서 한 화면에 "반품 환불" 줄과 커밋 전 주문 상태(반품접수)가 함께 뜰 수 있다 — 실제로 한 판이 그렇게 졌다.
+     * 다음 새로 고침은 맞다. 둘이 다 맞는 화면이 올 때까지 다시 연다.
+     */
     await expect
       .poll(async () => {
         await page.goto(`/order/${orderNo}`);
         await ready(page);
-        return await page.getByText('반품 환불').count();
+        return `${await page.getByText('반품 환불').count()}/${await page.getByText(/현재 상태.*배송완료/).count()}`;
       }, { timeout: 20_000 })
-      .toBe(1);
+      .toBe('1/1');
     const refundedRow = page.getByRole('term').filter({ hasText: '돌려받은 금액' });
     await expect(refundedRow.locator('xpath=following-sibling::dd')).toHaveText(`-${shown}`);
     await expect(page.getByText(/현재 상태.*배송완료/)).toBeVisible();

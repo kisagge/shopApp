@@ -320,7 +320,7 @@ export const ko = {
   'my.discontinued': '판매 종료',
 
   'my.restockHeading': '재입고 알림',
-  'my.restockLead': '재입고되면 이 목록에 표시됩니다. 메일·문자 발송은 아직 연결되지 않아 직접 확인해 주셔야 합니다.',
+  'my.restockLead': '재입고되면 알림함과 메일로 알려 드리고, 이 목록에 "재입고됨" 이 붙습니다. 문자로는 보내지 않습니다.',
   'my.restockEmpty': '걸어 둔 알림이 없습니다. 품절된 옵션을 고르면 신청할 수 있습니다.',
   'my.restocked': '재입고됨',
   'my.restockedThenOut': '알림 이후 다시 품절됐습니다. 상품 화면에서 다시 신청할 수 있습니다.',

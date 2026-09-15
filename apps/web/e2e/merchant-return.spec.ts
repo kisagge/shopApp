@@ -85,7 +85,11 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     await expect(receive).toBeVisible({ timeout: 20_000 });
     await expect(mp.getByRole('button', { name: /환불/ }), '가맹점이 스스로 돈을 돌려줄 수 있다').toHaveCount(0);
     await receive.click();
-    await expect(receive).toHaveCount(0, { timeout: 20_000 });
+    /*
+     * **끝났다는 말을 기다린다.** 누르는 순간 단추 이름이 "확인하는 중…" 으로 바뀌어, 이름으로 사라짐을 기다리면 요청이
+     * 끝나기 전에 통과한다 — 운영 화면이 확인 전 상태를 열어 한 판이 졌다(요청 485ms, 운영 화면은 그 140ms 뒤 시작).
+     */
+    await expect(mp.getByText('도착을 확인했습니다. 운영진이 환불을 진행합니다.')).toBeVisible({ timeout: 20_000 });
 
     // ── 운영진: 가맹점의 확인을 보고 환불
     const ap = await admin.newPage();

@@ -303,7 +303,7 @@ export const ja: Dictionary = {
   'my.discontinued': '販売終了',
 
   'my.restockHeading': '再入荷通知',
-  'my.restockLead': '再入荷するとこの一覧に表示されます。メール・SMS の送信はまだ接続していないため、ご自身でご確認ください。',
+  'my.restockLead': '再入荷すると通知とメールでお知らせし、この一覧に「再入荷」と表示されます。SMS ではお送りしません。',
   'my.restockEmpty': '設定した通知がありません。売り切れのオプションを選ぶと申請できます。',
   'my.restocked': '再入荷',
   'my.restockedThenOut': '通知のあと再び売り切れました。商品ページからもう一度申請できます。',

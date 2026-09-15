@@ -55,8 +55,9 @@ export default async function RestockPage() {
         {t('my.restockHeading')}
       </h1>
       {/*
-        발송 경로가 없다는 사실을 숨기지 않는다. "알려 드리겠습니다" 라고만
-        해 두고 아무 데도 안 오면 그게 더 나쁘다.
+        **어디로 알려 주는지 사실대로 적는다.** 한동안 "메일·문자 발송은 아직 연결되지 않았다" 고 적혀 있었는데, 그사이
+        메일과 알림함 알림이 붙어 문구만 옛날에 머물렀다 — 받고 있는 알림을 "안 온다" 고 말하고 있었다. 보내지 않는
+        경로(문자)는 그대로 밝힌다. 경로를 더하거나 빼면 이 문구와 restock/notify 를 함께 고친다.
       */}
       <p className="pb-6 text-[13px] leading-relaxed text-[var(--fg-secondary)]">
         {t('my.restockLead')}

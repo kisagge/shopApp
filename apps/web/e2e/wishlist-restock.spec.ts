@@ -134,6 +134,9 @@ test('품절 옵션을 골라 재입고 알림을 걸면, 운영이 재고를 �
     // ── 손님: 마이페이지에 걸어 둔 알림이 보인다(아직 재입고 전)
     await page.goto('/mypage/restock');
     await ready(page);
+    // 안내가 실제로 나가는 경로를 말한다 — 아래에서 알림함 알림이 오는 것을 확인한다
+    await expect(page.getByText(/알림함과 메일로 알려 드리고/)).toBeVisible();
+    await expect(page.getByText(/아직 연결되지 않아/)).toHaveCount(0);
     const row = page.getByRole('listitem').filter({ hasText: name }).filter({ hasText: optionLabel });
     await expect(row).toHaveCount(1);
     await expect(row.getByText('재입고됨')).toHaveCount(0);
