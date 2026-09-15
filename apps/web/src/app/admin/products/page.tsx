@@ -3,18 +3,24 @@ import Link from 'next/link';
 import { Badge } from '@shop/ui';
 import {
   format, discountRateOf, hasPermission,
-  PRODUCT_STATUS_LABEL, isAwaitingReview, type ProductStatus,
+  PRODUCT_STATUS_LABEL, isAwaitingReview, checkArchive, type ProductStatus,
 } from '@shop/core';
 import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin/products';
 import { Pager } from '../pager';
 import { StockBulkActions } from './stock-bulk-actions';
+import { RestoreProductButton } from './restore-button';
 
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
 
 // 라벨은 core 하나만 본다. 여기 따로 적어 두었더니 상태를 더할 때 이쪽이 남았다.
+const dateFormat = new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  timeZone: 'Asia/Seoul',
+});
+
 const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
   ACTIVE: 'success', SOLD_OUT: 'danger', PENDING_REVIEW: 'info',
   HIDDEN: 'neutral', DRAFT: 'neutral',
@@ -23,15 +29,16 @@ const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string; status?: string }>;
+  searchParams: Promise<{ cursor?: string; status?: string; view?: string; archived?: string; restored?: string }>;
 }) {
   const actor = await requireAdmin('product:read');
-  const { cursor, status } = await searchParams;
+  const { cursor, status, view, archived: justArchived, restored: justRestored } = await searchParams;
 
   // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다.
-  const filter: ProductStatus | undefined = status === 'PENDING_REVIEW' ? status : undefined;
+  const archivedView = view === 'archived';
+  const filter: ProductStatus | undefined = !archivedView && status === 'PENDING_REVIEW' ? status : undefined;
 
-  const page = await getAdminProducts(actor, { cursor, status: filter });
+  const page = await getAdminProducts(actor, { cursor, status: filter, archived: archivedView });
   const products = page.rows;
   const canWrite = hasPermission(actor, 'product:write');
   const canPublish = hasPermission(actor, 'product:publish');
@@ -39,7 +46,11 @@ export default async function AdminProductsPage({
   const nextHref = page.nextCursor
     ? {
         pathname: '/admin/products' as const,
-        query: { ...(filter ? { status: filter } : {}), cursor: page.nextCursor },
+        query: {
+          ...(filter ? { status: filter } : {}),
+          ...(archivedView ? { view: 'archived' } : {}),
+          cursor: page.nextCursor,
+        },
       }
     : null;
 
@@ -68,14 +79,14 @@ export default async function AdminProductsPage({
         <StockBulkActions canWrite={canWrite} />
 
         <nav aria-label="상품 상태" className="flex gap-1 border-b border-[var(--border)]">
-          {([undefined, 'PENDING_REVIEW'] as const).map((tab) => {
-            const current = filter === tab;
+          {(['all', 'PENDING_REVIEW', 'archived'] as const).map((tab) => {
+            const current = tab === 'archived' ? archivedView : tab === 'all' ? !archivedView && !filter : filter === tab;
             return (
               <Link
-                key={tab ?? 'all'}
+                key={tab}
                 href={{
                   pathname: '/admin/products',
-                  query: tab ? { status: tab } : {},
+                  query: tab === 'archived' ? { view: 'archived' } : tab === 'all' ? {} : { status: tab },
                 }}
                 aria-current={current ? 'page' : undefined}
                 className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] no-underline ${
@@ -84,17 +95,85 @@ export default async function AdminProductsPage({
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg)]'
                 }`}
               >
-                {tab ? '검수 대기' : '전체'}
-                {tab && page.awaitingReview > 0 && (
+                {tab === 'archived' ? '보관함' : tab === 'all' ? '전체' : '검수 대기'}
+                {tab === 'PENDING_REVIEW' && page.awaitingReview > 0 && (
                   <span className="ml-1.5 text-accent">{page.awaitingReview}</span>
+                )}
+                {tab === 'archived' && page.archivedCount > 0 && (
+                  <span className="tnum ml-1.5 text-[var(--fg-muted)]">{page.archivedCount}</span>
                 )}
               </Link>
             );
           })}
         </nav>
 
+        {/* 보관·되돌리기가 끝나면 누른 단추가 사라진다 — 결과는 주소에 실려 와 여기서 말한다 */}
+        {archivedView && justArchived === '1' && (
+          <p role="status" className="rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+            상품을 보관했습니다. 매대·검색에서 빠졌고, 여기서 되돌릴 수 있습니다.
+          </p>
+        )}
+        {archivedView && justRestored === '1' && (
+          <p role="status" className="rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+            상품을 되돌렸습니다. 보관하기 전 상태로 돌아갔습니다.
+          </p>
+        )}
+
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
-          {products.length === 0 ? (
+          {archivedView ? (
+            products.length === 0 ? (
+              <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">보관한 상품이 없습니다.</p>
+            ) : (
+              <div className="table-scroll" tabIndex={0} role="region" aria-label="보관한 상품 목록">
+                <table>
+                  <caption className="sr-only">보관한 상품 목록</caption>
+                  <thead>
+                    <tr className="border-b border-[var(--border)]">
+                      <th scope="col" className="px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">상품</th>
+                      <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">보관 전 상태</th>
+                      <th scope="col" className="w-40 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">보관한 때</th>
+                      <th scope="col" className="w-24 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">보관한 쪽</th>
+                      {canWrite && (
+                        <th scope="col" className="w-36 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">되돌리기</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {products.map((p) => {
+                      const restorable = checkArchive(actor, 'RESTORE', { deletedAt: p.archivedAt, archivedBy: p.archivedBy }) === null;
+                      return (
+                        <tr key={p.id} className="border-b border-[var(--surface-2)] last:border-0">
+                          {/* 보관한 상품은 수정 화면이 없다 — 링크를 걸지 않는다 */}
+                          <th scope="row" className="px-4 py-3 text-left font-normal">
+                            <span className="block text-[13px]">{p.name}</span>
+                            <span className="block text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
+                          </th>
+                          <td className="px-4 py-3 text-center">
+                            <Badge tone="neutral">{PRODUCT_STATUS_LABEL[p.status as ProductStatus] ?? p.status}</Badge>
+                          </td>
+                          <td className="tnum px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
+                            {p.archivedAt && <time dateTime={p.archivedAt.toISOString()}>{dateFormat.format(p.archivedAt)}</time>}
+                          </td>
+                          <td className="px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
+                            {p.archivedBy === 'MERCHANT' ? '가맹점' : '운영진'}
+                          </td>
+                          {canWrite && (
+                            <td className="px-4 py-3">
+                              {restorable ? (
+                                <RestoreProductButton productId={p.id} productName={p.name} />
+                              ) : (
+                                <span className="text-[11px] text-[var(--fg-muted)]">운영진에게 요청</span>
+                              )}
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
+          ) : products.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
               {filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
             </p>

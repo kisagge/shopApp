@@ -37,6 +37,7 @@ layoutTests(test, expect, [
   ['대시보드', '/admin'],
   ['주문', '/admin/orders'],
   ['상품', '/admin/products'],
+  ['상품 보관함', '/admin/products?view=archived'],
   ['상품 등록', '/admin/products/new'],
   ['정산', '/admin/settlements'],
   ['회원', '/admin/users'],

@@ -412,6 +412,12 @@ model Category {
   @@map("categories")
 }
 
+/// 상품을 보관한 쪽. 사람이 아니라 쪽을 적는다 — 역할은 나중에 바뀌고, 누가 했는지는 감사 로그가 갖는다.
+enum ProductArchiver {
+  MERCHANT
+  STAFF
+}
+
 enum ProductStatus {
   DRAFT
   /// 가맹점이 게시를 요청한 상태. 운영진이 보고 올린다.
@@ -503,7 +509,11 @@ model Product {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// 보관한 때. **지우지 않고 보관한다** — 주문 줄이 옵션을 가리키고 있어 행을 지울 수 없고, 지울 수 있더라도
+  /// 지난 주문·정산·리뷰가 가리킬 것을 잃는다. 매대·검색·장바구니는 이 칸이 비어 있는 상품만 본다.
   deletedAt DateTime?
+  /// 누가 보관했는가. 운영진이 내린 상품을 가맹점이 되살리지 못하게 한다(core product-archive).
+  archivedBy ProductArchiver?
   inquiries Inquiry[]
 
   @@index([status, publishedAt])

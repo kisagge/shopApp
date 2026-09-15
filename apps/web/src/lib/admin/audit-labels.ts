@@ -11,6 +11,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'product.create': '상품 등록',
   'product.update': '상품 수정',
   'product.duplicate': '상품 복제',
+  'product.archive': '상품 보관',
+  'product.restore': '보관 상품 되돌리기',
   'product.stock': '재고 조정',
   'product.publish.approve': '게시 승인',
   'product.publish.reject': '게시 반려',

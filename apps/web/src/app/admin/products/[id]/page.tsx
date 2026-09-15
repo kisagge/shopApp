@@ -14,6 +14,8 @@ import { StockForm } from '../stock-form';
 import { VariantForm } from '../variant-form';
 import { ImageManager } from '../image-manager';
 import { DuplicateProductButton } from '../duplicate-button';
+import { ArchiveProductButton } from '../archive-button';
+import { countUnshippedLines } from '~/lib/admin/archive-product';
 
 export const metadata: Metadata = { title: '상품 수정' };
 export const dynamic = 'force-dynamic';
@@ -32,9 +34,10 @@ export default async function AdminProductDetailPage({
   if (!product) notFound();
 
   const canWrite = hasPermission(actor, 'product:write');
-  const [options, images] = await Promise.all([
+  const [options, images, unshipped] = await Promise.all([
     canWrite ? getProductFormOptions(actor) : Promise.resolve(null),
     listProductImages(product.id),
+    canWrite ? countUnshippedLines(product.id) : Promise.resolve(0),
   ]);
 
   return (
@@ -53,7 +56,12 @@ export default async function AdminProductDetailPage({
             </li>
           </ol>
         </nav>
-        {canWrite && <DuplicateProductButton productId={product.id} />}
+        {canWrite && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <DuplicateProductButton productId={product.id} />
+            <ArchiveProductButton productId={product.id} unshipped={unshipped} />
+          </div>
+        )}
       </header>
 
       <div className="grid gap-6 p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">

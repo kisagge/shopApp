@@ -3,7 +3,7 @@ import {
   PRODUCT_STATUS as CORE_PRODUCT_STATUS,
   PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL,
   type ProductStatus as CoreProductStatus,
-  PUBLISH_ERROR, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, VARIANT_SKU_MAX,
+  PUBLISH_ERROR, ARCHIVE_ACTION, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, VARIANT_SKU_MAX,
 } from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
 
@@ -118,6 +118,7 @@ export type CreateVariantInput = z.infer<typeof createVariantSchema>;
 export const PRODUCT_ERROR = [
   'SLUG_TAKEN', 'BRAND_NOT_ALLOWED', 'PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'SKU_TAKEN',
   'PUBLISH_NOT_ALLOWED', 'NOT_AWAITING_REVIEW', 'REJECT_REASON_REQUIRED',
+  'ALREADY_ARCHIVED', 'NOT_ARCHIVED', 'RESTORE_NOT_ALLOWED',
 ] as const;
 export type ProductErrorCode = (typeof PRODUCT_ERROR)[number];
 
@@ -130,7 +131,16 @@ export const PRODUCT_ERROR_MESSAGE: Readonly<Record<ProductErrorCode, string>> =
   PUBLISH_NOT_ALLOWED: PUBLISH_ERROR.PUBLISH_NOT_ALLOWED,
   NOT_AWAITING_REVIEW: PUBLISH_ERROR.NOT_AWAITING_REVIEW,
   REJECT_REASON_REQUIRED: PUBLISH_ERROR.REJECT_REASON_REQUIRED,
+  ALREADY_ARCHIVED: '이미 보관한 상품입니다',
+  NOT_ARCHIVED: '보관함에 없는 상품입니다',
+  RESTORE_NOT_ALLOWED: '운영진이 보관한 상품은 운영진만 되돌릴 수 있습니다',
 };
+
+/** 상품 보관·되돌리기. 무엇을 하는지만 받는다 — 누가 했는지는 세션이 말한다 */
+export const archiveProductSchema = z.object({
+  action: z.enum(ARCHIVE_ACTION),
+});
+export type ArchiveProductInput = z.infer<typeof archiveProductSchema>;
 
 /** 게시 검수 결정 */
 export const reviewProductSchema = z.object({

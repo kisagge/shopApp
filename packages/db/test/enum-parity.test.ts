@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   ORDER_STATUS, ORDER_STATUS_LABEL, USER_ROLE, USER_ROLE_LABEL,
   PAYMENT_STATUS_CODE, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_CODE,
-  MEMBER_GRADE,
+  MEMBER_GRADE, PRODUCT_ARCHIVER,
 } from '@shop/core';
-import { OrderStatus, UserRole, PaymentStatus, PaymentMethod, MemberGrade } from '../src/generated/enums';
+import { OrderStatus, UserRole, PaymentStatus, PaymentMethod, MemberGrade, ProductArchiver } from '../src/generated/enums';
 
 /**
  * DB의 enum 과 도메인 로직의 상수가 어긋나면 규칙이 DB 에 반영되지 않는다.
@@ -50,4 +50,10 @@ describe('MemberGrade 정합성', () => {
   });
 
   // 등급 이름표는 사전이 가진다 — apps/web 의 enum-labels 검사가 지킨다
+});
+
+describe('ProductArchiver 정합성', () => {
+  it('Prisma enum 과 core 의 PRODUCT_ARCHIVER 가 같은 집합이다 — 되돌리기 판정이 이 값을 본다', () => {
+    expect(Object.values(ProductArchiver).toSorted()).toEqual([...PRODUCT_ARCHIVER].toSorted());
+  });
 });

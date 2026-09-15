@@ -114,6 +114,8 @@ describe('발송', () => {
     expect(r.notified).toBe(1);
     expect(db.restockNotification.findMany.mock.calls[0]?.[0].where).toMatchObject({
       notifiedAt: null,
+      // 보관한 상품의 대기자는 부르지 않는다 — 눌러 들어가면 없는 상품이다
+      variant: { product: { deletedAt: null } },
     });
   });
 

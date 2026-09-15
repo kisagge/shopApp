@@ -167,7 +167,11 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
   if (variantIds.length === 0) return { notified: 0, variantIds: [] };
 
   const pending = await prisma.restockNotification.findMany({
-    where: { variantId: { in: [...variantIds] }, notifiedAt: null },
+    /*
+     * 보관한 상품은 부르지 않는다 — 들어가 봐야 없는 상품이다. 알림을 걸어 둔 채 남겨 두므로(표시하지 않는다) 되돌린 뒤
+     * 재고가 다시 생기면 그때 간다.
+     */
+    where: { variantId: { in: [...variantIds] }, notifiedAt: null, variant: { product: { deletedAt: null } } },
     select: {
       id: true,
       userId: true,

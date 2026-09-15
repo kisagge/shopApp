@@ -40,6 +40,7 @@ export * from './structured-data';
 export * from './inquiry';
 export * from './review-reply';
 export * from './product-copy';
+export * from './product-archive';
 export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';

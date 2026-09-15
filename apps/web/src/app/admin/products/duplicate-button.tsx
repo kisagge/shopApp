@@ -36,7 +36,7 @@ export function DuplicateProductButton({ productId }: { productId: string }) {
   }
 
   return (
-    <div className="ml-auto flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       {confirming ? (
         <>
           <p id={noteId} className="text-[12px] text-[var(--fg-secondary)]">

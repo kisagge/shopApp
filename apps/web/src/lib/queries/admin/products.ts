@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { won, type Actor, type Won, type ProductStatus, LOW_STOCK_THRESHOLD,
+import { won, type Actor, type Won, type ProductStatus, type ProductArchiver, LOW_STOCK_THRESHOLD,
 } from '@shop/core';
 import {
   assertAdminQuery, scopeOf, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
@@ -23,18 +23,31 @@ export interface AdminProductRow {
   /** 검수를 요청한 시각. 대기줄 정렬에 쓴다. */
   readonly reviewRequestedAt: Date | null;
   readonly publishRejection: string | null;
+  /** 보관한 때와 보관한 쪽. 보관함에서만 채워진다 */
+  readonly archivedAt: Date | null;
+  readonly archivedBy: ProductArchiver | null;
 }
 
 export async function getAdminProducts(
   actor: Actor,
-  query: { cursor?: string | undefined; take?: number; status?: ProductStatus | undefined } = {},
-): Promise<Paged<AdminProductRow> & { readonly awaitingReview: number }> {
+  query: {
+    cursor?: string | undefined;
+    take?: number;
+    status?: ProductStatus | undefined;
+    /** 보관함을 본다. 상태 필터와 함께 쓰지 않는다 — 보관한 상품은 상태와 상관없이 한 곳에 모인다 */
+    archived?: boolean;
+  } = {},
+): Promise<Paged<AdminProductRow> & { readonly awaitingReview: number; readonly archivedCount: number }> {
   assertAdminQuery(actor, 'product:read');
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
 
-  const scoped = { deletedAt: null, ...(scope ? { brand: { merchantId: scope } } : {}) };
-  const where = { ...scoped, ...(query.status ? { status: query.status } : {}) };
+  const inScope = scope ? { brand: { merchantId: scope } } : {};
+  const scoped = { deletedAt: null, ...inScope };
+  const archivedWhere = { deletedAt: { not: null }, ...inScope };
+  const where = query.archived
+    ? archivedWhere
+    : { ...scoped, ...(query.status ? { status: query.status } : {}) };
 
   const [rows, total] = await Promise.all([
     prisma.product.findMany({
@@ -43,8 +56,10 @@ export async function getAdminProducts(
      * 검수 대기만 보고 있을 때는 **오래 기다린 것부터** 꺼낸다. 다른
      * 목록과 같은 최신순으로 두면 새로 들어온 요청이 계속 앞을 막는다.
      */
-    orderBy:
-      query.status === 'PENDING_REVIEW'
+    orderBy: query.archived
+      // 보관함은 최근에 넣은 것부터 — 잘못 넣은 것을 되돌리러 온 사람이 바로 찾는다
+      ? [{ deletedAt: 'desc' as const }, { id: 'desc' as const }]
+      : query.status === 'PENDING_REVIEW'
         ? [{ reviewRequestedAt: 'asc' as const }, { id: 'asc' as const }]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
     take: take + 1,
@@ -52,6 +67,7 @@ export async function getAdminProducts(
     select: {
       id: true, slug: true, name: true, listPrice: true, salePrice: true,
       status: true, createdAt: true, reviewRequestedAt: true, publishRejection: true,
+      deletedAt: true, archivedBy: true,
       brand: { select: { name: true } },
       category: { select: { name: true } },
       variants: { select: { stock: true }, where: { isActive: true } },
@@ -60,10 +76,11 @@ export async function getAdminProducts(
     prisma.product.count({ where }),
   ]);
 
-  // 탭에 붙는 숫자. 필터와 무관하게 범위 안의 대기 건수를 센다.
-  const awaitingReview = await prisma.product.count({
-    where: { ...scoped, status: 'PENDING_REVIEW' },
-  });
+  // 탭에 붙는 숫자. 필터와 무관하게 범위 안의 대기·보관 건수를 센다.
+  const [awaitingReview, archivedCount] = await Promise.all([
+    prisma.product.count({ where: { ...scoped, status: 'PENDING_REVIEW' } }),
+    prisma.product.count({ where: archivedWhere }),
+  ]);
 
   const hasMore = rows.length > take;
   const page = hasMore ? rows.slice(0, take) : rows;
@@ -80,10 +97,13 @@ export async function getAdminProducts(
       createdAt: p.createdAt,
       reviewRequestedAt: p.reviewRequestedAt,
       publishRejection: p.publishRejection,
+      archivedAt: p.deletedAt,
+      archivedBy: p.archivedBy,
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     total,
     awaitingReview,
+    archivedCount,
   };
 }
 
