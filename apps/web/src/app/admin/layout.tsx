@@ -14,7 +14,7 @@ export const metadata: Metadata = NO_INDEX;
 export const dynamic = 'force-dynamic';
 
 interface NavItem {
-  readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/products' | '/admin/settlements' | '/admin/audit'
+  readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/returns' | '/admin/products' | '/admin/settlements' | '/admin/audit'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
@@ -30,6 +30,8 @@ const NAV: readonly NavItem[] = [
   // 전체 트래픽이라 가맹점에게는 보이지 않는다
   { href: '/admin/traffic', label: '트래픽', permission: 'analytics:all' },
   { href: '/admin/orders', label: '주문', permission: 'order:read' },
+  // 반품은 가맹점과 운영진이 나눠 처리한다 — 누구 차례인지 모아 본다
+  { href: '/admin/returns', label: '반품·교환', permission: 'return:resolve' },
   { href: '/admin/products', label: '상품', permission: 'product:read' },
   { href: '/admin/banners', label: '배너', permission: 'banner:read' },
   { href: '/admin/collections', label: '기획전', permission: 'collection:read' },

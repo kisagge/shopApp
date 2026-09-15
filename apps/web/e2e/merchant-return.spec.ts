@@ -72,8 +72,18 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     await page.getByRole('button', { name: '신청하기' }).click();
     await expect(page.getByText('반품 진행 중')).toHaveCount(2, { timeout: 20_000 });
 
-    // ── 가맹점: 자기 화면에서 승인
+    // 대기열에서 이 신청을 찾는다 — 한 주문번호의 줄이 어떤 단계이고 누구 차례인지
+    const queueRow = (p: Page) =>
+      p.getByRole('region', { name: '반품·교환 신청 목록' }).getByRole('row').filter({ hasText: orderNo });
+
+    // ── 가맹점: 대기열에서 승인 대기로, 내 차례로 보인다(자기 상품만 든 신청)
     const mp = await merchant.newPage();
+    await mp.goto('/admin/returns');
+    await ready(mp);
+    await expect(queueRow(mp)).toContainText('승인 대기');
+    await expect(queueRow(mp)).toContainText('내 차례');
+
+    // ── 가맹점: 자기 화면에서 승인
     await mp.goto(`/admin/orders/${orderNo}`);
     await ready(mp);
     const returns = mp.getByRole('region', { name: /반품 신청|교환 신청/ });
@@ -91,9 +101,19 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
      */
     await expect(mp.getByText('도착을 확인했습니다. 운영진이 환불을 진행합니다.')).toBeVisible({ timeout: 20_000 });
 
+    // ── 대기열: 이제 환불 대기 — 가맹점 차례가 아니고 운영진 차례다(서로 기다리지 않게)
+    await mp.goto('/admin/returns?view=REFUND');
+    await ready(mp);
+    await expect(queueRow(mp)).toContainText('환불 대기');
+    await expect(queueRow(mp), '가맹점에게 환불이 자기 차례로 보인다').not.toContainText('내 차례');
+
     // ── 운영진: 가맹점의 확인을 보고 환불
     const ap = await admin.newPage();
-    await ap.goto(`/admin/orders/${orderNo}`);
+    await ap.goto('/admin/returns?view=REFUND');
+    await ready(ap);
+    await expect(queueRow(ap)).toContainText('내 차례');
+    await queueRow(ap).getByRole('link', { name: orderNo }).click();
+    await ap.waitForURL(new RegExp(`/admin/orders/${orderNo}$`));
     await ready(ap);
     await expect(ap.getByText('가맹점이 물건 도착을 확인했습니다')).toBeVisible();
     await ap.getByRole('button', { name: '환불', exact: true }).click();

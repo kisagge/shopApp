@@ -42,6 +42,7 @@ const openLinkRow = async (page: Page): Promise<void> => {
 layoutTests(test, expect, [
   ['대시보드', '/admin'],
   ['주문', '/admin/orders'],
+  ['반품·교환', '/admin/returns'],
   ['상품', '/admin/products'],
   ['상품 보관함', '/admin/products?view=archived'],
   ['상품 등록', '/admin/products/new'],

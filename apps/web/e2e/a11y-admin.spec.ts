@@ -13,6 +13,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['대시보드', '/admin'],
   ['트래픽', '/admin/traffic'],
   ['주문', '/admin/orders'],
+  ['반품·교환', '/admin/returns'],
   ['상품', '/admin/products'],
   ['상품 보관함', '/admin/products?view=archived'],
   ['배너', '/admin/banners'],

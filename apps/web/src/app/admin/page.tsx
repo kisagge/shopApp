@@ -139,7 +139,7 @@ export default async function AdminDashboard({
               <Todo href="/admin/orders?status=PREPARING" label="배송 준비 중" count={d.todo.preparing} />
               <Todo href="/admin/orders?status=PENDING" label="입금 대기" count={d.todo.pendingPayment} />
               <Todo
-                href="/admin/orders?status=RETURN_REQUESTED"
+                href="/admin/returns"
                 label="반품 요청"
                 count={d.todo.returnRequested}
                 urgent
@@ -314,7 +314,7 @@ function Todo({
   href, label, count, urgent, last,
 }: {
   href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING'
-    | '/admin/orders?status=RETURN_REQUESTED' | '/admin/products';
+    | '/admin/returns' | '/admin/products';
   label: string;
   count: number;
   urgent?: boolean;
