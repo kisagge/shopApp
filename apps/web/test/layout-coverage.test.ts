@@ -47,6 +47,7 @@ const DYNAMIC: Readonly<Record<string, string>> = {
   '/admin/products/[id]': '운영 상품 표에서 첫 줄을 눌러 들어간다',
   '/admin/users/[id]': '회원 표에서 첫 줄의 이름을 눌러 들어간다',
   '/admin/users/[id]/points': '회원 표에서 첫 줄의 포인트 잔액을 눌러 들어간다',
+  '/admin/merchants/[id]/return-address': '가맹점 표에서 첫 줄의 반품지 링크를 눌러 들어간다',
 };
 
 function routes(dir: string, prefix = ''): string[] {

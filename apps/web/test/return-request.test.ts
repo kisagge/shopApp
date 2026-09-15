@@ -7,11 +7,16 @@ const db = vi.hoisted(() => ({
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
   returnRequest: { create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
+  returnAddress: { findMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const { requestReturn, resolveReturn, receiveReturn } = await import('~/lib/orders/return-request');
+
+const addressOf = (merchantId: string | null) => ({
+  merchantId, recipient: '반품담당', phone: '010-0000-0000', postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: null,
+});
 
 const user = { id: 'u-1' };
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -226,6 +231,36 @@ describe('운영진 처리', () => {
 
   beforeEach(() => {
     db.order.findFirst.mockResolvedValue(requested);
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a'), addressOf('m-b')]);
+  });
+
+  it('반품지가 없는 판매처의 상품이 있으면 승인하지 않는다 — 손님에게 보낼 곳을 알려 줄 수 없다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a')]);
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin),
+    ).rejects.toMatchObject({ code: 'RETURN_ADDRESS_MISSING', status: 409 });
+    expect(db.returnRequest.update).not.toHaveBeenCalled();
+  });
+
+  it('반품지가 없어도 반려는 한다 — 보낼 물건이 없다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([]);
+    const r = await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적' }, admin);
+    expect(r.status).toBe('REJECTED');
+    expect(db.returnAddress.findMany).not.toHaveBeenCalled();
+  });
+
+  it('신청한 줄의 판매처 반품지만 본다 — 자사 상품 줄이면 플랫폼 반품지를', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...requested,
+      items: [...requested.items, { id: 'i-own', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: null }],
+      returnRequests: [{ id: 'r-1', type: 'RETURN', status: 'REQUESTED', itemIds: ['i-coat', 'i-own'], exchangeLines: [] }],
+    });
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a'), addressOf(null)]);
+    await resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin);
+    expect(db.returnAddress.findMany.mock.calls[0]![0].where).toEqual({
+      OR: [{ merchantId: { in: ['m-a'] } }, { id: 'platform' }],
+    });
+    expect(db.returnRequest.update).toHaveBeenCalled();
   });
 
   it('가맹점은 신청한 줄이 전부 자기 상품이면 승인한다 — 물건을 받는 곳이 가맹점 창고다', async () => {

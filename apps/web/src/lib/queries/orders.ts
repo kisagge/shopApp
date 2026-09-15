@@ -47,6 +47,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         select: {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
+          // 승인했고 아직 안 왔으면 손님에게 보낼 곳을 알려 준다(core showsReturnAddress)
+          receivedAt: true,
           exchangeLines: { select: { orderItemId: true, fromOptionLabel: true, toOptionLabel: true, quantity: true } },
           reshipCarrier: true, reshipTrackingNumber: true,
         },
@@ -55,6 +57,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         orderBy: { id: 'asc' },
         select: {
           id: true, canceledAt: true, status: true,
+          // 어느 판매처로 돌려보내는가 — 가맹점마다 반품지가 다르다
+          merchantId: true,
           productName: true, brandName: true, optionLabel: true,
           // 주문한 그때의 사진. 상품이 바뀌거나 지워져도 산 것은 그대로 남아야 한다.
           imageUrl: true,

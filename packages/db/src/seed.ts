@@ -43,18 +43,21 @@ const MERCHANTS = [
     businessNumber: '000-00-00001', representative: '[대표자명]',
     contactEmail: 'contact@studionoon.test', contactPhone: '02-0000-0001',
     commissionPercent: 15, brands: ['studio-noon'],
+    returnAddress: { recipient: '스튜디오눈 반품담당', phone: '010-0000-0101', postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: '스튜디오눈 물류창고 1층' },
   },
   {
     name: '아뜰리에케이', businessName: '아뜰리에케이',
     businessNumber: '000-00-00002', representative: '[대표자명]',
     contactEmail: 'contact@atelierk.test', contactPhone: '02-0000-0002',
     commissionPercent: 18, brands: ['atelier-k'],
+    returnAddress: { recipient: '아뜰리에케이 반품담당', phone: '010-0000-0102', postalCode: '06035', address1: '서울 강남구 가로수길 00', address2: '지하 1층' },
   },
   {
     name: '무어', businessName: '무어컴퍼니',
     businessNumber: '000-00-00003', representative: '[대표자명]',
     contactEmail: 'contact@moor.test', contactPhone: '02-0000-0003',
     commissionPercent: 12, brands: ['moor'],
+    returnAddress: { recipient: '무어 반품담당', phone: '010-0000-0103', postalCode: '10126', address1: '경기 김포시 고촌읍 아라육로 00', address2: null },
   },
 ];
 
@@ -652,7 +655,7 @@ async function main(): Promise<void> {
   console.log(`  브랜드 ${BRANDS.length}개`);
   // ── 가맹점 + 브랜드 연결
   for (const m of MERCHANTS) {
-    const { brands, ...data } = m;
+    const { brands, returnAddress, ...data } = m;
     const merchant = await prisma.merchant.upsert({
       where: { businessNumber: m.businessNumber },
       update: { status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
@@ -662,7 +665,19 @@ async function main(): Promise<void> {
       where: { slug: { in: brands } },
       data: { merchantId: merchant.id },
     });
+    // 반품지가 없으면 이 가맹점 상품의 반품을 승인할 수 없다. 이미 있으면 두어 둔다 — 화면에서 고친 값을 시드가 덮지 않게
+    await prisma.returnAddress.upsert({
+      where: { merchantId: merchant.id },
+      update: {},
+      create: { merchantId: merchant.id, ...returnAddress },
+    });
   }
+  // 자사 상품(PLAIN LABEL)을 받는 플랫폼 반품지
+  await prisma.returnAddress.upsert({
+    where: { id: 'platform' },
+    update: {},
+    create: { id: 'platform', recipient: 'PLAIN 반품센터', phone: '010-0000-0100', postalCode: '10881', address1: '경기 파주시 회동길 00', address2: 'PLAIN 물류센터 2층' },
+  });
   console.log(`  가맹점 ${MERCHANTS.length}개 (PLAIN LABEL 은 자사 브랜드)`);
 
 

@@ -5,8 +5,9 @@ import {
   checkExchangeOption, EXCHANGE_OPTION_MESSAGE,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type ReturnReason, type ReturnType,
-  statusBeforeReturn,
+  statusBeforeReturn, missingReturnAddresses,
 } from '@shop/core';
+import { destinationsFor } from './return-address';
 
 /**
  * 반품·교환 신청과 처리.
@@ -258,7 +259,7 @@ export async function loadForResolve(orderNo: string, actor: Actor) {
       403,
     );
   }
-  return { order, request };
+  return { order, request, lines };
 }
 
 /**
@@ -312,12 +313,20 @@ export async function resolveReturn(
   input: { action: 'APPROVE' | 'REJECT'; rejectReason?: string | undefined },
   actor: Actor,
 ): Promise<{ orderNo: string; status: string; orderStatus: string }> {
-  const { order, request } = await loadForResolve(orderNo, actor);
+  const { order, request, lines } = await loadForResolve(orderNo, actor);
   if (request.status !== 'REQUESTED') {
     throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
   }
 
   const approve = input.action === 'APPROVE';
+
+  // 보낼 곳이 없으면 승인하지 않는다 — 승인 안내에 적을 주소가 없다(core missingReturnAddresses)
+  if (approve && missingReturnAddresses(await destinationsFor(lines)).length > 0) {
+    throw new ReturnError(
+      'RETURN_ADDRESS_MISSING',
+      '반품지가 등록되지 않은 판매처의 상품이 있어 승인할 수 없습니다. 가맹점 화면(자사 상품은 배송비 화면)에서 반품지를 먼저 등록해 주세요.',
+    );
+  }
 
   /**
    * 반려하면 **왔던 자리로** 되돌린다.

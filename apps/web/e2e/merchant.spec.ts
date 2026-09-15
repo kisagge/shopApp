@@ -167,3 +167,34 @@ test('가맹점도 자기 상품의 전환을 본다', async ({ page }) => {
   await expect(steps).toContainText(['상품 조회', '장바구니 담기', '결제 완료']);
   await expect(funnel, '왜 세 칸인지 말해 주지 않는다').toContainText('내 상품 기준');
 });
+
+test('가맹점은 자기 반품지만 고친다 — 남의 반품지는 주소로도 못 연다', async ({ page }) => {
+  /*
+   * **반품 물건을 받는 곳은 가맹점 창고다.** 그래서 그 주소는 가맹점이 직접 쥔다. 대신 남의 것을 고칠 수 있으면
+   * 그 가게로 갈 물건을 자기 창고로 돌릴 수 있다 — 목록에도 자기 줄만 있고, 주소를 직접 쳐도 막혀야 한다.
+   */
+  await page.goto('/admin/merchants');
+  await ready(page);
+
+  const rows = page.getByRole('row').filter({ has: page.getByRole('link', { name: /반품지/ }) });
+  await expect(rows, '남의 가맹점 반품지 링크가 보인다').toHaveCount(1);
+
+  await rows.getByRole('link', { name: /반품지/ }).click();
+  await page.waitForURL(/\/admin\/merchants\/[^/]+\/return-address$/);
+  await ready(page);
+  await expect(page.getByRole('heading', { name: '스튜디오눈 반품지', level: 1 })).toBeVisible();
+
+  const mine = new URL(page.url()).pathname.split('/')[3]!;
+  const other = await page.request.put(`/api/admin/return-addresses/${mine}-not-mine`, {
+    data: { recipient: '내 창고', phone: '010-0000-0000', postalCode: '04799', address1: '서울 성동구 성수이로 00' },
+    failOnStatusCode: false,
+  });
+  expect(other.status(), '남의 반품지를 고칠 수 있다').toBe(403);
+
+  // 자사 상품 반품지는 배송 정책이라 가맹점 몫이 아니다
+  const platform = await page.request.put('/api/admin/return-addresses/platform', {
+    data: { recipient: '내 창고', phone: '010-0000-0000', postalCode: '04799', address1: '서울 성동구 성수이로 00' },
+    failOnStatusCode: false,
+  });
+  expect(platform.status(), '가맹점이 자사 상품 반품지를 고칠 수 있다').toBe(403);
+});

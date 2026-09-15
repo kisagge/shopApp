@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   afterSaleByOf, escapeHtml, mailButton, mailLead, mailList, mailRow, mailSectionLabel, mailShell,
-  recordsNotification, showsReason,
+  recordsNotification, returnAddressLine, showsReason,
   type AfterSaleBy, type AfterSaleKind, type MailMessage, type ReturnType,
 } from '@shop/core';
 import { formatMoney, formatNumber, type Locale, type MessageKey } from '@shop/i18n';
@@ -11,6 +11,7 @@ import { CRON_ACTOR } from '~/lib/cron';
 import { localeOf } from '~/lib/mail/recipient';
 import { wordOf, type MailWording } from '~/lib/mail/templates';
 import { deliverNotice } from '~/lib/notifications/deliver';
+import { destinationsFor } from './return-address';
 import { absoluteUrl } from '~/lib/urls';
 
 export interface AfterSaleMoney {
@@ -30,6 +31,8 @@ export interface AfterSaleMailInput {
   readonly reason?: string | null | undefined;
   readonly returnType?: ReturnType | undefined;
   readonly money?: AfterSaleMoney | undefined;
+  /** 승인 메일에 적는 보낼 곳. 판매처가 둘이면 둘 다 적는다 */
+  readonly returnTo?: readonly string[] | undefined;
 }
 
 /** 종류마다 사전의 열쇠 머리 */
@@ -63,6 +66,8 @@ export function afterSaleMail(input: AfterSaleMailInput, wording?: MailWording):
   if (money && money.pointsReturned > 0) rows.push([t('mail.afterSale.points'), `${formatNumber(input.locale, money.pointsReturned)}P`]);
   if (money && money.shippingDeducted > 0) rows.push([t('mail.afterSale.shipping'), formatMoney(input.locale, money.shippingDeducted)]);
 
+  const returnTo = input.returnTo ?? [];
+
   const next =
     input.kind === 'RETURN_APPROVED'
       ? t(input.returnType === 'EXCHANGE' ? 'mail.returnApproved.nextExchange' : 'mail.returnApproved.nextReturn')
@@ -83,6 +88,7 @@ export function afterSaleMail(input: AfterSaleMailInput, wording?: MailWording):
       '',
       ...rows.map(([label, value]) => `${label} ${value}`),
       ...(input.items.length ? ['', t('mail.afterSale.items'), ...input.items.map((i) => `- ${itemLine(i)}`)] : []),
+      ...(returnTo.length ? ['', t('mail.returnApproved.sendTo'), ...returnTo.map((a) => `- ${a}`)] : []),
       ...(next ? ['', next] : []),
       '',
       orderUrl,
@@ -93,6 +99,7 @@ export function afterSaleMail(input: AfterSaleMailInput, wording?: MailWording):
         mailLead(lead),
         ...rows.map(([label, value]) => mailRow(label, value)),
         input.items.length ? mailSectionLabel(t('mail.afterSale.items')) + mailList(input.items.map(itemLine)) : '',
+        returnTo.length ? mailSectionLabel(t('mail.returnApproved.sendTo')) + mailList(returnTo) : '',
         next ? `<p style="margin:20px 0 0">${escapeHtml(next)}</p>` : '',
         mailButton(orderUrl, t('mail.order.view')),
       ].join(''),
@@ -125,7 +132,7 @@ export async function notifyAfterSale(input: {
       select: {
         orderNo: true, userId: true,
         user: { select: { email: true, name: true, locale: true, deletedAt: true } },
-        items: { orderBy: { id: 'asc' }, select: { id: true, productName: true, optionLabel: true, quantity: true } },
+        items: { orderBy: { id: 'asc' }, select: { id: true, productName: true, optionLabel: true, quantity: true, merchantId: true } },
         returnRequests: { orderBy: { requestedAt: 'desc' }, take: 1, select: { type: true, itemIds: true, rejectReason: true } },
       },
     });
@@ -143,6 +150,14 @@ export async function notifyAfterSale(input: {
       input.kind === 'ORDER_CANCELLED' ? pick(input.itemIds)
         : isReturn && request ? pick(request.itemIds)
           : [];
+    /*
+     * 승인 메일에는 **보낼 곳을 적는다.** "상품을 보내 주시면" 만 있고 주소가 없으면 손님이 할 수 있는 일이 없다.
+     * 판매처가 둘이면 주소도 둘이다(core returnDestinations).
+     */
+    const returnTo = input.kind === 'RETURN_APPROVED'
+      ? (await destinationsFor(items)).flatMap((d) =>
+          d.address ? [`${d.address.recipient} · ${returnAddressLine(d.address)} · ${d.address.phone}`] : [])
+      : [];
     const locale = localeOf(order.user.locale);
     /*
      * 사유는 누가 적었는지에 따라 온다. 반려 사유는 신청에, 손님 사유는 요청에 있다. 배치가 취소한 것은 결제 대기가
@@ -168,6 +183,7 @@ export async function notifyAfterSale(input: {
           reason: showsReason(input.kind, by) ? reason : null,
           returnType: isReturn ? (request?.type as ReturnType | undefined) : undefined,
           money: input.money,
+          returnTo,
         }, wording),
       },
       notification: recordsNotification(by)

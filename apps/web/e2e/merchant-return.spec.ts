@@ -93,6 +93,20 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     // ── 가맹점: 도착 확인. 환불 단추는 가맹점에게 없다
     const receive = mp.getByRole('button', { name: '물건 도착 확인' });
     await expect(receive).toBeVisible({ timeout: 20_000 });
+
+    /*
+     * ── 손님: 승인했으면 **어디로 보낼지**가 주문 화면에 뜬다. 주소 없이 "상품을 보내 주세요" 만 오면 손님은 받은
+     * 상자의 출고지로 보내거나 고객센터에 묻는다. 물건을 받는 곳은 이 가맹점 창고다.
+     *
+     * 도착 확인 단추가 뜬 뒤에 본다 — 승인 요청이 끝나기 전에 열면 아직 접수 상태의 화면을 본다.
+     */
+    await page.goto(`/order/${orderNo}`);
+    await ready(page);
+    const returnTo = page.getByRole('region', { name: '보내실 곳' });
+    await expect(returnTo).toBeVisible();
+    await expect(returnTo).toContainText('스튜디오눈 반품담당');
+    await expect(returnTo).toContainText('서울 성동구 성수이로');
+
     await expect(mp.getByRole('button', { name: /환불/ }), '가맹점이 스스로 돈을 돌려줄 수 있다').toHaveCount(0);
     await receive.click();
     /*

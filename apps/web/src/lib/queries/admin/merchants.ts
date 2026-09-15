@@ -23,6 +23,8 @@ export interface MerchantRow {
   readonly userCount: number;
   readonly approvedAt: Date | null;
   readonly createdAt: Date;
+  /** 반품지를 등록했는가. 없으면 이 가맹점 상품의 반품을 승인할 수 없다 */
+  readonly hasReturnAddress: boolean;
 }
 
 export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
@@ -45,6 +47,7 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
       applicant: { select: { name: true, email: true } },
       brands: { select: { name: true } },
       _count: { select: { users: true } },
+      returnAddress: { select: { id: true } },
     },
   });
 
@@ -63,6 +66,7 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
     userCount: m._count.users,
     approvedAt: m.approvedAt,
     createdAt: m.createdAt,
+    hasReturnAddress: m.returnAddress !== null,
   }));
 }
 

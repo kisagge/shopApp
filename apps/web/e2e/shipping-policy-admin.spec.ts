@@ -49,12 +49,14 @@ test('운영 화면에서 바꾸면 값이 남는다', async ({ page }) => {
 
   await expect(page.getByRole('heading', { name: '배송비', level: 1 })).toBeVisible();
 
-  await page.getByLabel('기본 배송비').fill(String(CHANGED.baseFee));
-  await page.getByLabel('무료배송 기준').fill(String(CHANGED.freeThreshold));
-  await page.getByLabel('제주·도서산간 추가 배송비').fill(String(CHANGED.remoteSurcharge));
-  await page.getByRole('button', { name: '저장' }).click();
+  // 이 화면에는 반품지 폼도 있다 — 배송비 절 안에서 찾는다
+  const policy = page.getByRole('region', { name: '현재 정책' });
+  await policy.getByLabel('기본 배송비').fill(String(CHANGED.baseFee));
+  await policy.getByLabel('무료배송 기준').fill(String(CHANGED.freeThreshold));
+  await policy.getByLabel('제주·도서산간 추가 배송비').fill(String(CHANGED.remoteSurcharge));
+  await policy.getByRole('button', { name: '저장' }).click();
 
-  await expect(page.getByRole('status')).toContainText('저장했습니다');
+  await expect(policy.getByRole('status')).toContainText('저장했습니다');
 
   // 새로 열어도 그대로여야 한다 — 화면 상태가 아니라 저장된 값을 본다
   await page.goto('/admin/shipping');

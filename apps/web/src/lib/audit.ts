@@ -30,7 +30,9 @@ export type AuditTargetType =
    * 두는 이유는 **전후 값**을 남기기 위해서다. 무료 기준 하나가 모든 주문의
    * 금액을 바꾸므로, 언제 무엇에서 무엇으로 바뀌었는지가 남아야 한다.
    */
-  | 'shipping';
+  | 'shipping'
+  /** 반품지. id 는 가맹점 id, 자사 상품을 받는 플랫폼 반품지면 'platform' */
+  | 'return_address';
 
 /** 배치처럼 사람이 아닌 행위자 */
 function isSystemActor(actor: Actor): boolean {

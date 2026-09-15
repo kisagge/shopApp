@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { hasPermission, MERCHANT_STATUS_LABEL } from '@shop/core';
+import Link from 'next/link';
+import { canEditReturnAddress, hasPermission, MERCHANT_STATUS_LABEL } from '@shop/core';
 import type { MerchantStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchants } from '~/lib/queries/admin/merchants';
@@ -63,6 +64,7 @@ export default async function AdminMerchantsPage() {
                   <th scope="col" className="w-52 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">사업자</th>
                   <th scope="col" className="w-20 px-4 py-3 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
                   <th scope="col" className="w-28 px-4 py-3 text-center text-xs text-[var(--fg-secondary)]">상태</th>
+                  <th scope="col" className="w-32 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">반품지</th>
                   <th scope="col" className="w-64 px-4 py-3 text-left text-xs text-[var(--fg-secondary)]">
                     {canApprove ? '상태 변경' : '입점일'}
                   </th>
@@ -101,6 +103,23 @@ export default async function AdminMerchantsPage() {
                       <Badge tone={TONE[m.status] ?? 'neutral'}>
                         {MERCHANT_STATUS_LABEL[m.status as MerchantStatusInput] ?? m.status}
                       </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      {/* 없으면 반품을 승인할 수 없다 — 목록에서 먼저 보이게 */}
+                      {m.hasReturnAddress ? (
+                        <span className="block text-[12px] text-[var(--fg-secondary)]">등록됨</span>
+                      ) : (
+                        <Badge tone="danger">미등록</Badge>
+                      )}
+                      {canEditReturnAddress(actor, m.id) && (
+                        <Link
+                          href={`/admin/merchants/${m.id}/return-address`}
+                          aria-label={`${m.name} 반품지 ${m.hasReturnAddress ? '수정' : '등록'}`}
+                          className="mt-1 block text-[12px] underline underline-offset-2"
+                        >
+                          {m.hasReturnAddress ? '수정' : '등록'}
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       {canApprove ? (

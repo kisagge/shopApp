@@ -192,6 +192,8 @@ model Merchant {
   brands      Brand[]
   settlements Settlement[]
   orderNotes  OrderNote[]
+  /// 반품지. 없으면 이 가맹점 상품의 반품을 승인할 수 없다(core missingReturnAddresses)
+  returnAddress ReturnAddress?
 
   approvedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -270,6 +272,29 @@ model ShippingPolicy {
   updatedById String?
 
   @@map("shipping_policy")
+}
+
+/// 반품지 — 돌려보낸 물건을 받는 곳.
+///
+/// 가맹점마다 하나, 그리고 자사 상품(가맹점 없는 줄)을 받는 플랫폼 반품지 하나(id "platform", merchantId null).
+/// 가맹점 표에 칸을 늘리지 않고 따로 둔 까닭은 플랫폼 반품지가 같은 모양이기 때문이다 — 입력·검증·표시가 한 길이다.
+model ReturnAddress {
+  id         String    @id @default(cuid())
+  /// null 이면 플랫폼 반품지
+  merchantId String?   @unique
+  merchant   Merchant? @relation(fields: [merchantId], references: [id], onDelete: Cascade)
+
+  recipient  String
+  phone      String
+  postalCode String
+  address1   String
+  address2   String?
+
+  updatedAt   DateTime @updatedAt
+  /// 마지막으로 고친 사람. 감사 로그가 진실이고 이건 화면에 보여 줄 값이다.
+  updatedById String?
+
+  @@map("return_addresses")
 }
 
 model Banner {

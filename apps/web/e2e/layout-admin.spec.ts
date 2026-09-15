@@ -15,6 +15,12 @@ const openFirstRow = async (page: Page): Promise<void> => {
   await page.waitForLoadState('domcontentloaded');
 };
 
+/** 가맹점 표에서 반품지 링크를 누른다 — 표의 첫 링크가 아니다 */
+const openReturnAddressLink = async (page: Page): Promise<void> => {
+  await page.locator('table a[href$="/return-address"]').first().click();
+  await page.waitForLoadState('domcontentloaded');
+};
+
 /** 회원 표에서 포인트 잔액 링크를 누른다 — 이름 링크가 먼저라 첫 링크로는 닿지 않는다 */
 const openPointsLink = async (page: Page): Promise<void> => {
   await page.locator('table a[href$="/points"]').first().click();
@@ -72,5 +78,7 @@ layoutTests(test, expect, [
   ['회원 상세', '/admin/users', openFirstRow],
   // 원장 표와 조정 폼이 나란히 선다
   ['회원 포인트', '/admin/users', openPointsLink],
+  // 반품지 폼 — 칸이 좁은 폭에서 겹치지 않는지
+  ['가맹점 반품지', '/admin/merchants', openReturnAddressLink],
   ['공지 편집기 — 링크 줄', '/admin/support', openLinkRow],
 ], ADMIN_WIDTHS);

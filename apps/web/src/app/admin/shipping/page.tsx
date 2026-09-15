@@ -3,13 +3,15 @@ import { format } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getShippingPolicy } from '~/lib/shipping-policy';
 import { ShippingPolicyForm } from './shipping-form';
+import { getReturnAddress } from '~/lib/orders/return-address';
+import { ReturnAddressForm } from '~/components/admin/return-address-form';
 
 export const metadata: Metadata = { title: '배송비' };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminShippingPage() {
   await requireAdmin('shipping:write');
-  const policy = await getShippingPolicy();
+  const [policy, returnAddress] = await Promise.all([getShippingPolicy(), getReturnAddress(null)]);
 
   return (
     <>
@@ -51,6 +53,29 @@ export default async function AdminShippingPage() {
             freeThreshold={policy.freeThreshold}
             remoteSurcharge={policy.remoteSurcharge}
           />
+        </section>
+
+        {/*
+          자사 상품(가맹점이 없는 브랜드)을 돌려받는 곳. 가맹점 상품은 가맹점마다 제 반품지가 있다 — 가맹점 화면에서 고친다.
+          배송 정책처럼 가게 전체의 약속이라 이 화면에 둔다.
+        */}
+        <section
+          aria-labelledby="platform-return-title"
+          className="flex max-w-[560px] flex-col gap-5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
+        >
+          <div className="flex flex-col gap-1.5">
+            <h2 id="platform-return-title" className="text-base font-semibold">자사 상품 반품지</h2>
+            <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
+              가맹점이 없는 자사 브랜드 상품의 반품·교환을 승인하면 손님에게 이 주소를 안내합니다. 가맹점 상품은 가맹점
+              화면에서 가맹점마다 등록합니다.
+            </p>
+            {!returnAddress && (
+              <p className="mt-1 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
+                아직 등록하지 않았습니다. 등록하기 전에는 자사 상품의 반품·교환을 승인할 수 없습니다.
+              </p>
+            )}
+          </div>
+          <ReturnAddressForm owner="platform" initial={returnAddress} />
         </section>
       </div>
     </>

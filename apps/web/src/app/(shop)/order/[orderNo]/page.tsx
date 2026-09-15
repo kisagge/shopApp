@@ -6,6 +6,7 @@ import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
   isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber, canConfirmPurchase, isOpenReturn,
+  returnAddressLine,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -16,6 +17,7 @@ import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
+import { approvedReturnDestinations } from '~/lib/orders/return-address';
 import { getOrderForUser, getExchangeOptions } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
 import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
@@ -139,6 +141,12 @@ export default async function OrderPage({
   const canConfirm = canConfirmPurchase({ status: order.status, hasOpenReturn: openReturn });
   /** 방금 확정했는가 — 단추가 사라지므로 결과는 이 화면이 남긴다(confirm-purchase-button) */
   const justConfirmed = query['confirmed'] === '1' && order.status === 'CONFIRMED';
+  /*
+   * 승인한 신청의 보낼 곳. **승인하고 아직 안 왔을 때만** 읽는다 — 그때만 보여 준다(core showsReturnAddress).
+   * 판매처가 둘이면 주소도 둘이다. 한 주소만 적어 주면 한쪽 물건이 남의 창고로 간다.
+   */
+  const returnTo = activeReturn ? await approvedReturnDestinations(order.items, activeReturn) : [];
+
   // 폼을 띄울 때만 읽는다 — 교환으로 바꿀 수 있는 옵션(같은 상품·같은 가격·재고)
   const exchangeOptions = showReturnForm ? await getExchangeOptions(returnableItems) : {};
 
@@ -386,6 +394,58 @@ export default async function OrderPage({
               {t('order.rejectReason')}: {activeReturn.rejectReason}
             </p>
           )}
+        </section>
+      )}
+
+      {/*
+        **승인했으면 어디로 보낼지 적어 준다.** "상품을 보내 주세요" 만 있고 주소가 없으면 손님은 받은 상자에 적힌
+        출고지로 보내거나 고객센터에 묻는다 — 출고지가 물류 대행사면 물건이 엉뚱한 곳에 도착해 아무도 확인하지 못한다.
+        판매처가 둘이면 주소도 둘이고, 그때는 상자를 나눠야 한다는 것을 먼저 말한다.
+      */}
+      {returnTo.length > 0 && (
+        <section
+          aria-labelledby="return-to-title"
+          className="mt-4 rounded-sm border border-[var(--border-strong)] p-4"
+        >
+          <h2 id="return-to-title" className="mb-2 text-sm font-semibold">{t('order.returnTo')}</h2>
+          <p className="text-[12px] leading-relaxed text-[var(--fg-secondary)]">
+            {t('order.returnToNote')}
+            {returnTo.length > 1 && <> {t('order.returnToSplit')}</>}
+          </p>
+
+          <ul className="mt-3 flex flex-col gap-3">
+            {returnTo.map((destination) => {
+              const address = destination.address;
+              if (!address) return null;
+              const lines = order.items.filter((i) => destination.itemIds.includes(i.id));
+              return (
+                <li
+                  key={destination.merchantId ?? 'platform'}
+                  className="rounded-sm bg-[var(--surface-1)] p-3.5 text-[13px] leading-relaxed"
+                >
+                  <address className="not-italic">
+                    <span className="block font-medium">
+                      {t('order.returnToRecipient')} {address.recipient}
+                    </span>
+                    <span className="block">{returnAddressLine(address)}</span>
+                    <span className="tnum block text-[var(--fg-secondary)]">
+                      {t('order.returnToPhone')} {address.phone}
+                    </span>
+                  </address>
+                  {returnTo.length > 1 && lines.length > 0 && (
+                    <p className="mt-1.5 text-[12px] text-[var(--fg-secondary)]">
+                      {t('order.returnToItems')}:{' '}
+                      {lines.map((i) => `${i.productName} (${i.optionLabel})`).join(', ')}
+                    </p>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+
+          <p className="mt-3 text-[12px] text-[var(--fg-muted)]">
+            {t('order.returnToTip', { orderNo: order.orderNo })}
+          </p>
         </section>
       )}
 

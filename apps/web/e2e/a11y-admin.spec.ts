@@ -53,6 +53,7 @@ for (const [name, list, link] of [
   ['상품 수정', '/admin/products', 'a[href^="/admin/products/"]'],
   ['회원 상세', '/admin/users', 'a[href^="/admin/users/"]:not([href$="/points"])'],
   ['회원 포인트', '/admin/users', 'a[href$="/points"]'],
+  ['가맹점 반품지', '/admin/merchants', 'a[href$="/return-address"]'],
 ] as const) {
   test(`${name} 화면에 접근성 위반이 없다`, async ({ page }) => {
     await page.goto(list);

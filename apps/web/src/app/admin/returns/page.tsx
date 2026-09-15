@@ -7,6 +7,7 @@ import { adminDate, adminDateTime } from '~/lib/admin/date-format';
 import { getReturnQueue, isReturnQueueView, RETURN_QUEUE_VIEW, type ReturnQueueView } from '~/lib/queries/admin/returns';
 import { RETURN_REASON_KEY, RETURN_TYPE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
+import { getReturnAddress } from '~/lib/orders/return-address';
 import { Pager } from '../pager';
 
 export const metadata: Metadata = { title: '반품·교환' };
@@ -33,7 +34,12 @@ export default async function AdminReturnsPage({
   const view: ReturnQueueView = isReturnQueueView(params.view) ? params.view : 'OPEN';
   const type = (RETURN_TYPE as readonly string[]).includes(params.type ?? '') ? (params.type as ReturnType) : undefined;
 
-  const [page, t] = await Promise.all([getReturnQueue(actor, { view, type, cursor: params.cursor }), getT()]);
+  const [page, t, myReturnAddress] = await Promise.all([
+    getReturnQueue(actor, { view, type, cursor: params.cursor }),
+    getT(),
+    // 가맹점은 반품지가 없으면 승인 자체를 못 한다 — 대기열에서 먼저 말해 준다
+    actor.merchantId ? getReturnAddress(actor.merchantId) : Promise.resolve(null),
+  ]);
   const query = (v: ReturnQueueView) => ({ ...(v !== 'OPEN' ? { view: v } : {}), ...(type ? { type } : {}) });
   const nextHref = page.nextCursor
     ? { pathname: '/admin/returns' as const, query: { ...query(view), cursor: page.nextCursor } }
@@ -66,6 +72,15 @@ export default async function AdminReturnsPage({
       </header>
 
       <div className="flex flex-col gap-5 p-4 sm:p-8">
+        {actor.merchantId && !myReturnAddress && (
+          <p className="rounded-sm bg-[var(--accent-soft)] px-4 py-3 text-[13px] leading-relaxed text-accent">
+            반품지를 등록하지 않아 신청을 승인할 수 없습니다.{' '}
+            <Link href={`/admin/merchants/${actor.merchantId}/return-address`} className="underline underline-offset-2">
+              반품지 등록하기
+            </Link>
+          </p>
+        )}
+
         <nav aria-label="처리 단계" className="flex flex-wrap gap-1 border-b border-[var(--border)]">
           {RETURN_QUEUE_VIEW.map((v) => (
             <Link

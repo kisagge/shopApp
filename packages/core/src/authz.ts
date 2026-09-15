@@ -274,6 +274,18 @@ export function canResolveReturnOf(
 }
 
 /**
+ * 이 반품지를 고칠 수 있는가. `merchantId` 가 null 이면 플랫폼(자사 상품) 반품지.
+ *
+ * - **가맹점은 자기 가맹점 것만.** 남의 반품지를 바꾸면 그 가게로 갈 물건이 자기 창고로 온다.
+ * - **플랫폼 반품지는 배송 정책을 정하는 사람(shipping:write)이.** 자사 상품의 물건을 받는 곳은 한 가맹점의 일이 아니다.
+ * - 운영진은 가맹점 반품지도 고친다(merchant:write) — 가맹점이 전화로 바뀐 창고를 알려 오는 일이 있다.
+ */
+export function canEditReturnAddress(actor: Actor, merchantId: string | null): boolean {
+  if (merchantId === null) return hasPermission(actor, 'shipping:write');
+  return hasPermission(actor, 'merchant:write') && ownsMerchant(actor, merchantId);
+}
+
+/**
  * 이 회원의 이용을 정지(또는 해제)할 수 있는가.
  *
  * - 회원 관리 권한(user:write)이 있어야 한다.

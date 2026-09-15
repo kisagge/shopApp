@@ -24,3 +24,14 @@ export const addressInputSchema = z.object({
   isDefault: z.boolean().default(false),
 });
 export type AddressInput = z.infer<typeof addressInputSchema>;
+
+/**
+ * 반품지 입력 계약 — 가맹점과 플랫폼 반품지가 같이 쓴다.
+ *
+ * 배송지와 칸이 같다. 연락처는 **반품 담당자의 휴대폰**이다 — 택배 기사가 도착 전에 거는 번호라 받는 사람이 곧바로
+ * 받아야 한다.
+ */
+export const returnAddressInputSchema = addressInputSchema.pick({
+  recipient: true, phone: true, postalCode: true, address1: true, address2: true,
+});
+export type ReturnAddressInput = z.infer<typeof returnAddressInputSchema>;

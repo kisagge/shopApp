@@ -56,6 +56,9 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
         items: [{ productName: '울 코트', optionLabel: '오트 / M', quantity: 1 }],
         ...(kind === 'RETURN_REJECTED' ? { reason: '착용 흔적이 있어 반품을 받을 수 없습니다.' } : {}),
         ...(kind === 'RETURN_APPROVED' || kind === 'RETURN_REJECTED' ? { returnType: 'RETURN' as const } : {}),
+        ...(kind === 'RETURN_APPROVED'
+          ? { returnTo: ['스튜디오눈 반품담당 · (04799) 서울 성동구 성수이로 00 스튜디오눈 물류창고 1층 · 010-0000-0101'] }
+          : {}),
         ...(kind === 'ORDER_CANCELLED' || kind === 'REFUND_COMPLETED'
           ? { money: { refunded: 289_000, pointsReturned: 1_000, shippingDeducted: 0 } }
           : {}),
