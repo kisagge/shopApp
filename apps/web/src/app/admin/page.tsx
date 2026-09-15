@@ -1,11 +1,15 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { format, won, isDashboardRange, ORDER_STATUS_LABEL, USER_ROLE_LABEL } from '@shop/core';
+import {
+  format, won, isDashboardRange, customPeriod, ORDER_STATUS_LABEL, USER_ROLE_LABEL,
+  type DashboardPeriod, type DashboardRange,
+} from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getDashboard } from '~/lib/queries/admin/dashboard';
 import { RevenueChart } from '~/components/admin/revenue-chart';
 import { RangeTabs } from '~/components/admin/range-tabs';
+import { Compare, CustomPeriodForm, type KpiCompare } from '~/components/admin/dashboard-period';
 
 export const metadata: Metadata = { title: '대시보드' };
 export const dynamic = 'force-dynamic';
@@ -17,12 +21,25 @@ export default async function AdminDashboard({
 }) {
   const actor = await requireAdmin();
 
-  // 주소에 아무 값이나 들어올 수 있다. 아는 값이 아니면 기본값으로 되돌린다 —
-  // 오류를 내면 링크를 잘못 눌렀을 뿐인 사람에게 빈 화면을 보여 주게 된다.
-  const raw = (await searchParams)['range'];
-  const range = typeof raw === 'string' && isDashboardRange(raw) ? raw : '7d';
+  const params = await searchParams;
+  const pick = (key: string) => (typeof params[key] === 'string' ? params[key] : undefined);
 
-  const d = await getDashboard(actor, range);
+  /*
+   * 기간 고르기. 시작·종료일이 둘 다 오면 직접 고른 기간이고, 틀리면 **이유를 알리고 7일로 보여 준다** — 빈 화면을
+   * 주면 날짜를 잘못 적었을 뿐인 사람이 대시보드를 못 본다. 탭 값도 모르는 값이면 7일로 되돌린다.
+   */
+  const now = new Date();
+  const from = pick('from');
+  const to = pick('to');
+  const custom = from && to ? customPeriod(from, to, now) : null;
+  const rawRange = pick('range');
+  const range: DashboardRange = rawRange && isDashboardRange(rawRange) ? rawRange : '7d';
+  const selection: DashboardRange | DashboardPeriod = custom?.ok ? custom.period : range;
+  const periodError = custom && !custom.ok ? custom.message : null;
+
+  const d = await getDashboard(actor, selection, now);
+  const previousLabel = `${dayLabel.format(d.previous.from)} – ${dayLabel.format(new Date(d.previous.until.getTime() - 1))}`;
+  const conversion = d.funnel && (d.funnel[0]?.sessions ?? 0) > 0 ? (d.funnel.at(-1)?.rateFromStart ?? 0) : null;
 
   return (
     <>
@@ -35,8 +52,9 @@ export default async function AdminDashboard({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-4">
-          <RangeTabs current={range} />
+        <div className="flex flex-wrap items-center gap-4">
+          <RangeTabs current={d.range} />
+          <CustomPeriodForm from={d.window.fromDay} to={d.window.toDay} error={periodError} now={now} />
           <p className="text-[13px] text-[var(--fg-muted)]">{USER_ROLE_LABEL[actor.role]}</p>
         </div>
       </header>
@@ -58,14 +76,27 @@ export default async function AdminDashboard({
               label={`${d.rangeLabel} 순매출`}
               value={`${format(d.period.netRevenue)}원`}
               note={`총 ${format(d.period.revenue)}원 · 환불 ${format(d.period.refunded)}원`}
+              compare={{ current: d.period.netRevenue, previous: d.previous.netRevenue, unit: '원', previousLabel }}
             />
-            <Kpi label={`${d.rangeLabel} 주문`} value={`${d.period.orderCount}건`} />
-            <Kpi label="객단가" value={`${format(d.period.averageOrderValue)}원`} />
+            <Kpi
+              label={`${d.rangeLabel} 주문`}
+              value={`${d.period.orderCount}건`}
+              compare={{ current: d.period.orderCount, previous: d.previous.orderCount, unit: '건', previousLabel }}
+            />
+            <Kpi
+              label="객단가"
+              value={`${format(d.period.averageOrderValue)}원`}
+              compare={{ current: d.period.averageOrderValue, previous: d.previous.averageOrderValue, unit: '원', previousLabel }}
+            />
             {d.funnel ? (
               <Kpi
                 label="구매 전환율"
-                value={`${d.funnel.at(-1)?.rateFromStart ?? 0}%`}
+                value={conversion === null ? '—' : `${conversion}%`}
                 note={`상품 조회 ${d.funnel[0]?.sessions ?? 0}세션 · 결제 ${d.funnel.at(-1)?.sessions ?? 0}세션`}
+                // 비율의 차이는 %p 로 — "20% 늘었다" 로 적으면 2%→2.4% 인지 2%→22% 인지 모른다
+                compare={conversion !== null && d.previous.conversionRate !== null
+                  ? { current: conversion, previous: d.previous.conversionRate, unit: '%p', previousLabel, points: true }
+                  : undefined}
               />
             ) : (
               <Kpi label="재고 부족" value={`${d.todo.lowStock}개`} note="5개 이하 옵션" />
@@ -266,12 +297,15 @@ export default async function AdminDashboard({
   );
 }
 
-function Kpi({ label, value, note }: { label: string; value: string; note?: string }) {
+const dayLabel = new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric', timeZone: 'Asia/Seoul' });
+
+function Kpi({ label, value, note, compare }: { label: string; value: string; note?: string; compare?: KpiCompare | undefined }) {
   return (
     <li className="flex flex-col gap-2.5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-5">
       <p className="text-xs text-[var(--fg-muted)]">{label}</p>
       <p className="tnum text-[27px] font-semibold tracking-tight">{value}</p>
       {note && <p className="text-xs text-[var(--fg-secondary)]">{note}</p>}
+      {compare && <Compare {...compare} />}
     </li>
   );
 }

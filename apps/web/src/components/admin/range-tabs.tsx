@@ -11,7 +11,7 @@ import { DASHBOARD_RANGE, DASHBOARD_RANGE_LABEL, type DashboardRange } from '@sh
  * 눌러도 아무 일이 없어서 스크린리더 사용자에게 특히 혼란스럽다.
  * aria-current 로 어느 것이 지금인지 함께 알린다.
  */
-export function RangeTabs({ current }: { current: DashboardRange }) {
+export function RangeTabs({ current }: { current: DashboardRange | null }) {
   return (
     <nav aria-label="집계 기간">
       <ul className="flex items-center gap-1 rounded-md border border-[var(--border)] p-0.5">

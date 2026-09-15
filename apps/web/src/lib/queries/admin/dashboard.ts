@@ -2,8 +2,8 @@ import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
   funnelFromCounts, computeFunnel, won, FUNNEL_STEP, MERCHANT_FUNNEL_STEP,
-  rangeStart, DASHBOARD_RANGE_LABEL, netRevenue,
-  type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange,
+  presetPeriod, previousPeriod, DASHBOARD_RANGE_LABEL, netRevenue,
+  type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange, type DashboardPeriod,
   type EventName, LOW_STOCK_THRESHOLD,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
@@ -18,8 +18,15 @@ import { assertAdminQuery, scopeOf, maskName } from './scope';
  * 다르면 그 차트로는 아무것도 정할 수 없다.
  */
 
-/** 결제가 성립한 주문 — 돈이 들어온 시각이 있는 것 */
-const paidIn = (from: Date) => ({ paidAt: { gte: from } });
+/** 기간 — 시작 포함, 끝 미포함 */
+interface Window {
+  readonly from: Date;
+  readonly until: Date;
+}
+const within = (w: Window) => ({ gte: w.from, lt: w.until });
+
+/** 결제가 성립한 주문 — 돈이 들어온 시각이 그 기간 안인 것 */
+const paidIn = (w: Window) => ({ paidAt: within(w) });
 
 /*
  * **환불은 주문 상태로 세지 않는다.** 예전에는 "환불 상태이고 결제된 적 있는 주문의 결제액"
@@ -68,10 +75,17 @@ export interface DailyRevenue {
 
 export interface Dashboard {
   readonly scope: string | null;
-  readonly range: DashboardRange;
+  /** 탭으로 고른 기간이면 그 값, 직접 고른 기간이면 null */
+  readonly range: DashboardRange | null;
   /** '최근 7일' 처럼 화면에 그대로 쓰는 문구 */
   readonly rangeLabel: string;
+  readonly window: DashboardPeriod;
   readonly period: DashboardKpi;
+  /**
+   * 같은 길이의 바로 앞 기간. 오늘이 들어간 기간이면 **지금 시각까지만** 센 값이다(core previousPeriod) — 오늘
+   * 오전을 어제 온종일과 견주면 매일 아침 "줄었다" 고 말한다.
+   */
+  readonly previous: DashboardKpi & { readonly from: Date; readonly until: Date; readonly conversionRate: number | null };
   readonly todo: DashboardTodo;
   readonly topProducts: readonly TopProduct[];
   readonly recentOrders: readonly RecentOrder[];
@@ -90,51 +104,81 @@ export interface Dashboard {
 
 export async function getDashboard(
   actor: Actor,
-  range: DashboardRange = '1d',
+  selection: DashboardRange | DashboardPeriod = '1d',
   now: Date = new Date(),
 ): Promise<Dashboard> {
   assertAdminQuery(actor, 'admin:access');
   const scope = scopeOf(actor);
 
-  /**
-   * 기간의 시작. 오늘을 포함해서 센다.
-   *
-   * 90일까지만 고를 수 있다 — 원본 이벤트 보존 기간과 같다. 더 긴 구간을
-   * 원본에서 세면 지워진 날이 조용히 0으로 잡혀 트래픽이 줄어든 것처럼 보인다.
+  /*
+   * 기간. 탭 값이면 오늘을 포함해 센다(core presetPeriod), 직접 고른 기간은 부르는 쪽이 core customPeriod 로 검사해
+   * 넘긴다. 어느 쪽이든 90일까지 — 원본 이벤트 보존 기간과 같다.
    */
-  const since = rangeStart(range, now);
+  const period = typeof selection === 'string' ? presetPeriod(selection, now) : selection;
+  const prev = previousPeriod(period, now);
 
+  const [current, previous, todo, topRows, recent, daily, funnel, prevFunnel] = await Promise.all([
+    loadKpi(scope, period),
+    loadKpi(scope, prev),
+    loadTodo(scope),
+    loadTopProducts(scope, period),
+    loadRecentOrders(scope),
+    loadDailyRevenue(scope, period),
+    scope === null ? loadFunnel(period) : loadMerchantFunnel(scope, period),
+    scope === null ? loadFunnel(prev) : loadMerchantFunnel(scope, prev),
+  ]);
+
+  return {
+    scope,
+    range: period.preset,
+    rangeLabel:
+      period.preset === '1d' ? '오늘' : period.preset ? `최근 ${DASHBOARD_RANGE_LABEL[period.preset]}` : `${period.days}일`,
+    window: period,
+    period: current,
+    previous: {
+      ...previous,
+      from: prev.from,
+      until: prev.until,
+      // 앞 단계에 아무도 없었으면 비율도 없다 — 0% 로 적으면 "아무도 안 샀다" 로 읽힌다
+      conversionRate: (prevFunnel[0]?.sessions ?? 0) > 0 ? (prevFunnel.at(-1)?.rateFromStart ?? 0) : null,
+    },
+    todo,
+    topProducts: topRows,
+    recentOrders: recent,
+    dailyRevenue: daily,
+    funnel,
+  };
+}
+
+/**
+ * 한 기간의 매출 지표. 이번 기간과 지난 기간이 **같은 함수**를 지난다 — 두 벌로 적으면 비교가 규칙 차이를 재게 된다.
+ */
+async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
   const mine = scope ? { items: { some: { merchantId: scope } } } : {};
-  const soldWhere = { ...paidIn(since), ...mine };
+  const soldWhere = { ...paidIn(w), ...mine };
 
-  const [soldAgg, soldItems, backAgg, backItems, todo, topRows, recent, daily, funnel] =
-    await Promise.all([
-      prisma.order.aggregate({
-        where: soldWhere,
-        _count: { _all: true },
-        _sum: { payable: true },
-      }),
-      // 가맹점 매출은 자기 줄의 합계다 — 다른 가맹점 금액까지 더하면 남의 매출이 샌다
-      scope
-        ? prisma.orderItem.aggregate({
-            where: { merchantId: scope, order: soldWhere },
-            _sum: { subtotal: true },
-          })
-        : Promise.resolve(null),
-      prisma.orderRefund.aggregate({ where: { createdAt: { gte: since } }, _sum: { amount: true } }),
-      scope
-        ? prisma.orderItem.aggregate({
-            // 결제된 적 없는 주문의 줄은 매출에 들어간 적도 없다
-            where: { merchantId: scope, canceledAt: { gte: since }, order: { paidAt: { not: null } } },
-            _sum: { subtotal: true },
-          })
-        : Promise.resolve(null),
-      loadTodo(scope),
-      loadTopProducts(scope, since),
-      loadRecentOrders(scope),
-      loadDailyRevenue(scope, since),
-      scope === null ? loadFunnel(since) : loadMerchantFunnel(scope, since),
-    ]);
+  const [soldAgg, soldItems, backAgg, backItems] = await Promise.all([
+    prisma.order.aggregate({
+      where: soldWhere,
+      _count: { _all: true },
+      _sum: { payable: true },
+    }),
+    // 가맹점 매출은 자기 줄의 합계다 — 다른 가맹점 금액까지 더하면 남의 매출이 샌다
+    scope
+      ? prisma.orderItem.aggregate({
+          where: { merchantId: scope, order: soldWhere },
+          _sum: { subtotal: true },
+        })
+      : Promise.resolve(null),
+    prisma.orderRefund.aggregate({ where: { createdAt: within(w) }, _sum: { amount: true } }),
+    scope
+      ? prisma.orderItem.aggregate({
+          // 결제된 적 없는 주문의 줄은 매출에 들어간 적도 없다
+          where: { merchantId: scope, canceledAt: within(w), order: { paidAt: { not: null } } },
+          _sum: { subtotal: true },
+        })
+      : Promise.resolve(null),
+  ]);
 
   const totals = netRevenue(
     scope ? (soldItems?._sum.subtotal ?? 0) : (soldAgg._sum.payable ?? 0),
@@ -144,22 +188,11 @@ export async function getDashboard(
   const orderCount = soldAgg._count._all;
 
   return {
-    scope,
-    range,
-    rangeLabel:
-      range === '1d' ? '오늘' : `최근 ${DASHBOARD_RANGE_LABEL[range]}`,
-    period: {
-      revenue,
-      refunded: totals.refunded,
-      netRevenue: totals.net,
-      orderCount,
-      averageOrderValue: won(orderCount === 0 ? 0 : Math.floor(revenue / orderCount)),
-    },
-    todo,
-    topProducts: topRows,
-    recentOrders: recent,
-    dailyRevenue: daily,
-    funnel,
+    revenue,
+    refunded: totals.refunded,
+    netRevenue: totals.net,
+    orderCount,
+    averageOrderValue: won(orderCount === 0 ? 0 : Math.floor(revenue / orderCount)),
   };
 }
 
@@ -180,14 +213,14 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
   return { preparing, pendingPayment, returnRequested, lowStock };
 }
 
-async function loadTopProducts(scope: string | null, since: Date): Promise<TopProduct[]> {
+async function loadTopProducts(scope: string | null, w: Window): Promise<TopProduct[]> {
   const rows = await prisma.orderItem.groupBy({
     by: ['productName', 'brandName'],
     where: {
       ...(scope ? { merchantId: scope } : {}),
       // 취소된 줄은 빼고 센다. 주문 상태로 거르면 일부 취소한 주문의 취소 줄이 남는다
       canceledAt: null,
-      order: paidIn(since),
+      order: paidIn(w),
     },
     _sum: { quantity: true, subtotal: true },
     orderBy: { _sum: { subtotal: 'desc' } },
@@ -229,7 +262,7 @@ async function loadRecentOrders(scope: string | null): Promise<RecentOrder[]> {
   }));
 }
 
-async function loadDailyRevenue(scope: string | null, since: Date): Promise<DailyRevenue[]> {
+async function loadDailyRevenue(scope: string | null, w: Window): Promise<DailyRevenue[]> {
   /*
    * groupBy 로는 날짜 단위 집계가 안 되므로 raw 를 쓴다.
    * KST 로 변환해 자르지 않으면 한국 시간 오전 9시 전 주문이 전날에 붙는다.
@@ -244,24 +277,24 @@ async function loadDailyRevenue(scope: string | null, since: Date): Promise<Dail
           select to_char((o."paidAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
                  i.subtotal as amount
           from orders o join order_items i on i."orderId" = o.id
-          where i."merchantId" = ${scope} and o."paidAt" >= ${since}
+          where i."merchantId" = ${scope} and o."paidAt" >= ${w.from} and o."paidAt" < ${w.until}
           union all
           select to_char((i."canceledAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
                  -i.subtotal as amount
           from orders o join order_items i on i."orderId" = o.id
           where i."merchantId" = ${scope}
-            and o."paidAt" is not null and i."canceledAt" >= ${since}
+            and o."paidAt" is not null and i."canceledAt" >= ${w.from} and i."canceledAt" < ${w.until}
         ) t group by 1 order by 1`
     : await prisma.$queryRaw<{ date: string; revenue: bigint }[]>`
         select date, sum(amount)::bigint as revenue from (
           select to_char((o."paidAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
                  o.payable as amount
-          from orders o where o."paidAt" >= ${since}
+          from orders o where o."paidAt" >= ${w.from} and o."paidAt" < ${w.until}
           union all
           select to_char((r."createdAt" + interval '9 hours')::date, 'YYYY-MM-DD') as date,
                  -r.amount as amount
           from order_refunds r
-          where r."createdAt" >= ${since}
+          where r."createdAt" >= ${w.from} and r."createdAt" < ${w.until}
         ) t group by 1 order by 1`;
 
   return rows.map((r) => ({ date: r.date, revenue: Number(r.revenue) }));
@@ -278,7 +311,7 @@ async function loadDailyRevenue(scope: string | null, since: Date): Promise<Dail
  * 비율은 세지 않는다. 그건 core 가 하고(funnelFromCounts), 메모리로 세는
  * 경로와 같은 함수를 쓴다 — 두 벌로 두면 두 화면이 다른 수를 말한다.
  */
-async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
+async function loadFunnel(w: Window): Promise<FunnelStepResult[]> {
   /*
    * 세션마다 어떤 단계를 밟았는지 bool 로 접은 뒤, 앞 단계를 모두 밟은
    * 세션만 세어 올린다. 단계 이름은 core 의 FUNNEL_STEP 순서를 그대로
@@ -301,7 +334,7 @@ async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
         bool_or(name = ${step3}) as c,
         bool_or(name = ${step4}) as d
       from event_logs
-      where "receivedAt" >= ${since}
+      where "receivedAt" >= ${w.from} and "receivedAt" < ${w.until}
         and name in (${Prisma.join([...FUNNEL_STEP])})
       group by "sessionId"
     ) t
@@ -327,20 +360,20 @@ async function loadFunnel(since: Date): Promise<FunnelStepResult[]> {
  */
 async function loadMerchantFunnel(
   merchantId: string,
-  since: Date,
+  w: Window,
 ): Promise<FunnelStepResult[]> {
   const [viewed, added, bought] = await Promise.all([
     prisma.eventLog.groupBy({
       by: ['sessionId'],
-      where: { merchantId, name: 'view_item', receivedAt: { gte: since } },
+      where: { merchantId, name: 'view_item', receivedAt: within(w) },
     }),
     prisma.eventLog.groupBy({
       by: ['sessionId'],
-      where: { merchantId, name: 'add_to_cart', receivedAt: { gte: since } },
+      where: { merchantId, name: 'add_to_cart', receivedAt: within(w) },
     }),
     prisma.order.findMany({
       where: {
-        paidAt: { gte: since },
+        paidAt: within(w),
         browserSessionId: { not: null },
         items: { some: { merchantId } },
       },

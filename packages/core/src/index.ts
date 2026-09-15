@@ -40,6 +40,7 @@ export * from './structured-data';
 export * from './inquiry';
 export * from './review-reply';
 export * from './product-copy';
+export * from './dashboard-period';
 export * from './support';
 export * from './point';
 export * from './recommend';
