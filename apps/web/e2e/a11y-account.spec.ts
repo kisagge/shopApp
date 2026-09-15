@@ -30,6 +30,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['내 문의', '/mypage/inquiries'],
   ['알림', '/mypage/notifications'],
   ['재입고 알림', '/mypage/restock'],
+  ['회원정보', '/mypage/account'],
   ['1:1 문의 쓰기', '/support/ask'],
   ['탈퇴', '/mypage/close'],
 ];

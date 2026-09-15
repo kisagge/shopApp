@@ -5,6 +5,7 @@
  * tooling/client-message-groups.mjs 에 적었다.
  */
 export const CLIENT_MESSAGE_GROUPS: readonly string[] = [
+  'acct',
   'addr',
   'auth',
   'cancel',

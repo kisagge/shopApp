@@ -48,6 +48,9 @@ export function remoteAreaLabel(postalCode: string): string | null {
  * 입력은 제각각이지만(01012345678, 010 1234 5678) 저장과 표시는 한 가지여야
  * 한다. 같은 번호가 두 모양으로 저장되면 사람이 목록에서 중복을 못 알아본다.
  */
+/** 휴대폰 번호. 배송지 연락처와 회원 연락처가 같은 규칙을 쓴다 */
+export const PHONE_PATTERN = /^01[016789][-\s]?\d{3,4}[-\s]?\d{4}$/;
+
 export function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '');
   if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;

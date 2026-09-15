@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, NAME_MAX_LENGTH, isDerivedFromEmail,
+  PASSWORD_MIN_LENGTH, PASSWORD_MAX_LENGTH, NAME_MAX_LENGTH, PHONE_PATTERN, isDerivedFromEmail,
 } from '@shop/core';
 
 /**
@@ -69,3 +69,53 @@ export const forgotPasswordSchema = z.object({
 });
 
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
+
+/**
+ * 회원정보 수정 계약. 이메일은 없다 — 바꾸려면 새 주소 확인이 필요하고, 그 전에는 로그인 주소를 바꿀 수 없다.
+ *
+ * 연락처는 비워도 된다(빈 칸은 지우기). 적으면 휴대폰 형식이어야 한다 — 배송지 연락처와 같은 규칙이다.
+ */
+export const updateProfileSchema = z.object({
+  name: z
+    .string({ error: 'valid.nameRequired' })
+    .trim()
+    .min(1, 'valid.nameRequired')
+    .max(NAME_MAX_LENGTH, 'valid.nameTooLong'),
+  phone: z
+    .string()
+    .trim()
+    .max(20, 'valid.tooLongChars')
+    .refine((v) => v === '' || PHONE_PATTERN.test(v), 'valid.phoneFormat')
+    .default(''),
+});
+export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * 비밀번호 변경 폼 계약.
+ *
+ * 현재 비밀번호를 받는다 — 로그인해 둔 기기를 잠깐 빌린 사람이 비밀번호를 바꿔 계정을 가져가지 못하게. 새 비밀번호가
+ * 지금 것과 같으면 막는다(바꾼 줄 알고 끝나는 것을 막는다). 이메일과 비슷한지는 가입과 같은 검사다.
+ */
+export const changePasswordSchema = z
+  .object({
+    email: z.string(),
+    currentPassword: z.string().min(1, 'valid.currentPasswordRequired'),
+    newPassword: z
+      .string()
+      .min(PASSWORD_MIN_LENGTH, 'valid.passwordTooShort')
+      .max(PASSWORD_MAX_LENGTH, 'valid.passwordTooLong'),
+    newPasswordConfirm: z.string(),
+  })
+  .refine((v) => v.newPassword === v.newPasswordConfirm, {
+    path: ['newPasswordConfirm'],
+    message: 'valid.passwordMismatch',
+  })
+  .refine((v) => v.newPassword !== v.currentPassword, {
+    path: ['newPassword'],
+    message: 'valid.passwordSameAsCurrent',
+  })
+  .refine((v) => !isDerivedFromEmail(v.newPassword, v.email), {
+    path: ['newPassword'],
+    message: 'valid.passwordLikeEmail',
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

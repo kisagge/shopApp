@@ -28,6 +28,7 @@ layoutTests(test, expect, [
   ['문의', '/mypage/inquiries'],
   ['내 리뷰', '/mypage/reviews'],
   ['재입고 알림', '/mypage/restock'],
+  ['회원정보', '/mypage/account'],
   ['탈퇴', '/mypage/close'],
   // 담긴 것이 없으면 빈 화면이지만, 빈 화면도 무너질 수 있다
   ['결제', '/checkout'],

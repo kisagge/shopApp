@@ -31,6 +31,7 @@ const PAGES = [
   ['문의', '/mypage/inquiries'],
   ['내 리뷰', '/mypage/reviews'],
   ['재입고 알림', '/mypage/restock'],
+  ['회원정보', '/mypage/account'],
   ['탈퇴', '/mypage/close'],
 ] as const;
 

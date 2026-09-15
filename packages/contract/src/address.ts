@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { PHONE_PATTERN } from '@shop/core';
 
 /**
  * 배송지 입력 계약.
@@ -15,7 +16,7 @@ export const addressInputSchema = z.object({
     .trim()
     // 하이픈·공백을 섞어 쓰거나 아예 안 쓰는 사람이 많다. 어차피 저장할 때
     // 한 모양으로 통일하므로(core 의 normalizePhone) 입력 단계에서 막을 이유가 없다.
-    .regex(/^01[016789][-\s]?\d{3,4}[-\s]?\d{4}$/, 'valid.phoneFormat'),
+    .regex(PHONE_PATTERN, 'valid.phoneFormat'),
   postalCode: z.string().trim().regex(/^\d{5}$/, 'valid.zipFormat'),
   address1: z.string().trim().min(1, 'valid.addressRequired').max(200, 'valid.tooLongChars'),
   address2: z.string().trim().max(200, 'valid.tooLongChars').optional(),

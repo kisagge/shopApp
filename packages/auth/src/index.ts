@@ -9,6 +9,7 @@ import { resolveLocale } from '@shop/i18n/locale';
 import { getMailer } from '@shop/mail';
 import { prisma } from '@shop/db';
 import { assertNotSuspended } from './suspension';
+import { assertProfileUpdate } from './profile';
 
 /**
  * Better Auth 서버 인스턴스.
@@ -251,6 +252,13 @@ const options = {
       },
     },
     user: {
+      update: {
+        // 이름 길이·연락처 형식 — 설명은 profile.ts
+        before(data) {
+          assertProfileUpdate(data);
+          return Promise.resolve();
+        },
+      },
       create: {
         /**
          * 가입 축하 포인트.

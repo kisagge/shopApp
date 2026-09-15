@@ -194,6 +194,7 @@ export default async function MyPage() {
               { href: '/mypage/restock', label: t('my.restockHeading') },
               { href: '/mypage/inquiries', label: t('support.myInquiries') },
               { href: '/mypage/notifications', label: t('notif.heading') },
+              { href: '/mypage/account', label: t('acct.menu') },
             ] as const
           ).map((m) => (
             <li key={m.href} className="border-b border-[var(--border)]">
