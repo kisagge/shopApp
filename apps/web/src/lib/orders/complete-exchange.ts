@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { statusBeforeReturn, transition, type Actor, type CarrierCode } from '@shop/core';
 import { loadForResolve, ReturnError } from './return-request';
+import { notifyExchangeShipped } from './notify-exchange';
 
 /**
  * 교환 — 회수를 확인하고 바꾼 옵션을 보낸다.
@@ -16,6 +17,8 @@ import { loadForResolve, ReturnError } from './return-request';
  * - 줄과 주문을 신청 전 자리로 되돌린다(반려와 같은 statusBeforeReturn) — 새 물건이 가는 중이지만 확정·기한 계산을
  *   다시 시작하지 않는다. 날짜를 새로 쓰면 이미 지급한 달의 매출이 옮겨간다.
  * - 교환 송장을 신청에 적는다. 주문의 첫 송장은 덮지 않는다.
+ *
+ * 끝나면 손님에게 알린다(알림함·메일). 트랜잭션 밖이다 — 알림이 실패했다고 보낸 물건을 무를 수 없다.
  */
 export async function completeExchange(
   orderNo: string,
@@ -72,6 +75,14 @@ export async function completeExchange(
         note: `교환 상품 발송 ${request.exchangeLines.length}건 — ${input.carrier} ${trackingNumber}`,
       },
     });
+  });
+
+  await notifyExchangeShipped({
+    orderNo: order.orderNo,
+    userId: order.userId,
+    carrier: input.carrier,
+    trackingNumber,
+    lines: request.exchangeLines,
   });
 
   return { orderNo: order.orderNo, orderStatus: back, exchanged: request.exchangeLines.length };

@@ -22,6 +22,11 @@ export const NOTIFICATION_KIND = [
   'STOCK_LOW',
   /** 내 리뷰에 판매자가 답했다. 답은 늦게 달리는 일이 많아, 알리지 않으면 쓴 사람은 다시 와서 볼 일이 없다 */
   'REVIEW_REPLIED',
+  /**
+   * 교환한 상품을 보냈다. 손님은 신청한 뒤 승인·회수·발송을 기다리는데, 알리지 않으면 주문 화면을 다시 열어 봐야
+   * 교환이 끝났는지 안다 — 그 사이 송장이 움직여도 모른다.
+   */
+  'EXCHANGE_SHIPPED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 

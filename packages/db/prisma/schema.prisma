@@ -1593,6 +1593,8 @@ enum NotificationKind {
   STOCK_LOW
   /// 내 리뷰에 판매자가 답했다
   REVIEW_REPLIED
+  /// 교환한 상품을 보냈다
+  EXCHANGE_SHIPPED
 }
 
 model Notification {

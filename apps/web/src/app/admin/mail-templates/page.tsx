@@ -19,6 +19,7 @@ const KIND_LABEL: Record<MailTemplateKind, string> = {
   ORDER_DEPOSITED: '입금 확인',
   RESTOCK: '재입고',
   INQUIRY_ANSWERED: '문의 답변',
+  EXCHANGE_SHIPPED: '교환 상품 발송',
 };
 
 /** 기본 문구가 사전의 어느 열쇠인가 — 칸을 비우면 이 말이 나간다 */
@@ -28,6 +29,7 @@ const DEFAULT_KEY: Record<MailTemplateKind, Record<MailTemplateField, string>> =
   ORDER_DEPOSITED: { subject: 'mail.order.depositedSubject', heading: 'mail.order.depositedHeading', lead: 'mail.order.depositedLead' },
   RESTOCK: { subject: 'mail.restock.subject', heading: 'mail.restock.heading', lead: 'mail.restock.lead' },
   INQUIRY_ANSWERED: { subject: 'mail.inquiry.subject', heading: 'mail.inquiry.heading', lead: 'mail.inquiry.lead' },
+  EXCHANGE_SHIPPED: { subject: 'mail.exchange.subject', heading: 'mail.exchange.heading', lead: 'mail.exchange.lead' },
 };
 
 const PARAM_LABEL: Record<string, string> = { orderNo: '주문번호', name: '주문자 이름', item: '상품(옵션)', about: '문의한 상품' };

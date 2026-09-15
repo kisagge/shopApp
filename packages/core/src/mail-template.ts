@@ -9,7 +9,9 @@
  * 문장이 사라지면 피싱과 구분할 단서가 없어진다.
  */
 
-export const MAIL_TEMPLATE_KIND = ['ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED'] as const;
+export const MAIL_TEMPLATE_KIND = [
+  'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
+] as const;
 export type MailTemplateKind = (typeof MAIL_TEMPLATE_KIND)[number];
 
 export const MAIL_TEMPLATE_FIELD = ['subject', 'heading', 'lead'] as const;
@@ -27,6 +29,7 @@ export const MAIL_TEMPLATE_PARAMS = {
   ORDER_DEPOSITED: { subject: ['orderNo'], heading: [], lead: [] },
   RESTOCK: { subject: ['item'], heading: [], lead: ['item'] },
   INQUIRY_ANSWERED: { subject: ['about'], heading: [], lead: ['about'] },
+  EXCHANGE_SHIPPED: { subject: ['orderNo'], heading: [], lead: ['name'] },
 } as const satisfies Record<MailTemplateKind, Record<MailTemplateField, readonly string[]>>;
 
 /** 미리보기에 끼울 예시 값 */

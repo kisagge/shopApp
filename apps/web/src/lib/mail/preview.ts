@@ -3,6 +3,7 @@ import type { MailMessage, MailTemplateKind } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { orderMail } from '~/lib/orders/notify';
 import { restockMail, inquiryAnswerMail } from './notices';
+import { exchangeShippedMail } from '~/lib/orders/notify-exchange';
 import type { MailWording } from './templates';
 
 /**
@@ -37,6 +38,11 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
       return inquiryAnswerMail({
         to: order.to, productName: '울 코트', question: 'M 사이즈 어깨 너비가 궁금합니다.',
         answer: '어깨 너비는 48cm 입니다.', url: 'https://plain.test/product/wool-coat', locale,
+      }, wording);
+    case 'EXCHANGE_SHIPPED':
+      return exchangeShippedMail({
+        to: order.to, name: order.buyerName, orderNo: order.orderNo, locale, carrier: 'CJ', trackingNumber: '123456789012',
+        lines: [{ productName: '울 코트', fromOptionLabel: '오트 / M', toOptionLabel: '오트 / L', quantity: 1 }],
       }, wording);
   }
 }

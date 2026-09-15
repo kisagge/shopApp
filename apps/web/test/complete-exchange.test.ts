@@ -21,6 +21,8 @@ const db = vi.hoisted(() => ({
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
+const notifyExchangeShipped = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/orders/notify-exchange', () => ({ notifyExchangeShipped }));
 
 const { completeExchange } = await import('~/lib/orders/complete-exchange');
 const { resolveReturn } = await import('~/lib/orders/return-request');
@@ -29,10 +31,10 @@ const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
 const otherMerchant: Actor = { id: 'u-x', role: 'MERCHANT', merchantId: 'm-x' };
 
-const LINE = { orderItemId: 'i-knit', fromVariantId: 'v-knit-s', toVariantId: 'v-knit-m', toOptionLabel: '블랙 / M', quantity: 2 };
+const LINE = { orderItemId: 'i-knit', fromVariantId: 'v-knit-s', fromOptionLabel: '블랙 / S', toVariantId: 'v-knit-m', toOptionLabel: '블랙 / M', quantity: 2 };
 
 const order = (request: Record<string, unknown> = {}, over: Record<string, unknown> = {}) => ({
-  id: 'o-1', orderNo: '20260915-0000001', status: 'RETURN_REQUESTED',
+  id: 'o-1', orderNo: '20260915-0000001', status: 'RETURN_REQUESTED', userId: 'u-buyer',
   confirmedAt: null, deliveredAt: new Date('2026-09-12'),
   items: [
     { id: 'i-coat', status: 'DELIVERED', canceledAt: null, merchantId: 'm-a' },
@@ -103,6 +105,18 @@ describe('교환 상품 발송', () => {
     tx.returnRequest.updateMany.mockResolvedValue({ count: 0 });
     await expect(completeExchange('20260915-0000001', SHIP, admin)).rejects.toMatchObject({ code: 'ALREADY_PROCESSED' });
     expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
+    expect(notifyExchangeShipped, '처리되지 않은 교환을 보냈다고 알렸다').not.toHaveBeenCalled();
+  });
+
+  it('보낸 뒤 손님에게 알린다 — 주문·송장(숫자만)·바꾼 줄을 넘기고, 교환 처리가 끝난 다음이다', async () => {
+    const order: string[] = [];
+    db.$transaction.mockImplementation(async (fn: any) => { order.push('tx'); return fn(tx); });
+    notifyExchangeShipped.mockImplementation(() => { order.push('notify'); return Promise.resolve(); });
+    await completeExchange('20260915-0000001', SHIP, admin, NOW);
+    expect(notifyExchangeShipped).toHaveBeenCalledWith({
+      orderNo: '20260915-0000001', userId: 'u-buyer', carrier: 'CJ', trackingNumber: '123456789012', lines: [LINE],
+    });
+    expect(order).toEqual(['tx', 'notify']);
   });
 
   it('확정까지 갔던 주문은 확정으로 돌아간다 — 확정일을 다시 쓰지 않는다', async () => {

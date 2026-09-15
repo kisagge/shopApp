@@ -226,7 +226,7 @@ export async function loadForResolve(orderNo: string, actor: Actor) {
   const order = await prisma.order.findFirst({
     where: { orderNo },
     select: {
-      id: true, orderNo: true, status: true,
+      id: true, orderNo: true, status: true, userId: true,
       // 반려하면 왔던 자리로 되돌린다. 그 자리를 이 두 시각으로 되짚는다.
       confirmedAt: true, deliveredAt: true,
       items: { select: { id: true, status: true, canceledAt: true, merchantId: true } },
@@ -235,7 +235,9 @@ export async function loadForResolve(orderNo: string, actor: Actor) {
         take: 1,
         select: {
           id: true, type: true, status: true, itemIds: true, receivedAt: true,
-          exchangeLines: { select: { orderItemId: true, fromVariantId: true, toVariantId: true, toOptionLabel: true, quantity: true } },
+          exchangeLines: {
+            select: { orderItemId: true, fromVariantId: true, fromOptionLabel: true, toVariantId: true, toOptionLabel: true, quantity: true },
+          },
         },
       },
     },

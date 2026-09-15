@@ -9,6 +9,7 @@ import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './st
  * - 손님이 바꿀 옵션을 고르면 그 옵션의 재고가 신청 순간 잡힌다
  * - 운영 화면에 환불 단추가 없고, 교환 상품 발송(송장)으로 끝난다 — 결제는 그대로다
  * - 끝나면 주문 줄이 바꾼 옵션을 가리키고, 돌아온 옵션의 재고가 돌아온다
+ * - 손님 알림함에 교환 상품을 보냈다는 알림이 이 주문으로 이어진다
  *
  * 자기 손님(exchanger)과 자기 상품(RACE_PRODUCT.exchange)을 쓴다.
  */
@@ -90,6 +91,13 @@ test('다른 옵션으로 교환 신청하면 그 재고가 잡히고, 운영이
     await expect(page.getByRole('term').filter({ hasText: '돌려받은 금액' })).toHaveCount(0);
     expect(await stockOf(page, fromVariant!), '돌아온 옵션의 재고가 안 돌아왔다').toBe(fromStock + 1);
     expect(await stockOf(page, toVariant), '바꿀 옵션을 두 번 깎았다').toBe(toStockBefore - 1);
+
+    // ── 손님 알림함: 교환 상품을 보냈다는 알림이 이 주문으로 이어진다(메일도 같은 때 나간다 — 단위 검사가 본다)
+    await page.goto('/mypage/notifications');
+    await ready(page);
+    const notice = page.getByRole('list', { name: '알림' }).getByRole('link').filter({ hasText: `주문 ${orderNo} 의 교환 상품을 보냈습니다.` });
+    await expect(notice).toHaveCount(1);
+    await expect(notice).toHaveAttribute('href', `/order/${orderNo}`);
   } finally {
     await admin.close();
   }
