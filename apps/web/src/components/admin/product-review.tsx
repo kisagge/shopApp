@@ -2,6 +2,7 @@
 
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 게시 검수 결정.
@@ -36,8 +37,7 @@ export function ProductReview({
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '처리하지 못했습니다.');
+        setError(await failureMessage(response, '처리하지 못했습니다.'));
         return;
       }
       router.refresh();

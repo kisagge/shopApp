@@ -87,7 +87,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
  * 대상 이름표. **기록할 수 있는 대상 전부**를 타입으로 강제한다 — 대상 종류를 늘리면 여기가 컴파일에서 걸린다.
  * 이미 쌓인 옛 값(목록에 없는 문자열)은 targetLabel 이 코드 그대로 보여 준다.
  */
-export const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
+const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
   product: '상품',
   order: '주문',
   user: '회원',

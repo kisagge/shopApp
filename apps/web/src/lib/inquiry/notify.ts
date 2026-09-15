@@ -1,11 +1,9 @@
 import 'server-only';
 import { inquiryAnswerMail } from '~/lib/mail/notices';
-import { getMailWording } from '~/lib/mail/templates';
 import { localeOf } from '~/lib/mail/recipient';
-import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
 import type { AnsweredInquiry } from './write';
-import { recordNotification } from '~/lib/notifications/record';
+import { deliverNotice } from '~/lib/notifications/deliver';
 
 /**
  * 답변이 달렸다고 알린다.
@@ -18,38 +16,34 @@ import { recordNotification } from '~/lib/notifications/record';
  * 재입고 알림과 같은 규칙이다.
  */
 export async function notifyInquiryAnswered(inquiry: AnsweredInquiry): Promise<void> {
-  try {
-    // **답변을 쓴 운영자의 말이 아니라 물어본 사람의 말이다.**
-    const locale = localeOf(inquiry.authorLocale);
-    const wording = await getMailWording('INQUIRY_ANSWERED', locale);
-    await getMailer().send(
-      inquiryAnswerMail({
+  // **답변을 쓴 운영자의 말이 아니라 물어본 사람의 말이다.**
+  const locale = localeOf(inquiry.authorLocale);
+  /*
+   * 상품 없는 문의는 상품 화면으로 보낼 수 없다. 답을 보러 갈 곳이 없으면 알림이 반쪽이므로 내 문의 목록으로 보낸다.
+   */
+  const path = inquiry.productSlug ? `/product/${inquiry.productSlug}` : '/mypage/inquiries';
+
+  await deliverNotice({
+    tag: 'inquiry',
+    ref: inquiry.id,
+    mail: {
+      template: 'INQUIRY_ANSWERED',
+      locale,
+      build: (wording) => inquiryAnswerMail({
         to: inquiry.authorEmail,
         locale,
         ...(inquiry.productName ? { productName: inquiry.productName } : {}),
         question: inquiry.question,
         answer: inquiry.answer,
-        /*
-         * 상품 없는 문의는 상품 화면으로 보낼 수 없다. 답을 보러 갈 곳이
-         * 없으면 알림이 반쪽이므로 내 문의 목록으로 보낸다.
-         */
-        url: inquiry.productSlug
-          ? absoluteUrl(`/product/${inquiry.productSlug}`)
-          : absoluteUrl('/mypage/inquiries'),
+        url: absoluteUrl(path),
       }, wording),
-    );
-  } catch (error) {
-    console.error('[inquiry] 답변 알림 메일 실패', inquiry.id, error);
-  }
-
-  /*
-   * 메일과 **함께** 남긴다. 메일은 놓치기 쉽고 스팸함으로 가기도 한다 —
-   * 다시 들어온 사람이 답이 왔는지 볼 자리가 있어야 한다.
-   */
-  await recordNotification({
-    userId: inquiry.authorId,
-    kind: 'INQUIRY_ANSWERED',
-    ...(inquiry.productName ? { params: { productName: inquiry.productName } } : {}),
-    linkPath: inquiry.productSlug ? `/product/${inquiry.productSlug}` : '/mypage/inquiries',
+    },
+    // 메일과 **함께** 남긴다. 메일은 놓치기 쉽고 스팸함으로 가기도 한다 — 다시 들어온 사람이 답이 왔는지 볼 자리가 있어야 한다
+    notification: {
+      userId: inquiry.authorId,
+      kind: 'INQUIRY_ANSWERED',
+      ...(inquiry.productName ? { params: { productName: inquiry.productName } } : {}),
+      linkPath: path,
+    },
   });
 }

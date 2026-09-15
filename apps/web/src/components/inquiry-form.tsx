@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { INQUIRY_MAX_LENGTH } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 문의 작성.
@@ -37,8 +38,7 @@ export function InquiryForm({ productId }: { productId: string }) {
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? t('inq.postFailed'));
+        setError(await failureMessage(response, t('inq.postFailed')));
         return;
       }
 

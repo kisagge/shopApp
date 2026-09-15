@@ -11,3 +11,13 @@ describe('HTML 이스케이프', () => {
     expect(escapeHtml('&lt;')).toBe('&amp;lt;');
   });
 });
+
+describe('메일 본문 조각', () => {
+  it('값을 스스로 이스케이프한다 — 부르는 쪽이 잊어도 가맹점이 적은 이름이 마크업이 되지 않는다', async () => {
+    const { mailLead, mailRow, mailSectionLabel, mailList } = await import('../src/mail');
+    expect(mailRow('상품', '<b>코트</b>')).toBe('<p style="margin:0 0 6px"><span style="color:#6f6a63">상품</span> &lt;b&gt;코트&lt;/b&gt;</p>');
+    expect(mailList(['<i>a</i>', 'b'])).toBe('<ul style="margin:0;padding-left:18px"><li style="margin:0 0 4px">&lt;i&gt;a&lt;/i&gt;</li><li style="margin:0 0 4px">b</li></ul>');
+    expect(mailLead('"안녕"')).toContain('&quot;안녕&quot;');
+    expect(mailSectionLabel('&')).toContain('&amp;');
+  });
+});

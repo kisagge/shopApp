@@ -48,20 +48,20 @@ describe('listOrderNotes', () => {
 
   it('운영진은 조건 없이, 가맹점은 자기 가맹점 메모만 where 로 읽는다', async () => {
     db.orderNote.findMany.mockResolvedValue(rows);
-    await listOrderNotes(admin, 'o-1');
-    expect(db.orderNote.findMany.mock.calls[0]?.[0].where).toEqual({ orderId: 'o-1' });
-    await listOrderNotes(merchant, 'o-1');
-    expect(db.orderNote.findMany.mock.calls[1]?.[0].where).toEqual({ orderId: 'o-1', merchantId: 'm-a' });
+    await listOrderNotes(admin, ORDER_NO);
+    expect(db.orderNote.findMany.mock.calls[0]?.[0].where).toEqual({ order: { orderNo: ORDER_NO } });
+    await listOrderNotes(merchant, ORDER_NO);
+    expect(db.orderNote.findMany.mock.calls[1]?.[0].where).toEqual({ order: { orderNo: ORDER_NO }, merchantId: 'm-a' });
   });
 
   it('손님은 읽지도 않는다', async () => {
-    expect(await listOrderNotes(customer, 'o-1')).toEqual([]);
+    expect(await listOrderNotes(customer, ORDER_NO)).toEqual([]);
     expect(db.orderNote.findMany).not.toHaveBeenCalled();
   });
 
   it('쓴 사람·가맹점 이름과 지울 수 있는지를 붙인다 — 지워진 계정은 그렇게 적는다', async () => {
     db.orderNote.findMany.mockResolvedValue(rows);
-    const notes = await listOrderNotes(admin, 'o-1');
+    const notes = await listOrderNotes(admin, ORDER_NO);
     expect(notes.map((n) => [n.authorName, n.merchantName, n.deletable])).toEqual([
       ['운영자', null, true],
       ['지워진 계정', '스튜디오눈', false],

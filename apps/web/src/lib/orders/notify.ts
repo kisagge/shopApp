@@ -1,5 +1,7 @@
 import 'server-only';
-import { escapeHtml, mailShell, mailButton, type MailMessage } from '@shop/core';
+import {
+  escapeHtml, mailButton, mailLead, mailList, mailRow, mailSectionLabel, mailShell, type MailMessage,
+} from '@shop/core';
 import {
   formatMoney, formatDateTime, isLocale, DEFAULT_LOCALE, type Locale,
 } from '@shop/i18n';
@@ -43,19 +45,8 @@ export interface OrderMailInput {
 
 type Kind = 'paid' | 'pending' | 'deposited';
 
-/** 이름 = 값 한 줄. 메일 클라이언트가 표 레이아웃을 잘 다루지 못해 문단으로 쌓는다. */
-function row(label: string, value: string): string {
-  return [
-    '<p style="margin:0 0 6px"><span style="color:#6f6a63">',
-    escapeHtml(label),
-    '</span> ',
-    escapeHtml(value),
-    '</p>',
-  ].join('');
-}
-
 /** 주문 메일 종류와 문구 템플릿 종류 */
-export const ORDER_MAIL_TEMPLATE: Readonly<Record<Kind, MailTemplateKind>> = {
+const ORDER_MAIL_TEMPLATE: Readonly<Record<Kind, MailTemplateKind>> = {
   paid: 'ORDER_PAID',
   pending: 'ORDER_PENDING',
   deposited: 'ORDER_DEPOSITED',
@@ -67,35 +58,31 @@ export function orderMail(kind: Kind, input: OrderMailInput, wording?: MailWordi
   const lead = wordOf(t, wording, 'lead', `mail.order.${kind}Lead`, kind === 'deposited' ? {} : { name: input.buyerName });
   const money = (won: number): string => formatMoney(input.locale, won);
 
-  const lines = input.items
-    .map((i) => {
-      const name = `${i.productName} (${i.optionLabel})`;
-      const qty = t('mail.order.quantity', { count: i.quantity });
-      return `<li style="margin:0 0 4px">${escapeHtml(name)} · ${escapeHtml(qty)} · ${escapeHtml(money(i.unitPrice * i.quantity))}</li>`;
-    })
-    .join('');
+  const lines = input.items.map(
+    (i) => `${i.productName} (${i.optionLabel}) · ${t('mail.order.quantity', { count: i.quantity })} · ${money(i.unitPrice * i.quantity)}`,
+  );
 
   const account =
     kind === 'pending' && input.virtualAccount
       ? [
           '<div style="background:#f6f4f0;border-radius:6px;padding:16px;margin:20px 0">',
-          row(t('mail.order.bank'), input.virtualAccount.bank),
-          row(t('mail.order.account'), input.virtualAccount.accountNumber),
+          mailRow(t('mail.order.bank'), input.virtualAccount.bank),
+          mailRow(t('mail.order.account'), input.virtualAccount.accountNumber),
           input.virtualAccount.dueDate
-            ? row(t('mail.order.due'), formatDateTime(input.locale, input.virtualAccount.dueDate))
+            ? mailRow(t('mail.order.due'), formatDateTime(input.locale, input.virtualAccount.dueDate))
             : '',
           '</div>',
         ].join('')
       : '';
 
   const bodyHtml = [
-    `<p style="margin:0 0 20px">${escapeHtml(lead)}</p>`,
-    row(t('mail.order.orderNo'), input.orderNo),
+    mailLead(lead),
+    mailRow(t('mail.order.orderNo'), input.orderNo),
     account,
-    `<p style="margin:20px 0 6px;color:#6f6a63">${escapeHtml(t('mail.order.items'))}</p>`,
-    `<ul style="margin:0;padding-left:18px">${lines}</ul>`,
+    mailSectionLabel(t('mail.order.items')),
+    mailList(lines),
     `<p style="margin:20px 0 0;font-weight:600">${escapeHtml(t('mail.order.total'))} ${escapeHtml(money(input.payable))}</p>`,
-    row(t('mail.order.shipTo'), input.shipTo),
+    mailRow(t('mail.order.shipTo'), input.shipTo),
     mailButton(absoluteUrl(`/order/${input.orderNo}`), t('mail.order.view')),
   ].join('');
 

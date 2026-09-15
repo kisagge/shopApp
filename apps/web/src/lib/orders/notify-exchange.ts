@@ -1,15 +1,14 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  carrierOf, escapeHtml, formatTrackingNumber, mailButton, mailShell, trackingUrlFor,
+  carrierOf, formatTrackingNumber, mailButton, mailLead, mailList, mailRow, mailSectionLabel, mailShell, trackingUrlFor,
   type MailMessage,
 } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { createTranslator } from '@shop/i18n/all';
-import { getMailer } from '@shop/mail';
 import { localeOf } from '~/lib/mail/recipient';
-import { getMailWording, wordOf, type MailWording } from '~/lib/mail/templates';
-import { recordNotification } from '~/lib/notifications/record';
+import { wordOf, type MailWording } from '~/lib/mail/templates';
+import { deliverNotice } from '~/lib/notifications/deliver';
 import { absoluteUrl } from '~/lib/urls';
 
 export interface ExchangeShippedLine {
@@ -49,8 +48,6 @@ export function exchangeShippedMail(input: ExchangeShippedMailInput, wording?: M
   const lineText = (l: ExchangeShippedLine) =>
     `${l.productName}: ${l.fromOptionLabel} → ${l.toOptionLabel} · ${t('mail.order.quantity', { count: l.quantity })}`;
 
-  const label = (text: string) => `<p style="margin:20px 0 6px;color:#6f6a63">${escapeHtml(text)}</p>`;
-
   return {
     to: input.to,
     subject: wordOf(t, wording, 'subject', 'mail.exchange.subject', { orderNo: input.orderNo }),
@@ -69,11 +66,11 @@ export function exchangeShippedMail(input: ExchangeShippedMailInput, wording?: M
     html: mailShell({
       heading: wordOf(t, wording, 'heading', 'mail.exchange.heading'),
       bodyHtml: [
-        `<p style="margin:0 0 20px">${escapeHtml(lead)}</p>`,
-        `<p style="margin:0 0 6px"><span style="color:#6f6a63">${escapeHtml(t('mail.order.orderNo'))}</span> ${escapeHtml(input.orderNo)}</p>`,
-        `<p style="margin:0 0 6px"><span style="color:#6f6a63">${escapeHtml(t('mail.exchange.shipment'))}</span> ${escapeHtml(carrierName)} ${escapeHtml(tracking)}</p>`,
-        label(t('mail.exchange.items')),
-        `<ul style="margin:0;padding-left:18px">${input.lines.map((l) => `<li style="margin:0 0 4px">${escapeHtml(lineText(l))}</li>`).join('')}</ul>`,
+        mailLead(lead),
+        mailRow(t('mail.order.orderNo'), input.orderNo),
+        mailRow(t('mail.exchange.shipment'), `${carrierName} ${tracking}`),
+        mailSectionLabel(t('mail.exchange.items')),
+        mailList(input.lines.map(lineText)),
         // 조회 주소가 없는 택배사(기타)면 주문 화면으로 — 거기에 송장이 적혀 있다
         trackUrl ? mailButton(trackUrl, t('mail.exchange.track')) : mailButton(orderUrl, t('mail.order.view')),
       ].join(''),
@@ -113,32 +110,33 @@ export async function notifyExchangeShipped(input: {
     const nameOf = new Map(items.map((i) => [i.id, i.productName]));
     const locale = localeOf(user.locale);
 
-    try {
-      const wording = await getMailWording('EXCHANGE_SHIPPED', locale);
-      await getMailer().send(exchangeShippedMail({
-        to: user.email,
-        name: user.name,
-        orderNo: input.orderNo,
+    await deliverNotice({
+      tag: 'exchange',
+      ref: input.orderNo,
+      mail: {
+        template: 'EXCHANGE_SHIPPED',
         locale,
-        carrier: input.carrier,
-        trackingNumber: input.trackingNumber,
-        lines: input.lines.map((l) => ({
-          productName: nameOf.get(l.orderItemId) ?? '',
-          fromOptionLabel: l.fromOptionLabel,
-          toOptionLabel: l.toOptionLabel,
-          quantity: l.quantity,
-        })),
-      }, wording));
-    } catch (error) {
-      console.error('[exchange] 교환 발송 메일 실패', input.orderNo, error);
-    }
-
-    // 메일과 함께 남긴다 — 메일은 스팸함으로 가기도 한다
-    await recordNotification({
-      userId: input.userId,
-      kind: 'EXCHANGE_SHIPPED',
-      params: { orderNo: input.orderNo },
-      linkPath: `/order/${input.orderNo}`,
+        build: (wording) => exchangeShippedMail({
+          to: user.email,
+          name: user.name,
+          orderNo: input.orderNo,
+          locale,
+          carrier: input.carrier,
+          trackingNumber: input.trackingNumber,
+          lines: input.lines.map((l) => ({
+            productName: nameOf.get(l.orderItemId) ?? '',
+            fromOptionLabel: l.fromOptionLabel,
+            toOptionLabel: l.toOptionLabel,
+            quantity: l.quantity,
+          })),
+        }, wording),
+      },
+      notification: {
+        userId: input.userId,
+        kind: 'EXCHANGE_SHIPPED',
+        params: { orderNo: input.orderNo },
+        linkPath: `/order/${input.orderNo}`,
+      },
     });
   } catch (error) {
     console.error('[exchange] 교환 발송 알림 실패', input.orderNo, error);

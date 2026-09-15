@@ -11,6 +11,7 @@ import {
 } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { TOPIC_KEY } from '~/lib/i18n/support';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 편집기는 **따로 받아 온다.**
@@ -149,8 +150,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
           : { headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
       });
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '저장하지 못했습니다.');
+        setError(await failureMessage(response, '저장하지 못했습니다.'));
         return false;
       }
       return true;

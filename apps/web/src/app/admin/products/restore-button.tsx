@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 보관함에서 되돌리기.
@@ -24,8 +25,7 @@ export function RestoreProductButton({ productId, productName }: { productId: st
         body: JSON.stringify({ action: 'RESTORE' }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? '되돌리지 못했습니다.');
+        setError(await failureMessage(response, '되돌리지 못했습니다.'));
         return;
       }
       router.replace('/admin/products?view=archived&restored=1');

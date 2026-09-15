@@ -7,15 +7,11 @@ import { getAdminPointAccount } from '~/lib/queries/admin/points';
 import { POINT_REASON_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { PointAdjustForm } from '~/components/admin/point-adjust-form';
+import { adminDate, adminTimestamp } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '회원 포인트' };
 export const dynamic = 'force-dynamic';
 
-const dateFormat = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  timeZone: 'Asia/Seoul',
-});
-const dayFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 const points = (n: number) => `${n.toLocaleString('ko-KR')}P`;
 
 /**
@@ -77,14 +73,14 @@ export default async function AdminUserPointsPage({ params }: { params: Promise<
                   {account.ledger.map((row) => (
                     <tr key={row.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
                       <td className="tnum px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
-                        <time dateTime={row.createdAt.toISOString()}>{dateFormat.format(row.createdAt)}</time>
+                        <time dateTime={row.createdAt.toISOString()}>{adminTimestamp.format(row.createdAt)}</time>
                       </td>
                       <td className="px-3 py-2.5 text-[13px]">
                         {t(POINT_REASON_KEY[row.reason])}
                         {row.note && <span className="block text-[11px] text-[var(--fg-muted)]">{row.note}</span>}
                         {row.amount > 0 && row.expiresAt && (
                           <span className="block text-[11px] text-[var(--fg-muted)]">
-                            <time dateTime={row.expiresAt.toISOString()}>{dayFormat.format(row.expiresAt)}</time> 소멸 예정
+                            <time dateTime={row.expiresAt.toISOString()}>{adminDate.format(row.expiresAt)}</time> 소멸 예정
                           </span>
                         )}
                       </td>

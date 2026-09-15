@@ -12,13 +12,10 @@ import { ReviewReplyForm } from '~/components/admin/review-reply-form';
 import { Pager } from '../pager';
 import { getT } from '~/lib/i18n/server';
 import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
+import { adminDateTime } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '리뷰 관리' };
 export const dynamic = 'force-dynamic';
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul',
-});
 
 const STATE_STYLE: Readonly<Record<ModerationState, string>> = {
   reported: 'bg-accent/12 text-accent',
@@ -192,7 +189,7 @@ export default async function AdminReviewsPage({
                     </span>
                     <span>{row.authorName}</span>
                     <time dateTime={row.createdAt.toISOString()}>
-                      {dateFormat.format(row.createdAt)}
+                      {adminDateTime.format(row.createdAt)}
                     </time>
                     {row.imageCount > 0 && <span>사진 {row.imageCount}장</span>}
                   </p>
@@ -218,7 +215,7 @@ export default async function AdminReviewsPage({
                                 dateTime={report.createdAt.toISOString()}
                                 className="text-[var(--fg-muted)]"
                               >
-                                {dateFormat.format(report.createdAt)}
+                                {adminDateTime.format(report.createdAt)}
                               </time>
                               {report.resolvedAt && (
                                 <span className="text-[var(--fg-muted)]">

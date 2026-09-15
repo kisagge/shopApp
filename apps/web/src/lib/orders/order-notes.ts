@@ -43,11 +43,12 @@ async function findOrder(actor: Actor, orderNo: string): Promise<{ id: string }>
  *
  * **보는 범위를 where 로 건다.** 읽어 놓고 거르면 어딘가에서 한 줄 빠뜨렸을 때 운영진 상담 메모가 가맹점 화면으로 샌다.
  */
-export async function listOrderNotes(actor: Actor, orderId: string): Promise<OrderNoteView[]> {
+export async function listOrderNotes(actor: Actor, orderNo: string): Promise<OrderNoteView[]> {
   const scope = orderNoteScope(actor);
   if (scope === undefined) return [];
   const rows = await prisma.orderNote.findMany({
-    where: { orderId, ...(scope ? { merchantId: scope } : {}) },
+    // 주문번호로 묻는다 — 주문 상세가 주문을 읽는 것과 나란히 부를 수 있게. 주문을 볼 수 있는지는 그 조회가 본다
+    where: { order: { orderNo }, ...(scope ? { merchantId: scope } : {}) },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     select: {
       id: true, body: true, createdAt: true, authorId: true, merchantId: true,

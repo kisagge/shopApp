@@ -6,13 +6,10 @@ import { InquiryAnswerForm } from '~/components/admin/inquiry-answer-form';
 import { Pager } from '../pager';
 import { getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
+import { adminDateTime } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '상품 문의' };
 export const dynamic = 'force-dynamic';
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul',
-});
 
 export default async function AdminInquiriesPage({
   searchParams,
@@ -111,7 +108,7 @@ export default async function AdminInquiriesPage({
                       {row.isPrivate && <span>🔒 비공개</span>}
                       <span>{row.authorName}</span>
                       <time dateTime={row.createdAt.toISOString()}>
-                        {dateFormat.format(row.createdAt)}
+                        {adminDateTime.format(row.createdAt)}
                       </time>
                     </p>
                   </div>
@@ -124,7 +121,7 @@ export default async function AdminInquiriesPage({
                         답변
                         {row.answeredAt && (
                           <time dateTime={row.answeredAt.toISOString()} className="ml-2 font-normal">
-                            {dateFormat.format(row.answeredAt)}
+                            {adminDateTime.format(row.answeredAt)}
                           </time>
                         )}
                       </p>

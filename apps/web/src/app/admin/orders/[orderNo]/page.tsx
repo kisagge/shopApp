@@ -28,11 +28,10 @@ export default async function AdminOrderDetail({
   params: Promise<{ orderNo: string }>;
 }) {
   const actor = await requireAdmin('order:read');
-  const t = await getT();
-  const { orderNo } = await params;
-  const order = await getAdminOrder(actor, orderNo);
+  const [t, { orderNo }] = await Promise.all([getT(), params]);
+  // 메모는 주문과 나란히 읽는다. 볼 수 없는 주문이면 아래에서 404 로 끝나 메모는 쓰이지 않는다
+  const [order, notes] = await Promise.all([getAdminOrder(actor, orderNo), listOrderNotes(actor, orderNo)]);
   if (!order) notFound();
-  const notes = await listOrderNotes(actor, order.id);
 
   /**
    * 송장 입력은 출고 권한이 있을 때만 보여 준다.

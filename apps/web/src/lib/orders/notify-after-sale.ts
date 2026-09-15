@@ -1,16 +1,16 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  afterSaleByOf, escapeHtml, mailButton, mailShell, recordsNotification, showsReason,
+  afterSaleByOf, escapeHtml, mailButton, mailLead, mailList, mailRow, mailSectionLabel, mailShell,
+  recordsNotification, showsReason,
   type AfterSaleBy, type AfterSaleKind, type MailMessage, type ReturnType,
 } from '@shop/core';
 import { formatMoney, formatNumber, type Locale, type MessageKey } from '@shop/i18n';
 import { createTranslator } from '@shop/i18n/all';
-import { getMailer } from '@shop/mail';
 import { CRON_ACTOR } from '~/lib/cron';
 import { localeOf } from '~/lib/mail/recipient';
-import { getMailWording, wordOf, type MailWording } from '~/lib/mail/templates';
-import { recordNotification } from '~/lib/notifications/record';
+import { wordOf, type MailWording } from '~/lib/mail/templates';
+import { deliverNotice } from '~/lib/notifications/deliver';
 import { absoluteUrl } from '~/lib/urls';
 
 export interface AfterSaleMoney {
@@ -90,13 +90,9 @@ export function afterSaleMail(input: AfterSaleMailInput, wording?: MailWording):
     html: mailShell({
       heading: wordOf(t, wording, 'heading', key('heading')),
       bodyHtml: [
-        `<p style="margin:0 0 20px">${escapeHtml(lead)}</p>`,
-        ...rows.map(([label, value]) =>
-          `<p style="margin:0 0 6px"><span style="color:#6f6a63">${escapeHtml(label)}</span> ${escapeHtml(value)}</p>`),
-        input.items.length
-          ? `<p style="margin:20px 0 6px;color:#6f6a63">${escapeHtml(t('mail.afterSale.items'))}</p>` +
-            `<ul style="margin:0;padding-left:18px">${input.items.map((i) => `<li style="margin:0 0 4px">${escapeHtml(itemLine(i))}</li>`).join('')}</ul>`
-          : '',
+        mailLead(lead),
+        ...rows.map(([label, value]) => mailRow(label, value)),
+        input.items.length ? mailSectionLabel(t('mail.afterSale.items')) + mailList(input.items.map(itemLine)) : '',
         next ? `<p style="margin:20px 0 0">${escapeHtml(next)}</p>` : '',
         mailButton(orderUrl, t('mail.order.view')),
       ].join(''),
@@ -156,31 +152,33 @@ export async function notifyAfterSale(input: {
       input.kind === 'RETURN_REJECTED' ? request?.rejectReason
         : by === 'system' ? createTranslator(locale)('mail.afterSale.holdExpired')
           : input.reason;
-    try {
-      const wording = await getMailWording(input.kind, locale);
-      await getMailer().send(afterSaleMail({
-        kind: input.kind,
-        to: order.user.email,
-        name: order.user.name,
-        orderNo: order.orderNo,
+    await deliverNotice({
+      tag: `after-sale:${input.kind}`,
+      ref: input.orderNo,
+      mail: {
+        template: input.kind,
         locale,
-        items,
-        reason: showsReason(input.kind, by) ? reason : null,
-        returnType: isReturn ? (request?.type as ReturnType | undefined) : undefined,
-        money: input.money,
-      }, wording));
-    } catch (error) {
-      console.error('[after-sale] 안내 메일 실패', input.kind, input.orderNo, error);
-    }
-
-    if (recordsNotification(by)) {
-      await recordNotification({
-        userId: order.userId,
-        kind: input.kind,
-        params: { orderNo: order.orderNo },
-        linkPath: `/order/${order.orderNo}`,
-      });
-    }
+        build: (wording) => afterSaleMail({
+          kind: input.kind,
+          to: order.user.email,
+          name: order.user.name,
+          orderNo: order.orderNo,
+          locale,
+          items,
+          reason: showsReason(input.kind, by) ? reason : null,
+          returnType: isReturn ? (request?.type as ReturnType | undefined) : undefined,
+          money: input.money,
+        }, wording),
+      },
+      notification: recordsNotification(by)
+        ? {
+            userId: order.userId,
+            kind: input.kind,
+            params: { orderNo: order.orderNo },
+            linkPath: `/order/${order.orderNo}`,
+          }
+        : null,
+    });
   } catch (error) {
     console.error('[after-sale] 알림 실패', input.kind, input.orderNo, error);
   }

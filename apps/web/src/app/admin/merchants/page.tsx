@@ -5,6 +5,7 @@ import type { MerchantStatusInput } from '@shop/contract';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchants } from '~/lib/queries/admin/merchants';
 import { MerchantStatusForm } from './status-form';
+import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '가맹점' };
 export const dynamic = 'force-dynamic';
@@ -12,8 +13,6 @@ export const dynamic = 'force-dynamic';
 const TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
   APPROVED: 'success', PENDING: 'info', SUSPENDED: 'danger', TERMINATED: 'neutral',
 };
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
 export default async function AdminMerchantsPage() {
   const actor = await requireAdmin('merchant:read');
@@ -114,7 +113,7 @@ export default async function AdminMerchantsPage() {
                         <span className="text-[12px] text-[var(--fg-muted)]">
                           {m.approvedAt ? (
                             <time dateTime={m.approvedAt.toISOString()}>
-                              {dateFormat.format(m.approvedAt)}
+                              {adminDate.format(m.approvedAt)}
                             </time>
                           ) : (
                             '미승인'

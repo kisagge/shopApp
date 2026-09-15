@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ANSWER_MAX_LENGTH } from '@shop/core';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 대기줄에서 바로 답한다.
@@ -37,8 +38,7 @@ export function InquiryAnswerForm({
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '등록하지 못했습니다.');
+        setError(await failureMessage(response, '등록하지 못했습니다.'));
         return;
       }
       router.refresh();

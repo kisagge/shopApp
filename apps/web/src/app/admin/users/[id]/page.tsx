@@ -10,14 +10,10 @@ import { GRADE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { SuspendForm } from '../suspend-form';
 import { suspendBlocked } from '../suspend-blocked';
+import { adminDate, adminTimestamp } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '회원 상세' };
 export const dynamic = 'force-dynamic';
-
-const dayFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
-const timeFormat = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul',
-});
 
 /** 가입 방식의 이름. better-auth 의 providerId 를 사람이 읽는 말로 */
 const SIGN_IN_LABEL: Readonly<Record<string, string>> = { credential: '이메일·비밀번호', google: '구글' };
@@ -45,7 +41,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     ['권한', USER_ROLE_LABEL[user.role]],
     ['소속 가맹점', user.merchantName ?? '—'],
     ['로그인 방식', user.signInMethods.length ? user.signInMethods.map((m) => SIGN_IN_LABEL[m] ?? m).join(', ') : '—'],
-    ['가입', <time key="joined" dateTime={user.createdAt.toISOString()}>{dayFormat.format(user.createdAt)}</time>],
+    ['가입', <time key="joined" dateTime={user.createdAt.toISOString()}>{adminDate.format(user.createdAt)}</time>],
   ];
 
   const activity: [string, number, string | undefined][] = [
@@ -82,12 +78,12 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           <p className="rounded-sm border border-accent bg-accent-soft px-4 py-3 text-[13px] leading-relaxed text-accent-hover">
             {user.closedAt ? (
               <>
-                <time dateTime={user.closedAt.toISOString()}>{dayFormat.format(user.closedAt)}</time>에 탈퇴한
+                <time dateTime={user.closedAt.toISOString()}>{adminDate.format(user.closedAt)}</time>에 탈퇴한
                 계정입니다. 주문 기록만 남아 있습니다.
               </>
             ) : (
               <>
-                <time dateTime={user.suspendedAt!.toISOString()}>{dayFormat.format(user.suspendedAt!)}</time>부터 이용이
+                <time dateTime={user.suspendedAt!.toISOString()}>{adminDate.format(user.suspendedAt!)}</time>부터 이용이
                 정지된 계정입니다 — 로그인과 주문이 막혀 있습니다. 사유: {user.suspendedReason ?? '—'}
               </>
             )}
@@ -140,7 +136,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                             <span className="block text-[11px] text-[var(--fg-muted)]">상품 {o.itemCount}줄</span>
                           </th>
                           <td className="tnum px-3 py-2.5 text-[12px] text-[var(--fg-secondary)]">
-                            <time dateTime={o.placedAt.toISOString()}>{dayFormat.format(o.placedAt)}</time>
+                            <time dateTime={o.placedAt.toISOString()}>{adminDate.format(o.placedAt)}</time>
                           </td>
                           <td className="px-3 py-2.5 text-center">
                             <Badge tone="neutral">{ORDER_STATUS_LABEL[o.status]}</Badge>
@@ -173,7 +169,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                         <span className="ml-2 text-[12px] text-[var(--fg-muted)]">{a.actorName}</span>
                       </span>
                       <time dateTime={a.createdAt.toISOString()} className="tnum text-[12px] text-[var(--fg-muted)]">
-                        {timeFormat.format(a.createdAt)}
+                        {adminTimestamp.format(a.createdAt)}
                       </time>
                     </li>
                   ))}

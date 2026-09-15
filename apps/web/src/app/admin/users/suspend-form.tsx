@@ -3,8 +3,8 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
+import { adminDate } from '~/lib/admin/date-format';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 회원 이용 정지·해제.
@@ -55,9 +55,8 @@ export function SuspendForm({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const data = (await response.json()) as { message?: string };
       if (!response.ok) {
-        setError(data.message ?? '처리하지 못했습니다.');
+        setError(await failureMessage(response, '처리하지 못했습니다.'));
         return;
       }
       setReason('');
@@ -81,7 +80,7 @@ export function SuspendForm({
         aria-label={`${userName} 정지 해제`}
       >
         <p className="text-[11px] text-[var(--fg-secondary)]">
-          <time dateTime={suspendedAt}>{dateFormat.format(new Date(suspendedAt))}</time> 정지
+          <time dateTime={suspendedAt}>{adminDate.format(new Date(suspendedAt))}</time> 정지
           {suspendedReason && <> · 사유: {suspendedReason}</>}
         </p>
         <div>

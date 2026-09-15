@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { saveResponseAsFile } from '~/lib/csv/save-download';
+import { failureMessage } from '~/lib/client/failure-message';
 
 export interface AuditExportFilter {
   readonly action?: string | undefined;
@@ -32,8 +33,7 @@ export function AuditExport({ filter }: { filter: AuditExportFilter }) {
     try {
       const response = await fetch(`/api/admin/audit/export?${query}`, { method: 'POST' });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? '내려받지 못했습니다.');
+        setError(await failureMessage(response, '내려받지 못했습니다.'));
         return;
       }
       await saveResponseAsFile(response, 'audit.csv');

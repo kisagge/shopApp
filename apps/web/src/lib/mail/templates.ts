@@ -79,7 +79,7 @@ export class MailTemplateError extends Error {
   }
 }
 
-export const FIELD_LABEL: Readonly<Record<MailTemplateField, string>> = { subject: '제목', heading: '머리말', lead: '첫 문장' };
+const FIELD_LABEL: Readonly<Record<MailTemplateField, string>> = { subject: '제목', heading: '머리말', lead: '첫 문장' };
 
 /** 칸마다 검사. 비운 칸(null)은 기본 문구라 보지 않는다 */
 export function checkMailWording(

@@ -7,6 +7,7 @@ import { formatMoney, formatNumber } from '@shop/i18n';
 import type { CancelItemsPreviewResponse } from '@shop/contract';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
+import { failureMessage } from '~/lib/client/failure-message';
 
 export interface CancelableItem {
   readonly id: string;
@@ -115,8 +116,7 @@ export function CancelItemsForm({
         body: JSON.stringify({ itemIds: picked, reason: reason.trim() || t('cancel.defaultReason') }),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? t('cancel.failed'));
+        setError(await failureMessage(res, t('cancel.failed')));
         return;
       }
       setDone(t('cancel.itemsDone', { count: formatNumber(locale, picked.length) }));

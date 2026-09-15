@@ -3,6 +3,8 @@
 import { useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ORDER_NOTE_MAX } from '@shop/core';
+import { adminTimestamp } from '~/lib/admin/date-format';
+import { failureMessage } from '~/lib/client/failure-message';
 
 export interface OrderNoteItem {
   readonly id: string;
@@ -13,10 +15,6 @@ export interface OrderNoteItem {
   readonly merchantName: string | null;
   readonly deletable: boolean;
 }
-
-const timeFormat = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul',
-});
 
 /**
  * 주문 내부 메모 — 목록과 남기기.
@@ -65,8 +63,7 @@ export function OrderNotes({
         body: JSON.stringify({ body }),
       });
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '메모를 남기지 못했습니다.');
+        setError(await failureMessage(response, '메모를 남기지 못했습니다.'));
         return;
       }
       setBody('');
@@ -86,8 +83,7 @@ export function OrderNotes({
     try {
       const response = await fetch(`/api/admin/orders/${encodeURIComponent(orderNo)}/notes/${id}`, { method: 'DELETE' });
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '메모를 지우지 못했습니다.');
+        setError(await failureMessage(response, '메모를 지우지 못했습니다.'));
         return;
       }
       setConfirmingId(null);
@@ -109,7 +105,7 @@ export function OrderNotes({
       ) : (
         <ol aria-label="메모 목록" className="flex flex-col divide-y divide-[var(--surface-2)]">
           {notes.map((n) => {
-            const when = timeFormat.format(new Date(n.createdAt));
+            const when = adminTimestamp.format(new Date(n.createdAt));
             return (
               <li key={n.id} className="flex flex-col gap-1.5 py-3 first:pt-0">
                 <p className="flex flex-wrap items-baseline gap-x-2 text-[12px] text-[var(--fg-muted)]">

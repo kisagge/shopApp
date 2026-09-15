@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 상품 보관.
@@ -35,8 +36,7 @@ export function ArchiveProductButton({ productId, unshipped }: { productId: stri
         body: JSON.stringify({ action: 'ARCHIVE' }),
       });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? '보관하지 못했습니다.');
+        setError(await failureMessage(response, '보관하지 못했습니다.'));
         return;
       }
       router.replace('/admin/products?view=archived&archived=1');

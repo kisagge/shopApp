@@ -63,6 +63,31 @@ export function mailShell(input: {
 }
 
 
+/**
+ * 본문 조각들 — 주문·교환·취소 메일이 같은 모양을 따로 적고 있어 여기로 모았다. **값은 여기서 이스케이프한다** — 부르는
+ * 쪽이 잊어도 가맹점이 적은 상품명이 마크업으로 실행되지 않게.
+ */
+
+/** 첫 문장. 아래 줄들과 한 칸 띄운다 */
+export function mailLead(text: string): string {
+  return `<p style="margin:0 0 20px">${escapeHtml(text)}</p>`;
+}
+
+/** 이름 = 값 한 줄. 메일 클라이언트가 표 레이아웃을 잘 다루지 못해 문단으로 쌓는다 */
+export function mailRow(label: string, value: string): string {
+  return `<p style="margin:0 0 6px"><span style="color:#6f6a63">${escapeHtml(label)}</span> ${escapeHtml(value)}</p>`;
+}
+
+/** 목록 위의 작은 제목 */
+export function mailSectionLabel(text: string): string {
+  return `<p style="margin:20px 0 6px;color:#6f6a63">${escapeHtml(text)}</p>`;
+}
+
+/** 줄 목록(상품 줄 등). 줄마다 이스케이프한다 */
+export function mailList(lines: readonly string[]): string {
+  return `<ul style="margin:0;padding-left:18px">${lines.map((l) => `<li style="margin:0 0 4px">${escapeHtml(l)}</li>`).join('')}</ul>`;
+}
+
 export function mailButton(url: string, label: string): string {
   return button(url, label);
 }

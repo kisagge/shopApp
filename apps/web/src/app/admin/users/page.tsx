@@ -9,6 +9,7 @@ import { RoleForm } from './role-form';
 import { SuspendForm } from './suspend-form';
 import { suspendBlocked } from './suspend-blocked';
 import { Pager } from '../pager';
+import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '회원' };
 export const dynamic = 'force-dynamic';
@@ -16,8 +17,6 @@ export const dynamic = 'force-dynamic';
 const TONE: Record<string, 'success' | 'info' | 'neutral'> = {
   SUPER_ADMIN: 'info', ADMIN: 'info', MERCHANT: 'success', CUSTOMER: 'neutral',
 };
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
 
 export default async function AdminUsersPage({
   searchParams,
@@ -112,7 +111,7 @@ export default async function AdminUsersPage({
                             // 행은 남으므로 목록에서 구분되지 않으면 살아 있는
                             // 계정으로 읽힌다
                             <span className="ml-1.5 text-[11px] text-[var(--fg-muted)]">
-                              · 탈퇴 {dateFormat.format(u.closedAt)}
+                              · 탈퇴 {adminDate.format(u.closedAt)}
                             </span>
                           )}
                           {u.suspendedAt && (
@@ -141,7 +140,7 @@ export default async function AdminUsersPage({
                         </Link>
                       </td>
                       <td className="px-4 py-3 text-[12px] text-[var(--fg-muted)]">
-                        <time dateTime={u.createdAt.toISOString()}>{dateFormat.format(u.createdAt)}</time>
+                        <time dateTime={u.createdAt.toISOString()}>{adminDate.format(u.createdAt)}</time>
                       </td>
                       {canSuspend && (
                         <td className="px-4 py-3">

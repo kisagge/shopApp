@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { INQUIRY_MAX_LENGTH, INQUIRY_TOPIC, type InquiryTopic } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { TOPIC_KEY } from '~/lib/i18n/support';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 고객센터 1:1 문의.
@@ -43,8 +44,7 @@ export function SupportAskForm() {
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? t('support.submit'));
+        setError(await failureMessage(response, t('support.submit')));
         return;
       }
 

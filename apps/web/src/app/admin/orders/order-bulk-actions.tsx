@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { BulkShipmentResult } from '@shop/contract';
 import { decodeUpload } from '~/lib/csv/decode-upload';
 import { saveResponseAsFile } from '~/lib/csv/save-download';
+import { failureMessage } from '~/lib/client/failure-message';
 
 export interface OrderExportFilter {
   readonly status?: string | undefined;
@@ -56,8 +57,7 @@ function ExportOrders({ filter }: { filter: OrderExportFilter }) {
     try {
       const response = await fetch(`/api/admin/orders/export?${query}`, { method: 'POST' });
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? '내려받지 못했습니다.');
+        setError(await failureMessage(response, '내려받지 못했습니다.'));
         return;
       }
       await saveResponseAsFile(response, 'orders.csv');

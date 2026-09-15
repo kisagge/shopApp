@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useT } from '~/lib/i18n/client';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 도움이 됐다고 누르는 버튼.
@@ -52,8 +53,7 @@ export function ReviewHelpful({
         method: next ? 'PUT' : 'DELETE',
       });
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? t('review.helpful'));
+        setError(await failureMessage(response, t('review.helpful')));
         return;
       }
       const data = (await response.json()) as { helpfulCount: number };

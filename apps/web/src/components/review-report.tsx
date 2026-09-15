@@ -5,6 +5,7 @@ import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import { REPORT_REASON, type ReportReason } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
 import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 리뷰 신고.
@@ -76,8 +77,7 @@ export function ReviewReport({
       });
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? t('review.reportFailed'));
+        setError(await failureMessage(response, t('review.reportFailed')));
         return;
       }
       setDone(true);

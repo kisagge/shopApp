@@ -69,3 +69,13 @@ describe('이용 정지 폼', () => {
     expect(screen.queryByRole('button')).toBeNull();
   });
 });
+
+describe('이용 정지 폼 — 서버가 JSON 이 아닌 오류를 줄 때', () => {
+  it('네트워크 오류가 아니라 처리 실패로 말한다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502</html>', { status: 502 }));
+    const user = userEvent.setup();
+    render(<SuspendForm userId="u-1" userName="김손님" suspendedAt="2026-09-01T00:00:00.000Z" suspendedReason="x" />);
+    await user.click(screen.getByRole('button', { name: /정지 해제/ }));
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('처리하지 못했습니다.'));
+  });
+});

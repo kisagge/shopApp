@@ -11,16 +11,12 @@ import { getAdminProducts } from '~/lib/queries/admin/products';
 import { Pager } from '../pager';
 import { StockBulkActions } from './stock-bulk-actions';
 import { RestoreProductButton } from './restore-button';
+import { adminTimestamp } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
 
 // 라벨은 core 하나만 본다. 여기 따로 적어 두었더니 상태를 더할 때 이쪽이 남았다.
-const dateFormat = new Intl.DateTimeFormat('ko-KR', {
-  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  timeZone: 'Asia/Seoul',
-});
-
 const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
   ACTIVE: 'success', SOLD_OUT: 'danger', PENDING_REVIEW: 'info',
   HIDDEN: 'neutral', DRAFT: 'neutral',
@@ -152,7 +148,7 @@ export default async function AdminProductsPage({
                             <Badge tone="neutral">{PRODUCT_STATUS_LABEL[p.status as ProductStatus] ?? p.status}</Badge>
                           </td>
                           <td className="tnum px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
-                            {p.archivedAt && <time dateTime={p.archivedAt.toISOString()}>{dateFormat.format(p.archivedAt)}</time>}
+                            {p.archivedAt && <time dateTime={p.archivedAt.toISOString()}>{adminTimestamp.format(p.archivedAt)}</time>}
                           </td>
                           <td className="px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
                             {p.archivedBy === 'MERCHANT' ? '가맹점' : '운영진'}

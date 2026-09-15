@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ANSWER_MAX_LENGTH } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 문의 한 건에 붙는 동작.
@@ -36,8 +37,7 @@ export function InquiryActions({
     try {
       const response = await fetch(url, init);
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? t('common.failed'));
+        setError(await failureMessage(response, t('common.failed')));
         return;
       }
       router.refresh();

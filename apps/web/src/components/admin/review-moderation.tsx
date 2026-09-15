@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { failureMessage } from '~/lib/client/failure-message';
 
 type Action = 'remove' | 'dismiss' | 'restore';
 
@@ -38,8 +39,7 @@ export function ReviewModeration({
       );
 
       if (!response.ok) {
-        const data = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(data.message ?? '처리하지 못했습니다.');
+        setError(await failureMessage(response, '처리하지 못했습니다.'));
         return;
       }
 

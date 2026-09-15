@@ -4,6 +4,7 @@ import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { decodeUpload } from '~/lib/csv/decode-upload';
 import { saveResponseAsFile } from '~/lib/csv/save-download';
+import { failureMessage } from '~/lib/client/failure-message';
 
 interface Failure {
   readonly sku: string;
@@ -45,8 +46,7 @@ export function StockBulkActions({ canWrite }: { canWrite: boolean }) {
     try {
       const response = await fetch('/api/admin/products/stock/export');
       if (!response.ok) {
-        const body = (await response.json().catch(() => ({}))) as { message?: string };
-        setError(body.message ?? '내려받지 못했습니다.');
+        setError(await failureMessage(response, '내려받지 못했습니다.'));
         return;
       }
       await saveResponseAsFile(response, 'stock.csv');

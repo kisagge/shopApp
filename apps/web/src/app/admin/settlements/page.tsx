@@ -8,15 +8,14 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getSettlements } from '~/lib/queries/admin/settlements';
 import { previewSettlements } from '~/lib/admin/close-settlement';
 import { CloseButton, PayButton } from './settlement-actions';
+import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '정산' };
 export const dynamic = 'force-dynamic';
 
-const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZone: 'Asia/Seoul' });
-
 /** 기간 끝은 다음 달 1일 00:00 이라 그대로 찍으면 하루 뒤로 보인다 */
 function endLabel(end: Date): string {
-  return dateFormat.format(new Date(end.getTime() - 1));
+  return adminDate.format(new Date(end.getTime() - 1));
 }
 
 export default async function SettlementsPage({
@@ -94,7 +93,7 @@ export default async function SettlementsPage({
                 <span className="tnum">{yearMonth}</span> 정산 초안
               </h2>
               <p className="text-xs text-[var(--fg-muted)]">
-                {dateFormat.format(period.start)} ~ {endLabel(period.end)} · 구매확정 기준
+                {adminDate.format(period.start)} ~ {endLabel(period.end)} · 구매확정 기준
                 {!closed && <span className="ml-2 text-warning">진행 중인 기간 — 확정할 수 없습니다</span>}
               </p>
             </div>
@@ -238,7 +237,7 @@ export default async function SettlementsPage({
                   {settlements.map((s) => (
                     <tr key={s.id} className="border-b border-[var(--surface-2)] last:border-0">
                       <td className="tnum py-3 text-xs">
-                        {dateFormat.format(s.periodStart)} ~ {endLabel(s.periodEnd)}
+                        {adminDate.format(s.periodStart)} ~ {endLabel(s.periodEnd)}
                       </td>
                       {!actor.merchantId && <td className="py-3 text-[13px]">{s.merchantName}</td>}
                       <td className="tnum py-3 text-right text-[13px]">{format(s.grossAmount)}</td>

@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { useT } from '~/lib/i18n/client';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 구매확정.
@@ -27,9 +28,8 @@ export function ConfirmPurchaseButton({ orderNo, points }: { orderNo: string; po
     setError(null);
     try {
       const response = await fetch(`/api/orders/${encodeURIComponent(orderNo)}/purchase-confirm`, { method: 'POST' });
-      const body = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
-        setError(body.message ?? t('purchase.failed'));
+        setError(await failureMessage(response, t('purchase.failed')));
         return;
       }
       router.replace(`/order/${encodeURIComponent(orderNo)}?confirmed=1`, { scroll: false });

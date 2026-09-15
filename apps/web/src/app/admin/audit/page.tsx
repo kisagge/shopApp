@@ -6,13 +6,10 @@ import { getAuditLogs, type AuditLogPage } from '~/lib/queries/audit-log';
 import { actionLabel as labelOf, targetLabel } from '~/lib/admin/audit-labels';
 import { AuditExport } from './audit-export';
 import { Pager } from '../pager';
+import { adminDateTime } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '감사 로그' };
 export const dynamic = 'force-dynamic';
-
-const dateFormat = new Intl.DateTimeFormat('ko-KR', {
-  dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Seoul',
-});
 
 function preview(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -188,7 +185,7 @@ export default async function AdminAuditPage({
                     <tr key={row.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
                       <td className="px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
                         <time dateTime={row.createdAt.toISOString()}>
-                          {dateFormat.format(row.createdAt)}
+                          {adminDateTime.format(row.createdAt)}
                         </time>
                       </td>
                       <td className="px-4 py-3">
