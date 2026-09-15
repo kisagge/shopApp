@@ -102,6 +102,8 @@ export interface AdminInquiryRow {
   readonly createdAt: Date;
   readonly answer: string | null;
   readonly answeredAt: Date | null;
+  /** 첨부한 사진 주소(1:1 문의) — 답할 사람은 봐야 한다 */
+  readonly imageUrls: readonly string[];
 }
 
 /**
@@ -161,6 +163,7 @@ export async function getAdminInquiries(
         topic: true,
         product: { select: { id: true, name: true } },
         author: { select: { name: true } },
+        images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
       },
     }),
     prisma.inquiry.count({ where: { ...scoped, answeredAt: null } }),
@@ -182,6 +185,7 @@ export async function getAdminInquiries(
       createdAt: row.createdAt,
       answer: row.answer,
       answeredAt: row.answeredAt,
+      imageUrls: row.images.map((i) => i.url),
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     pending,
@@ -198,6 +202,8 @@ export interface MyInquiryRow {
   readonly createdAt: Date;
   readonly answer: string | null;
   readonly answeredAt: Date | null;
+  /** 첨부한 사진 주소(1:1 문의) */
+  readonly imageUrls: readonly string[];
 }
 
 /**
@@ -222,6 +228,7 @@ export async function getMyInquiries(
       id: true, content: true, isPrivate: true, topic: true, createdAt: true,
       answer: true, answeredAt: true,
       product: { select: { name: true, slug: true } },
+      images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
     },
   });
 
@@ -239,6 +246,7 @@ export async function getMyInquiries(
       createdAt: row.createdAt,
       answer: row.answer,
       answeredAt: row.answeredAt,
+      imageUrls: row.images.map((i) => i.url),
     })),
     nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
   };

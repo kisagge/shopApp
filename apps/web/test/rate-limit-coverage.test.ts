@@ -178,6 +178,8 @@ describe('요청 제한이 붙은 자리', () => {
       'request.json()',
       'JSON.parse(raw)',
       'readBody(',
+      // 리뷰·문의가 함께 쓰는 본문 읽기(사진 multipart 포함)
+      'readJsonWithImages(',
       '.safeParse(',
       'new URL(request.url)',
       'prisma.',

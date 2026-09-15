@@ -35,6 +35,8 @@ export const MAX_IMAGES_PER_PRODUCT = 8;
  * 읽는 사람에게 도움이 되는 양은 늘지 않는다.
  */
 export const MAX_IMAGES_PER_REVIEW = 5;
+/** 1:1 문의 사진. 불량·오배송을 보여 주는 데는 몇 장이면 된다 — 많이 받으면 저장소만 찬다 */
+export const MAX_IMAGES_PER_INQUIRY = 3;
 
 const EXTENSION: Readonly<Record<ImageContentType, string>> = {
   'image/jpeg': 'jpg',
@@ -50,6 +52,7 @@ export const IMAGE_ERROR = [
   'EMPTY_FILE',
   'TOO_MANY_IMAGES',
   'TOO_MANY_REVIEW_IMAGES',
+  'TOO_MANY_INQUIRY_IMAGES',
   'ALT_REQUIRED',
 ] as const;
 export type ImageErrorCode = (typeof IMAGE_ERROR)[number];
@@ -61,6 +64,7 @@ export const IMAGE_ERROR_MESSAGE: Readonly<Record<ImageErrorCode, string>> = {
   EMPTY_FILE: '빈 파일입니다',
   TOO_MANY_IMAGES: `이미지는 상품당 ${MAX_IMAGES_PER_PRODUCT}장까지입니다`,
   TOO_MANY_REVIEW_IMAGES: `사진은 리뷰당 ${MAX_IMAGES_PER_REVIEW}장까지입니다`,
+  TOO_MANY_INQUIRY_IMAGES: `사진은 문의당 ${MAX_IMAGES_PER_INQUIRY}장까지입니다`,
   ALT_REQUIRED: '대체 텍스트를 입력해 주세요',
 };
 
@@ -165,6 +169,17 @@ export function reviewImageObjectKey(input: {
     throw new ImageError('CONTENT_MISMATCH');
   }
   return `reviews/${input.orderItemId}/${input.token}.${EXTENSION[input.contentType]}`;
+}
+
+/**
+ * 1:1 문의 사진의 저장 키. 쓴 사람 아래에 둔다 — 문의가 지워지거나 계정을 닫을 때 그 사람의 것을 한 번에 찾는다.
+ * 파일 이름은 쓰지 않는다(경로 탈출·덮어쓰기). 토큰은 추측할 수 없게 — 비공개 문의의 사진도 주소는 공개 저장소에 있다.
+ */
+export function inquiryImageObjectKey(input: { authorId: string; contentType: ImageContentType; token: string }): string {
+  if (!/^[A-Za-z0-9_-]{16,64}$/.test(input.token)) {
+    throw new ImageError('CONTENT_MISMATCH');
+  }
+  return `inquiries/${input.authorId}/${input.token}.${EXTENSION[input.contentType]}`;
 }
 
 /**

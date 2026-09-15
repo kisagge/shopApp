@@ -6,6 +6,7 @@ import {
   type Actor, type InquiryErrorCode,
 } from '@shop/core';
 import type { CreateInquiryInput, AnswerInquiryInput } from '@shop/contract';
+import type { UploadedImage } from '~/lib/images/upload-files';
 
 export class InquiryError extends Error {
   constructor(readonly code: InquiryErrorCode, readonly status = 400) {
@@ -21,7 +22,10 @@ export class InquiryError extends Error {
  * 다른 점이 바로 그것이다. 로그인만 요구한다: 익명으로 열면 누구에게
  * 답해야 하는지 알 수 없고, 답이 왔는지도 알려 줄 수 없다.
  */
-export async function createInquiry(userId: string, input: CreateInquiryInput) {
+export async function createInquiry(userId: string, input: CreateInquiryInput, images: readonly UploadedImage[] = []) {
+  // 상품 문의는 공개 Q&A 다 — 사진을 받으면 손님의 물건·집 사진이 상품 화면에 걸린다
+  if (images.length > 0 && input.productId != null) throw new InquiryError('IMAGES_SUPPORT_ONLY', 400);
+
   /*
    * 상품이 붙은 문의만 상품을 확인한다. 고객센터로 들어오는 물음(배송·환불
    * 같은 것)에는 상품이 없다 — 계약이 "상품이나 갈래 중 하나" 를 이미
@@ -43,6 +47,9 @@ export async function createInquiry(userId: string, input: CreateInquiryInput) {
       authorId: userId,
       content: input.content,
       isPrivate: input.isPrivate,
+      ...(images.length > 0
+        ? { images: { createMany: { data: images.map((img, i) => ({ url: img.url, storageKey: img.key, sortOrder: i })) } } }
+        : {}),
     },
     select: { id: true, content: true, isPrivate: true, createdAt: true },
   });

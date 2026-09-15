@@ -7,6 +7,7 @@ import { getMyInquiries } from '~/lib/queries/inquiries';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
 import { NO_INDEX } from '~/lib/no-index';
+import { InquiryPhotos } from '~/components/inquiry-photos';
 
 export const dynamic = 'force-dynamic';
 
@@ -78,6 +79,13 @@ export default async function MyInquiriesPage() {
                 </div>
 
                 <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{row.content}</p>
+
+                <InquiryPhotos
+                  urls={row.imageUrls}
+                  listLabel={t('support.photosAttached')}
+                  altOf={(index) => t('support.photoAlt', { index })}
+                  labelOf={(index) => t('support.photoOpen', { index })}
+                />
 
                 {row.answer && (
                   <div className="rounded-sm bg-[var(--surface)] p-4">

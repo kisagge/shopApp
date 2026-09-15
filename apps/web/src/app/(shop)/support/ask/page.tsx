@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { getT } from '~/lib/i18n/server';
 import { SupportAskForm } from '~/components/support-ask-form';
 import { NO_INDEX } from '~/lib/no-index';
+import { isStorageConfigured } from '~/lib/storage';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,8 @@ export default async function AskPage() {
 
       <div className="pt-8">
         {viewer ? (
-          <SupportAskForm />
+          // 저장소가 없는 배포에서는 사진 칸을 내밀지 않는다 — 고르고 보냈는데 실패하면 쓴 글까지 다시 써야 한다
+          <SupportAskForm photosEnabled={isStorageConfigured()} />
         ) : (
           /*
            * 익명으로 열지 않는다. 누구에게 답할지 알 수 없고, 답이 왔다고

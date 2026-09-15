@@ -7,6 +7,7 @@ import { Pager } from '../pager';
 import { getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
 import { adminDateTime } from '~/lib/admin/date-format';
+import { InquiryPhotos } from '~/components/inquiry-photos';
 
 export const metadata: Metadata = { title: '상품 문의' };
 export const dynamic = 'force-dynamic';
@@ -114,6 +115,13 @@ export default async function AdminInquiriesPage({
                   </div>
 
                   <p className="whitespace-pre-wrap text-[13px] leading-relaxed">{row.content}</p>
+
+                  <InquiryPhotos
+                    urls={row.imageUrls}
+                    listLabel="첨부 사진"
+                    altOf={(index) => `${row.authorName} 님의 문의 사진 ${index}`}
+                    labelOf={(index) => `첨부 사진 ${index} 새 탭으로 크게 보기`}
+                  />
 
                   {row.answer ? (
                     <div className="rounded-sm bg-[var(--surface)] p-4">

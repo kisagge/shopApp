@@ -1012,11 +1012,11 @@ model Coupon {
   issueLimit  Int?
   issuedCount Int  @default(0)
 
-  startsAt DateTime
-  endsAt   DateTime
-  isActive Boolean  @default(true)
+  startsAt     DateTime
+  endsAt       DateTime
+  isActive     Boolean  @default(true)
   /// 누구나 받아 갈 수 있는가 — 쿠폰 받기 화면과 대상 상품 화면에 받기 단추로 뜬다. 끄면 코드를 아는 사람과 운영 지급만
-  downloadable Boolean @default(false)
+  downloadable Boolean  @default(false)
 
   issued  UserCoupon[]
   targets CouponTarget[]
@@ -1219,6 +1219,21 @@ model ReviewImage {
 
   @@index([reviewId])
   @@map("review_images")
+}
+
+/// 1:1 문의 사진 — 불량·오배송은 글보다 사진이 빠르다. 쓴 사람과 답하는 사람만 본다.
+model InquiryImage {
+  id        String  @id @default(cuid())
+  inquiryId String
+  inquiry   Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+
+  url        String
+  /// 지울 대상. 공개 주소에서 되짚지 않는다(ReviewImage 와 같은 이유)
+  storageKey String
+  sortOrder  Int    @default(0)
+
+  @@index([inquiryId])
+  @@map("inquiry_images")
 }
 
 model ReviewReport {
@@ -1812,6 +1827,9 @@ model Inquiry {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
+
+  /// 첨부 사진 — 1:1 문의에만(상품 문의는 공개 Q&A 라 받지 않는다)
+  images InquiryImage[]
 
   /// 상품 화면의 목록
   @@index([productId, createdAt])
