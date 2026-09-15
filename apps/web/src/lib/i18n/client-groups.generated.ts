@@ -34,6 +34,7 @@ export const CLIENT_MESSAGE_GROUPS: readonly string[] = [
   'pointReason',
   'price',
   'product',
+  'purchase',
   'receipt',
   'recent',
   'repay',

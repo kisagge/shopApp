@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { AUTO_CONFIRM_DAYS, isAutoConfirmable } from '@shop/core';
-import { grantPurchaseReward } from './grant-reward';
+import { AUTO_CONFIRM_DAYS, OPEN_RETURN_STATUS, isAutoConfirmable } from '@shop/core';
+import { confirmDeliveredOrder } from './confirm-purchase';
 
 /**
  * 자동 구매확정.
@@ -48,7 +48,7 @@ export async function autoConfirmDelivered(
       deliveredAt: true, rewardPoints: true,
       // 처리 전인 반품 신청이 있으면 확정하지 않는다
       returnRequests: {
-        where: { status: { in: ['REQUESTED', 'APPROVED'] } },
+        where: { status: { in: [...OPEN_RETURN_STATUS] } },
         take: 1,
         select: { id: true },
       },
@@ -80,31 +80,9 @@ export async function autoConfirmDelivered(
      * 다시 잡힌다.
      */
     try {
-      const granted = await prisma.$transaction(async (tx) => {
-        // 조건부 UPDATE. 그 사이 사람이 확정했거나 반품이 접수됐으면 0건이다.
-        const { count } = await tx.order.updateMany({
-          where: { id: order.id, status: 'DELIVERED' },
-          data: { status: 'CONFIRMED', confirmedAt: now },
-        });
-        if (count === 0) return null;
-
-        await tx.orderItem.updateMany({
-          // 출고 전에 취소된 줄은 확정하지 않는다 — 취소로 남는다
-          where: { orderId: order.id, canceledAt: null },
-          data: { status: 'CONFIRMED' },
-        });
-        await tx.orderStatusLog.create({
-          data: {
-            orderId: order.id,
-            from: 'DELIVERED',
-            to: 'CONFIRMED',
-            actor: 'system',
-            note: `배송완료 ${days}일 경과로 자동 구매확정`,
-          },
-        });
-
-        return grantPurchaseReward(tx, order, now);
-      });
+      // 확정 한 번의 일(상태·줄·이력·적립)은 손님 확정과 같은 함수다
+      const granted = await prisma.$transaction((tx) =>
+        confirmDeliveredOrder(tx, order, { actor: 'system', note: `배송완료 ${days}일 경과로 자동 구매확정`, now }));
 
       if (granted === null) {
         skipped += 1;

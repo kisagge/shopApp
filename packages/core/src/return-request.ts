@@ -86,6 +86,11 @@ export const isReturnableLine = (line: { readonly status: OrderStatus; readonly 
 export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const;
 export type ReturnStatus = (typeof RETURN_STATUS)[number];
 
+/** 아직 끝나지 않은 신청 — 이것이 있으면 주문을 확정하지 않는다(손님 확정·자동 확정이 같은 목록을 본다) */
+export const OPEN_RETURN_STATUS = ['REQUESTED', 'APPROVED'] as const satisfies readonly ReturnStatus[];
+
+export const isOpenReturn = (status: string): boolean => (OPEN_RETURN_STATUS as readonly string[]).includes(status);
+
 /*
  * 이름표는 여기 없다.
  *

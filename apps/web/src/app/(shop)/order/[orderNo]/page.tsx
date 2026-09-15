@@ -5,13 +5,14 @@ import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
-  isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber,
+  isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber, canConfirmPurchase, isOpenReturn,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { CancelItemsForm } from '~/components/cancel-items-form';
 import { RepayButton } from '~/components/repay-button';
+import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
@@ -134,6 +135,10 @@ export default async function OrderPage({
     now: new Date(),
   });
   const returnableItems = order.items.filter(isReturnableLine);
+  const openReturn = activeReturn !== null && isOpenReturn(activeReturn.status);
+  const canConfirm = canConfirmPurchase({ status: order.status, hasOpenReturn: openReturn });
+  /** 방금 확정했는가 — 단추가 사라지므로 결과는 이 화면이 남긴다(confirm-purchase-button) */
+  const justConfirmed = query['confirmed'] === '1' && order.status === 'CONFIRMED';
   // 폼을 띄울 때만 읽는다 — 교환으로 바꿀 수 있는 옵션(같은 상품·같은 가격·재고)
   const exchangeOptions = showReturnForm ? await getExchangeOptions(returnableItems) : {};
 
@@ -174,6 +179,14 @@ export default async function OrderPage({
           `role="alert"` 은 결제 화면에서 실패해 막 넘어온 경우에만 쓴다 —
           나중에 주문 내역에서 다시 들어온 사람에게는 새로 난 일이 아니다.
         */}
+        {justConfirmed && (
+          <p role="status" className="max-w-[420px] rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+            {order.rewardPoints > 0
+              ? t('purchase.confirmed', { points: formatNumber(locale, order.rewardPoints) })
+              : t('purchase.confirmedNoPoints')}
+          </p>
+        )}
+
         {repayable && (
           <p
             {...(paymentFailed ? { role: 'alert' as const } : { role: 'status' as const })}
@@ -398,6 +411,9 @@ export default async function OrderPage({
         )}
         {isCancellableByCustomer(order.status) && (
           <CancelOrderButton orderNo={order.orderNo} />
+        )}
+        {canConfirm && (
+          <ConfirmPurchaseButton orderNo={order.orderNo} points={formatNumber(locale, order.rewardPoints)} />
         )}
         {showReturnForm && (
           <ReturnRequestForm

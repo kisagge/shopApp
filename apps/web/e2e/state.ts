@@ -42,6 +42,8 @@ export const STATE_FILE = {
   wishlistRestock: 'test-results/.auth/wishlist-restock.json',
   /** 받은 상품을 다른 옵션으로 교환한다 — exchange */
   exchanger: 'test-results/.auth/exchange.json',
+  /** 받은 주문을 스스로 구매확정한다 — purchase-confirm */
+  purchaseConfirmer: 'test-results/.auth/purchase-confirm.json',
 } as const;
 
 /**
@@ -94,6 +96,8 @@ export const RACE_PRODUCT = {
    * 옵션이 여럿이고 추가금이 없는(같은 값) 자사 브랜드 상품이다.
    */
   exchange: 'cotton-field-jacket',
+  /** 사서 받고 구매확정한다 — purchase-confirm. 재고 하나를 물고 돌려주지 않으므로 옵션과 재고가 넉넉한 자사 브랜드 상품이다 */
+  purchaseConfirm: 'canvas-low-sneakers',
 } as const;
 
 export const REVIEW_PRODUCT = {

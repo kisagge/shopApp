@@ -80,6 +80,9 @@ export const SEED_ACCOUNT = {
   /** 받은 상품을 다른 사이즈로 교환한다 — exchange */
   exchanger: 'exchange@plain.test',
 
+  /** 받은 주문을 스스로 구매확정한다 — purchase-confirm */
+  purchaseConfirmer: 'purchase-confirm@plain.test',
+
   /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *
@@ -94,4 +97,5 @@ export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
   'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
+  'purchaseConfirmer',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

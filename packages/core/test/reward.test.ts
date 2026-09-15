@@ -63,3 +63,14 @@ describe('지급액', () => {
     expect(rewardToGrant(-100)).toBe(0);
   });
 });
+
+describe('canConfirmPurchase — 손님이 직접 확정', () => {
+  it('배송완료이고 처리 전 반품이 없으면 기한을 기다리지 않고 확정할 수 있다', async () => {
+    const { canConfirmPurchase } = await import('../src');
+    expect(canConfirmPurchase({ status: 'DELIVERED', hasOpenReturn: false })).toBe(true);
+    expect(canConfirmPurchase({ status: 'DELIVERED', hasOpenReturn: true })).toBe(false);
+    for (const status of ['SHIPPED', 'CONFIRMED', 'RETURN_REQUESTED', 'PAID']) {
+      expect(canConfirmPurchase({ status, hasOpenReturn: false }), status).toBe(false);
+    }
+  });
+});

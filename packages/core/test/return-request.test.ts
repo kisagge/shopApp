@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shippingBorneBy, returnWindowDays, checkReturnEligibility, canRequestReturn,
-  availableReturnReasons,
+  availableReturnReasons, isOpenReturn,
   RETURN_REASON,
 } from '../src/return-request';
 
@@ -174,5 +174,14 @@ describe('고를 수 있는 사유', () => {
         ).toMatchObject({ ok: true });
       }
     }
+  });
+});
+
+describe('isOpenReturn', () => {
+  it('요청·승인은 진행 중이고, 반려·완료는 끝났다', () => {
+    expect(isOpenReturn('REQUESTED')).toBe(true);
+    expect(isOpenReturn('APPROVED')).toBe(true);
+    expect(isOpenReturn('REJECTED')).toBe(false);
+    expect(isOpenReturn('COMPLETED')).toBe(false);
   });
 });

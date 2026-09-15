@@ -57,6 +57,16 @@ export function isAutoConfirmable(input: {
 }
 
 /**
+ * 손님이 직접 구매확정할 수 있는가.
+ *
+ * 자동 확정과 조건이 같되 **기한을 기다리지 않는다** — 받아 보고 마음에 들었으면 적립을 며칠 기다릴 이유가 없다.
+ * 배송완료여야 하고(상태 규칙상 확정은 배송완료에서만 간다), 처리 전인 반품 신청이 없어야 한다.
+ */
+export function canConfirmPurchase(input: { readonly status: string; readonly hasOpenReturn: boolean }): boolean {
+  return input.status === 'DELIVERED' && !input.hasOpenReturn;
+}
+
+/**
  * 실제로 지급할 적립 포인트.
  *
  * **주문에 저장해 둔 값을 쓴다.** 주문 당시의 등급과 금액으로 계산해
