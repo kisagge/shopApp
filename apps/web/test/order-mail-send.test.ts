@@ -20,6 +20,9 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  // 알림함에도 남는다 — 흉내에 이 표가 없으면 기록이 조용히 삼켜진다(record 가 삼킨다)
+  notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 1 })) },
+  notificationTemplate: { findMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve([])) },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -33,7 +36,7 @@ const order = (over: Record<string, unknown> = {}) => ({
   address1: '110 Sejong-daero', address2: null,
   items: [{ quantity: 2, productName: 'Wool coat', optionLabel: 'M / Black', unitPrice: 144_500 }],
   payment: { id: 'p-1', status: 'READY', pgPaymentKey: null },
-  user: { email: 'demo@plain.test', name: 'Demo' },
+  user: { id: 'u-1', email: 'demo@plain.test', name: 'Demo' },
   ...over,
 });
 
@@ -50,6 +53,9 @@ const gateway = (over: Partial<PaymentGateway> = {}): PaymentGateway => ({
 });
 
 const sent = () => send.mock.calls[0]![0] as { to: string; subject: string; text: string };
+const noticed = () => db.notification.createMany.mock.calls[0]?.[0]?.data as
+  | { userId: string; kind: string; params: Record<string, string>; linkPath: string | null }[]
+  | undefined;
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -109,5 +115,63 @@ describe('결제가 확정되면 안내가 나간다', () => {
 
     await expect(confirm(gw)).rejects.toThrow();
     expect(send).not.toHaveBeenCalled();
+  });
+});
+
+describe('알림함에도 남는다', () => {
+  /*
+   * **한동안 메일로만 나갔다.** 배송·취소·환불·반품은 전부 알림함에도 남는데, 가장
+   * 많이 오가고 가장 마음 졸이며 확인하는 세 가지가 빠져 있었다 — 알림함을 만든
+   * 이유가 "메일은 스팸함으로 가기도 한다" 인데 정작 돈이 오가는 자리에 그 대비가 없었다.
+   */
+  const virtualGateway = () =>
+    gateway({
+      confirm: vi.fn<(...a: any[]) => any>(async ({ amount }) => ({
+        paymentKey: 'pk_1', approvalNo: null, method: 'VIRTUAL_ACCOUNT' as const,
+        status: 'WAITING_FOR_DEPOSIT' as const, amount: won(amount), approvedAt: null,
+        virtualAccount: { bank: '국민', accountNumber: '12345678901234', dueDate: null },
+        raw: {},
+      })),
+    });
+
+  it('결제가 끝나면 주문한 사람의 알림함에 남는다', async () => {
+    await confirm(gateway());
+
+    expect(noticed()).toEqual([
+      expect.objectContaining({ userId: 'u-1', kind: 'ORDER_PAID' }),
+    ]);
+  });
+
+  it('가상계좌는 계좌가 적힌 주문 화면으로 데려간다', async () => {
+    /*
+     * 이 알림의 값은 여기에 있다 — 메일을 놓친 사람이 어디로 입금할지 찾는 길이다.
+     * 주문 화면에 계좌가 적혀 있다(order/[orderNo] 의 입금할 곳).
+     */
+    await confirm(virtualGateway());
+
+    expect(noticed()?.[0]).toMatchObject({
+      kind: 'ORDER_PENDING',
+      params: { orderNo: '20260906-1234567' },
+      linkPath: '/order/20260906-1234567',
+    });
+  });
+
+  it('메일이 실패해도 알림함에는 남는다 — 그러라고 있는 자리다', async () => {
+    send.mockRejectedValueOnce(new Error('메일 서버 장애'));
+
+    await confirm(gateway());
+
+    expect(noticed()).toHaveLength(1);
+  });
+
+  it('승인이 실패하면 알림도 남기지 않는다', async () => {
+    const gw = gateway({
+      confirm: vi.fn<(...a: any[]) => any>(async () => {
+        throw new Error('PG 거절');
+      }),
+    });
+
+    await expect(confirm(gw)).rejects.toThrow();
+    expect(db.notification.createMany).not.toHaveBeenCalled();
   });
 });

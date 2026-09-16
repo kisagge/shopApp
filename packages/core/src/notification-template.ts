@@ -12,6 +12,9 @@ import type { NotificationKind } from './notification';
  * 종류마다 알림에 실리는 값 — 알림을 남기는 코드가 넣는 것과 같아야 한다(검사가 소스를 읽어 맞춘다).
  */
 export const NOTIFICATION_PARAMS = {
+  ORDER_PAID: ['orderNo'],
+  ORDER_PENDING: ['orderNo'],
+  ORDER_DEPOSITED: ['orderNo'],
   ORDER_SHIPPED: ['orderNo'],
   ORDER_DELIVERED: ['orderNo'],
   INQUIRY_ANSWERED: ['productName'],

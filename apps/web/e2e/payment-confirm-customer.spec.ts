@@ -132,6 +132,18 @@ test('가상계좌는 결제완료가 아니라 입금대기다', async ({ page 
   // 옮겨 적을 번호가 실제로 있어야 한다 — 이름표만 있고 값이 비면 소용없다
   await expect(deposit).toContainText(/\d{4}/);
 
+  /*
+   * **알림함에도 남는가.** 이 셋만 한동안 메일로만 나갔다 — 알림함을 만든 이유가
+   * "메일은 스팸함으로 가기도 한다" 인데 정작 돈이 오가는 자리에 그 대비가 없었다.
+   * 가상계좌가 특히 그랬다: 그 메일을 놓치면 어디로 입금할지 알 길이 없었다.
+   */
+  await page.goto('/mypage/notifications');
+  await ready(page);
+  const notice = page.getByRole('link', { name: new RegExp(orderNo) });
+  await expect(notice, '주문 알림이 알림함에 없다').toBeVisible();
+  // 눌러서 가는 곳에 계좌가 있어야 이 알림이 쓸모가 있다
+  await expect(notice).toHaveAttribute('href', `/order/${orderNo}`);
+
   await undo(page, orderNo);
 });
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { afterResponse } from '~/lib/api/after-response';
-import { sendOrderMail, orderLocale, shipToLine } from '~/lib/orders/notify';
+import { deliverOrderNotice, orderLocale, shipToLine } from '~/lib/orders/notify';
 import {
   assertPaymentAmount, isPaidStatus, transition, won,
   PaymentError, type PaymentGateway, type Won,
@@ -51,7 +51,8 @@ export async function confirmPayment(
       locale: true, recipient: true, postalCode: true, address1: true, address2: true,
       items: { select: { quantity: true, productName: true, optionLabel: true, unitPrice: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true } },
-      user: { select: { email: true, name: true } },
+      // id 를 함께 읽는다 — 알림함에 남기려면 누구의 것인지 알아야 한다
+          user: { select: { id: true, email: true, name: true } },
     },
   });
   if (!order) throw new ConfirmError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
@@ -187,7 +188,8 @@ export async function confirmPayment(
      *
      * 던지지 않는다. 여기서 실패한다고 승인된 결제를 되돌릴 수는 없다.
      */
-    await sendOrderMail(paid ? 'paid' : 'pending', {
+    await deliverOrderNotice(paid ? 'paid' : 'pending', {
+      userId: order.user.id,
       to: order.user.email,
       buyerName: order.user.name,
       orderNo: order.orderNo,

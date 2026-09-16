@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AFTER_SALE_KIND, NOTIFICATION_KIND, NOTIFICATION_PARAMS, type Actor } from '@shop/core';
 import { LOCALES, translatorFor } from '@shop/i18n';
@@ -152,12 +152,23 @@ describe('표가 코드와 맞는다', () => {
         if (!/\bkind:/.test(line)) return;
         const literal = [...line.matchAll(/'([A-Z_]+)'/g)].map((m) => m[1]!).filter((k) => (NOTIFICATION_KIND as readonly string[]).includes(k));
         /*
-         * 취소·반품·환불 알림은 한 함수가 종류를 받아 남긴다(notify-after-sale) — 글자로 적힌 종류가 없다. 그 파일의
-         * `kind: input.kind` 는 AfterSaleKind 넷 모두를 싣는 것으로 센다. 넷의 값 목록이 같다는 것은 core 검사가 본다.
+         * **한 함수가 종류를 받아 남기는 자리가 둘 있다.** 거기에는 글자로 적힌 종류가 없다.
+         *
+         * · notify-after-sale: `kind: input.kind` — AfterSaleKind 넷 모두를 싣는 것으로 센다.
+         * · orders/notify: `kind: ORDER_NOTIFICATION_KIND[kind]` — 주문 접수·가상계좌·입금 확인 셋.
+         *
+         * 묶어서 세는 것이 맞는 이유는 **그 종류들의 값 목록이 서로 같기** 때문이다(셋 다 orderNo
+         * 하나). 갈라져야 할 만큼 달라지면 종류마다 따로 적게 되고, 그때는 이 예외가 필요 없어진다.
+         * 목록이 같다는 것 자체는 core 검사가 본다.
          */
-        const kinds = literal.length === 0 && /kind:\s*input\.kind\b/.test(line) && file.endsWith('notify-after-sale.ts')
-          ? [...AFTER_SALE_KIND]
-          : literal;
+        const byMap: Readonly<Record<string, readonly string[]>> = {
+          'notify-after-sale.ts': AFTER_SALE_KIND,
+          'notify.ts': ['ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED'],
+        };
+        const mapped = literal.length === 0 && /kind:\s*(input\.kind|ORDER_NOTIFICATION_KIND\[)/.test(line)
+          ? byMap[basename(file)] ?? []
+          : [];
+        const kinds = mapped.length > 0 ? [...mapped] : literal;
         if (kinds.length === 0) return;
         const near = lines.slice(i, i + 8).join('\n');
         const params = /params:\s*\{([\s\S]*?)\}/.exec(near);

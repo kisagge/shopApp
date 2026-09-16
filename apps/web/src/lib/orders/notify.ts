@@ -6,10 +6,10 @@ import {
   formatMoney, formatDateTime, isLocale, DEFAULT_LOCALE, type Locale,
 } from '@shop/i18n';
 import { createTranslator } from '@shop/i18n/all';
-import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
-import { getMailWording, wordOf, type MailWording } from '~/lib/mail/templates';
-import type { MailTemplateKind } from '@shop/core';
+import { wordOf, type MailWording } from '~/lib/mail/templates';
+import { deliverNotice } from '~/lib/notifications/deliver';
+import type { MailTemplateKind, NotificationKind } from '@shop/core';
 
 /**
  * 주문 안내 메일.
@@ -125,23 +125,47 @@ export function orderMail(kind: Kind, input: OrderMailInput, wording?: MailWordi
   };
 }
 
+/** 주문 메일 종류와 알림 종류 */
+const ORDER_NOTIFICATION_KIND: Readonly<Record<Kind, NotificationKind>> = {
+  paid: 'ORDER_PAID',
+  pending: 'ORDER_PENDING',
+  deposited: 'ORDER_DEPOSITED',
+};
+
 /**
- * 보낸다.
+ * 알린다 — 메일과 알림함 둘 다.
  *
- * **실패해도 던지지 않는다.** 결제는 이미 성립했고 주문도 만들어졌다 —
- * 안내 메일이 안 나갔다고 그것을 되돌릴 수는 없다. 재입고 알림과 같은
- * 판단이다. 대신 무엇이 못 나갔는지는 반드시 로그에 남긴다.
+ * **한동안 메일로만 나갔다.** 배송·취소·환불·반품은 전부 알림함에도 남는데, 가장
+ * 많이 오가고 가장 마음 졸이며 확인하는 세 가지가 빠져 있었다. 알림함을 만든 이유가
+ * "메일은 놓치기 쉽고 스팸함으로 가기도 한다"(deliver.ts) 인데, 정작 돈이 오가는
+ * 자리에는 그 대비가 없었다.
+ *
+ * 가상계좌(pending)가 특히 그랬다. 그 메일을 놓치면 어디로 입금할지 알 길이 없었다 —
+ * 이제 알림을 누르면 계좌가 적힌 주문 화면으로 간다.
+ *
+ * **실패해도 던지지 않는다.** 결제는 이미 성립했고 주문도 만들어졌다 — 안내가 안
+ * 나갔다고 그것을 되돌릴 수는 없다. 메일이 실패해도 알림함에는 남는다(deliver).
  */
-export async function sendOrderMail(kind: Kind, input: OrderMailInput): Promise<void> {
-  try {
-    // 운영이 고친 문구 — 못 읽으면 기본 문구(getMailWording 이 삼킨다)
-    const wording = await getMailWording(ORDER_MAIL_TEMPLATE[kind], input.locale);
-    await getMailer().send(orderMail(kind, input, wording));
-  } catch (error) {
-    console.error('[order] 안내 메일 발송 실패', {
-      kind, orderNo: input.orderNo, to: input.to,
-    }, error);
-  }
+export async function deliverOrderNotice(
+  kind: Kind,
+  input: OrderMailInput & { readonly userId: string },
+): Promise<void> {
+  await deliverNotice({
+    mail: {
+      template: ORDER_MAIL_TEMPLATE[kind],
+      locale: input.locale,
+      build: (wording) => orderMail(kind, input, wording),
+    },
+    notification: {
+      userId: input.userId,
+      kind: ORDER_NOTIFICATION_KIND[kind],
+      params: { orderNo: input.orderNo },
+      // 눌렀을 때 가는 곳. 가상계좌라면 거기 계좌가 적혀 있다.
+      linkPath: `/order/${input.orderNo}`,
+    },
+    tag: 'order',
+    ref: input.orderNo,
+  });
 }
 
 /**

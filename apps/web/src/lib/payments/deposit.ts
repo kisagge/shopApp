@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { isPaidStatus, transition, type PaymentGateway } from '@shop/core';
-import { sendOrderMail, orderLocale, shipToLine } from '~/lib/orders/notify';
+import { deliverOrderNotice, orderLocale, shipToLine } from '~/lib/orders/notify';
 import { getPaymentGateway } from './index';
 import { recordServerEvent } from '~/lib/analytics/server';
 
@@ -44,7 +44,8 @@ export async function applyDeposit(
           locale: true, payable: true, recipient: true, postalCode: true,
           address1: true, address2: true,
           items: { select: { productName: true, optionLabel: true, quantity: true, unitPrice: true } },
-          user: { select: { email: true, name: true } },
+          // id 를 함께 읽는다 — 알림함에 남기려면 누구의 것인지 알아야 한다
+          user: { select: { id: true, email: true, name: true } },
         },
       },
     },
@@ -145,7 +146,8 @@ export async function applyDeposit(
 
   // 입금이 확인된 순간이 이 주문의 결제가 성립한 순간이다.
   // 그때의 말을 알 길이 여기에는 없으므로 주문이 들고 있던 값을 쓴다.
-  await sendOrderMail('deposited', {
+  await deliverOrderNotice('deposited', {
+    userId: payment.order.user.id,
     to: payment.order.user.email,
     buyerName: payment.order.user.name,
     orderNo: payment.order.orderNo,

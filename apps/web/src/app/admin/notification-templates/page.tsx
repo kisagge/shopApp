@@ -15,6 +15,9 @@ export const dynamic = 'force-dynamic';
 
 /** 운영자가 알아보는 이름 — 코드 이름(ORDER_SHIPPED)은 옆에 작게 둔다 */
 const KIND_LABEL: Record<NotificationKind, string> = {
+  ORDER_PAID: '주문 접수',
+  ORDER_PENDING: '가상계좌 발급',
+  ORDER_DEPOSITED: '입금 확인',
   ORDER_SHIPPED: '출고',
   ORDER_DELIVERED: '배송 완료',
   INQUIRY_ANSWERED: '문의 답변',

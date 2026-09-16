@@ -7,6 +7,20 @@
  */
 
 export const NOTIFICATION_KIND = [
+  /**
+   * 주문이 접수됐다 / 입금 계좌를 받았다 / 입금이 확인됐다.
+   *
+   * **이 셋만 메일로만 나가고 있었다.** 배송·취소·환불·반품은 전부 알림함에도
+   * 남는데, 가장 많이 오가고 가장 마음 졸이며 확인하는 세 가지가 빠져 있었다 —
+   * 알림함을 만든 이유가 "메일은 스팸함으로 가기도 한다"(deliver.ts)인데, 정작
+   * 돈이 오가는 자리에는 그 대비가 없었던 것이다.
+   *
+   * 가상계좌(ORDER_PENDING)가 특히 그렇다. 그 메일을 놓치면 어디로 입금할지
+   * 알 길이 없었다 — 알림을 누르면 계좌가 적힌 주문 화면으로 간다.
+   */
+  'ORDER_PAID',
+  'ORDER_PENDING',
+  'ORDER_DEPOSITED',
   'ORDER_SHIPPED',
   'ORDER_DELIVERED',
   'INQUIRY_ANSWERED',
