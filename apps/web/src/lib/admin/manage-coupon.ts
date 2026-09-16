@@ -6,7 +6,7 @@ import {
   type Actor, type CouponStatus,
 } from '@shop/core';
 import type { CreateCouponInput, UpdateCouponInput } from '@shop/contract';
-import { recordNotifications } from '~/lib/notifications/record';
+import { recordNotifications, type NoticeInput } from '~/lib/notifications/record';
 
 /**
  * 쿠폰 발행과 발급.
@@ -412,11 +412,17 @@ export async function issueCouponToUsers(
    */
   if (summary.issued > 0) {
     await recordNotifications(
-      summary.granted.map((userId) => ({
+      /*
+       * **돌려주는 타입을 적어 둔다.** 이게 없으면 map 이 타입을 스스로
+       * 지어내고, 그 배열을 NoticeInput[] 로 넘기는 것은 초과 속성 검사가
+       * 걸리지 않는 그냥 부분형 검사가 된다 — 실제로 `href` 라고 적힌 채
+       * 통과했고, 쿠폰 알림만 갈 곳 없이 쌓였다.
+       */
+      summary.granted.map((userId): NoticeInput => ({
         userId,
-        kind: 'COUPON_ISSUED' as const,
+        kind: 'COUPON_ISSUED',
         params: { couponName: coupon.name },
-        href: '/mypage/coupons',
+        linkPath: '/mypage/coupons',
       })),
     );
   }

@@ -7,7 +7,7 @@ import { getMailWording, type MailWording } from '~/lib/mail/templates';
 import { localeOf } from '~/lib/mail/recipient';
 import { getMailer } from '@shop/mail';
 import { absoluteUrl } from '~/lib/urls';
-import { recordNotifications } from '~/lib/notifications/record';
+import { recordNotifications, type NoticeInput } from '~/lib/notifications/record';
 
 /**
  * 재입고 알림.
@@ -214,9 +214,10 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
    * 다시 들어온 사람이 무슨 일이 있었는지 볼 자리가 있어야 한다.
    */
   await recordNotifications(
-    notices.map((n) => ({
+    // 돌려주는 타입을 적는다 — 안 적으면 오타 난 칸이 조용히 통과한다(쿠폰에서 겪었다)
+    notices.map((n): NoticeInput => ({
       userId: n.userId,
-      kind: 'RESTOCKED' as const,
+      kind: 'RESTOCKED',
       params: { productName: n.productName, optionLabel: n.optionLabel },
       linkPath: `/product/${n.productSlug}`,
     })),
