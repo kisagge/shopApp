@@ -88,6 +88,18 @@ describe('보내기', () => {
     expect(screen.getByRole('button', { name: '저장' })).toBeDisabled();
   });
 
+  it('사진을 붙여 들어온 적립금은 결과 문구까지 따라간다', async () => {
+    // 말없이 들어오면 잔액이 왜 늘었는지 모른다. 결과를 말하는 곳은 목록 화면이다
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValue(Response.json({ id: 'r-1', earnedPoints: 400 }));
+    render(<ReviewEditForm review={review()} />);
+    await user.click(screen.getByRole('button', { name: '저장' }));
+
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith('/mypage/reviews?edited=1&earned=400', { scroll: false }),
+    );
+  });
+
   it('창구가 거절하면 그 이유를 그대로 말하고 머문다', async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValue(Response.json({ message: '자기 리뷰만 고칠 수 있습니다' }, { status: 403 }));

@@ -79,3 +79,39 @@ export function canConfirmPurchase(input: { readonly status: string; readonly ha
 export function rewardToGrant(orderRewardPoints: number): number {
   return orderRewardPoints > 0 ? orderRewardPoints : 0;
 }
+
+/**
+ * 리뷰 적립.
+ *
+ * **사진 있는 후기가 훨씬 쓸모 있다.** 색이 화면과 얼마나 다른지, 소재가 어떻게 떨어지는지는 글로 적기 어렵고 대개 안 적는다.
+ * 그래서 값을 다르게 둔다 — 같은 값을 주면 사진을 붙일 이유가 없다.
+ *
+ * 금액은 구매 적립과 달리 **정액**이다. 산 금액에 비례하면 비싼 물건의 후기만 값어치가 있는 셈이 되는데, 후기의 쓸모는
+ * 가격이 아니라 내용에서 나온다.
+ */
+export const REVIEW_REWARD = {
+  text: 100,
+  photo: 500,
+} as const;
+
+export function reviewReward(hasPhoto: boolean): number {
+  return hasPhoto ? REVIEW_REWARD.photo : REVIEW_REWARD.text;
+}
+
+/**
+ * 지금 줄 리뷰 적립.
+ *
+ * **한 구매에 한 번이되, 사진을 나중에 붙이면 차액을 준다.** 리뷰는 고칠 수 있으므로 "쓸 때 사진이 없었다" 는 것이 영영
+ * 그 값으로 굳을 이유가 없다. 반대로 사진을 뺐다고 빼앗지는 않는다 — 이미 받은 것을 도로 가져가려면 쓴 사람에게서
+ * 빼앗아야 하고, 그건 대개 불가능하다. 그래서 **0 아래로는 내려가지 않는다.**
+ *
+ * 지우고 다시 써도 이미 받은 만큼은 셈에 들어간다. 그러지 않으면 썼다 지웠다를 되풀이해 적립금을 찍어낼 수 있다 —
+ * 본인이 지운 글은 행이 남지 않으므로(같은 구매로 다시 쓸 수 있다) 원장이 그 기억을 대신 맡는다.
+ */
+export function reviewRewardToGrant(input: {
+  readonly hasPhoto: boolean;
+  /** 이 구매의 리뷰로 이미 나간 적립의 합 */
+  readonly alreadyGranted: number;
+}): number {
+  return Math.max(0, reviewReward(input.hasPhoto) - input.alreadyGranted);
+}

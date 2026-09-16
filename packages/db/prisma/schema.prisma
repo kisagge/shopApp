@@ -887,6 +887,8 @@ model OrderItem {
   refundedAfterConfirm Boolean @default(false)
 
   review Review?
+  /// 이 구매의 리뷰로 나간 적립. 리뷰가 지워져도 남는다
+  pointTransactions PointTransaction[]
 
   @@index([orderId])
   @@index([variantId])
@@ -1128,6 +1130,14 @@ model PointTransaction {
   orderId String?
   order   Order?  @relation(fields: [orderId], references: [id])
 
+  /// 리뷰 적립이 어느 구매에 대한 것인지.
+  ///
+  /// **리뷰 id 가 아니라 주문 항목 id 다.** 본인이 지운 리뷰는 행이 남지 않고(같은 구매로 다시 쓸 수 있다),
+  /// 그러면 "이미 준 적이 있는가" 에 답할 것이 사라진다 — 썼다 지웠다를 되풀이해 적립금을 찍어낼 수 있다.
+  /// 주문 항목은 지워지지 않으므로 그 기억을 원장이 맡는다.
+  orderItemId String?
+  orderItem   OrderItem? @relation(fields: [orderItemId], references: [id])
+
   /// 적립 포인트의 소멸 예정일. 사용/소멸 건은 null.
   expiresAt      DateTime?
   /// 이 적립이 곧 사라진다고 알린 때. 한 번만 알린다(core expiry-notice)
@@ -1141,6 +1151,8 @@ model PointTransaction {
 
   @@index([userId, createdAt])
   @@index([expiresAt])
+  /// 이 구매의 리뷰로 이미 나간 적립을 센다
+  @@index([orderItemId, reason])
   @@map("point_transactions")
 }
 

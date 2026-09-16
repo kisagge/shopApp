@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { REVIEW_REWARD } from '@shop/core';
 
 const tx = vi.hoisted(() => ({
   review: {
@@ -13,6 +14,12 @@ const tx = vi.hoisted(() => ({
     update: vi.fn<(...a: any[]) => any>(),
   },
   product: { update: vi.fn<(...a: any[]) => any>() },
+  // 리뷰 적립도 같은 트랜잭션 안에서 나간다
+  pointTransaction: {
+    aggregate: vi.fn<(...a: any[]) => any>(),
+    create: vi.fn<(...a: any[]) => any>(),
+  },
+  user: { update: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({
   orderItem: { findUnique: vi.fn<(...a: any[]) => any>() },
@@ -51,6 +58,7 @@ beforeEach(() => {
   tx.review.create.mockResolvedValue({ id: 'r-1', rating: 5, productId: 'p-1' });
   tx.review.update.mockResolvedValue({ id: 'r-1', rating: 4, productId: 'p-1' });
   tx.review.aggregate.mockResolvedValue({ _sum: { rating: 9 }, _count: { _all: 2 } });
+  tx.pointTransaction.aggregate.mockResolvedValue({ _sum: { amount: null } });
 });
 
 describe('구매 확인', () => {
@@ -397,5 +405,43 @@ describe('수정할 때의 사진', () => {
   it('글자 하나 안 바뀌어도 사진이 바뀌었으면 수정됨이 붙는다', async () => {
     await updateReview(USER, 'r-1', { keepImageIds: ['i-1'] });
     expect(tx.review.update.mock.calls[0]?.[0].data.editedAt).toBeInstanceOf(Date);
+  });
+});
+
+describe('리뷰 적립', () => {
+  it('글이 올라가는 그 트랜잭션 안에서 나간다', async () => {
+    // 밖에서 주면 글은 올라갔는데 적립이 실패하는 구간이 생긴다 — 아무도 모르는 채로
+    const written = await createReview(USER, input);
+
+    expect(db.$transaction).toHaveBeenCalledOnce();
+    expect(tx.pointTransaction.create.mock.calls[0]?.[0].data).toMatchObject({
+      userId: USER, reason: 'EARN_REVIEW', orderItemId: 'oi-1',
+    });
+    expect(written.earnedPoints).toBeGreaterThan(0);
+  });
+
+  it('사진을 함께 올리면 더 준다', async () => {
+    const withPhoto = await createReview(USER, input, [
+      { url: 'https://cdn/a.webp', key: 'k-a', blurDataUrl: null },
+    ]);
+    const plain = tx.pointTransaction.create.mock.calls[0]?.[0].data.amount as number;
+    expect(withPhoto.earnedPoints).toBe(plain);
+    expect(plain).toBe(REVIEW_REWARD.photo);
+  });
+
+  it('고쳐서 사진을 붙이면 차액이 나간다', async () => {
+    db.review.findFirst.mockResolvedValue({
+      id: 'r-1', userId: USER, productId: 'p-1', orderItemId: 'oi-1', images: [],
+    });
+    db.review.findUniqueOrThrow.mockResolvedValue({
+      rating: 5, content: '아주 좋습니다 정말로요', sizeFit: 'TRUE', height: 175, weight: 70,
+    });
+    // 글로 쓸 때 이미 받았다
+    tx.pointTransaction.aggregate.mockResolvedValue({ _sum: { amount: REVIEW_REWARD.text } });
+
+    const edited = await updateReview(USER, 'r-1', {}, [
+      { url: 'https://cdn/a.webp', key: 'k-a', blurDataUrl: null },
+    ]);
+    expect(edited.earnedPoints).toBe(REVIEW_REWARD.photo - REVIEW_REWARD.text);
   });
 });

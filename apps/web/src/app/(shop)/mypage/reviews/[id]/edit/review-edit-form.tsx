@@ -73,7 +73,7 @@ export function ReviewEditForm({ review }: { review: EditableReview }) {
             })(),
           });
 
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json()) as { message?: string; earnedPoints?: number };
       if (!response.ok) {
         setError(data.message ?? t('review.saveFailed'));
         return;
@@ -83,7 +83,10 @@ export function ReviewEditForm({ review }: { review: EditableReview }) {
        * 목록으로 돌아가며 결과를 주소에 싣는다. 이 화면에 "저장했습니다" 를 띄우고 머물면, 고친 글이 목록에 어떻게
        * 보이는지는 여전히 안 보인다 — 등록 뒤 처리와 같은 결이다.
        */
-      router.replace('/mypage/reviews?edited=1', { scroll: false });
+      const earned = data.earnedPoints ?? 0;
+      router.replace(earned > 0 ? `/mypage/reviews?edited=1&earned=${earned}` : '/mypage/reviews?edited=1', {
+        scroll: false,
+      });
       router.refresh();
     } catch {
       setError(t('common.networkError'));

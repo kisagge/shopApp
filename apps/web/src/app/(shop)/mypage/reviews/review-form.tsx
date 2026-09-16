@@ -71,7 +71,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
               return form;
             })(),
           });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json()) as { message?: string; earnedPoints?: number };
       if (!response.ok) {
         setError(data.message ?? t('review.saveFailed'));
         return;
@@ -82,7 +82,11 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
        * 등록했습니다" 가 곧바로 사라진다 — 마지막 한 개였으면 "쓸 수 있는 상품이 없습니다" 만 남아 등록이 된 건지 모른다.
        * 낭독기는 읽기도 전에 사라진 알림을 말하지 않는다. 화면(page)이 주소를 보고 같은 말을 남긴다.
        */
-      router.replace('/mypage/reviews?saved=1', { scroll: false });
+      // 들어온 적립금은 결과 문구에 함께 싣는다 — 말없이 들어오면 잔액이 왜 늘었는지 모른다
+      const earned = data.earnedPoints ?? 0;
+      router.replace(earned > 0 ? `/mypage/reviews?saved=1&earned=${earned}` : '/mypage/reviews?saved=1', {
+        scroll: false,
+      });
     } catch {
       setError(t('common.networkError'));
     } finally {

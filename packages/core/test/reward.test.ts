@@ -74,3 +74,39 @@ describe('canConfirmPurchase — 손님이 직접 확정', () => {
     }
   });
 });
+
+describe('리뷰 적립', () => {
+  it('사진 있는 후기에 더 준다 — 같은 값을 주면 사진을 붙일 이유가 없다', async () => {
+    const { reviewReward, REVIEW_REWARD } = await import('../src');
+    expect(reviewReward(true)).toBe(REVIEW_REWARD.photo);
+    expect(reviewReward(false)).toBe(REVIEW_REWARD.text);
+    expect(REVIEW_REWARD.photo).toBeGreaterThan(REVIEW_REWARD.text);
+  });
+
+  it('처음 쓰면 그 값을 그대로 준다', async () => {
+    const { reviewRewardToGrant, REVIEW_REWARD } = await import('../src');
+    expect(reviewRewardToGrant({ hasPhoto: false, alreadyGranted: 0 })).toBe(REVIEW_REWARD.text);
+    expect(reviewRewardToGrant({ hasPhoto: true, alreadyGranted: 0 })).toBe(REVIEW_REWARD.photo);
+  });
+
+  it('사진을 나중에 붙이면 차액만 준다', async () => {
+    const { reviewRewardToGrant, REVIEW_REWARD } = await import('../src');
+    expect(reviewRewardToGrant({ hasPhoto: true, alreadyGranted: REVIEW_REWARD.text }))
+      .toBe(REVIEW_REWARD.photo - REVIEW_REWARD.text);
+  });
+
+  it('이미 받은 만큼은 다시 주지 않는다 — 썼다 지웠다로 찍어낼 수 없다', async () => {
+    const { reviewRewardToGrant, REVIEW_REWARD } = await import('../src');
+    expect(reviewRewardToGrant({ hasPhoto: false, alreadyGranted: REVIEW_REWARD.text })).toBe(0);
+    expect(reviewRewardToGrant({ hasPhoto: true, alreadyGranted: REVIEW_REWARD.photo })).toBe(0);
+  });
+
+  it('사진을 뺐다고 빼앗지 않는다 — 0 아래로 내려가지 않는다', async () => {
+    /*
+     * 이미 받은 것을 도로 가져가려면 쓴 사람에게서 빼앗아야 하고, 그건 대개 불가능하다.
+     * 구매 적립의 회수(환불)와 다르다 — 그쪽은 돈이 실제로 돌아간 일이다.
+     */
+    const { reviewRewardToGrant, REVIEW_REWARD } = await import('../src');
+    expect(reviewRewardToGrant({ hasPhoto: false, alreadyGranted: REVIEW_REWARD.photo })).toBe(0);
+  });
+});

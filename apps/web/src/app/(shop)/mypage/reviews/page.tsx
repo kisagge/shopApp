@@ -3,6 +3,8 @@ import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
+import { REVIEW_REWARD } from '@shop/core';
+import { formatNumber } from '@shop/i18n';
 import { getMyReviews, getReviewableItems } from '~/lib/queries/reviews';
 import { ReviewForm } from './review-form';
 import { ReviewStars } from '~/components/review-stars';
@@ -26,7 +28,7 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZ
 export default async function MyReviewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; edited?: string }>;
+  searchParams: Promise<{ saved?: string; edited?: string; earned?: string }>;
 }) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/reviews');
@@ -42,6 +44,16 @@ export default async function MyReviewsPage({
   // 고치고 돌아온 뒤. 고친 화면은 떠나고 없으므로 여기서 말한다
   const edited = params.edited === '1';
 
+  /*
+   * 들어온 적립금.
+   *
+   * **아는 금액만 말한다.** 주소에 실린 값이라 누구든 고쳐 넣을 수 있는데, 그 숫자를 그대로 읽으면 화면이 거짓을
+   * 말하게 된다. 실제로 줄 수 있는 값(글·사진·그 차액)일 때만 적는다.
+   */
+  const knownRewards = [REVIEW_REWARD.text, REVIEW_REWARD.photo, REVIEW_REWARD.photo - REVIEW_REWARD.text];
+  const earnedValue = Number(params.earned);
+  const earned = knownRewards.includes(earnedValue) ? earnedValue : null;
+
   return (
     <div className="mx-auto w-full max-w-[760px] px-4 pb-24 md:px-10">
       <header className="flex flex-col gap-2 py-8">
@@ -52,13 +64,21 @@ export default async function MyReviewsPage({
         </nav>
         <h1 className="text-xl font-semibold tracking-tight md:text-2xl">{t('my.reviews')}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          {t('my.reviewLead')}
+          {t('my.reviewLead')}{' '}
+          {/* 적립을 말하지 않으면 사진을 붙일 이유가 없다 */}
+          {t('review.rewardHint', {
+            text: formatNumber(t.locale, REVIEW_REWARD.text),
+            photo: formatNumber(t.locale, REVIEW_REWARD.photo),
+          })}
         </p>
       </header>
 
       {(saved || edited) && (
         <p role="status" className="mb-6 rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
           {t(saved ? 'review.saved' : 'review.editSaved')}
+          {earned !== null && (
+            <> {t('review.earned', { amount: formatNumber(t.locale, earned) })}</>
+          )}
         </p>
       )}
 

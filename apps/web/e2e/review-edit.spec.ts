@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+import { REVIEW_REWARD } from '@shop/core';
 import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
 import { layoutProblems, WIDTHS } from './layout';
 
@@ -17,6 +18,14 @@ test.use({ storageState: STATE_FILE.reviewEditor });
 test.describe.configure({ mode: 'serial' });
 
 const PRODUCT = `/product/${RACE_PRODUCT.reviewEdit}`;
+/** 사용 가능 포인트. 적립은 화면에 보이는 잔액까지 닿아야 준 것이다 */
+async function pointBalance(page: Page): Promise<number> {
+  await page.goto('/mypage/points');
+  await ready(page);
+  const text = await page.getByText('사용 가능 포인트').locator('xpath=following-sibling::span').textContent();
+  return Number(text!.replace(/[^\d]/g, ''));
+}
+
 const FIRST = '처음 쓴 후기입니다. 어깨선이 잘 떨어지고 기장도 알맞았습니다.';
 const EDITED = '다시 읽어 보니 한 가지 빠뜨렸습니다. 소매가 생각보다 길어 한 번 접어 입습니다.';
 
@@ -53,6 +62,8 @@ test('쓴 리뷰를 고치면 손님 화면이 바뀌고, 고쳐졌다는 사실
     await admin.close();
   }
 
+  const pointsBefore = await pointBalance(page);
+
   // ── 쓴다
   await page.goto('/mypage/reviews');
   await ready(page);
@@ -60,7 +71,14 @@ test('쓴 리뷰를 고치면 손님 화면이 바뀌고, 고쳐졌다는 사실
   await page.locator('label').filter({ hasText: '4점' }).first().click();
   await page.getByRole('textbox', { name: '후기' }).first().fill(FIRST);
   await page.getByRole('button', { name: '리뷰 등록' }).first().click();
-  await expect(page.getByText('리뷰를 등록했습니다')).toBeVisible();
+  /*
+   * **적립이 들어왔다고 말한다.** 말없이 들어오면 잔액이 왜 늘었는지 알 수 없다. 금액은 사진 없는 후기의 값이다.
+   *
+   * 결과 문단 하나만 본다 — 화면에는 알림 자리(role=status)가 여럿이라 통째로 집으면 어느 것을 보는지 알 수 없다.
+   */
+  const result = page.getByText('리뷰를 등록했습니다');
+  await expect(result).toBeVisible();
+  await expect(result).toContainText(String(REVIEW_REWARD.text));
 
   const written = page.getByRole('region', { name: /내가 쓴 리뷰/ });
   // 쓴 글은 그 상품 화면까지 들어가지 않아도 여기 모인다
@@ -106,6 +124,10 @@ test('쓴 리뷰를 고치면 손님 화면이 바뀌고, 고쳐졌다는 사실
     await expect(reviews.getByText(EDITED)).toBeVisible();
     await expect(reviews.getByText(FIRST)).toHaveCount(0);
     await expect(reviews.getByText('수정됨').first()).toBeVisible();
+
+    // 말만 한 것이 아니라 잔액까지 늘어야 한다 — 원장이 진실이고 잔액은 그 합계 캐시다
+    expect(await pointBalance(page), '리뷰를 썼는데 포인트가 안 들어왔다')
+      .toBe(pointsBefore + REVIEW_REWARD.text);
   } finally {
     /*
      * 지워서 원래 리뷰 수로 되돌린다. 미리 세어 둔 값은 더할 때보다 뺄 때 틀리므로, 되돌리는 쪽도 화면에서 밟는다.
@@ -115,6 +137,13 @@ test('쓴 리뷰를 고치면 손님 화면이 바뀌고, 고쳐졌다는 사실
     await page.getByRole('button', { name: '내 리뷰 삭제' }).first().click();
     await page.getByRole('button', { name: '삭제', exact: true }).first().click();
     await expect(page.getByText(EDITED)).toHaveCount(0);
+
+    /*
+     * **지웠다고 빼앗지 않는다.** 이미 받은 것을 도로 가져가려면 쓴 사람에게서 빼앗아야 하고, 그건 대개 불가능하다.
+     * 대신 같은 구매로 다시 써도 두 번 주지 않는다 — 그 기억은 원장이 맡는다(주문 항목 id).
+     */
+    expect(await pointBalance(page), '리뷰를 지웠다고 적립금을 빼앗았다')
+      .toBe(pointsBefore + REVIEW_REWARD.text);
   }
 });
 

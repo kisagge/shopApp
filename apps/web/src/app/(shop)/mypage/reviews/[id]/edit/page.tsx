@@ -3,6 +3,8 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { getViewer } from '~/lib/viewer';
 import { TrackedLink as Link } from '~/components/tracked-link';
+import { REVIEW_REWARD } from '@shop/core';
+import { formatNumber } from '@shop/i18n';
 import { getMyReview } from '~/lib/queries/reviews';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -69,6 +71,15 @@ export default async function EditReviewPage({
           답글이 달린 글은 고치는 순간 그 답이 무엇에 대한 말인지 흐려진다. 막지는 않는다 — 판매자가 답했다고 해서
           글쓴이가 자기 글을 못 고칠 이유는 없다. 대신 그렇게 된다는 것을 미리 말한다.
         */}
+        {/* 사진이 없는 글에만 말한다 — 이미 붙인 사람에게 더 준다고 말하면 거짓이 된다 */}
+        {review.images.length === 0 && (
+          <p className="mt-5 rounded-sm bg-[var(--surface)] px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
+            {t('review.photoTopUp', {
+              amount: formatNumber(t.locale, REVIEW_REWARD.photo - REVIEW_REWARD.text),
+            })}
+          </p>
+        )}
+
         {review.replied && (
           <p className="mt-5 rounded-sm bg-[var(--surface)] px-4 py-3 text-[12px] text-[var(--fg-secondary)]">
             {t('review.editRepliedNote')}

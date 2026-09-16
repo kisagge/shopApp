@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { discardReviewImages } from './images';
+import { grantReviewReward } from './reward';
 import {
   ImageError, isReviewableStatus, planReviewImages, ratingScore, reviewChanged,
   REVIEW_ERROR_MESSAGE, type ReviewErrorCode,
@@ -117,7 +118,7 @@ export async function createReview(
    * 롤백해도 파일은 남는다. 올리는 것은 바깥에서, 여기서는 기록만 한다.
    */
   images: readonly { url: string; key: string; blurDataUrl: string | null }[] = [],
-): Promise<ReviewRow> {
+): Promise<ReviewRow & { earnedPoints: number }> {
   const { productId } = await assertCanReview(userId, input.orderItemId);
 
   return prisma.$transaction(async (tx) => {
@@ -145,7 +146,17 @@ export async function createReview(
     });
 
     await recountRating(tx as typeof prisma, productId);
-    return review;
+
+    /*
+     * 적립은 글이 올라가는 **그 트랜잭션 안에서** 준다. 밖에서 주면 글은 올라갔는데 적립이 실패하는 구간이 생기고,
+     * 그건 약속한 적립금을 못 받은 채 아무도 모르는 상태다.
+     */
+    const earnedPoints = await grantReviewReward(
+      tx as unknown as Parameters<typeof grantReviewReward>[0],
+      { userId, orderItemId: input.orderItemId, hasPhoto: images.length > 0 },
+    );
+
+    return { ...review, earnedPoints };
   });
 }
 
@@ -184,7 +195,7 @@ export async function updateReview(
   input: UpdateReviewInput,
   /** 이미 올라간 사진. 작성과 같이, 트랜잭션 밖에서 올린 것만 들어온다 */
   added: readonly { url: string; key: string; blurDataUrl: string | null }[] = [],
-): Promise<ReviewRow> {
+): Promise<ReviewRow & { earnedPoints: number }> {
   const before = await assertCanEditReview(userId, reviewId);
 
   const { keepImageIds, ...fields } = input;
@@ -245,7 +256,22 @@ export async function updateReview(
     });
     // 별점을 고쳤을 수 있다
     await recountRating(tx as typeof prisma, before.productId);
-    return updated;
+
+    /*
+     * **사진을 붙였으면 차액을 준다.** 리뷰는 고칠 수 있으므로 "쓸 때 사진이 없었다" 는 것이 영영 그 값으로 굳을
+     * 이유가 없다. 사진을 뺐다고 빼앗지는 않는다 — 이미 받은 것을 도로 가져가려면 쓴 사람에게서 빼앗아야 한다.
+     */
+    const earnedPoints = await grantReviewReward(
+      tx as unknown as Parameters<typeof grantReviewReward>[0],
+      {
+        userId,
+        orderItemId: before.orderItemId,
+        hasPhoto: plan.keep.length + added.length > 0,
+        topUpOnly: true,
+      },
+    );
+
+    return { ...updated, earnedPoints };
   });
 
   /*
