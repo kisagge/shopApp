@@ -231,6 +231,18 @@ export default async function AdminReviewsPage({
                     </details>
                   )}
 
+                  {/*
+                    **누가 언제 답했는지.** 답한 사람은 적어 두기만 하고 보여 주지 않아서, 담당자가 여럿인
+                    가게는 감사 로그를 뒤져야 했다. 고쳐 쓴 답이면 그것도 적는다 — 손님 화면에도 뜨는 표시다.
+                  */}
+                  {row.reply !== null && row.repliedAt && (
+                    <p className="text-[11px] text-[var(--fg-muted)]">
+                      답글 · {row.repliedBy}
+                      {' · '}
+                      <time dateTime={row.repliedAt.toISOString()}>{adminDateTime.format(row.repliedAt)}</time>
+                      {row.replyEditedAt && ' · 고침'}
+                    </p>
+                  )}
                   {/* 답은 파는 사람이 — 가맹점은 자기 상품(조회가 이미 좁혔다), 운영진은 전부. 내려진 리뷰에는 달지 않는다 */}
                   {canReplyToReview(actor, { merchantId: row.merchantId, removed: row.state === 'removed' }) ? (
                     <ReviewReplyForm key={row.id} reviewId={row.id} productName={row.productName} reply={row.reply} />

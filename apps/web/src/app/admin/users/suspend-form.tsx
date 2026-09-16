@@ -18,6 +18,7 @@ export function SuspendForm({
   userName,
   suspendedAt,
   suspendedReason,
+  suspendedBy = null,
   disabledReason,
 }: {
   userId: string;
@@ -25,6 +26,8 @@ export function SuspendForm({
   /** ISO 문자열. 서버 컴포넌트에서 Date 를 넘기지 않는다 */
   suspendedAt: string | null;
   suspendedReason: string | null;
+  /** 정지를 건 사람 — 보는 사람에 맞게 이미 적은 말 */
+  suspendedBy?: string | null | undefined;
   disabledReason?: string | undefined;
 }) {
   const router = useRouter();
@@ -81,6 +84,7 @@ export function SuspendForm({
       >
         <p className="text-[11px] text-[var(--fg-secondary)]">
           <time dateTime={suspendedAt}>{adminDate.format(new Date(suspendedAt))}</time> 정지
+          {suspendedBy && <> · {suspendedBy}</>}
           {suspendedReason && <> · 사유: {suspendedReason}</>}
         </p>
         <div>

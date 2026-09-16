@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ready } from './state';
+import { STATE_FILE, ready } from './state';
 
 /**
  * 로그인한 고객이 보는 화면.
@@ -213,6 +213,48 @@ test('고객센터에 물으면 내 문의 내역에 남는다', async ({ page }
   await expect(page.getByText(asked)).toBeVisible();
   // 아직 아무도 답하지 않았다
   await expect(page.getByText('답변 대기').first()).toBeVisible();
+});
+
+test('운영진이 답하면 운영 화면에 누가 답했는지 남고, 손님 화면에는 이름이 나가지 않는다', async ({ page, browser }) => {
+  /*
+   * 답한 사람은 적어 두기만 하고 보여 주지 않았다 — 담당자가 여럿이면 감사 로그를 뒤져야 했다.
+   * 운영 화면에만 싣는다. 손님은 "누가" 가 아니라 "답이 왔다" 를 알면 된다.
+   */
+  const asked = `E2E 답한 사람 문의 ${Date.now()}`;
+  await page.goto('/support/ask');
+  await page.getByLabel('무엇에 대한 문의인가요?').selectOption('DELIVERY');
+  await page.getByLabel('문의 내용').fill(asked);
+  await page.getByRole('button', { name: '문의 보내기' }).click();
+  await expect(page.getByRole('status').filter({ hasText: /./ })).toContainText('접수');
+
+  const admin = await browser.newContext({ storageState: STATE_FILE.admin });
+  try {
+    const ap = await admin.newPage();
+    /*
+     * "전체" 탭에서 찾는다. 기본 탭은 답변 대기(오래된 것부터)라 새 문의가 다른 쪽으로 밀릴 수 있고,
+     * 답하고 나면 그 탭에서 빠져 누가 답했는지를 볼 수 없다.
+     */
+    await ap.goto('/admin/inquiries?tab=all');
+    await ready(ap);
+    const row = ap.getByRole('listitem').filter({ hasText: asked });
+    await row.getByLabel('고객센터 문의 답변').fill('내일 출고됩니다.');
+    await row.getByRole('button', { name: '답변 등록' }).click();
+    // 저장이 끝나 답이 뜰 때까지 기다린다 — 곧바로 떠나면 요청이 끊긴다
+    await expect(row.getByText('내일 출고됩니다.')).toBeVisible({ timeout: 20_000 });
+
+    await ap.goto('/admin/inquiries?tab=all');
+    await ready(ap);
+    await expect(ap.getByRole('listitem').filter({ hasText: asked }).getByText(/^답변\s*운영 관리자 · 관리자/))
+      .toBeVisible({ timeout: 20_000 });
+  } finally {
+    await admin.close();
+  }
+
+  await page.goto('/mypage/inquiries');
+  await ready(page);
+  const mine = page.getByRole('listitem').filter({ hasText: asked });
+  await expect(mine).toContainText('내일 출고됩니다.');
+  await expect(mine).not.toContainText('운영 관리자');
 });
 
 test('마이페이지에서 문의 내역으로 갈 수 있다', async ({ page }) => {

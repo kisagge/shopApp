@@ -126,6 +126,7 @@ export default async function AdminInquiriesPage({
                     <div className="rounded-sm bg-[var(--surface)] p-4">
                       <p className="text-[11px] font-medium text-[var(--fg-secondary)]">
                         답변
+                        {row.answeredBy && <span className="ml-2 font-normal">{row.answeredBy}</span>}
                         {row.answeredAt && (
                           <time dateTime={row.answeredAt.toISOString()} className="ml-2 font-normal">
                             {adminDateTime.format(row.answeredAt)}

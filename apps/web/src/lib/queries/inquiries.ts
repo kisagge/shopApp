@@ -3,7 +3,7 @@ import { prisma } from '@shop/db';
 import {
   offsetOf,
   hasPermission,
-  canReadInquiry, canAnswerInquiry, assertPermission,
+  canReadInquiry, canAnswerInquiry, assertPermission, actorLabel,
   type Actor, type InquiryTopic,
 } from '@shop/core';
 import { clampToLastPage } from './paged';
@@ -104,6 +104,13 @@ export interface AdminInquiryRow {
   readonly createdAt: Date;
   readonly answer: string | null;
   readonly answeredAt: Date | null;
+  /**
+   * 답한 사람을 보는 사람에게 맞게 적은 말(core 의 actorLabel). 답이 없으면 null.
+   *
+   * **적어 두기만 했다.** 담당자가 여럿인 가게에서 "이 답은 누가 했지" 에 답하려면 감사 로그를
+   * 뒤져야 했다. 가맹점이 보면 운영진의 이름은 "운영진" 으로만 나간다.
+   */
+  readonly answeredBy: string | null;
   /** 첨부한 사진 주소(1:1 문의) — 답할 사람은 봐야 한다 */
   readonly imageUrls: readonly string[];
 }
@@ -170,7 +177,8 @@ export async function getAdminInquiries(
       skip: offsetOf(at, ADMIN_INQUIRY_PAGE_SIZE),
       select: {
         id: true, content: true, isPrivate: true, createdAt: true,
-        answer: true, answeredAt: true,
+        answer: true, answeredAt: true, answeredById: true,
+        answeredBy: { select: { id: true, name: true, role: true, merchantId: true } },
         topic: true,
         product: { select: { id: true, name: true } },
         author: { select: { name: true } },
@@ -199,6 +207,10 @@ export async function getAdminInquiries(
       createdAt: row.createdAt,
       answer: row.answer,
       answeredAt: row.answeredAt,
+      answeredBy: row.answeredAt === null
+        ? null
+        // 이 칸이 생기기 전에 단 답은 누가 했는지 적혀 있지 않다
+        : actorLabel(actor, { id: row.answeredById, identity: row.answeredBy }, '기록 없음'),
       imageUrls: row.images.map((i) => i.url),
     })),
     total,

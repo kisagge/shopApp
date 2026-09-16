@@ -51,6 +51,8 @@ test('가맹점이 단 답글이 상품 화면의 그 리뷰 안에 뜨고, 고�
     await review.getByLabel(`${PRODUCT_NAME} 리뷰에 남길 답글`).fill(text);
     await review.getByRole('button', { name: '답글 달기' }).click();
     await expect(review.getByRole('status')).toContainText('알림이 갑니다');
+    // 누가 답했는지가 답글 곁에 선다 — 같은 가게 사람이 보면 이름만(운영진이면 "운영진")
+    await expect(review.getByText(/^답글 · 스튜디오눈 담당자 · /)).toBeVisible({ timeout: 20_000 });
 
     // ── 손님(비로그인): 상품 화면의 리뷰 안에 판매자 답글
     await gp.goto(PRODUCT_PATH);

@@ -22,7 +22,7 @@ const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const detail = (over: Partial<AdminUserDetail> = {}): AdminUserDetail => ({
   id: 'u-1', name: '김손님', email: 'kim@plain.test', emailVerified: false, phone: null, role: 'CUSTOMER',
   merchantName: null, signInMethods: ['credential', 'google'], grade: 'SILVER', totalSpent: 320_000,
-  createdAt: new Date('2026-01-01T00:00:00Z'), closedAt: null, suspendedAt: null, suspendedReason: null,
+  createdAt: new Date('2026-01-01T00:00:00Z'), closedAt: null, suspendedAt: null, suspendedReason: null, suspendedBy: null,
   pointBalance: 1_200,
   counts: { orders: 12, reviews: 3, inquiries: 4, inquiriesWaiting: 1, coupons: 2, wishlist: 5 },
   recentOrders: [{ orderNo: 'PL-20260901-0001', status: 'CONFIRMED', payable: 50_000, placedAt: new Date('2026-09-01T00:00:00Z'), itemCount: 2 }],
@@ -79,10 +79,14 @@ describe('회원 상세 화면', () => {
     expect(screen.getByRole('region', { name: '운영 기록' })).toHaveTextContent('포인트 수동 지급운영자');
   });
 
-  it('정지된 계정이면 맨 위에 사유와 함께 막힌 것을 말한다', async () => {
-    getAdminUserDetail.mockResolvedValue(detail({ suspendedAt: new Date('2026-09-05T00:00:00Z'), suspendedReason: '결제 사기 의심' }));
+  it('정지된 계정이면 맨 위에 사유와 건 사람을 함께 말한다', async () => {
+    getAdminUserDetail.mockResolvedValue(detail({
+      suspendedAt: new Date('2026-09-05T00:00:00Z'), suspendedReason: '결제 사기 의심', suspendedBy: '박운영 · 관리자',
+    }));
     await renderPage();
-    expect(screen.getByText(/로그인과 주문이 막혀 있습니다\. 사유: 결제 사기 의심/)).toBeInTheDocument();
+    expect(screen.getByText(/로그인과 주문이 막혀 있습니다\. 사유: 결제 사기 의심 · 정지한\s+사람: 박운영 · 관리자/)).toBeInTheDocument();
+    // 정지 칸에도 건 사람이 있다 — 목록 화면과 같은 폼이다
+    expect(screen.getByRole('region', { name: '이용 정지' })).toHaveTextContent('박운영 · 관리자');
     expect(screen.getByRole('button', { name: /정지 해제/ })).toBeInTheDocument();
   });
 

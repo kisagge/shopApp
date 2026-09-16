@@ -152,6 +152,7 @@ export default async function AdminUsersPage({
                             userName={u.name}
                             suspendedAt={u.suspendedAt?.toISOString() ?? null}
                             suspendedReason={u.suspendedReason}
+                            suspendedBy={u.suspendedBy}
                             disabledReason={suspendBlocked(actor, u)}
                           />
                         </td>

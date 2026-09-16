@@ -84,7 +84,8 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
             ) : (
               <>
                 <time dateTime={user.suspendedAt!.toISOString()}>{adminDate.format(user.suspendedAt!)}</time>부터 이용이
-                정지된 계정입니다 — 로그인과 주문이 막혀 있습니다. 사유: {user.suspendedReason ?? '—'}
+                정지된 계정입니다 — 로그인과 주문이 막혀 있습니다. 사유: {user.suspendedReason ?? '—'} · 정지한
+                사람: {user.suspendedBy ?? '—'}
               </>
             )}
           </p>
@@ -213,6 +214,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                   userName={user.name}
                   suspendedAt={user.suspendedAt?.toISOString() ?? null}
                   suspendedReason={user.suspendedReason}
+                  suspendedBy={user.suspendedBy}
                   disabledReason={suspendBlocked(actor, { id: user.id, role: user.role, closedAt: user.closedAt })}
                 />
               </section>

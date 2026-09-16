@@ -1,8 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
+import { actorLabel, assertPermission, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
 import { assertAdminQuery, scopeOf } from './scope';
 import { clampToLastPage } from '../paged';
+import { loadActors } from './actors';
 
 // ── 가맹점·회원 (슈퍼관리자 화면) ─────────────────────────────
 
@@ -86,9 +87,11 @@ export interface AdminUserRow {
   readonly createdAt: Date;
   /** 탈퇴 시각. 행은 남으므로 목록에서 구분할 수 있어야 한다. */
   readonly closedAt: Date | null;
-  /** 이용 정지 시각과 사유. 정지를 건 사람은 감사 로그에 있다 */
+  /** 이용 정지 시각과 사유 */
   readonly suspendedAt: Date | null;
   readonly suspendedReason: string | null;
+  /** 정지를 건 사람(core 의 actorLabel). 정지 중이 아니면 null — 전에는 "감사 로그에 있다" 고만 적혀 있었다 */
+  readonly suspendedBy: string | null;
   /** 적립금 잔액. 누르면 수동 지급·차감 화면으로 간다 */
   readonly pointBalance: number;
 }
@@ -126,7 +129,7 @@ export async function getAdminUsers(
     skip: offsetOf(at, take),
     select: {
       id: true, name: true, email: true, role: true, createdAt: true, deletedAt: true,
-      suspendedAt: true, suspendedReason: true, pointBalance: true,
+      suspendedAt: true, suspendedReason: true, suspendedBy: true, pointBalance: true,
       merchant: { select: { id: true, name: true } },
       _count: { select: { orders: true } },
     },
@@ -135,6 +138,8 @@ export async function getAdminUsers(
   const [first, total] = await Promise.all([readAt(page), prisma.user.count({ where })]);
   // 검색어를 좁히면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
   const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
+  // 정지를 건 사람은 관계가 없는 칸이다 — 쪽에 나온 사람을 한 번에 읽는다
+  const suspenders = await loadActors(rows.map((u) => (u.suspendedAt ? u.suspendedBy : null)));
 
   return {
     rows: rows.map((u) => ({
@@ -146,6 +151,12 @@ export async function getAdminUsers(
       closedAt: u.deletedAt,
       suspendedAt: u.suspendedAt,
       suspendedReason: u.suspendedReason,
+      suspendedBy: u.suspendedAt === null
+        ? null
+        : actorLabel(actor, {
+          id: u.suspendedBy,
+          identity: u.suspendedBy ? suspenders.get(u.suspendedBy) ?? null : null,
+        }, '기록 없음'),
       pointBalance: u.pointBalance,
     })),
     total,

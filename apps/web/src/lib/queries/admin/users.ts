@@ -1,7 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, type Actor, type MemberGrade, type OrderStatus, type UserRole } from '@shop/core';
+import { actorLabel, assertPermission, type Actor, type MemberGrade, type OrderStatus, type UserRole } from '@shop/core';
 import { getEffectiveGrade } from '~/lib/grade/effective';
+import { loadActors } from './actors';
 
 /** 한 번에 보여 줄 최근 주문·운영 기록 수. 더 보려면 주문·감사 로그 화면으로 간다 */
 export const USER_DETAIL_RECENT = 10;
@@ -22,6 +23,11 @@ export interface AdminUserDetail {
   readonly closedAt: Date | null;
   readonly suspendedAt: Date | null;
   readonly suspendedReason: string | null;
+  /**
+   * 정지를 건 사람(core 의 actorLabel). 정지 중이 아니면 null.
+   * **적어 두기만 했다** — 사유는 화면에 있는데 건 사람은 감사 로그를 뒤져야 나왔다.
+   */
+  readonly suspendedBy: string | null;
   readonly pointBalance: number;
   readonly counts: {
     readonly orders: number;
@@ -65,7 +71,7 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
     where: { id: userId },
     select: {
       id: true, name: true, email: true, emailVerified: true, phone: true, role: true, grade: true,
-      createdAt: true, deletedAt: true, suspendedAt: true, suspendedReason: true, pointBalance: true,
+      createdAt: true, deletedAt: true, suspendedAt: true, suspendedReason: true, suspendedBy: true, pointBalance: true,
       merchant: { select: { name: true } },
       accounts: { select: { providerId: true } },
       _count: { select: { orders: true, reviews: true, wishlist: true } },
@@ -73,7 +79,7 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
   });
   if (!user) return null;
 
-  const [effective, inquiries, inquiriesWaiting, coupons, recentOrders, audit] = await Promise.all([
+  const [effective, inquiries, inquiriesWaiting, coupons, recentOrders, audit, suspenders] = await Promise.all([
     getEffectiveGrade(user.id, user.grade),
     prisma.inquiry.count({ where: { authorId: user.id, deletedAt: null } }),
     prisma.inquiry.count({ where: { authorId: user.id, deletedAt: null, answeredAt: null } }),
@@ -90,6 +96,7 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
       take: USER_DETAIL_RECENT,
       select: { id: true, action: true, createdAt: true, actorLabel: true, actor: { select: { name: true } } },
     }),
+    loadActors([user.suspendedAt ? user.suspendedBy : null]),
   ]);
 
   return {
@@ -107,6 +114,12 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
     closedAt: user.deletedAt,
     suspendedAt: user.suspendedAt,
     suspendedReason: user.suspendedReason,
+    suspendedBy: user.suspendedAt === null
+      ? null
+      : actorLabel(actor, {
+        id: user.suspendedBy,
+        identity: user.suspendedBy ? suspenders.get(user.suspendedBy) ?? null : null,
+      }, '기록 없음'),
     pointBalance: user.pointBalance,
     counts: {
       orders: user._count.orders,

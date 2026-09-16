@@ -50,6 +50,8 @@ test('정지하면 로그인해 둔 사람은 주문을 못 하고 새 로그인
     await row.getByRole('button', { name: '정지', exact: true }).click();
     await expect(row.getByText('정지됨')).toBeVisible({ timeout: 20_000 });
     await expect(row.getByText(/사유: e2e 정지 검사/)).toBeVisible();
+    // 건 사람이 사유 곁에 선다 — 전에는 감사 로그를 뒤져야 나왔다
+    await expect(row.getByText(/운영 관리자 · 관리자 · 사유: e2e 정지 검사/)).toBeVisible();
 
     // ── 회원 상세: 막힌 상태가 맨 위에 사유와 함께 선다 — 모르고 주문을 들여다보면 엉뚱한 답을 한다
     const detailHref = (await row.getByRole('link', { name: '정지 검사 손님', exact: true }).getAttribute('href'))!;
@@ -57,7 +59,7 @@ test('정지하면 로그인해 둔 사람은 주문을 못 하고 새 로그인
     await detail.goto(detailHref);
     await ready(detail);
     await expect(detail.getByRole('heading', { level: 1, name: '정지 검사 손님' })).toBeVisible();
-    await expect(detail.getByText(/로그인과 주문이 막혀 있습니다\. 사유: e2e 정지 검사/)).toBeVisible();
+    await expect(detail.getByText(/로그인과 주문이 막혀 있습니다\. 사유: e2e 정지 검사 · 정지한\s+사람: 운영 관리자 · 관리자/)).toBeVisible();
     await expect(detail.getByRole('region', { name: '운영 기록' }).getByText('이용 정지').first()).toBeVisible();
     await detail.close();
 

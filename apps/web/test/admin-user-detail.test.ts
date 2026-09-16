@@ -6,7 +6,7 @@ import type { Actor } from '@shop/core';
  */
 
 const db = vi.hoisted(() => ({
-  user: { findUnique: vi.fn<(...a: any[]) => any>() },
+  user: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   inquiry: { count: vi.fn<(...a: any[]) => any>() },
   userCoupon: { count: vi.fn<(...a: any[]) => any>() },
   order: { findMany: vi.fn<(...a: any[]) => any>() },
@@ -44,6 +44,7 @@ beforeEach(() => {
     { id: 'a-3', action: 'user.restore', createdAt: new Date('2026-09-08'), actorLabel: null, actor: null },
   ]);
   getEffectiveGrade.mockResolvedValue({ grade: 'SILVER', totalSpent: 320_000, rewardPercent: 2 });
+  db.user.findMany.mockResolvedValue([{ id: 'u-park', name: '박운영', role: 'ADMIN', merchantId: null }]);
 });
 
 describe('getAdminUserDetail', () => {
@@ -84,5 +85,43 @@ describe('getAdminUserDetail', () => {
     const d = (await getAdminUserDetail(admin, 'u-1', NOW))!;
     expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].where).toEqual({ targetType: 'user', targetId: 'u-1' });
     expect(d.audit.map((a) => a.actorName)).toEqual(['운영자', '구매확정 배치', '자동 실행']);
+  });
+});
+
+describe('정지를 건 사람', () => {
+  /*
+   * 적어 두기만 했다. 사유는 화면에 있는데 건 사람은 감사 로그를 뒤져야 나왔다.
+   */
+  it('정지 중이면 건 사람을 이름과 역할로 준다', async () => {
+    db.user.findUnique.mockResolvedValue({
+      ...USER, suspendedAt: new Date('2026-09-05'), suspendedReason: '사기 의심', suspendedBy: 'u-park',
+    });
+
+    const detail = await getAdminUserDetail(admin, 'u-1', NOW);
+
+    expect(detail?.suspendedBy).toBe('박운영 · 관리자');
+    expect(db.user.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['u-park'] } });
+  });
+
+  it('정지 중이 아니면 비우고, 사람을 찾으러 가지도 않는다', async () => {
+    const detail = await getAdminUserDetail(admin, 'u-1', NOW);
+
+    expect(detail?.suspendedBy).toBeNull();
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('건 사람이 적히기 전의 정지면 "기록 없음"', async () => {
+    db.user.findUnique.mockResolvedValue({
+      ...USER, suspendedAt: new Date('2026-09-05'), suspendedReason: '사기 의심', suspendedBy: null,
+    });
+    expect((await getAdminUserDetail(admin, 'u-1', NOW))?.suspendedBy).toBe('기록 없음');
+  });
+
+  it('건 사람의 계정이 사라졌으면 그렇다고 말한다', async () => {
+    db.user.findUnique.mockResolvedValue({
+      ...USER, suspendedAt: new Date('2026-09-05'), suspendedReason: '사기 의심', suspendedBy: 'u-gone',
+    });
+    db.user.findMany.mockResolvedValue([]);
+    expect((await getAdminUserDetail(admin, 'u-1', NOW))?.suspendedBy).toBe('탈퇴한 계정');
   });
 });

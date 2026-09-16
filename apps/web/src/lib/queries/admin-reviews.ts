@@ -3,9 +3,10 @@ import { prisma } from '@shop/db';
 import {
   assertPermission, merchantScope, moderationState, reportPriority,
   type Actor, type ModerationState, type ReportReason,
-  offsetOf,
+  offsetOf, actorLabel,
 } from '@shop/core';
 import { clampToLastPage } from './paged';
+import { loadActors } from './admin/actors';
 
 /**
  * 리뷰 관리 조회.
@@ -49,6 +50,11 @@ export interface AdminReviewRow {
   readonly reply: string | null;
   readonly repliedAt: Date | null;
   readonly replyEditedAt: Date | null;
+  /**
+   * 답글을 단 사람을 보는 사람에게 맞게 적은 말(core 의 actorLabel). 답글이 없으면 null.
+   * 적어 두기만 하고 보여 주지 않던 칸이다 — 가맹점이 보면 운영진의 이름은 "운영진" 으로만 나간다.
+   */
+  readonly repliedBy: string | null;
   /** 처리 순서 점수. 대기줄 정렬에만 쓴다. */
   readonly priority: number;
 }
@@ -97,7 +103,7 @@ const reviewSelect = {
   createdAt: true, deletedAt: true, productId: true,
   user: { select: { name: true } },
   product: { select: { name: true, brand: { select: { merchantId: true } } } },
-  reply: true, repliedAt: true, replyEditedAt: true,
+  reply: true, repliedAt: true, replyEditedAt: true, repliedById: true,
   reports: {
     orderBy: { createdAt: 'desc' as const },
     select: {
@@ -113,7 +119,7 @@ type RawReview = {
   createdAt: Date; deletedAt: Date | null; productId: string;
   user: { name: string };
   product: { name: string; brand: { merchantId: string | null } };
-  reply: string | null; repliedAt: Date | null; replyEditedAt: Date | null;
+  reply: string | null; repliedAt: Date | null; replyEditedAt: Date | null; repliedById: string | null;
   reports: {
     id: string; reason: ReportReason; detail: string | null; createdAt: Date;
     resolvedAt: Date | null; resolution: string | null;
@@ -121,7 +127,22 @@ type RawReview = {
   }[];
 };
 
-function toRow(raw: RawReview): AdminReviewRow {
+/**
+ * 줄로 옮긴다. 답글을 단 사람은 **쪽에 나온 사람을 한 번에** 읽어 둔 것에서 찾는다 — repliedById 는
+ * 관계가 없는 칸이라 줄마다 물으면 쪽마다 스무 번이 나간다.
+ */
+async function toRows(actor: Actor, raws: readonly RawReview[]): Promise<AdminReviewRow[]> {
+  const repliers = await loadActors(raws.map((r) => (r.reply === null ? null : r.repliedById)));
+  return raws.map((raw) => toRow(
+    raw,
+    raw.reply === null
+      ? null
+      // 이 칸이 생기기 전에 단 답글은 누가 했는지 적혀 있지 않다
+      : actorLabel(actor, { id: raw.repliedById, identity: raw.repliedById ? repliers.get(raw.repliedById) ?? null : null }, '기록 없음'),
+  ));
+}
+
+function toRow(raw: RawReview, repliedBy: string | null): AdminReviewRow {
   const open = raw.reports.filter((r) => r.resolvedAt === null);
 
   return {
@@ -137,6 +158,7 @@ function toRow(raw: RawReview): AdminReviewRow {
     reply: raw.reply,
     repliedAt: raw.repliedAt,
     replyEditedAt: raw.replyEditedAt,
+    repliedBy,
     state: moderationState({
       removedByModerator: raw.deletedAt !== null,
       openReports: open.length,
@@ -209,9 +231,7 @@ export async function getAdminReviews(
     })) as RawReview[];
 
     const capped = raw.length > QUEUE_CAP;
-    const rows = raw
-      .slice(0, QUEUE_CAP)
-      .map(toRow)
+    const rows = (await toRows(actor, raw.slice(0, QUEUE_CAP)))
       // 점수가 같으면 오래 기다린 것부터. 새 신고가 계속 앞을 막으면 안 된다.
       .sort((a, b) => b.priority - a.priority || a.createdAt.getTime() - b.createdAt.getTime());
 
@@ -239,7 +259,7 @@ export async function getAdminReviews(
   const raw = await clampToLastPage(first, { page, pageSize: PAGE_SIZE, total }, readAt);
 
   return {
-    rows: raw.map(toRow),
+    rows: await toRows(actor, raw),
     total,
     pending,
     capped: false,
