@@ -213,7 +213,7 @@ export default async function MyPage() {
               href="/mypage/reviews"
               className="flex min-h-13 items-center justify-between px-1 text-sm text-[var(--fg)] no-underline"
             >
-              <span>{t('my.writeReview')}</span>
+              <span>{t('my.reviews')}</span>
               <span className="flex items-center gap-2">
                 {summary.reviewableCount > 0 && (
                   <span className="tnum text-xs font-semibold text-accent">

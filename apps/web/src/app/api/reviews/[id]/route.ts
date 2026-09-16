@@ -1,14 +1,26 @@
 import { NextResponse } from 'next/server';
 import { updateReviewSchema } from '@shop/contract';
-import { hasPermission } from '@shop/core';
+import { hasPermission, ImageError, MAX_IMAGES_PER_REVIEW } from '@shop/core';
 import { getActor, getSessionUser } from '@shop/auth/session';
-import { updateReview, deleteReview, ReviewError } from '~/lib/reviews/write-review';
+import { readJsonWithImages } from '~/lib/images/read-body';
+import { enforceRateLimit } from '~/lib/rate-limit';
+import {
+  uploadReviewImages, discardReviewImages, type UploadedImage,
+} from '~/lib/reviews/images';
+import {
+  assertCanEditReview, updateReview, deleteReview, ReviewError,
+} from '~/lib/reviews/write-review';
 import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
 
+/**
+ * 리뷰 수정.
+ *
+ * 글만 고치면 JSON, 사진까지 고치면 multipart 다 — 작성 창구와 같은 두 갈래다. 사진을 올리는 자리라 제한을 건다.
+ */
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -18,10 +30,19 @@ export async function PATCH(
     return await unauthorized();
   }
 
+  const limited = await enforceRateLimit('review', request, user.id);
+  if (limited) return limited;
+
   let body: unknown;
+  let files: { bytes: Uint8Array; declaredType: string }[];
   try {
-    body = await request.json();
-  } catch {
+    const read = await readJsonWithImages(request, { max: MAX_IMAGES_PER_REVIEW, tooMany: 'TOO_MANY_REVIEW_IMAGES' });
+    body = read.fields;
+    files = read.files;
+  } catch (error) {
+    if (error instanceof ImageError) {
+      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
+    }
     return await invalidJson();
   }
 
@@ -32,11 +53,24 @@ export async function PATCH(
 
   const { id } = await params;
 
+  // 자격을 먼저 보고, 그다음에 올린다 — 남의 리뷰 id 로 파일만 올리는 길을 막는다
+  let uploaded: UploadedImage[] = [];
   try {
-    const updated = await updateReview(user.id, id, parsed.data);
+    if (files.length > 0) {
+      const review = await assertCanEditReview(user.id, id);
+      uploaded = await uploadReviewImages(review.orderItemId, files);
+    }
+
+    const updated = await updateReview(user.id, id, parsed.data, uploaded);
     revalidateReviews();
     return NextResponse.json(updated);
   } catch (error) {
+    // 고쳐지지 않았으면 올린 사진도 되돌린다
+    if (uploaded.length > 0) await discardReviewImages(uploaded.map((u) => u.key));
+
+    if (error instanceof ImageError) {
+      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
+    }
     if (error instanceof ReviewError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
@@ -58,6 +92,9 @@ export async function DELETE(
   if (!actor) {
     return await unauthorized();
   }
+
+  const limited = await enforceRateLimit('review', request, actor.id);
+  if (limited) return limited;
 
   const canModerate = hasPermission(actor, 'review:moderate');
   const { id } = await params;

@@ -1,14 +1,13 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-import {
-  SIZE_FIT, RATING_MAX, MAX_IMAGES_PER_REVIEW, MAX_IMAGE_BYTES,
-  IMAGE_CONTENT_TYPE, type SizeFit,
-} from '@shop/core';
+import type { SizeFit } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
-import { SIZE_FIT_KEY } from '~/lib/i18n/enum-labels';
+import {
+  BodyFields, ContentField, PhotoField, RatingField, SizeFitField,
+} from '~/components/review-fields';
 
 export interface ReviewTarget {
   readonly orderItemId: string;
@@ -21,9 +20,8 @@ export interface ReviewTarget {
 /**
  * 리뷰 작성 폼.
  *
- * 별점은 라디오 그룹이다. 별 모양 버튼을 클릭 이벤트로만 다루면 키보드로
- * 고를 수 없고 현재 값도 읽히지 않는다. 라디오는 화살표 키로 옮겨 다닐 수
- * 있고 선택 상태를 스스로 알린다.
+ * 칸은 고치는 화면과 함께 쓴다(review-fields). 여기 남은 것은 **처음 쓸 때만의 일** 뿐이다 — 어느 구매의 후기인지
+ * 싣는 것, 등록하고 나서 폼을 거두는 것.
  */
 export function ReviewForm({ target }: { target: ReviewTarget }) {
   const router = useRouter();
@@ -37,28 +35,6 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [done, setDone] = useState(false);
-
-  /**
-   * 미리보기 주소는 브라우저가 들고 있는 자원이다.
-   *
-   * createObjectURL 로 만든 것은 revoke 하지 않으면 페이지를 떠날 때까지
-   * 남는다. 사진을 여러 번 골라 보면 그만큼 쌓인다.
-   *
-   * 상태로 두지 않고 파생시킨다. 이펙트 안에서 setState 로 채우면 고를
-   * 때마다 렌더가 한 번 더 돌고, 그 사이 한 프레임은 미리보기가 비어 있다.
-   * 이펙트는 **직전 묶음을 되돌리는 일만** 한다.
-   */
-  const previews = useMemo(() => images.map((file) => URL.createObjectURL(file)), [images]);
-  useEffect(
-    () => () => { for (const url of previews) URL.revokeObjectURL(url); },
-    [previews],
-  );
-
-  const contentId = useId();
-  const imagesId = useId();
-  const heightId = useId();
-  const weightId = useId();
-  const groupId = useId();
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -119,159 +95,11 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
 
   return (
     <form onSubmit={(e) => submit(e)} noValidate className="flex flex-col gap-5">
-      <fieldset className="flex flex-col gap-2 border-0 p-0">
-        <legend id={groupId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          {t('review.rating')}
-          <span className="ml-1 text-accent" aria-hidden="true">*</span>
-          <span className="sr-only"> {t('review.required')}</span>
-        </legend>
-        <div className="flex gap-1">
-          {Array.from({ length: RATING_MAX }, (_, i) => i + 1).map((value) => (
-            <label
-              key={value}
-              className="cursor-pointer text-[26px] leading-none has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-[var(--ring)]"
-            >
-              <input
-                type="radio" name="rating" value={value} className="sr-only"
-                checked={rating === value}
-                onChange={() => setRating(value)}
-              />
-              <span aria-hidden="true" className={value <= rating ? 'text-warning-graphic' : 'text-n-300'}>
-                ★
-              </span>
-              <span className="sr-only">{t('review.starCount', { rating: value })}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor={contentId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          {t('review.body')}
-          <span className="ml-1 text-accent" aria-hidden="true">*</span>
-          <span className="sr-only"> {t('review.required')}</span>
-        </label>
-        <textarea
-          id={contentId} value={content} onChange={(e) => setContent(e.target.value)}
-          rows={5} maxLength={2000} required
-          placeholder={t('review.bodyPlaceholder')}
-          className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3.5 py-3 text-sm"
-        />
-        <p className="text-[11px] text-[var(--fg-muted)]">
-          <span className="tnum">{content.trim().length}</span> {t('review.minLength')}
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <label htmlFor={imagesId} className="text-xs font-medium text-[var(--fg-secondary)]">
-          {t('review.photos')}
-        </label>
-        <input
-          id={imagesId}
-          type="file"
-          multiple
-          /**
-           * accept 는 파일 선택 창을 좁혀 줄 뿐 강제가 아니다.
-           * 실제 검사는 서버가 파일 앞부분의 매직 바이트로 한다.
-           */
-          accept={IMAGE_CONTENT_TYPE.join(',')}
-          onChange={(e) => {
-            const picked = Array.from(e.target.files ?? []);
-            if (picked.length > MAX_IMAGES_PER_REVIEW) {
-              setError(t('review.photoLimit', { max: MAX_IMAGES_PER_REVIEW }));
-              return;
-            }
-            const tooBig = picked.find((f) => f.size > MAX_IMAGE_BYTES);
-            if (tooBig) {
-              // 여기서 막는 것은 편의다. 진짜 한도는 서버가 다시 본다.
-              setError(t('review.photoSize'));
-              return;
-            }
-            setError(null);
-            setImages(picked);
-          }}
-          className="text-[13px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--surface)] file:px-3 file:text-[13px]"
-        />
-        <p className="text-[11px] text-[var(--fg-muted)]">
-          {t('review.photoHint', { max: MAX_IMAGES_PER_REVIEW })}
-        </p>
-
-        {previews.length > 0 && (
-          <ul className="mt-1 flex flex-wrap gap-2">
-            {previews.map((url, i) => (
-              <li key={url} className="relative">
-                {/*
-                  방금 고른 파일의 미리보기다. 주소가 blob: 이라 브라우저
-                  안에만 있고 서버가 가져올 수 없다 — next/image 를 쓸 수
-                  없는 유일한 자리다. 어차피 네트워크로 나가지 않는다.
-                */}
-                <img
-                  src={url}
-                  alt={t('review.pickedPhoto', { index: i + 1 })}
-                  className="h-20 w-20 rounded-sm border border-[var(--border)] object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={() => setImages((prev) => prev.filter((_, at) => at !== i))}
-                  aria-label={t('review.removePhoto', { index: i + 1 })}
-                  className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-[var(--brand)] text-[11px] text-[var(--bg)]"
-                >
-                  <span aria-hidden="true">×</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <fieldset className="flex flex-col gap-2 border-0 p-0">
-        <legend className="text-xs font-medium text-[var(--fg-secondary)]">
-          {t('review.sizeAsk')}
-        </legend>
-        <div className="flex gap-2">
-          {SIZE_FIT.map((fit) => (
-            <label
-              key={fit}
-              className={`flex h-10 cursor-pointer items-center rounded-sm border px-4 text-[13px] ${
-                sizeFit === fit ? 'border-[var(--brand)] bg-[var(--brand)] text-[var(--bg)]' : 'border-[var(--border-strong)]'
-              }`}
-            >
-              <input
-                type="radio" name="sizeFit" value={fit} className="sr-only"
-                checked={sizeFit === fit}
-                onChange={() => setSizeFit(fit)}
-              />
-              {t(SIZE_FIT_KEY[fit])}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="flex flex-wrap gap-4 border-0 p-0">
-        <legend className="mb-2 text-xs font-medium text-[var(--fg-secondary)]">
-          {t('review.bodyInfo')}
-        </legend>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={heightId} className="text-[11px] text-[var(--fg-muted)]">
-            {t('review.height')}
-          </label>
-          <input
-            id={heightId} type="number" inputMode="numeric" min={100} max={250}
-            value={height} onChange={(e) => setHeight(e.target.value)}
-            className="tnum h-10 w-24 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor={weightId} className="text-[11px] text-[var(--fg-muted)]">
-            {t('review.weight')}
-          </label>
-          <input
-            id={weightId} type="number" inputMode="numeric" min={20} max={300}
-            value={weight} onChange={(e) => setWeight(e.target.value)}
-            className="tnum h-10 w-24 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2.5 text-[13px]"
-          />
-        </div>
-      </fieldset>
+      <RatingField value={rating} onChange={setRating} />
+      <ContentField value={content} onChange={setContent} />
+      <PhotoField files={images} onFiles={setImages} onError={setError} />
+      <SizeFitField value={sizeFit} onChange={setSizeFit} />
+      <BodyFields height={height} weight={weight} onHeight={setHeight} onWeight={setWeight} />
 
       {error && <p role="alert" className="text-[12px] text-accent">{error}</p>}
 

@@ -1,7 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
-import { ratingBreakdown, sizeFitSummary, averageRating, REVIEWABLE_STATUS } from '@shop/core';
+import {
+  ratingBreakdown, sizeFitSummary, averageRating, isSizeFit, REVIEWABLE_STATUS, type SizeFit,
+} from '@shop/core';
 import type { ReviewSort } from '@shop/contract';
 
 /**
@@ -21,6 +23,8 @@ export interface PublicReview {
   readonly authorName: string;
   readonly optionLabel: string | null;
   readonly createdAt: Date;
+  /** 글쓴이가 고친 시각. 화면에 "수정됨" 으로 적는다 — 없으면 처음 쓴 그대로다 */
+  readonly editedAt: Date | null;
   readonly images: readonly {
     readonly url: string;
     readonly blurDataUrl: string | null;
@@ -92,7 +96,7 @@ export async function getProductReviews(
     ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
     select: {
       id: true, rating: true, content: true, sizeFit: true,
-      height: true, weight: true, createdAt: true, userId: true,
+      height: true, weight: true, createdAt: true, editedAt: true, userId: true,
       images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
       helpfulCount: true,
       reply: true, repliedAt: true, replyEditedAt: true,
@@ -146,6 +150,7 @@ export async function getProductReviews(
       authorName: maskAuthor(r.user.name),
       optionLabel: r.orderItem?.optionLabel ?? null,
       createdAt: r.createdAt,
+      editedAt: r.editedAt,
       images: r.images,
       isMine: options.viewerId !== undefined && r.userId === options.viewerId,
       canReport: options.viewerId !== undefined && r.userId !== options.viewerId,
@@ -208,6 +213,88 @@ export async function getReviewSummary(productId: string): Promise<ReviewSummary
     breakdown: ratingBreakdown(counts),
     sizeFit: sizeFitSummary(fits.map((f) => f.sizeFit)),
   };
+}
+
+export interface MyReview {
+  readonly id: string;
+  readonly rating: number;
+  readonly content: string;
+  readonly sizeFit: SizeFit | null;
+  readonly height: number | null;
+  readonly weight: number | null;
+  readonly createdAt: Date;
+  readonly editedAt: Date | null;
+  readonly productSlug: string;
+  readonly productName: string;
+  readonly brandName: string;
+  readonly optionLabel: string;
+  readonly imageUrl: string | null;
+  readonly images: readonly { readonly id: string; readonly url: string; readonly blurDataUrl: string | null }[];
+  /** 판매자가 답했는가 — 답이 달린 글을 고치면 그 답이 무엇에 대한 말인지 흐려진다 */
+  readonly replied: boolean;
+}
+
+/**
+ * 내가 쓴 리뷰.
+ *
+ * **고칠 문이 여기 있어야 한다.** 그 전에는 자기가 쓴 글을 모아 보는 자리가 없어서, 오타 하나를 고치려면 그 상품 화면을
+ * 찾아 들어가 자기 글을 목록에서 찾아내야 했다. 리뷰를 쓴 자리에서 다시 볼 수 있어야 고치기도 한다.
+ *
+ * 운영진이 내린 글은 뺀다. 고칠 수 없는 글을 고칠 수 있는 것처럼 늘어놓지 않는다 — 누르면 404 가 돌아온다.
+ */
+const myReviewSelect = {
+  id: true, rating: true, content: true, sizeFit: true,
+  height: true, weight: true, createdAt: true, editedAt: true, repliedAt: true,
+  images: { select: { id: true, url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
+  product: { select: { slug: true } },
+  orderItem: { select: { productName: true, brandName: true, optionLabel: true, imageUrl: true } },
+} as const;
+
+type MyReviewRow = Awaited<ReturnType<typeof prisma.review.findFirstOrThrow<{ select: typeof myReviewSelect }>>>;
+
+function toMyReview(r: MyReviewRow): MyReview {
+  return {
+    id: r.id,
+    rating: r.rating,
+    content: r.content,
+    sizeFit: r.sizeFit !== null && isSizeFit(r.sizeFit) ? r.sizeFit : null,
+    height: r.height,
+    weight: r.weight,
+    createdAt: r.createdAt,
+    editedAt: r.editedAt,
+    productSlug: r.product.slug,
+    /*
+     * 상품 이름은 **주문 항목에 박아 둔 것**을 쓴다. 상품 이름이 나중에 바뀌어도 그때 산 물건의 이름은 그대로여야 한다 —
+     * 주문 내역이 스냅샷을 들고 있는 것과 같은 이유다.
+     */
+    productName: r.orderItem.productName,
+    brandName: r.orderItem.brandName,
+    optionLabel: r.orderItem.optionLabel,
+    imageUrl: r.orderItem.imageUrl,
+    images: r.images,
+    replied: r.repliedAt !== null,
+  };
+}
+
+export async function getMyReviews(userId: string): Promise<MyReview[]> {
+  const rows = await prisma.review.findMany({
+    where: { userId, deletedAt: null },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: 50,
+    select: myReviewSelect,
+  });
+
+  return rows.map(toMyReview);
+}
+
+/** 고칠 리뷰 하나. 내 글이 아니거나 운영진이 내린 글이면 없는 것과 같다 */
+export async function getMyReview(userId: string, reviewId: string): Promise<MyReview | null> {
+  const row = await prisma.review.findFirst({
+    where: { id: reviewId, userId, deletedAt: null },
+    select: myReviewSelect,
+  });
+
+  return row === null ? null : toMyReview(row);
 }
 
 export interface ReviewableItem {

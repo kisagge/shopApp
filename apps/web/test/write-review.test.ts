@@ -7,11 +7,19 @@ const tx = vi.hoisted(() => ({
     delete: vi.fn<(...a: any[]) => any>(),
     aggregate: vi.fn<(...a: any[]) => any>(),
   },
+  reviewImage: {
+    deleteMany: vi.fn<(...a: any[]) => any>(),
+    createMany: vi.fn<(...a: any[]) => any>(),
+    update: vi.fn<(...a: any[]) => any>(),
+  },
   product: { update: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({
   orderItem: { findUnique: vi.fn<(...a: any[]) => any>() },
-  review: { findFirst: vi.fn<(...a: any[]) => any>() },
+  review: {
+    findFirst: vi.fn<(...a: any[]) => any>(),
+    findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
+  },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -138,30 +146,57 @@ describe('평점 집계', () => {
 });
 
 describe('수정', () => {
+  const stored = { rating: 5, content: '아주 좋습니다 정말로요', sizeFit: 'TRUE', height: 175, weight: 70 };
+  const mine = (over: Record<string, unknown> = {}) => ({
+    id: 'r-1', userId: USER, productId: 'p-1', orderItemId: 'oi-1', images: [], ...over,
+  });
+
   beforeEach(() => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: USER, productId: 'p-1', images: [] });
+    db.review.findFirst.mockResolvedValue(mine());
+    db.review.findUniqueOrThrow.mockResolvedValue(stored);
   });
 
   it('내 리뷰만 고칠 수 있다', async () => {
-    db.review.findFirst.mockResolvedValue({ id: 'r-1', userId: 'u-other', productId: 'p-1', images: [] });
+    db.review.findFirst.mockResolvedValue(mine({ userId: 'u-other' }));
     await expect(updateReview(USER, 'r-1', { rating: 1 })).rejects.toMatchObject({
       code: 'NOT_OWN_REVIEW', status: 403,
     });
   });
 
+  it('운영진이 내린 글은 없는 것과 같다 — 고쳐서 되살릴 수 없다', async () => {
+    db.review.findFirst.mockResolvedValue(null);
+    await expect(updateReview(USER, 'r-1', { rating: 1 })).rejects.toMatchObject({
+      code: 'REVIEW_NOT_FOUND', status: 404,
+    });
+  });
+
   it('보내지 않은 필드는 건드리지 않는다', async () => {
     await updateReview(USER, 'r-1', { rating: 4 });
-    expect(Object.keys(tx.review.update.mock.calls[0]?.[0].data)).toEqual(['rating']);
+    expect(Object.keys(tx.review.update.mock.calls[0]?.[0].data)).toEqual(['rating', 'editedAt']);
   });
 
   it('null 은 지운다는 뜻이라 그대로 보낸다', async () => {
     await updateReview(USER, 'r-1', { sizeFit: null });
-    expect(tx.review.update.mock.calls[0]?.[0].data).toEqual({ sizeFit: null });
+    expect(tx.review.update.mock.calls[0]?.[0].data).toMatchObject({ sizeFit: null });
   });
 
   it('별점을 고치면 집계도 다시 센다', async () => {
     await updateReview(USER, 'r-1', { rating: 4 });
     expect(tx.product.update).toHaveBeenCalled();
+  });
+
+  it('달라진 것이 있으면 고친 시각을 남긴다', async () => {
+    await updateReview(USER, 'r-1', { content: '생각보다 얇습니다. 안에 하나 더 입어야 합니다.' });
+    expect(tx.review.update.mock.calls[0]?.[0].data.editedAt).toBeInstanceOf(Date);
+  });
+
+  it('같은 값을 그대로 저장하면 수정됨이 붙지 않는다', async () => {
+    /*
+     * 저장을 눌렀다는 것만으로 표시가 붙으면, 그 표시를 보고 "내가 읽은 것과 다른 글일 수 있다" 고 판단하는
+     * 사람을 헛되게 만든다.
+     */
+    await updateReview(USER, 'r-1', { rating: stored.rating, content: stored.content });
+    expect(tx.review.update.mock.calls[0]?.[0].data.editedAt).toBeUndefined();
   });
 });
 
@@ -303,5 +338,64 @@ describe('내린 글 되돌리기', () => {
     expect(db.review.findFirst.mock.calls[0]![0].where).toMatchObject({
       deletedAt: { not: null },
     });
+  });
+});
+
+describe('수정할 때의 사진', () => {
+  const photos = [
+    { id: 'i-1', storageKey: 'k-1' },
+    { id: 'i-2', storageKey: 'k-2' },
+  ];
+
+  beforeEach(() => {
+    db.review.findFirst.mockResolvedValue({
+      id: 'r-1', userId: USER, productId: 'p-1', orderItemId: 'oi-1', images: photos,
+    });
+    db.review.findUniqueOrThrow.mockResolvedValue({
+      rating: 5, content: '아주 좋습니다 정말로요', sizeFit: 'TRUE', height: 175, weight: 70,
+    });
+  });
+
+  it('사진 얘기가 없으면 손대지 않는다 — 글만 고치는 요청이 사진을 날리면 안 된다', async () => {
+    await updateReview(USER, 'r-1', { rating: 4 });
+    expect(tx.reviewImage.deleteMany).not.toHaveBeenCalled();
+    expect(discard).not.toHaveBeenCalled();
+  });
+
+  it('남기지 않은 사진은 기록에서도 저장소에서도 지운다', async () => {
+    await updateReview(USER, 'r-1', { keepImageIds: ['i-1'] });
+    expect(tx.reviewImage.deleteMany.mock.calls[0]?.[0].where.id.in).toEqual(['i-2']);
+    expect(discard).toHaveBeenCalledWith(['k-2']);
+  });
+
+  it('빈 목록은 전부 뺀다는 뜻이다', async () => {
+    await updateReview(USER, 'r-1', { keepImageIds: [] });
+    expect(discard).toHaveBeenCalledWith(['k-1', 'k-2']);
+  });
+
+  it('새 사진은 남은 사진 뒤에 붙고, 남은 사진은 번호를 다시 받는다', async () => {
+    // 가운데를 빼면 번호에 구멍이 생기는데, 그대로 두면 새 사진이 옛 사진 앞으로 끼어든다
+    await updateReview(USER, 'r-1', { keepImageIds: ['i-2'] }, [
+      { url: 'https://cdn/new.webp', key: 'k-new', blurDataUrl: null },
+    ]);
+    expect(tx.reviewImage.update.mock.calls[0]?.[0]).toMatchObject({
+      where: { id: 'i-2' }, data: { sortOrder: 0 },
+    });
+    expect(tx.reviewImage.createMany.mock.calls[0]?.[0].data[0]).toMatchObject({
+      storageKey: 'k-new', sortOrder: 1,
+    });
+  });
+
+  it('한도를 넘으면 아무것도 고치지 않는다', async () => {
+    const adding = Array.from({ length: 4 }, (_, i) => ({ url: `u-${i}`, key: `k-${i}`, blurDataUrl: null }));
+    await expect(
+      updateReview(USER, 'r-1', { keepImageIds: ['i-1', 'i-2'] }, adding),
+    ).rejects.toMatchObject({ code: 'TOO_MANY_REVIEW_IMAGES' });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('글자 하나 안 바뀌어도 사진이 바뀌었으면 수정됨이 붙는다', async () => {
+    await updateReview(USER, 'r-1', { keepImageIds: ['i-1'] });
+    expect(tx.review.update.mock.calls[0]?.[0].data.editedAt).toBeInstanceOf(Date);
   });
 });

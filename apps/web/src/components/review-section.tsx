@@ -129,6 +129,13 @@ export function ReviewSection({
                     >
                       {formatDate(t.locale, review.createdAt)}
                     </time>
+                    {/*
+                      고쳐진 글이라고 적는다. 판매자 답글이 달린 뒤에 원문이 바뀌면 답글이 엉뚱해 보이는데,
+                      표시가 없으면 읽는 사람은 그 이유를 알 길이 없다 — 답글 쪽에 이미 같은 표시가 있다.
+                    */}
+                    {review.editedAt && (
+                      <span className="text-[11px] text-[var(--fg-muted)]">{t('review.edited')}</span>
+                    )}
                     {review.isMine && <ReviewActions reviewId={review.id} />}
                     {review.canReport && (
                       <ReviewReport reviewId={review.id} alreadyReported={review.reportedByMe} />

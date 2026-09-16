@@ -18,7 +18,7 @@ const SRC = join(process.cwd(), 'src');
  * 주소가 blob: 이라 브라우저 안에만 있고 서버가 가져올 수 없다. 목록에서
  * 빼는 것이 아니라 **왜 예외인지 적어 두는** 것이 목적이다.
  */
-const RAW_IMG_ALLOWED = ['app/(shop)/mypage/reviews/review-form.tsx', 'components/support-ask-form.tsx'] as const;
+const RAW_IMG_ALLOWED = ['components/review-fields.tsx', 'components/support-ask-form.tsx'] as const;
 
 function walk(dir: string): string[] {
   const out: string[] = [];

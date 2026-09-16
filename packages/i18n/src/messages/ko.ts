@@ -300,7 +300,6 @@ export const ko = {
   'my.allOrders': '전체 주문내역',
   'my.recentOrder': '최근 주문',
   'my.menu': '마이페이지 메뉴',
-  'my.writeReview': '리뷰 쓰기',
   'my.reviewable': '작성 가능 {count}',
   'my.analytics': '이용 기록 수집',
   'my.analyticsNote': '어떤 화면이 느린지, 어디서 그만두는지를 봅니다. 익명 식별자와 해시한 IP 만 남고 밖으로 나가지 않습니다.',
@@ -382,6 +381,10 @@ export const ko = {
 
   'my.reviewLead': '배송이 완료된 상품에 후기를 남길 수 있습니다.',
   'my.reviewNone': '지금 리뷰를 쓸 수 있는 상품이 없습니다.',
+  'my.reviews': '내 리뷰',
+  'my.reviewToWrite': '쓸 수 있는 상품',
+  'my.reviewsWritten': '내가 쓴 리뷰',
+  'my.reviewsWrittenNone': '아직 쓴 리뷰가 없습니다.',
   'my.delivered': '배송 완료',
 
   'my.addressesHeading': '배송지 관리',
@@ -655,6 +658,18 @@ export const ko = {
   'review.posting': '등록 중…',
   'review.post': '리뷰 등록',
   'review.saveFailed': '리뷰를 저장하지 못했습니다.',
+  'review.edit': '수정',
+  'review.edited': '수정됨',
+  'review.editTitle': '리뷰 수정',
+  'review.editSaved': '리뷰를 수정했습니다.',
+  'review.editRepliedNote': '판매자 답글이 달린 글입니다. 고치면 손님 화면에 수정됨으로 표시됩니다.',
+  'review.save': '저장',
+  'review.saving': '저장 중…',
+  'review.currentPhotos': '올린 사진',
+  'review.currentPhoto': '올린 사진 {index}',
+  'review.keepPhoto': '사진 {index} 남기기',
+  'review.addPhotos': '사진 더 올리기 (선택)',
+  'review.photoCount': { one: '사진 {count}장', other: '사진 {count}장' },
 
   // ── 재입고 · 찜 ─────────────────────────────────────────
   'restock.on': '재입고 알림 신청',

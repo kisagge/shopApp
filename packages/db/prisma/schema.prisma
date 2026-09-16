@@ -1193,6 +1193,12 @@ model Review {
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  /// 글쓴이가 고친 시각. 화면에 "수정됨" 으로 적는다 — 판매자 답글이 달린 뒤에 원문이 바뀌면
+  /// 답글이 엉뚱해 보이는데, 표시가 없으면 읽는 사람은 그 이유를 알 길이 없다.
+  ///
+  /// updatedAt 으로는 답할 수 없다. 도움돼요 표가 오갈 때도 그 행이 갱신되므로
+  /// "고쳐졌는가" 와 "건드려졌는가" 가 섞인다.
+  editedAt  DateTime?
   deletedAt DateTime?
 
   @@index([productId, createdAt])

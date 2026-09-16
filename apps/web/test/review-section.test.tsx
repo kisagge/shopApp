@@ -16,7 +16,7 @@ const review = (over: Record<string, unknown> = {}) => ({
   id: 'r-1', rating: 4, content: '두껍고 따뜻합니다',
   sizeFit: 'TRUE', height: 175, weight: 70,
   authorName: '데****자', optionLabel: '오트밀 / M',
-  createdAt: new Date('2026-09-01T00:00:00Z'), images: [], isMine: false,
+  createdAt: new Date('2026-09-01T00:00:00Z'), editedAt: null, images: [], isMine: false,
   canReport: false, reportedByMe: false,
   helpfulCount: 0, helpfulByMe: false, reply: null,
   ...over,

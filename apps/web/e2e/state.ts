@@ -23,6 +23,9 @@ export const STATE_FILE = {
   cartTotal: 'test-results/.auth/cart-total.json',
   cartCallback: 'test-results/.auth/cart-callback.json',
 
+  /** 자기 리뷰를 쓰고 고친다 — review-edit */
+  reviewEditor: 'test-results/.auth/review-edit.json',
+
   /** 마지막 한 개를 두고 겨루는 두 사람 — stock-race */
   raceBuyerA: 'test-results/.auth/race-a.json',
   raceBuyerB: 'test-results/.auth/race-b.json',
@@ -104,6 +107,11 @@ export const RACE_PRODUCT = {
   exchange: 'cotton-field-jacket',
   /** 사서 받고 구매확정한다 — purchase-confirm. 재고 하나를 물고 돌려주지 않으므로 옵션과 재고가 넉넉한 자사 브랜드 상품이다 */
   purchaseConfirm: 'canvas-low-sneakers',
+  /**
+   * 사서 받고 리뷰를 써서 고친다 — review-edit. **다른 명세가 리뷰를 쓰지 않는 상품**이어야 한다: 리뷰는 상품 행에
+   * 미리 세어 둔 평점을 흔들고, 이 명세는 그 상품의 리뷰 글을 눈으로 찾는다.
+   */
+  reviewEdit: 'alpaca-shawl-cardigan',
 } as const;
 
 export const REVIEW_PRODUCT = {

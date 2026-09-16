@@ -43,8 +43,18 @@ export const createReviewSchema = z.object({
 });
 export type CreateReviewInput = z.infer<typeof createReviewSchema>;
 
-/** 수정은 부분 갱신. 기본값을 두지 않는다 — .partial() 이 걷어내지 않는다. */
-export const updateReviewSchema = z.object(reviewShape).partial();
+/**
+ * 수정은 부분 갱신. 기본값을 두지 않는다 — .partial() 이 걷어내지 않는다.
+ *
+ * **사진은 "남길 것" 을 받는다.** 뺄 것을 받으면 화면이 보고 있던 목록과 서버의 목록이 어긋났을 때 엉뚱한 사진이 지워진다.
+ * 새로 올릴 파일은 여기 없다 — 작성과 같은 이유로 multipart 로 온다(주소를 받으면 남의 서버 그림이 우리 이름으로 실린다).
+ *
+ * 키 자체가 없으면 사진은 그대로 둔다. 빈 배열은 "전부 뺀다" 는 뜻이다.
+ */
+export const updateReviewSchema = z.object({
+  ...reviewShape,
+  keepImageIds: z.array(cuidSchema),
+}).partial();
 export type UpdateReviewInput = z.infer<typeof updateReviewSchema>;
 
 /**

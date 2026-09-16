@@ -1,4 +1,5 @@
 import type { OrderStatus } from './order-state';
+import { MAX_IMAGES_PER_REVIEW } from './image';
 
 /**
  * 리뷰 규칙. 순수 로직만.
@@ -112,6 +113,59 @@ export function sizeFitSummary(fits: readonly (string | null)[]): SizeFitSummary
     const count = answered.filter((f) => f === fit).length;
     return { fit, count, percent: total === 0 ? 0 : Math.round((count / total) * 100) };
   });
+}
+
+export interface ReviewImageRef {
+  readonly id: string;
+  readonly storageKey: string;
+}
+
+export interface ReviewImagePlan {
+  /** 남길 사진 — 화면에 보이던 차례 그대로다 */
+  readonly keep: readonly ReviewImageRef[];
+  /** 뺄 사진. 저장소에서도 지울 대상이라 키까지 들고 나간다 */
+  readonly remove: readonly ReviewImageRef[];
+  /** 남길 것 + 새로 올릴 것 */
+  readonly total: number;
+  readonly overLimit: boolean;
+}
+
+/**
+ * 리뷰를 고칠 때 사진을 어떻게 갈아 끼울지.
+ *
+ * **화면이 보내는 것은 "남길 것" 이지 "뺄 것" 이 아니다.** 뺄 것을 받으면 화면이 보고 있던 목록과 서버의 목록이 어긋났을 때
+ * 엉뚱한 사진이 지워진다 — 다른 탭에서 먼저 한 장을 뺀 경우가 그렇다. 남길 것만 받으면 그 어긋남은 "이미 없는 것을 남기라고
+ * 했다" 가 되어 조용히 넘어간다.
+ *
+ * 모르는 id 는 무시한다. 남의 사진 id 를 끼워 넣어도 이 리뷰의 사진이 아니면 애초에 keep 에 들어오지 않는다.
+ */
+export function planReviewImages(
+  existing: readonly ReviewImageRef[],
+  keepIds: readonly string[],
+  addingCount: number,
+  max: number = MAX_IMAGES_PER_REVIEW,
+): ReviewImagePlan {
+  const wanted = new Set(keepIds);
+  const keep = existing.filter((image) => wanted.has(image.id));
+  const remove = existing.filter((image) => !wanted.has(image.id));
+  const total = keep.length + addingCount;
+
+  return { keep, remove, total, overLimit: total > max };
+}
+
+/**
+ * 고친 글인가.
+ *
+ * **저장을 눌렀다는 것만으로 "수정됨" 을 붙이지 않는다.** 아무것도 안 바꾸고 나온 사람에게까지 그 표시가 붙으면, 표시를 보고
+ * "내가 읽은 것과 다른 글일 수 있다" 고 판단하는 사람을 헛되게 만든다. 표시는 실제로 달라졌을 때만 뜻이 있다.
+ */
+export function reviewChanged(
+  before: Readonly<Record<string, unknown>>,
+  after: Readonly<Record<string, unknown>>,
+  imagesChanged = false,
+): boolean {
+  if (imagesChanged) return true;
+  return Object.entries(after).some(([field, value]) => value !== undefined && before[field] !== value);
 }
 
 export const REVIEW_ERROR = [

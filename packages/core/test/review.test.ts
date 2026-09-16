@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   averageRating, ratingScore, ratingBreakdown, sizeFitSummary,
-  isReviewableStatus, isSizeFit, RATING_MAX, RATING_MIN,
+  isReviewableStatus, isSizeFit, planReviewImages, reviewChanged, RATING_MAX, RATING_MIN,
 } from '../src/review';
 
 describe('평균 평점', () => {
@@ -95,5 +95,66 @@ describe('사이즈 값', () => {
 describe('평점 범위', () => {
   it('1~5 다', () => {
     expect([RATING_MIN, RATING_MAX]).toEqual([1, 5]);
+  });
+});
+
+describe('사진 갈아 끼우기', () => {
+  const photos = [
+    { id: 'i-1', storageKey: 'k-1' },
+    { id: 'i-2', storageKey: 'k-2' },
+    { id: 'i-3', storageKey: 'k-3' },
+  ];
+
+  it('남길 것만 남기고 나머지는 뺄 대상이 된다', () => {
+    const plan = planReviewImages(photos, ['i-1', 'i-3'], 0);
+    expect(plan.keep.map((i) => i.id)).toEqual(['i-1', 'i-3']);
+    // 저장소에서도 지워야 하므로 키까지 들고 나간다
+    expect(plan.remove.map((i) => i.storageKey)).toEqual(['k-2']);
+  });
+
+  it('원래 차례를 지킨다 — 남길 것을 거꾸로 적어 보내도 사진이 뒤집히지 않는다', () => {
+    expect(planReviewImages(photos, ['i-3', 'i-1'], 0).keep.map((i) => i.id)).toEqual(['i-1', 'i-3']);
+  });
+
+  it('모르는 id 는 무시한다 — 남의 사진 id 를 끼워 넣어도 이 리뷰의 것이 아니면 들어오지 않는다', () => {
+    const plan = planReviewImages(photos, ['i-1', 'someone-elses'], 0);
+    expect(plan.keep.map((i) => i.id)).toEqual(['i-1']);
+    expect(plan.remove).toHaveLength(2);
+  });
+
+  it('한도는 남길 것과 새로 올릴 것을 함께 센다', () => {
+    // 세 장을 그대로 두고 세 장을 더하면 여섯 장이다
+    expect(planReviewImages(photos, ['i-1', 'i-2', 'i-3'], 3).overLimit).toBe(true);
+    // 두 장을 빼고 세 장을 더하면 네 장이라 들어간다
+    expect(planReviewImages(photos, ['i-1'], 3).overLimit).toBe(false);
+  });
+
+  it('빈 목록은 전부 빼라는 뜻이다', () => {
+    expect(planReviewImages(photos, [], 0).remove).toHaveLength(3);
+  });
+});
+
+describe('고쳐졌는가', () => {
+  const before = { rating: 4, content: '두껍고 따뜻합니다', sizeFit: 'TRUE', height: 175, weight: 70 };
+
+  it('값이 달라지면 고쳐진 것이다', () => {
+    expect(reviewChanged(before, { content: '생각보다 얇습니다' })).toBe(true);
+    expect(reviewChanged(before, { rating: 2 })).toBe(true);
+  });
+
+  it('같은 값을 그대로 저장하면 고쳐진 것이 아니다', () => {
+    /*
+     * 아무것도 안 바꾸고 나온 사람에게까지 "수정됨" 이 붙으면, 그 표시를 보고 "내가 읽은 것과 다른 글일 수 있다" 고
+     * 판단하는 사람을 헛되게 만든다.
+     */
+    expect(reviewChanged(before, { rating: 4, content: '두껍고 따뜻합니다' })).toBe(false);
+  });
+
+  it('보내지 않은 칸은 견주지 않는다 — 부분 갱신이다', () => {
+    expect(reviewChanged(before, { rating: undefined, content: undefined })).toBe(false);
+  });
+
+  it('글자 하나 안 바뀌어도 사진이 바뀌었으면 고쳐진 것이다', () => {
+    expect(reviewChanged(before, {}, true)).toBe(true);
   });
 });

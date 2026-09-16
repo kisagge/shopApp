@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { discardReviewImages } from './images';
 import {
-  isReviewableStatus, ratingScore,
+  ImageError, isReviewableStatus, planReviewImages, ratingScore, reviewChanged,
   REVIEW_ERROR_MESSAGE, type ReviewErrorCode,
 } from '@shop/core';
 import type { CreateReviewInput, UpdateReviewInput } from '@shop/contract';
@@ -22,12 +22,13 @@ export interface ReviewRow {
   readonly height: number | null;
   readonly weight: number | null;
   readonly createdAt: Date;
+  readonly editedAt: Date | null;
   readonly productId: string;
 }
 
 const select = {
   id: true, rating: true, content: true, sizeFit: true,
-  height: true, weight: true, createdAt: true, productId: true,
+  height: true, weight: true, createdAt: true, editedAt: true, productId: true,
   images: { select: { url: true, blurDataUrl: true }, orderBy: { sortOrder: 'asc' } },
 } as const;
 
@@ -148,29 +149,114 @@ export async function createReview(
   });
 }
 
+export interface EditableReview {
+  readonly id: string;
+  readonly productId: string;
+  readonly orderItemId: string;
+  readonly images: readonly { id: string; storageKey: string }[];
+}
+
+/**
+ * 이 사람이 이 리뷰를 고칠 수 있는가.
+ *
+ * **사진을 올리기 전에** 같은 판단이 필요해서 꺼냈다 — 작성 쪽의 assertCanReview 와 같은 이유다. 순서가 반대면 남의 리뷰
+ * id 를 적어 파일만 올리는 길이 열린다. 올릴 자리(orderItemId)도 함께 내보낸다.
+ *
+ * 운영진이 내린 글(deletedAt)은 여기 걸리지 않는다. 사유가 있어 내린 글을 고쳐서 되살릴 수 있으면 안 된다.
+ */
+export async function assertCanEditReview(userId: string, reviewId: string): Promise<EditableReview> {
+  const review = await prisma.review.findFirst({
+    where: { id: reviewId, deletedAt: null },
+    select: {
+      id: true, userId: true, productId: true, orderItemId: true,
+      images: { select: { id: true, storageKey: true }, orderBy: { sortOrder: 'asc' } },
+    },
+  });
+  if (!review) throw new ReviewError('REVIEW_NOT_FOUND', 404);
+  if (review.userId !== userId) throw new ReviewError('NOT_OWN_REVIEW', 403);
+
+  return review;
+}
+
 export async function updateReview(
   userId: string,
   reviewId: string,
   input: UpdateReviewInput,
+  /** 이미 올라간 사진. 작성과 같이, 트랜잭션 밖에서 올린 것만 들어온다 */
+  added: readonly { url: string; key: string; blurDataUrl: string | null }[] = [],
 ): Promise<ReviewRow> {
-  const before = await prisma.review.findFirst({
-    where: { id: reviewId, deletedAt: null },
-    select: { id: true, userId: true, productId: true },
-  });
-  if (!before) throw new ReviewError('REVIEW_NOT_FOUND', 404);
-  if (before.userId !== userId) throw new ReviewError('NOT_OWN_REVIEW', 403);
+  const before = await assertCanEditReview(userId, reviewId);
 
+  const { keepImageIds, ...fields } = input;
   // 보내지 않은 필드는 키 자체를 뺀다. null 은 "지운다"는 뜻이라 그대로 실어야 한다.
   const data = Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined),
+    Object.entries(fields).filter(([, value]) => value !== undefined),
   );
 
-  return prisma.$transaction(async (tx) => {
-    const review = await tx.review.update({ where: { id: reviewId }, data, select });
+  /*
+   * 사진 키가 아예 없으면 손대지 않는다 — 글만 고치는 요청(JSON)이 사진을 통째로 날리면 안 된다.
+   * 빈 배열은 "전부 뺀다" 는 뜻이라 그대로 따른다.
+   */
+  const plan = keepImageIds === undefined
+    ? planReviewImages(before.images, before.images.map((i) => i.id), added.length)
+    : planReviewImages(before.images, keepImageIds, added.length);
+  if (plan.overLimit) throw new ImageError('TOO_MANY_REVIEW_IMAGES');
+
+  const imagesChanged = plan.remove.length > 0 || added.length > 0;
+  const current = await prisma.review.findUniqueOrThrow({
+    where: { id: reviewId },
+    select: { rating: true, content: true, sizeFit: true, height: true, weight: true },
+  });
+
+  const review = await prisma.$transaction(async (tx) => {
+    if (plan.remove.length > 0) {
+      await tx.reviewImage.deleteMany({ where: { id: { in: plan.remove.map((i) => i.id) } } });
+      /*
+       * 남은 것에 0부터 다시 번호를 매긴다. 가운데 한 장을 빼면 번호에 구멍이 생기는데(0,2),
+       * 그 뒤에 새 사진을 1번으로 붙이면 화면에서는 새 사진이 옛 사진 앞으로 끼어든다.
+       */
+      await Promise.all(
+        plan.keep.map((image, sortOrder) =>
+          tx.reviewImage.update({ where: { id: image.id }, data: { sortOrder } }),
+        ),
+      );
+    }
+    if (added.length > 0) {
+      await tx.reviewImage.createMany({
+        data: added.map((image, at) => ({
+          reviewId,
+          url: image.url,
+          storageKey: image.key,
+          blurDataUrl: image.blurDataUrl,
+          // 남은 사진 뒤에 붙는다 — 순서가 곧 화면에 보이는 차례다
+          sortOrder: plan.keep.length + at,
+        })),
+      });
+    }
+
+    const updated = await tx.review.update({
+      where: { id: reviewId },
+      data: {
+        ...data,
+        // 실제로 달라졌을 때만 "수정됨" 을 붙인다
+        ...(reviewChanged(current, data, imagesChanged) ? { editedAt: new Date() } : {}),
+      },
+      select,
+    });
     // 별점을 고쳤을 수 있다
     await recountRating(tx as typeof prisma, before.productId);
-    return review;
+    return updated;
   });
+
+  /*
+   * 뺀 사진은 기록이 지워진 뒤에 저장소에서 지운다. 실패해도 넘어간다 — 화면에서 사라지는 것이 먼저고,
+   * 남은 객체는 눈에 보이는 피해가 없다. 삭제와 같은 판단이다.
+   */
+  if (plan.remove.length > 0) {
+    await discardReviewImages(plan.remove.map((i) => i.storageKey));
+  }
+
+  return review;
 }
 
 /**
