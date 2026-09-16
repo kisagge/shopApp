@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  settlementPeriod, isClosedPeriod, previousYearMonth,
+  settlementPeriod, isClosedPeriod, previousYearMonth, yearMonthOf, settlementWorthTelling,
   calculateSettlement, isRecalculable, SettlementError,
 } from '../src/settlement';
 import { won } from '../src/money';
@@ -66,6 +66,46 @@ describe('앞 달 계산', () => {
   it('KST 로 해가 바뀐 직후를 앞해 12월로 본다', () => {
     // 2026-01-01 08:00 KST = 2025-12-31 23:00 UTC
     expect(previousYearMonth(new Date('2025-12-31T23:00:00Z'))).toBe('2025-12');
+  });
+});
+
+describe('그 시각이 속한 달', () => {
+  it('정산 행의 시작 시각을 그 달 이름으로 되읽는다', () => {
+    /*
+     * 정산 행은 기간의 시작 시각만 들고 다닌다. 8월 정산의 시작은 7월 31일
+     * 15:00 UTC 라서, UTC 로 읽으면 알림이 "2026-07 정산" 이라고 말한다.
+     */
+    expect(yearMonthOf(settlementPeriod('2026-08').start)).toBe('2026-08');
+  });
+
+  it('해가 바뀌는 자리도 KST 로 읽는다', () => {
+    expect(yearMonthOf(settlementPeriod('2026-01').start)).toBe('2026-01');
+  });
+
+  it('달의 마지막 순간은 아직 그 달이다', () => {
+    const august = settlementPeriod('2026-08');
+    expect(yearMonthOf(new Date(august.end.getTime() - 1))).toBe('2026-08');
+    expect(yearMonthOf(august.end)).toBe('2026-09');
+  });
+});
+
+describe('마감을 알릴 만한가', () => {
+  it('판 것이 있으면 알린다', () => {
+    expect(settlementWorthTelling({ grossAmount: won(413_000), refundAmount: won(0) })).toBe(true);
+  });
+
+  it('오간 것이 없는 달은 알리지 않는다 — 장부에는 남지만 할 말은 아니다', () => {
+    /*
+     * 마감은 쉬고 있는 가맹점에도 0원짜리 한 줄을 쓴다(내려받은 정산 파일의 합이
+     * 맞아야 한다). 그 줄마다 알림을 보내면 알림함이 매달 0원으로 채워져서,
+     * 정작 돈이 오간 달의 알림까지 함께 지나친다.
+     */
+    expect(settlementWorthTelling({ grossAmount: won(0), refundAmount: won(0) })).toBe(false);
+  });
+
+  it('환불만 있어 지급액이 음수인 달은 알린다', () => {
+    // 오간 것이 없어서 0원인 것과, 물러난 돈이 있어서 마이너스인 것은 전혀 다른 소식이다
+    expect(settlementWorthTelling({ grossAmount: won(0), refundAmount: won(90_000) })).toBe(true);
   });
 });
 

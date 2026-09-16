@@ -67,14 +67,39 @@ export function isClosedPeriod(period: SettlementPeriod, now: Date): boolean {
   return now.getTime() >= period.end.getTime();
 }
 
+/**
+ * 그 시각이 속한 달 — KST 기준 'YYYY-MM'.
+ *
+ * 정산 행은 기간의 시작 시각만 들고 다닌다(periodStart). 그 행을 두고 사람에게
+ * 말을 걸려면 "2026-08 정산" 처럼 달 이름이 필요한데, 그 시각은 8월 1일 00:00
+ * KST = 7월 31일 15:00 UTC 다 — UTC 로 읽으면 한 달 전을 말하게 된다.
+ */
+export function yearMonthOf(instant: Date): string {
+  const kst = new Date(instant.getTime() + KST_OFFSET_MS);
+  return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 /** 그 시각이 속한 달의 앞 달 — 정산 배치가 기본으로 도는 대상 */
 export function previousYearMonth(now: Date): string {
-  const kst = new Date(now.getTime() + KST_OFFSET_MS);
-  const year = kst.getUTCFullYear();
-  const month = kst.getUTCMonth(); // 0-based 이므로 이미 앞 달
-  const target = month === 0 ? { y: year - 1, m: 12 } : { y: year, m: month };
-  return `${target.y}-${String(target.m).padStart(2, '0')}`;
+  // 이 달 1일 KST 의 한 순간 전 = 앞 달의 마지막 순간. 12월→1월 넘김을 따로 적지 않는다.
+  return yearMonthOf(new Date(settlementPeriod(yearMonthOf(now)).start.getTime() - 1));
 }
+
+/**
+ * 마감 결과를 그 가맹점에게 알릴 만한가.
+ *
+ * **마감은 판 것이 없는 가맹점에도 한 줄을 쓴다** — 그 달 장부는 0원이라도 있어야
+ * 내려받은 정산 파일의 합이 맞는다. 하지만 장부에 필요한 것과 사람에게 할 말은
+ * 다르다. 쉬고 있는 가맹점에 매달 "0원이 확정되었습니다" 가 가면, 그 알림함은
+ * 읽을 것이 없는 곳이 되어 정작 돈이 오간 달의 알림까지 함께 지나친다.
+ *
+ * 환불만 있어 지급액이 음수인 달은 **알린다.** 오간 것이 없어서 0원인 것과
+ * 물러난 돈이 있어서 마이너스인 것은 전혀 다른 소식이다.
+ */
+export const settlementWorthTelling = (amounts: {
+  readonly grossAmount: Won;
+  readonly refundAmount: Won;
+}): boolean => amounts.grossAmount !== 0 || amounts.refundAmount !== 0;
 
 export interface SettlementAmounts {
   readonly grossAmount: Won;

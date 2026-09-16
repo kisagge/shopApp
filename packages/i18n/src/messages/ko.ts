@@ -1174,6 +1174,8 @@ export const ko = {
   'notif.MERCHANT_APPROVED': '{merchantName} 입점이 승인되었습니다 — 이제 상품을 올릴 수 있습니다',
   'notif.MERCHANT_REJECTED': '{merchantName} 입점 신청이 반려되었습니다 — {reason}',
   'notif.REVIEW_REPLIED': '{productName} 리뷰에 판매자가 답글을 남겼습니다.',
+  'notif.SETTLEMENT_CLOSED': '{period} 정산이 확정되었습니다 — 지급 예정액 {amount}원',
+  'notif.SETTLEMENT_PAID': '{period} 정산금 {amount}원이 지급되었습니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

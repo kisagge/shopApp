@@ -1810,6 +1810,9 @@ enum NotificationKind {
   /// 쿠폰·적립금이 한 주 안에 사라진다
   COUPON_EXPIRING
   POINTS_EXPIRING
+  /// 지난달 정산이 확정됐다 / 지급이 나갔다 — 둘 다 운영 알림함에만 뜬다
+  SETTLEMENT_CLOSED
+  SETTLEMENT_PAID
 }
 
 model Notification {

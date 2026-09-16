@@ -2,9 +2,10 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  hasSettlementAccount, won,
+  hasSettlementAccount, settlementWorthTelling, won,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
+import { notifySettlementClosed, notifySettlementPaid } from '~/lib/notifications/settlement';
 
 /**
  * 정산 확정.
@@ -165,6 +166,13 @@ export async function closeSettlements(
   let created = 0;
   let updated = 0;
   const skipped: string[] = [];
+  /*
+   * **처음 확정될 때만 알린다.** 이 함수는 여러 번 돌려도 결과가 같게 만들어 뒀고,
+   * 배치는 실제로 재실행된다 — 재실행마다 알리면 같은 달 정산이 알림함에 여러 번
+   * 쌓여서, 두 번째부터는 아무도 읽지 않는다. 다시 계산해 금액이 바뀐 경우는
+   * 알리지 않고 두는 편이 낫다고 봤다: 그 숫자는 정산 화면이 늘 옳게 보여 준다.
+   */
+  const told: { merchantId: string; netAmount: number }[] = [];
 
   for (const d of drafts) {
     if (d.existingStatus !== null && !isRecalculable(d.existingStatus)) {
@@ -203,9 +211,16 @@ export async function closeSettlements(
       select: { id: true },
     });
 
-    if (d.existingStatus === null) created += 1;
-    else updated += 1;
+    if (d.existingStatus === null) {
+      created += 1;
+      // 판 것도 돌아간 것도 없는 달은 장부에만 남긴다 — 0원 확정을 매달 보내면 알림함이 죽는다
+      if (settlementWorthTelling(d)) told.push({ merchantId: d.merchantId, netAmount: d.netAmount });
+    } else {
+      updated += 1;
+    }
   }
+
+  await notifySettlementClosed(yearMonth, told);
 
   return { yearMonth, created, updated, skipped };
 }
@@ -218,6 +233,8 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
     where: { id: settlementId },
     select: {
       id: true, status: true, netAmount: true,
+      // 알림이 "어느 달 정산인지" 를 말해야 한다. 행은 기간의 시작 시각만 들고 다닌다
+      merchantId: true, periodStart: true,
       merchant: {
         select: {
           name: true,
@@ -261,6 +278,16 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
   if (result.count === 0) {
     throw new SettlementCloseError('ALREADY_PAID', 409, '이미 지급된 정산입니다.');
   }
+
+  /*
+   * 상태를 바꾼 뒤에 알린다 — 위 updateMany 가 한 번만 통과하므로 두 사람이 동시에
+   * 눌러도 알림은 한 번 나간다. 먼저 알리면 진 쪽도 알림을 남기게 된다.
+   */
+  await notifySettlementPaid({
+    merchantId: before.merchantId,
+    periodStart: before.periodStart,
+    netAmount: before.netAmount,
+  });
 
   return {
     id: before.id,

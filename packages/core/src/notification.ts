@@ -81,6 +81,19 @@ export const NOTIFICATION_KIND = [
   /** 쿠폰·적립금이 한 주 안에 사라진다 — 들어와야 보이는 것을 미리 알린다 */
   'COUPON_EXPIRING',
   'POINTS_EXPIRING',
+  /**
+   * 지난달 정산이 확정됐다 / 지급이 나갔다.
+   *
+   * **돈이 오갔는데 아무 말도 하지 않았다.** 마감은 배치가 새벽에 돌고, 지급은
+   * 운영진이 누른다 — 둘 다 가맹점이 없는 자리에서 일어나는 일이라, 가맹점은
+   * 정산 화면을 열어 뱃지가 "지급됨" 으로 바뀐 것을 보고서야 알았다. 그래서
+   * "들어왔나" 를 확인하러 며칠씩 화면을 여닫게 된다.
+   *
+   * **금액을 알림에 싣는다.** "정산이 확정되었습니다" 만으로는 결국 화면을 열게
+   * 되고, 그러면 알린 뜻이 없다.
+   */
+  'SETTLEMENT_CLOSED',
+  'SETTLEMENT_PAID',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
@@ -99,6 +112,9 @@ export const CONSOLE_NOTIFICATION_KIND = [
   // 검수 결과는 상품을 올린 사람이 들을 말이다 — 손님으로 온 자리에 뜰 것이 아니다
   'PRODUCT_APPROVED',
   'PRODUCT_REJECTED',
+  // 정산은 장사의 일이다. 누르면 정산 화면으로 가니 운영 알림함이 아니면 갈 곳이 없다
+  'SETTLEMENT_CLOSED',
+  'SETTLEMENT_PAID',
 ] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>

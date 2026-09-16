@@ -1144,4 +1144,6 @@ export const en: Dictionary = {
   'notif.MERCHANT_APPROVED': '{merchantName} was approved — you can list products now',
   'notif.MERCHANT_REJECTED': '{merchantName} application was declined — {reason}',
   'notif.REVIEW_REPLIED': 'The seller replied to your review of {productName}.',
+  'notif.SETTLEMENT_CLOSED': 'Settlement for {period} is confirmed — {amount} KRW due',
+  'notif.SETTLEMENT_PAID': 'Settlement for {period} was paid — {amount} KRW',
 };

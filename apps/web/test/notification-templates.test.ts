@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AFTER_SALE_KIND, NOTIFICATION_KIND, NOTIFICATION_PARAMS, type Actor } from '@shop/core';
 import { LOCALES, translatorFor } from '@shop/i18n';
 import { ko } from '@shop/i18n/messages/ko';
+import { DICTIONARIES } from '@shop/i18n/all';
 import { TEMPLATE_LOCALES } from '@shop/contract';
 
 /**
@@ -109,6 +110,22 @@ describe('알림함이 읽는 문구', () => {
   it('고친 문구가 있으면 그것으로, 없으면 사전의 기본 문구로', () => {
     expect(notificationText(t, 'COUPON_ISSUED', { couponName: '가을' }, '{couponName} 받아 가세요')).toBe('가을 받아 가세요');
     expect(notificationText(t, 'COUPON_ISSUED', { couponName: '가을' })).toBe('가을 쿠폰이 도착했습니다');
+  });
+
+  it('정산 알림은 말마다 기간과 금액을 둘 다 말한다', () => {
+    /*
+     * **금액이 빠지면 알린 뜻이 없다.** "정산이 확정되었습니다" 만으로는 얼마인지
+     * 보러 결국 정산 화면을 열게 되는데, 화면을 안 열어도 알게 하려고 만든 알림이다.
+     * 옮긴 문구에서 {amount} 하나가 떨어지는 것은 눈에 잘 띄지 않아 검사로 막는다.
+     */
+    for (const locale of LOCALES) {
+      const tr = translatorFor(locale, DICTIONARIES[locale]);
+      for (const kind of ['SETTLEMENT_CLOSED', 'SETTLEMENT_PAID'] as const) {
+        const line = notificationText(tr, kind, { period: '2026-08', amount: '750,000' });
+        expect(line, `${locale}/${kind}`).toContain('2026-08');
+        expect(line, `${locale}/${kind}`).toContain('750,000');
+      }
+    }
   });
 
   it('끼울 값이 빠진 옛 알림은 고친 문구 대신 기본 문구로 — 자리표시가 글자로 보이지 않는다', () => {

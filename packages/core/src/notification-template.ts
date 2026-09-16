@@ -37,6 +37,9 @@ export const NOTIFICATION_PARAMS = {
   ACCOUNT_RESTORED: [],
   COUPON_EXPIRING: ['count', 'date'],
   POINTS_EXPIRING: ['points', 'date'],
+  /** 금액까지 싣는다 — 기간만 알리면 얼마인지 보러 결국 화면을 열게 된다 */
+  SETTLEMENT_CLOSED: ['period', 'amount'],
+  SETTLEMENT_PAID: ['period', 'amount'],
 } as const satisfies Record<NotificationKind, readonly string[]>;
 
 /** 미리보기에 끼울 값. 운영자가 고친 문구가 실제로 어떻게 읽히는지 보려고 쓴다 */
@@ -51,6 +54,8 @@ export const NOTIFICATION_SAMPLE_PARAMS: Readonly<Record<string, string>> = {
   date: '2026-09-22',
   reason: '대표 이미지에 다른 브랜드 로고가 보입니다',
   merchantName: '스튜디오 눈',
+  period: '2026-08',
+  amount: '1,284,000',
 };
 
 /** 알림 한 줄의 상한. 머리의 알림 목록과 앱 알림에 한눈에 들어가야 한다 */

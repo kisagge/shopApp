@@ -39,6 +39,8 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   ACCOUNT_RESTORED: '이용 정지 해제',
   COUPON_EXPIRING: '쿠폰 기한 임박',
   POINTS_EXPIRING: '적립금 소멸 임박',
+  SETTLEMENT_CLOSED: '정산 확정',
+  SETTLEMENT_PAID: '정산 지급',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */
@@ -53,6 +55,8 @@ const PARAM_LABEL: Record<string, string> = {
   points: '포인트(쉼표 포함)',
   count: '개수',
   date: '가장 빠른 날(YYYY-MM-DD)',
+  period: '정산 기간(YYYY-MM)',
+  amount: '금액(원, 쉼표 포함)',
 };
 
 /**

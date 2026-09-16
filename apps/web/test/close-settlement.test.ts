@@ -5,6 +5,9 @@ const db = vi.hoisted(() => ({
   merchant: { findMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { groupBy: vi.fn<(...a: any[]) => any>() },
   settlement: { findMany: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
+  // 알림을 진짜로 남기는 길을 함께 본다 — 모듈을 흉내 내면 "안 부른다" 를 못 잡는다
+  user: { findMany: vi.fn<(...a: any[]) => any>() },
+  notification: { createMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -21,6 +24,9 @@ const AFTER = new Date('2026-09-02T00:00:00Z');
 /** 2026-08 진행 중 */
 const DURING = new Date('2026-08-15T00:00:00Z');
 
+/** 가맹점에 소속된 계정. 알림이 여기로 간다 */
+let staff: { id: string; merchantId: string }[];
+
 beforeEach(() => {
   vi.clearAllMocks();
   db.merchant.findMany.mockResolvedValue([
@@ -35,7 +41,15 @@ beforeEach(() => {
     .mockResolvedValueOnce([{ merchantId: 'm-a', _sum: { subtotal: 100_000 } }]);
   db.settlement.findMany.mockResolvedValue([]);
   db.settlement.upsert.mockResolvedValue({ id: 's-1' });
+  // where 를 흉내 낸다 — 그냥 전부 돌려주면 "남의 가맹점에는 안 간다" 가 검사되지 않는다
+  staff = [{ id: 'u-moore', merchantId: 'm-a' }, { id: 'u-noon', merchantId: 'm-b' }];
+  db.user.findMany.mockImplementation(async (args: any) =>
+    staff.filter((s) => (args.where.merchantId.in as string[]).includes(s.merchantId)));
+  db.notification.createMany.mockResolvedValue({ count: 1 });
 });
+
+/** 방금 남긴 알림들 — createMany 에 실려 간 줄 */
+const notices = () => db.notification.createMany.mock.calls.flatMap((c) => c[0].data as any[]);
 
 describe('초안 계산', () => {
   it('가맹점별로 매출·수수료·환불을 묶는다', async () => {
@@ -188,6 +202,153 @@ describe('기간 확정', () => {
   });
 });
 
+/**
+ * 마감·지급 알림.
+ *
+ * 마감은 배치가 새벽에 돌고 지급은 운영진이 누른다 — 둘 다 가맹점이 없는 자리에서
+ * 일어나는 일이라, 지금까지는 정산 화면을 열어 뱃지가 바뀐 것을 보고서야 알았다.
+ */
+describe('마감을 알린다', () => {
+  it('가맹점마다 지급 예정액과 기간을 실어 보낸다', async () => {
+    await closeSettlements(admin, '2026-08', AFTER);
+
+    expect(notices()).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        userId: 'u-moore',
+        kind: 'SETTLEMENT_CLOSED',
+        params: { period: '2026-08', amount: '750,000' },
+        linkPath: '/admin/settlements',
+      }),
+    ]));
+  });
+
+  it('그 가맹점에 소속된 계정 전부에게 간다 — 누가 돈을 챙기는지 우리는 모른다', async () => {
+    staff.push({ id: 'u-moore-2', merchantId: 'm-a' });
+
+    await closeSettlements(admin, '2026-08', AFTER);
+
+    expect(notices().filter((n) => n.params.amount === '750,000').map((n) => n.userId))
+      .toEqual(['u-moore', 'u-moore-2']);
+    expect(db.user.findMany.mock.calls[0]?.[0].where.role).toBe('MERCHANT');
+  });
+
+  it('남의 가맹점 금액이 섞이지 않는다', async () => {
+    await closeSettlements(admin, '2026-08', AFTER);
+
+    const noon = notices().find((n) => n.userId === 'u-noon');
+    expect(noon.params.amount).toBe('450,000');
+  });
+
+  it('처음 확정될 때만 알린다 — 배치는 재실행되기 마련이다', async () => {
+    /*
+     * 다시 돌 때마다 알리면 같은 달 정산이 알림함에 여러 번 쌓여서, 두 번째부터는
+     * 아무도 읽지 않는다. 보류(HELD)를 다시 계산해 덮어쓰는 경우가 그렇다.
+     */
+    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', status: 'HELD' }]);
+
+    await closeSettlements(admin, '2026-08', AFTER);
+
+    expect(notices().map((n) => n.userId)).toEqual(['u-noon']);
+  });
+
+  it('오간 것이 없는 달은 알리지 않는다 — 장부에는 남는다', async () => {
+    // 쉬고 있는 가맹점에 매달 "0원이 확정되었습니다" 가 가면 알림함에 읽을 것이 없어진다
+    db.orderItem.groupBy.mockReset();
+    db.orderItem.groupBy.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+
+    const result = await closeSettlements(admin, '2026-08', AFTER);
+
+    expect(result.created, '장부에는 두 줄 다 쓴다').toBe(2);
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('환불만 있어 지급액이 음수인 달은 알린다', async () => {
+    /*
+     * 오간 것이 없어서 0원인 것과, 물러난 돈이 있어서 마이너스인 것은 전혀 다른 소식이다 —
+     * 음수는 다음 달에 받아야 할 돈이라 오히려 먼저 알아야 한다.
+     */
+    db.orderItem.groupBy.mockReset();
+    db.orderItem.groupBy
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ merchantId: 'm-a', _sum: { subtotal: 90_000 } }]);
+
+    await closeSettlements(admin, '2026-08', AFTER);
+
+    const moore = notices().find((n) => n.userId === 'u-moore');
+    expect(moore.params.amount).toBe('-90,000');
+  });
+
+  it('알림을 못 남겨도 마감은 끝난 것이다', async () => {
+    // 정산은 이미 확정됐다. 알림 하나 때문에 그것을 무를 수는 없다
+    db.user.findMany.mockRejectedValue(new Error('db down'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(closeSettlements(admin, '2026-08', AFTER)).resolves.toMatchObject({ created: 2 });
+  });
+});
+
+describe('지급을 알린다', () => {
+  const payee = {
+    name: '무어',
+    settlementBank: 'KB', settlementAccount: '12345678901', settlementHolder: '무어',
+  };
+
+  beforeEach(() => {
+    db.settlement.findUnique.mockResolvedValue({
+      id: 's-1', status: 'CONFIRMED', netAmount: 750_000, merchant: payee,
+      merchantId: 'm-a', periodStart: new Date('2026-07-31T15:00:00Z'),
+    });
+    db.settlement.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('돈을 보낸 뒤에 그 가맹점에게 알린다', async () => {
+    await paySettlement(superAdmin, 's-1');
+
+    expect(notices()).toEqual([expect.objectContaining({
+      userId: 'u-moore',
+      kind: 'SETTLEMENT_PAID',
+      params: { period: '2026-08', amount: '750,000' },
+      linkPath: '/admin/settlements',
+    })]);
+    expect(db.user.findMany.mock.calls[0]?.[0].where.merchantId).toEqual({ in: ['m-a'] });
+  });
+
+  it('어느 달 정산인지를 KST 로 읽는다', async () => {
+    /*
+     * 8월 정산의 시작 시각은 7월 31일 15:00 UTC 다. UTC 로 읽으면 알림이
+     * "2026-07 정산금이 지급되었습니다" 라고 말한다.
+     */
+    await paySettlement(superAdmin, 's-1');
+    expect(notices()[0].params.period).toBe('2026-08');
+  });
+
+  it('지급이 막히면 알리지도 않는다', async () => {
+    db.settlement.findUnique.mockResolvedValue({
+      id: 's-1', status: 'CONFIRMED', netAmount: 750_000,
+      merchantId: 'm-a', periodStart: new Date('2026-07-31T15:00:00Z'),
+      merchant: { ...payee, settlementAccount: null },
+    });
+
+    await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({ code: 'NO_ACCOUNT' });
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('동시에 두 번 눌러도 알림은 한 번뿐이다', async () => {
+    // 진 쪽은 조건부 UPDATE 가 0행을 고쳐 ALREADY_PAID 로 끝난다 — 상태를 바꾼 뒤에 알리는 이유다
+    db.settlement.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({ code: 'ALREADY_PAID' });
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('알림을 못 남겨도 지급은 나간 것이다', async () => {
+    db.user.findMany.mockRejectedValue(new Error('db down'));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(paySettlement(superAdmin, 's-1')).resolves.toMatchObject({ status: 'PAID' });
+  });
+});
+
 describe('지급 집행', () => {
   /** 돈을 보낼 수 있는 가맹점 — 계좌가 없으면 지급 자체가 막힌다 */
   const payee = {
@@ -198,6 +359,7 @@ describe('지급 집행', () => {
   beforeEach(() => {
     db.settlement.findUnique.mockResolvedValue({
       id: 's-1', status: 'CONFIRMED', netAmount: 750_000, merchant: payee,
+      merchantId: 'm-a', periodStart: new Date('2026-07-31T15:00:00Z'),
     });
     db.settlement.updateMany.mockResolvedValue({ count: 1 });
   });

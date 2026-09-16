@@ -1140,4 +1140,6 @@ export const ja: Dictionary = {
   'notif.MERCHANT_APPROVED': '{merchantName} の出店が承認されました — 商品を登録できます',
   'notif.MERCHANT_REJECTED': '{merchantName} の出店申請が却下されました — {reason}',
   'notif.REVIEW_REPLIED': '{productName} のレビューに販売者が返信しました。',
+  'notif.SETTLEMENT_CLOSED': '{period} の精算が確定しました — 支払予定額 {amount}ウォン',
+  'notif.SETTLEMENT_PAID': '{period} の精算金 {amount}ウォンが支払われました',
 };
