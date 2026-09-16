@@ -4,9 +4,10 @@ import {
   funnelFromCounts, computeFunnel, won, FUNNEL_STEP, MERCHANT_FUNNEL_STEP,
   presetPeriod, previousPeriod, DASHBOARD_RANGE_LABEL, netRevenue,
   type Actor, type Won, type OrderStatus, type FunnelStepResult, type DashboardRange, type DashboardPeriod,
-  type EventName, LOW_STOCK_THRESHOLD,
+  type EventName,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
+import { stockAttentionWhere } from './products';
 
 /**
  * 매출은 **돈이 오간 시각**으로 센다 — 자세한 까닭은 `@shop/core` 의 revenue.ts.
@@ -50,6 +51,11 @@ export interface DashboardTodo {
   readonly preparing: number;
   readonly pendingPayment: number;
   readonly returnRequested: number;
+  /**
+   * 품절·임박 옵션이 있는 **상품** 수. 눌러서 도착하는 상품 목록의 탭과 같은 조건이다
+   * (stockAttentionWhere) — 옵션을 세던 때에는 도착한 목록에서 그 숫자를 찾을 수 없었다.
+   */
+  readonly outOfStock: number;
   readonly lowStock: number;
 }
 
@@ -198,19 +204,19 @@ async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
 
 async function loadTodo(scope: string | null): Promise<DashboardTodo> {
   const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
-  const [preparing, pendingPayment, returnRequested, lowStock] = await Promise.all([
+  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock] = await Promise.all([
     prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
     prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
     prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
-    prisma.productVariant.count({
-      where: {
-        isActive: true,
-        stock: { lte: LOW_STOCK_THRESHOLD },
-        ...(scope ? { product: { brand: { merchantId: scope } } } : {}),
-      },
-    }),
+    /*
+     * **품절과 임박을 가른다.** 예전에는 `재고 ≤ 5` 하나로 세어 "품절 임박" 이라 불렀는데,
+     * 그러면 이미 품절된 옵션이 섞이고 목록의 "임박"(0 초과)과 다른 수가 된다. 할 일도
+     * 다르다 — 품절은 지금 팔 수 없는 것이다.
+     */
+    prisma.product.count({ where: stockAttentionWhere('OUT', scope) }),
+    prisma.product.count({ where: stockAttentionWhere('LOW', scope) }),
   ]);
-  return { preparing, pendingPayment, returnRequested, lowStock };
+  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock };
 }
 
 async function loadTopProducts(scope: string | null, w: Window): Promise<TopProduct[]> {

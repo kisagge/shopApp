@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { won, type Actor, type Won, type ProductStatus, type ProductArchiver, LOW_STOCK_THRESHOLD,
-  offsetOf,
+import { won, type Actor, type Won, type ProductStatus, type ProductArchiver, type StockLevel,
+  offsetOf, stockLevel, STOCK_LEVEL_RANGE, VISIBLE_STATUS,
 } from '@shop/core';
 import {
   assertAdminQuery, scopeOf, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
@@ -39,6 +39,30 @@ export interface AdminProductRow {
   readonly archivedBy: ProductArchiver | null;
 }
 
+/** 목록에서 재고로 거를 때 쓰는 칸. 넉넉(OK)은 거를 까닭이 없다 */
+export type StockAttention = Exclude<StockLevel, 'OK'>;
+
+/**
+ * **품절·임박 상품** 의 조회 조건 — 대시보드의 숫자와 상품 목록의 탭이 이것 하나를 쓴다.
+ *
+ * 따로 적었을 때는 대시보드가 옵션을, 목록이 상품을 셌다. "품절 임박 12" 를 눌러
+ * 들어가면 필터 없는 전체 목록이 열렸고, 거기서 12 를 찾을 길이 없었다. 숫자를 보여
+ * 주는 곳과 눌러서 도착하는 곳이 **같은 조건**이어야 그 숫자가 뜻이 있다.
+ *
+ * · 옵션 하나라도 그 칸이면 그 상품을 센다 — M 이 품절이면 L 이 남아도 채울 일이다
+ * · 판매를 멈춘 옵션(isActive)은 보지 않는다 — 팔지 않는 것의 재고는 급하지 않다
+ * · 매대에 오른 상품만(VISIBLE_STATUS) — 작성 중·숨긴 상품의 품절은 할 일이 아니다
+ * · 보관한 상품은 뺀다
+ */
+export function stockAttentionWhere(level: StockAttention, merchantId: string | null) {
+  return {
+    deletedAt: null,
+    status: { in: [...VISIBLE_STATUS] },
+    variants: { some: { isActive: true, stock: STOCK_LEVEL_RANGE[level] } },
+    ...(merchantId ? { brand: { merchantId } } : {}),
+  };
+}
+
 export async function getAdminProducts(
   actor: Actor,
   query: {
@@ -47,8 +71,15 @@ export async function getAdminProducts(
     status?: ProductStatus | undefined;
     /** 보관함을 본다. 상태 필터와 함께 쓰지 않는다 — 보관한 상품은 상태와 상관없이 한 곳에 모인다 */
     archived?: boolean;
+    /** 품절·임박 옵션이 있는 상품만. 대시보드의 "처리가 필요한 일" 이 여기로 보낸다 */
+    stock?: StockAttention | undefined;
   } = {},
-): Promise<Paged<AdminProductRow> & { readonly awaitingReview: number; readonly archivedCount: number }> {
+): Promise<Paged<AdminProductRow> & {
+  readonly awaitingReview: number;
+  readonly archivedCount: number;
+  readonly outOfStockCount: number;
+  readonly lowStockCount: number;
+}> {
   assertAdminQuery(actor, 'product:read');
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
@@ -58,7 +89,9 @@ export async function getAdminProducts(
   const archivedWhere = { deletedAt: { not: null }, ...inScope };
   const where = query.archived
     ? archivedWhere
-    : { ...scoped, ...(query.status ? { status: query.status } : {}) };
+    : query.stock
+      ? stockAttentionWhere(query.stock, scope)
+      : { ...scoped, ...(query.status ? { status: query.status } : {}) };
 
   const page = query.page ?? 1;
   const readAt = (at: number) =>
@@ -93,13 +126,15 @@ export async function getAdminProducts(
     },
     });
 
-  // 목록·전체 수·탭 숫자(대기·보관)는 서로 기다릴 이유가 없다 — 한 번에 묻는다
-  const [first, total, awaitingReview, archivedCount] = await Promise.all([
+  // 목록·전체 수·탭 숫자(대기·보관·품절·임박)는 서로 기다릴 이유가 없다 — 한 번에 묻는다
+  const [first, total, awaitingReview, archivedCount, outOfStockCount, lowStockCount] = await Promise.all([
     readAt(page),
     prisma.product.count({ where }),
     // 탭에 붙는 숫자. 필터와 무관하게 범위 안의 대기·보관 건수를 센다.
     prisma.product.count({ where: { ...scoped, status: 'PENDING_REVIEW' } }),
     prisma.product.count({ where: archivedWhere }),
+    prisma.product.count({ where: stockAttentionWhere('OUT', scope) }),
+    prisma.product.count({ where: stockAttentionWhere('LOW', scope) }),
   ]);
   // 탭을 옮기면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
   const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
@@ -112,7 +147,7 @@ export async function getAdminProducts(
       salePrice: p.salePrice === null ? null : won(p.salePrice),
       status: p.status,
       totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
-      lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD),
+      lowStock: p.variants.some((v) => stockLevel(v.stock) === 'LOW'),
       waitingRestock: p.variants.reduce((s, v) => s + v._count.restockAlerts, 0),
       createdAt: p.createdAt,
       reviewRequestedAt: p.reviewRequestedAt,
@@ -123,6 +158,8 @@ export async function getAdminProducts(
     total,
     awaitingReview,
     archivedCount,
+    outOfStockCount,
+    lowStockCount,
   };
 }
 

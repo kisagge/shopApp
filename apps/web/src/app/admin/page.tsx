@@ -2,7 +2,7 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
-  format, won, isDashboardRange, customPeriod, ORDER_STATUS_LABEL, USER_ROLE_LABEL,
+  format, won, isDashboardRange, customPeriod, ORDER_STATUS_LABEL, USER_ROLE_LABEL, LOW_STOCK_THRESHOLD,
   type DashboardPeriod, type DashboardRange,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
@@ -99,7 +99,11 @@ export default async function AdminDashboard({
                   : undefined}
               />
             ) : (
-              <Kpi label="재고 부족" value={`${d.todo.lowStock}개`} note="5개 이하 옵션" />
+              <Kpi
+                label="품절 상품"
+                value={`${d.todo.outOfStock}개`}
+                note={`임박 ${d.todo.lowStock}개 · 옵션 ${LOW_STOCK_THRESHOLD}개 이하`}
+              />
             )}
           </ul>
         </section>
@@ -144,7 +148,18 @@ export default async function AdminDashboard({
                 count={d.todo.returnRequested}
                 urgent
               />
-              <Todo href="/admin/products" label="품절 임박 (재고 5개 이하)" count={d.todo.lowStock} last />
+              {/*
+                **숫자는 눌러서 도착하는 목록과 같은 조건으로 센다.** 전에는 옵션을 세고
+                필터 없는 전체 목록으로 보내서, 도착한 곳에서 그 숫자를 찾을 수 없었다.
+                기준도 5 를 글자로 박아 두어 core 의 기준을 바꾸면 이 줄만 거짓이 됐다.
+              */}
+              <Todo href="/admin/products?stock=out" label="품절 옵션이 있는 상품" count={d.todo.outOfStock} urgent />
+              <Todo
+                href="/admin/products?stock=low"
+                label={`재고 임박 (옵션 ${LOW_STOCK_THRESHOLD}개 이하)`}
+                count={d.todo.lowStock}
+                last
+              />
             </ul>
           </section>
         </div>
@@ -314,7 +329,7 @@ function Todo({
   href, label, count, urgent, last,
 }: {
   href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING'
-    | '/admin/returns' | '/admin/products';
+    | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low';
   label: string;
   count: number;
   urgent?: boolean;

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NOTIFICATION_KIND, CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND,
-  LOW_STOCK_THRESHOLD, crossedLowStock,
+  LOW_STOCK_THRESHOLD, crossedLowStock, stockLevel, STOCK_LEVEL_RANGE,
 } from '../src/notification';
 
 /**
@@ -68,5 +68,40 @@ describe('어느 알림함에 뜨는가', () => {
   it('재고 부족은 운영 알림함의 것이다', () => {
     expect(CONSOLE_NOTIFICATION_KIND).toContain('STOCK_LOW');
     expect(CUSTOMER_NOTIFICATION_KIND as readonly string[]).not.toContain('STOCK_LOW');
+  });
+});
+
+describe('재고 칸 — 품절 / 임박 / 넉넉', () => {
+  it('0 이하는 품절이다', () => {
+    expect(stockLevel(0)).toBe('OUT');
+    // 음수는 생기면 안 되지만, 생겼다면 팔 수 있는 것으로 읽지 않는다
+    expect(stockLevel(-1)).toBe('OUT');
+  });
+
+  it('1 부터 기준까지가 임박이다 — 품절은 임박이 아니다', () => {
+    /*
+     * 대시보드는 한동안 `재고 ≤ 5` 로 "품절 임박" 을 셌고 목록은 `0 < 재고 ≤ 5` 로
+     * "임박" 을 붙였다. 같은 이름으로 다른 수를 말했다.
+     */
+    expect(stockLevel(1)).toBe('LOW');
+    expect(stockLevel(LOW_STOCK_THRESHOLD)).toBe('LOW');
+  });
+
+  it('기준을 넘으면 넉넉하다', () => {
+    expect(stockLevel(LOW_STOCK_THRESHOLD + 1)).toBe('OK');
+  });
+
+  it('조회 범위가 판정과 같은 경계다 — 대시보드 숫자와 도착한 목록이 맞는다', () => {
+    /*
+     * 판정은 화면이, 범위는 조회가 쓴다. 둘 중 하나만 고치면 숫자는 12 인데 눌러서
+     * 들어간 목록은 10 줄이 된다. 경계 부근의 값을 둘 다에 넣어 본다.
+     */
+    const inRange = (range: { gt?: number; lte: number }, n: number) =>
+      (range.gt === undefined || n > range.gt) && n <= range.lte;
+
+    for (let n = -1; n <= LOW_STOCK_THRESHOLD + 2; n += 1) {
+      expect(inRange(STOCK_LEVEL_RANGE.OUT, n), `OUT ${n}`).toBe(stockLevel(n) === 'OUT');
+      expect(inRange(STOCK_LEVEL_RANGE.LOW, n), `LOW ${n}`).toBe(stockLevel(n) === 'LOW');
+    }
   });
 });

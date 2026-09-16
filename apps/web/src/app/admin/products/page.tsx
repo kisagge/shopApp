@@ -3,11 +3,11 @@ import Link from 'next/link';
 import { Badge } from '@shop/ui';
 import {
   format, discountRateOf, hasPermission,
-  PRODUCT_STATUS_LABEL, isAwaitingReview, checkArchive, type ProductStatus,
+  PRODUCT_STATUS_LABEL, isAwaitingReview, checkArchive, LOW_STOCK_THRESHOLD, type ProductStatus,
 } from '@shop/core';
 import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getAdminProducts } from '~/lib/queries/admin/products';
+import { getAdminProducts, type StockAttention } from '~/lib/queries/admin/products';
 import { PageNav } from '~/components/page-nav';
 import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 import { StockBulkActions } from './stock-bulk-actions';
@@ -16,6 +16,22 @@ import { adminTimestamp } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '상품 관리' };
 export const dynamic = 'force-dynamic';
+
+/*
+ * **재고 탭은 대시보드의 "처리가 필요한 일" 이 도착하는 자리다.** 숫자와 이 목록이 같은
+ * 조건(stockAttentionWhere)을 쓴다 — 전에는 필터 없는 전체 목록으로 보내서, 눌러 들어온
+ * 사람이 그 숫자에 해당하는 상품을 찾을 길이 없었다.
+ */
+const TABS = ['all', 'PENDING_REVIEW', 'OUT', 'LOW', 'archived'] as const;
+const TAB_LABEL: Record<(typeof TABS)[number], string> = {
+  all: '전체',
+  PENDING_REVIEW: '검수 대기',
+  OUT: '품절',
+  LOW: '재고 임박',
+  archived: '보관함',
+};
+/** 주소에는 소문자로 싣는다 — 대시보드 링크가 이 값을 쓴다 */
+const STOCK_PARAM: Record<StockAttention, string> = { OUT: 'out', LOW: 'low' };
 
 // 라벨은 core 하나만 본다. 여기 따로 적어 두었더니 상태를 더할 때 이쪽이 남았다.
 const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
@@ -26,17 +42,27 @@ const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string; status?: string; view?: string; archived?: string; restored?: string }>;
+  searchParams: Promise<{
+    page?: string; status?: string; view?: string; stock?: string; archived?: string; restored?: string;
+  }>;
 }) {
   const actor = await requireAdmin('product:read');
-  const { page: pageParam, status, view, archived: justArchived, restored: justRestored } = await searchParams;
+  const {
+    page: pageParam, status, view, stock, archived: justArchived, restored: justRestored,
+  } = await searchParams;
   const asked = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
 
-  // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다.
+  // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다. 필터는 한 번에 하나다.
   const archivedView = view === 'archived';
-  const filter: ProductStatus | undefined = !archivedView && status === 'PENDING_REVIEW' ? status : undefined;
+  const stockFilter: StockAttention | undefined = archivedView
+    ? undefined
+    : stock === 'out' ? 'OUT' : stock === 'low' ? 'LOW' : undefined;
+  const filter: ProductStatus | undefined =
+    !archivedView && !stockFilter && status === 'PENDING_REVIEW' ? status : undefined;
 
-  const result = await getAdminProducts(actor, { page: asked, status: filter, archived: archivedView });
+  const result = await getAdminProducts(actor, {
+    page: asked, status: filter, archived: archivedView, stock: stockFilter,
+  });
   const products = result.rows;
   const canWrite = hasPermission(actor, 'product:write');
   const canPublish = hasPermission(actor, 'product:publish');
@@ -47,6 +73,7 @@ export default async function AdminProductsPage({
     query: {
       ...(filter ? { status: filter } : {}),
       ...(archivedView ? { view: 'archived' } : {}),
+      ...(stockFilter ? { stock: STOCK_PARAM[stockFilter] } : {}),
       ...(n > 1 ? { page: String(n) } : {}),
     },
   });
@@ -75,26 +102,45 @@ export default async function AdminProductsPage({
       <div className="flex flex-col gap-5 p-8">
         <StockBulkActions canWrite={canWrite} />
 
-        <nav aria-label="상품 상태" className="flex gap-1 border-b border-[var(--border)]">
-          {(['all', 'PENDING_REVIEW', 'archived'] as const).map((tab) => {
-            const current = tab === 'archived' ? archivedView : tab === 'all' ? !archivedView && !filter : filter === tab;
+        {/* 탭이 다섯이라 좁은 화면에서는 줄 안에서 옆으로 민다 — 화면 전체가 밀리면 안 된다 */}
+        <nav aria-label="상품 상태" className="flex gap-1 overflow-x-auto border-b border-[var(--border)]">
+          {TABS.map((tab) => {
+            const current = tab === 'archived'
+              ? archivedView
+              : tab === 'all'
+                ? !archivedView && !filter && !stockFilter
+                : tab === 'OUT' || tab === 'LOW'
+                  ? stockFilter === tab
+                  : filter === tab;
             return (
               <Link
                 key={tab}
                 href={{
                   pathname: '/admin/products',
-                  query: tab === 'archived' ? { view: 'archived' } : tab === 'all' ? {} : { status: tab },
+                  query: tab === 'archived'
+                    ? { view: 'archived' }
+                    : tab === 'all'
+                      ? {}
+                      : tab === 'OUT' || tab === 'LOW'
+                        ? { stock: STOCK_PARAM[tab] }
+                        : { status: tab },
                 }}
                 aria-current={current ? 'page' : undefined}
-                className={`-mb-px border-b-2 px-4 py-2.5 text-[13px] no-underline ${
+                className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-[13px] no-underline ${
                   current
                     ? 'border-[var(--brand)] font-medium text-[var(--fg)]'
                     : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg)]'
                 }`}
               >
-                {tab === 'archived' ? '보관함' : tab === 'all' ? '전체' : '검수 대기'}
+                {TAB_LABEL[tab]}
                 {tab === 'PENDING_REVIEW' && result.awaitingReview > 0 && (
                   <span className="ml-1.5 text-accent">{result.awaitingReview}</span>
+                )}
+                {tab === 'OUT' && result.outOfStockCount > 0 && (
+                  <span className="tnum ml-1.5 text-accent">{result.outOfStockCount}</span>
+                )}
+                {tab === 'LOW' && result.lowStockCount > 0 && (
+                  <span className="tnum ml-1.5 text-warning">{result.lowStockCount}</span>
                 )}
                 {tab === 'archived' && result.archivedCount > 0 && (
                   <span className="tnum ml-1.5 text-[var(--fg-muted)]">{result.archivedCount}</span>
@@ -172,7 +218,11 @@ export default async function AdminProductsPage({
             )
           ) : products.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-              {filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
+              {stockFilter === 'OUT'
+                ? '품절된 옵션이 있는 판매 중 상품이 없습니다.'
+                : stockFilter === 'LOW'
+                  ? `재고가 ${LOW_STOCK_THRESHOLD}개 이하로 남은 판매 중 상품이 없습니다.`
+                  : filter ? '검수를 기다리는 상품이 없습니다.' : '등록된 상품이 없습니다.'}
             </p>
           ) : (
             <div className="table-scroll" tabIndex={0} role="region" aria-label="등록된 상품 목록">

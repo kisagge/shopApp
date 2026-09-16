@@ -353,3 +353,34 @@ test('목록은 쪽 번호로 넘긴다 — 조건을 쥔 채로', async ({ page
   await expect(page.getByRole('navigation', { name: '쪽 이동' }).getByText('2', { exact: true }))
     .toHaveAttribute('aria-current', 'page');
 });
+
+/**
+ * **숫자를 누르면 그 숫자에 해당하는 목록이 열린다.**
+ *
+ * 한동안 "품절 임박 (재고 5개 이하)" 는 옵션을 세어 놓고 필터 없는 전체 상품 목록으로
+ * 보냈다 — 도착한 사람이 그 숫자를 찾을 길이 없었다. 게다가 이미 품절된 옵션까지 섞어
+ * 셌다. 대시보드와 목록이 같은 조건을 쓰는지는 단위 검사가 본다. 여기서는 **사람이
+ * 밟는 길**을 본다: 눌러서 맞는 탭에 도착하고, 그 탭이 자기 숫자를 말하는가.
+ */
+for (const { row, tab, param } of [
+  { row: '품절 옵션이 있는 상품', tab: '품절', param: 'out' },
+  { row: /^재고 임박 \(옵션 \d+개 이하\)/, tab: '재고 임박', param: 'low' },
+] as const) {
+  test(`대시보드의 "${tab}" 을 누르면 그 탭이 열린다`, async ({ page }) => {
+    await page.goto('/admin');
+    await ready(page);
+
+    const todo = page.getByRole('region', { name: '처리가 필요한 일' });
+    await todo.getByRole('link', { name: row }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/admin/products\\?stock=${param}$`));
+    const current = page.getByRole('navigation', { name: '상품 상태' })
+      .getByRole('link', { name: new RegExp(`^${tab}`) });
+    await expect(current).toHaveAttribute('aria-current', 'page');
+
+    // 머리의 개수와 탭의 개수가 같은 조건에서 나온다 — 같은 요청이라 서로 어긋날 수 없다
+    const total = Number(await page.locator('h1 + p .tnum').textContent());
+    const badge = (await current.textContent())!.replace(tab, '').trim();
+    expect(badge === '' ? 0 : Number(badge)).toBe(total);
+  });
+}

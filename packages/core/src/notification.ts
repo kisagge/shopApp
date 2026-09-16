@@ -131,6 +131,34 @@ export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
 export const LOW_STOCK_THRESHOLD = 5;
 
 /**
+ * 한 옵션의 재고가 어느 칸에 있는가 — 품절 / 임박 / 넉넉.
+ *
+ * **숫자만 한 곳에 두는 것으로는 부족했다.** 기준(5)은 여기 모았는데 경계를 쓰는
+ * 식은 저마다 적었다: 상품 목록의 "임박" 은 `0 < 재고 ≤ 5` 였고 대시보드의 "품절
+ * 임박" 은 `재고 ≤ 5` 여서, 대시보드만 **이미 품절된 옵션까지** 셌다. 둘이 다른
+ * 수를 말하는데 같은 이름을 달고 있었다. 품절과 임박은 할 일도 다르다 — 품절은
+ * 지금 팔 수 없는 것이고, 임박은 곧 그렇게 될 것이다.
+ */
+export type StockLevel = 'OUT' | 'LOW' | 'OK';
+
+export function stockLevel(stock: number, threshold: number = LOW_STOCK_THRESHOLD): StockLevel {
+  if (stock <= 0) return 'OUT';
+  return stock <= threshold ? 'LOW' : 'OK';
+}
+
+/**
+ * 조회에 거는 같은 경계. stockLevel 과 **한 벌**이어야 대시보드의 숫자와 눌러서
+ * 도착한 목록이 맞는다.
+ *
+ * **내보낸다.** 조회는 판정 함수가 아니라 범위가 필요하다 — Prisma 의 `stock: {...}`
+ * 에 그대로 들어간다(REVIEWABLE_STATUS 와 같은 이유).
+ */
+export const STOCK_LEVEL_RANGE = {
+  OUT: { lte: 0 },
+  LOW: { gt: 0, lte: LOW_STOCK_THRESHOLD },
+} as const satisfies Record<Exclude<StockLevel, 'OK'>, { gt?: number; lte: number }>;
+
+/**
  * 이번 주문으로 **기준을 넘어 내려갔는가.**
  *
  * 넘는 순간 한 번만 알린다. "기준 이하면 알림" 으로 하면 6→5 에서 한 번,

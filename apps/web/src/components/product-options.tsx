@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { LOW_STOCK_THRESHOLD } from '@shop/core';
+import { stockLevel } from '@shop/core';
 import { Button, Price } from '@shop/ui';
 import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
@@ -94,7 +94,7 @@ export function ProductOptions({
           <div className="flex flex-col gap-1">
             <p className="text-xs text-[var(--fg-secondary)]">{selected.label}</p>
             <Price amount={selected.price} size="sm" />
-            {selected.stock > 0 && selected.stock <= LOW_STOCK_THRESHOLD && (
+            {stockLevel(selected.stock) === 'LOW' && (
               <p className="text-[11px] text-accent">{t('opt.stockLeft', { count: selected.stock })}</p>
             )}
           </div>
