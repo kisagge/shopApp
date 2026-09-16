@@ -19,8 +19,14 @@ const read = (rel: string) => readFileSync(join(process.cwd(), 'src', rel), 'utf
 
 const TOP_BARS: readonly { file: string; what: string; pattern: RegExp }[] = [
   { file: 'components/site-header.tsx', what: '매장 머리', pattern: /<header className="[^"]*\bsafe-t\b/ },
-  // 상태바 자리를 채우는 띠는 화면 바탕색이다 — 어두운 띠는 그 아래에서 시작한다
-  { file: 'components/admin/admin-nav.tsx', what: '운영 머리띠', pattern: /className="safe-t bg-\[var\(--bg\)\]"/ },
+  // 머리띠가 상태바 자리까지 화면 바탕색으로 덮는다 — 어둡게 칠하면 밝은 모드의 검은 글자가 묻힌다
+  {
+    file: 'components/admin/admin-nav.tsx',
+    what: '운영 머리띠',
+    pattern: /className="safe-t fixed inset-x-0 top-0[^"]*bg-\[var\(--bg\)\]/,
+  },
+  // 고정한 만큼 자리를 비운다. box-content 라야 안전영역이 h-14 안으로 먹히지 않는다
+  { file: 'components/admin/admin-nav.tsx', what: '머리띠가 비운 자리', pattern: /className="safe-t box-content h-14/ },
   { file: 'components/admin/admin-nav.tsx', what: '운영 서랍', pattern: /env\(safe-area-inset-top/ },
 ];
 

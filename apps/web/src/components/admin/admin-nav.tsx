@@ -78,10 +78,23 @@ export function AdminNav({
     };
   }, [open]);
 
-  const wordmark = (
+  /**
+   * 워드마크.
+   *
+   * 두 자리에 선다 — 밝은 머리띠(좁은 화면)와 어두운 서랍·사이드바. 색을 한 벌로 두면 한쪽에서 반드시 묻힌다.
+   */
+  const wordmark = (onDark: boolean) => (
     <p className="flex items-baseline gap-2">
-      <span className="font-serif text-[19px] font-medium tracking-[0.16em] text-n-0">PLAIN</span>
-      <span className="text-[10px] font-medium tracking-[0.14em] text-dark-muted">ADMIN</span>
+      <span
+        className={`font-serif text-[19px] font-medium tracking-[0.16em] ${onDark ? 'text-n-0' : 'text-[var(--fg)]'}`}
+      >
+        PLAIN
+      </span>
+      <span
+        className={`text-[10px] font-medium tracking-[0.14em] ${onDark ? 'text-dark-muted' : 'text-[var(--fg-muted)]'}`}
+      >
+        ADMIN
+      </span>
     </p>
   );
 
@@ -89,23 +102,19 @@ export function AdminNav({
     <div ref={rootRef}>
       {/*
         좁은 화면의 머리띠. 넓은 화면에서는 사이드바가 그 일을 하므로 감춘다.
-        `sticky` 인 이유는 표가 길어도 메뉴를 다시 찾으러 맨 위까지 올라가지
-        않게 하기 위해서다.
-      */}
-      {/*
-        **앱에서는 머리띠가 상태바 밑으로 들어간다.** 웹뷰는 화면 맨 위부터 그리므로(contentInset
-        never) 시계·배터리·카메라 구멍이 메뉴 단추와 겹쳤다. 매장 머리(site-header)는 safe-t 를
-        달고 있었는데 운영 화면을 떼어 내면서 이것만 빠졌다.
 
-        **그 자리를 어둡게 칠하지 않는다.** 처음에는 띠 전체에 safe-t 를 달아 상태바 자리까지 어두운
-        면으로 덮었는데, iOS 는 상태바 글자색을 앱의 밝기 설정으로 정한다(웹이 못 고친다) — 밝은 모드
-        에서는 검은 글자라 검정 위 검정이 되어 **시계와 배터리가 안 보였다**. 그래서 상태바 자리는
-        화면 바탕색으로 두고, 어두운 띠는 그 아래에서 시작한다. 어두운 모드에서는 바탕도 어둡고
-        글자도 희어 그대로 읽힌다. 브라우저에서는 이 자리가 0 이라 달라지는 것이 없다.
+        **`sticky` 가 아니라 `fixed` 다.** sticky 는 부모 상자 안에서만 붙어 있는데 이 조각의 부모는
+        머리띠 높이밖에 안 된다(서랍은 fixed 라 흐름 밖이다) — 그래서 조금만 굴려도 머리띠가 함께 밀려
+        올라갔고, 앱에서는 그 위로 본문이 상태바 자리까지 올라왔다. 어두운 띠였을 때는 같이 사라져서
+        티가 안 났다. fixed 로 두고 아래에 같은 높이의 자리를 비워 본문이 가려지지 않게 한다.
+
+        **상태바 자리까지 머리띠 색으로 덮는다.** 웹뷰는 화면 맨 위부터 그리므로(contentInset never)
+        시계·배터리·카메라 구멍 밑까지 우리가 칠한다. 색은 **화면 바탕색**이다 — 어둡게 칠하면 iOS 가
+        앱 밝기로 정하는 상태바 글자색(밝은 모드에서는 검정)이 묻힌다. 그 글자색은 웹이 못 고친다.
+        매장 머리(site-header)가 밝은 것과 같은 결이고, 운영의 어두운 색은 서랍이 계속 들고 있다.
       */}
-      <div className="sticky top-0 z-30 md:hidden">
-        <div className="safe-t bg-[var(--bg)]" />
-        <div className="flex h-14 items-center gap-2 bg-dark-bg px-3">
+      <div className="safe-t fixed inset-x-0 top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)] md:hidden">
+        <div className="flex h-14 items-center gap-2 px-3">
           <button
             ref={buttonRef}
             type="button"
@@ -113,7 +122,7 @@ export function AdminNav({
             aria-expanded={open}
             aria-controls={PANEL_ID}
             onClick={() => setOpenedAt(pathname)}
-            className="flex h-11 w-11 items-center justify-center rounded-sm text-n-0"
+            className="flex h-11 w-11 items-center justify-center rounded-sm text-[var(--fg)]"
           >
             {/* 아이콘은 장식이다 — 이름과 상태는 버튼이 말한다 */}
             <svg
@@ -128,9 +137,18 @@ export function AdminNav({
               <path d="M2 5h16M2 10h16M2 15h16" />
             </svg>
           </button>
-          {wordmark}
+          {wordmark(false)}
         </div>
       </div>
+
+      {/*
+        고정한 머리띠가 가린 만큼 자리를 비운다 — 안 비우면 첫 줄이 머리띠 뒤에 깔린다.
+        상태바 자리까지 머리띠가 덮으므로 그 높이도 함께 센다.
+
+        **box-content 다.** 기본값(border-box)으로 두면 안전영역 여백이 h-14 안으로 먹혀 들어가
+        자리가 56px 로 고정된다 — 앱에서 딱 상태바 높이만큼 본문이 머리띠 뒤로 들어간다.
+      */}
+      <div aria-hidden="true" className="safe-t box-content h-14 md:hidden" />
 
       {/*
         **좁은 화면에서는 본문 위에 뜬다.** 자리를 차지하며 밀어내면 본문이
@@ -203,7 +221,7 @@ export function AdminNav({
               <path d="M4 4l12 12M16 4L4 16" />
             </svg>
           </button>
-          {wordmark}
+          {wordmark(true)}
         </div>
 
         <nav aria-label="관리자 메뉴" className="flex-1 md:mt-0">
