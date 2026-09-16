@@ -75,6 +75,7 @@ layoutTests(test, expect, [
   ['포인트', '/admin/points'],
   ['트래픽', '/admin/traffic'],
   ['감사 로그', '/admin/audit'],
+  ['오류', '/admin/errors'],
   /*
    * 상세 화면은 목록과 마크업이 전혀 다르다 — 주문 상세는 처리 단추와 배송
    * 정보가, 상품 상세는 옵션·재고 표가 붙는다. 목록만 재면 못 보는 자리다.

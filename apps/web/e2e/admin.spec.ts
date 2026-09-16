@@ -291,3 +291,34 @@ test('주문 관리에서 모든 상태를 걸러 볼 수 있다', async ({ page
   const missing = ORDER_STATUS.filter((s) => !labels.includes(ORDER_STATUS_LABEL[s]));
   expect(missing, '이 상태들은 탭이 없어 전체에서 눈으로 찾아야 한다').toEqual([]);
 });
+
+test('브라우저에서 난 오류가 오류함에 쌓이고, 처리하면 목록에서 빠진다', async ({ page }) => {
+  /*
+   * **브라우저 오류는 우리가 받지 않으면 영영 모른다.** 서버 오류는 배포 로그에 스택이라도 남지만, 앱(웹뷰)에서
+   * 터진 것은 개발자 도구도 로그도 없다. 여기서 보는 것은 그 길이 실제로 이어져 있는가다 —
+   * 브라우저가 보낸 것이 지문으로 묶여 운영 화면에 뜨고, 처리하면 목록에서 빠진다.
+   */
+  const message = `검사가 만든 오류 ${Date.now()}`;
+
+  const sent = await page.request.post('/api/errors', {
+    data: { name: 'E2ETestError', message, stack: 'E2ETestError: …\n  at e2e', routePath: '/cart' },
+  });
+  expect(sent.status(), '오류 창구가 받지 않았다').toBe(204);
+
+  await page.goto('/admin/errors');
+  await ready(page);
+
+  const row = page.getByRole('article', { name: 'E2ETestError' });
+  await expect(row).toBeVisible();
+  await expect(row).toContainText(message);
+  // 서버 것과 갈라 둔다 — 고치는 자리가 다르다
+  await expect(row).toContainText('브라우저');
+
+  await row.getByRole('button', { name: '처리함' }).click();
+  await expect(page.getByRole('article', { name: 'E2ETestError' })).toHaveCount(0);
+
+  // 지우는 것이 아니다. 처리한 것 쪽에 그대로 있다
+  await page.goto('/admin/errors?resolved=1');
+  await ready(page);
+  await expect(page.getByRole('article', { name: 'E2ETestError' })).toContainText(message);
+});

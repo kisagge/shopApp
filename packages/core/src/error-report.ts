@@ -158,3 +158,56 @@ export function isIgnorableError(error: unknown): boolean {
   }
   return false;
 }
+
+/**
+ * 오류가 어디서 났는가.
+ *
+ * **서버와 브라우저를 갈라 둔다.** 고치는 자리가 다르고, 재현하는 방법도 다르다 — 서버 오류는 로그와 스택이 그대로
+ * 남지만 브라우저 오류는 그 기기에서만 일어난 일이라 우리가 받지 않으면 영영 모른다. 앱(웹뷰)에서는 특히 그렇다:
+ * 개발자 도구도 없고 서버 로그에도 안 남는다.
+ */
+export const ERROR_SOURCE = ['server', 'browser'] as const;
+export type ErrorSource = (typeof ERROR_SOURCE)[number];
+
+export const isErrorSource = (value: unknown): value is ErrorSource =>
+  typeof value === 'string' && (ERROR_SOURCE as readonly string[]).includes(value);
+
+/**
+ * 오류 기록을 지문별로 **묶어서** 쌓는다.
+ *
+ * 한 건마다 행을 남기면 표가 금방 커지고, 정작 보고 싶은 것("이 오류가 몇 번 났는가")은 매번 세어야 한다. 그래서
+ * 지문 하나에 행 하나를 두고 횟수와 처음·마지막 시각을 센다 — 메일이 한 시간에 한 번만 나가는 것과 짝이 되는 규칙이다.
+ * 메일만 있으면 몰려 난 오류가 한 통으로 보여 규모를 알 수 없다.
+ */
+export interface ErrorGroup {
+  readonly count: number;
+  readonly firstSeenAt: Date;
+  readonly lastSeenAt: Date;
+  readonly resolvedAt: Date | null;
+}
+
+/**
+ * 처리했다고 표시한 뒤에 또 났는가.
+ *
+ * **다시 나면 다시 연다.** 고쳤다고 닫아 둔 오류가 또 나는 것은 안 고쳐졌다는 뜻이고, 그걸 조용히 횟수만 올리면
+ * 닫힌 목록 뒤에 숨는다 — 처리 표시가 오히려 눈을 가리게 된다.
+ */
+export function reopensGroup(group: Pick<ErrorGroup, 'resolvedAt'>, occurredAt: Date): boolean {
+  return group.resolvedAt !== null && occurredAt.getTime() > group.resolvedAt.getTime();
+}
+
+/**
+ * 브라우저가 보낸 스택을 그대로 믿지 않는다.
+ *
+ * 창구가 열려 있으므로 아무나 아무 길이의 글을 보낼 수 있다. 길이를 자르고, 사용자가 적은 값이 섞여 들어오는 메시지는
+ * 지문을 만들 때처럼 숫자·식별자를 지운 뒤 저장한다.
+ */
+export const MAX_ERROR_MESSAGE = 500;
+export const MAX_ERROR_STACK = 4000;
+
+export function trimStack(stack: string | null | undefined, max = MAX_ERROR_STACK): string | null {
+  if (stack === null || stack === undefined) return null;
+  const trimmed = stack.trim();
+  if (trimmed === '') return null;
+  return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max)}\n…(잘림)`;
+}

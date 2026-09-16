@@ -4,6 +4,7 @@ import { Hahmlet } from 'next/font/google';
 import './globals.css';
 import { AnalyticsProvider } from '~/components/analytics-provider';
 import { WebVitalsReporter } from '~/components/web-vitals-reporter';
+import { ErrorReporter } from '~/components/error-reporter';
 import { CartSync } from '~/components/cart-sync';
 import { NativeSession } from '~/components/native-session';
 import { NativeSplash } from '~/components/native-splash';
@@ -140,6 +141,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <AnalyticsProvider />
             {/* 실사용자 성능. 같은 파이프라인으로 나간다. */}
             <WebVitalsReporter />
+            {/*
+              브라우저에서 터진 오류를 서버로 보낸다. 앱(웹뷰)에서는 이것이 유일한 길이다 —
+              개발자 도구도 없고 배포 로그에도 안 남는다.
+            */}
+            <ErrorReporter />
             {/* 로그인하면 장바구니를 서버와 맞춘다. 비로그인은 아무것도 하지 않는다. */}
             <CartSync userId={viewer?.id ?? null} />
             {/* 네이티브 셸에서만 — 저장해 둔 토큰으로 서버 세션까지 되살린다 */}

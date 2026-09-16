@@ -21,6 +21,8 @@ export type AuditTargetType =
   | 'inquiry'
   /** 감사 로그 자체 — 내려받기. 가져간 사람도 기록에 남는다 */
   | 'audit'
+  /** 오류함의 한 묶음. id 는 지문이다 */
+  | 'error_group'
   /** 알림 문구 템플릿. id 는 '<종류>:<말>' */
   | 'notification_template'
   /** 메일 문구 템플릿. id 는 '<종류>:<말>' */

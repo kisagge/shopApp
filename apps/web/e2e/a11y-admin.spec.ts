@@ -32,6 +32,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['회원', '/admin/users'],
   ['포인트 대사', '/admin/points'],
   ['감사 로그', '/admin/audit'],
+  ['오류', '/admin/errors'],
   ['상품 등록', '/admin/products/new'],
 ];
 

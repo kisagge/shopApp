@@ -1,9 +1,10 @@
 import 'server-only';
 import {
-  fingerprintOf, redactHeaders, redactPath, severityOf,
-  shouldNotify, pruneSeen, isIgnorableError, type ErrorReport,
+  fingerprintOf, redactHeaders, redactPath, severityOf, trimStack,
+  shouldNotify, pruneSeen, isIgnorableError, MAX_ERROR_MESSAGE, type ErrorReport,
 } from '@shop/core';
 import { getMailer } from '@shop/mail';
+import { dbSink } from './db-sink';
 
 /**
  * 오류 보고.
@@ -121,7 +122,13 @@ let sinks: ErrorSink[] | null = null;
 function resolveSinks(): ErrorSink[] {
   if (sinks) return sinks;
   const to = process.env['ERROR_ALERT_EMAIL'];
-  sinks = to ? [consoleSink, mailSink(to)] : [consoleSink];
+  /*
+   * **남기는 것은 늘 한다.** 콘솔은 배포 로그, DB 는 운영 화면(오류함)이 읽는다 — 메일만 있으면
+   * 같은 지문이 한 시간에 한 통이라 몰려 난 오류의 규모를 알 수 없다. 알림은 주소가 있을 때만.
+   */
+  sinks = to
+    ? [consoleSink, dbSink('server'), mailSink(to)]
+    : [consoleSink, dbSink('server')];
   return sinks;
 }
 
@@ -129,6 +136,60 @@ function resolveSinks(): ErrorSink[] {
 export function setErrorSinksForTest(list: ErrorSink[] | null): void {
   sinks = list;
   seen.clear();
+}
+
+/**
+ * 브라우저에서 난 오류.
+ *
+ * **서버 오류와 같은 길을 쓰되 출처만 가른다.** 지문·심각도·가림 규칙이 갈라지면 같은 오류가 두 벌로 쌓이고,
+ * 고칠 때 어느 쪽을 봐야 하는지 알 수 없다. 스택은 브라우저가 보낸 것이라 그대로 믿지 않고 잘라 둔다.
+ */
+export async function reportBrowserError(input: {
+  readonly name: string;
+  readonly message: string;
+  readonly stack: string | null;
+  readonly routePath: string;
+  readonly now?: Date;
+}): Promise<ErrorReport> {
+  const report: ErrorReport = {
+    fingerprint: fingerprintOf({
+      name: input.name,
+      message: input.message,
+      routePath: input.routePath,
+    }),
+    // 브라우저에서 터진 것은 사용자가 그 화면을 못 쓰는 상태다 — 렌더 실패와 같은 무게로 본다
+    severity: 'fatal',
+    name: input.name,
+    message: input.message.slice(0, MAX_ERROR_MESSAGE),
+    stack: trimStack(input.stack),
+    digest: null,
+    routePath: input.routePath,
+    routeType: 'browser',
+    method: 'GET',
+    path: redactPath(input.routePath),
+    occurredAt: input.now ?? new Date(),
+  };
+
+  const context: ErrorContext = { headers: {} };
+  const list = browserSinks();
+  const results = await Promise.allSettled(list.map((sink) => sink.report(report, context)));
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      console.error('[error-report] 싱크 실패', result.reason);
+    }
+  }
+  return report;
+}
+
+/**
+ * 브라우저 오류의 싱크.
+ *
+ * 서버 쪽과 같은 목록이되 **출처가 'browser'** 인 DB 싱크를 쓴다. 테스트에서 갈아 끼운 목록이 있으면 그것을 따른다.
+ */
+function browserSinks(): ErrorSink[] {
+  if (sinks) return sinks;
+  const to = process.env['ERROR_ALERT_EMAIL'];
+  return to ? [consoleSink, dbSink('browser'), mailSink(to)] : [consoleSink, dbSink('browser')];
 }
 
 interface ReportInput {

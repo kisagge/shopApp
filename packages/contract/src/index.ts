@@ -32,3 +32,4 @@ export * from './support';
 export * from './policy';
 export * from './shipping';
 export * from './notification-template';
+export * from './error-report';

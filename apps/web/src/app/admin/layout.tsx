@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 interface NavItem {
   readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/returns' | '/admin/products' | '/admin/settlements' | '/admin/audit' | '/admin/policies'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
+    | '/admin/errors'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
     | '/admin/traffic' | '/admin/coupons' | '/admin/shipping' | '/admin/notification-templates' | '/admin/mail-templates';
@@ -56,6 +57,11 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/points', label: '포인트 대사', permission: 'user:read' },
   // 가맹점에게는 보이지 않는다. 감사 로그는 운영진을 감시하는 도구다.
   { href: '/admin/audit', label: '감사 로그', permission: 'user:read' },
+  /*
+   * 오류함. 전체 플랫폼의 것이라 가맹점에게는 보이지 않는다 — 다른 가맹점 화면의 오류까지 보이고,
+   * 스택에는 우리 코드 구조가 그대로 드러난다.
+   */
+  { href: '/admin/errors', label: '오류', permission: 'analytics:all' },
 ];
 
 export default async function AdminLayout({ children }: { children: ReactNode }) {

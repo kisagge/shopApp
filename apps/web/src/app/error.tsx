@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Button } from '@shop/ui';
 import { useT } from '~/lib/i18n/client';
+import { reportClientError } from '~/components/error-reporter';
 
 /**
  * 화면 하나가 깨졌을 때.
@@ -22,8 +23,12 @@ export default function ErrorScreen({
 }) {
   const t = useT();
   useEffect(() => {
-    // 서버 오류는 instrumentation 이 받는다. 이건 브라우저에서 난 것이다.
+    /*
+     * 서버 오류는 instrumentation 이 받는다. **이건 브라우저에서 난 것이라 우리가 보내지 않으면 아무도 모른다** —
+     * React 가 잡은 오류는 window 의 error 까지 올라오지 않아 ErrorReporter 도 못 듣는다.
+     */
     console.error('[client-error]', error.digest ?? '(digest 없음)', error);
+    reportClientError(error, '화면을 그리다 오류가 났습니다');
   }, [error]);
 
   return (

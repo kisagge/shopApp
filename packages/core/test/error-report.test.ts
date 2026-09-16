@@ -141,3 +141,48 @@ describe('보고하지 않을 오류', () => {
     expect(isIgnorableError(null)).toBe(false);
   });
 });
+
+describe('오류 묶음', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('처리한 뒤에 또 나면 다시 연다', async () => {
+    /*
+     * 고쳤다고 닫아 둔 오류가 또 나는 것은 안 고쳐졌다는 뜻이다. 조용히 횟수만 올리면 닫힌 목록 뒤에 숨어,
+     * 처리 표시가 오히려 눈을 가린다.
+     */
+    const { reopensGroup } = await import('../src');
+    expect(reopensGroup({ resolvedAt: at('2026-09-16T00:00:00Z') }, at('2026-09-16T01:00:00Z'))).toBe(true);
+  });
+
+  it('처리하기 전에 난 것으로는 열지 않는다 — 늦게 도착한 보고다', async () => {
+    const { reopensGroup } = await import('../src');
+    expect(reopensGroup({ resolvedAt: at('2026-09-16T02:00:00Z') }, at('2026-09-16T01:00:00Z'))).toBe(false);
+  });
+
+  it('처리한 적 없으면 열 것도 없다', async () => {
+    const { reopensGroup } = await import('../src');
+    expect(reopensGroup({ resolvedAt: null }, at('2026-09-16T01:00:00Z'))).toBe(false);
+  });
+});
+
+describe('브라우저가 보낸 스택', () => {
+  it('길면 자르고 잘렸다고 적는다', async () => {
+    const { trimStack, MAX_ERROR_STACK } = await import('../src');
+    const cut = trimStack('가'.repeat(MAX_ERROR_STACK + 100));
+    expect(cut!.length).toBeLessThan(MAX_ERROR_STACK + 20);
+    expect(cut).toContain('잘림');
+  });
+
+  it('비었으면 null 이다 — 빈 문자열을 스택으로 남기지 않는다', async () => {
+    const { trimStack } = await import('../src');
+    expect(trimStack('   ')).toBeNull();
+    expect(trimStack(undefined)).toBeNull();
+  });
+
+  it('출처는 아는 값만 받는다', async () => {
+    const { isErrorSource } = await import('../src');
+    expect(isErrorSource('browser')).toBe(true);
+    expect(isErrorSource('server')).toBe(true);
+    expect(isErrorSource('app')).toBe(false);
+  });
+});
