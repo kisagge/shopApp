@@ -170,6 +170,29 @@ openssl rand -base64 32   # CRON_SECRET
 > 운영에서 `VERCEL_URL` 을 쓰면 안 된다. 배포마다 바뀌는 주소라 사용자가
 > 실제로 접속하는 안정 도메인과 달라 `Invalid origin` 이 난다. 실제로 겪었다.
 
+### 도메인을 바꾸면 로그인이 막힌다
+
+**증상은 "비밀번호가 틀렸다" 가 아니다.** 로그인 창구가 403 으로 거절한다:
+
+```
+POST /api/auth/sign-in/email → {"message":"Invalid origin","code":"INVALID_ORIGIN"}
+```
+
+신뢰하는 출처 목록은 **배포 시점의 환경변수**로 만들어진다(`BETTER_AUTH_URL`
+또는 `NEXT_PUBLIC_APP_URL`, 그리고 Vercel 이 주는 `VERCEL_PROJECT_PRODUCTION_URL`
+· `VERCEL_BRANCH_URL` · `VERCEL_URL`). 도메인만 바꾸고 다시 배포하지 않으면
+새 주소는 그 목록 어디에도 없다 — 옛 주소를 명시해 뒀다면 더욱 그렇다.
+
+1. Production 환경변수의 `BETTER_AUTH_URL` · `NEXT_PUBLIC_APP_URL` 을 새 도메인으로
+2. **다시 배포한다.** 환경변수는 새 배포에만 실리고, `NEXT_PUBLIC_*` 은 빌드 때
+   번들에 박힌다 — 재시작만으로는 안 바뀐다
+3. 구글 로그인을 쓴다면 승인된 리디렉션 URI 에
+   `https://<새 도메인>/api/auth/callback/google` 을 더한다
+4. 앱 셸과 딥링크에도 도메인이 박혀 있다(`apps/mobile/capacitor.config.ts`,
+   `AndroidManifest.xml`, `App.entitlements`) — 이쪽은 **앱을 다시 빌드**해야 반영된다
+
+옛 도메인에서 로그인해 둔 세션은 따라오지 않는다. 쿠키는 도메인별이다.
+
 ## 4. 배포
 
 GitHub 저장소를 Vercel 에 연결하면 `vercel.json` 을 그대로 읽는다.

@@ -16,7 +16,7 @@
 <dict>
 	<key>com.apple.developer.associated-domains</key>
 	<array>
-		<string>applinks:shop-app-web-tau.vercel.app</string>
+		<string>applinks:plain-shop-byjang.vercel.app</string>
 	</array>
 </dict>
 </plist>

@@ -63,9 +63,9 @@ describe('배포 주소', () => {
       NEXT_PUBLIC_APP_URL: undefined,
       VERCEL_ENV: 'production',
       VERCEL_URL: 'shop-abc123.vercel.app',
-      VERCEL_PROJECT_PRODUCTION_URL: 'shop-app-web-tau.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'plain-shop-byjang.vercel.app',
     });
-    expect(auth.options.baseURL).toBe('https://shop-app-web-tau.vercel.app');
+    expect(auth.options.baseURL).toBe('https://plain-shop-byjang.vercel.app');
   });
 
   it('둘 다 없으면 비워 둔다 — 로컬에서는 현재 출처를 쓴다', async () => {
@@ -97,12 +97,12 @@ describe('신뢰 출처', () => {
       VERCEL_ENV: 'production',
       VERCEL_URL: 'shop-abc123.vercel.app',
       VERCEL_BRANCH_URL: 'shop-git-main.vercel.app',
-      VERCEL_PROJECT_PRODUCTION_URL: 'shop-app-web-tau.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'plain-shop-byjang.vercel.app',
     });
     const origins = auth.options.trustedOrigins;
     expect(origins).toContain('https://shop-abc123.vercel.app');
     expect(origins).toContain('https://shop-git-main.vercel.app');
-    expect(origins).toContain('https://shop-app-web-tau.vercel.app');
+    expect(origins).toContain('https://plain-shop-byjang.vercel.app');
   });
 
   it('운영 도메인을 명시하지 않아도 그 주소를 신뢰한다', async () => {
@@ -110,9 +110,9 @@ describe('신뢰 출처', () => {
       BETTER_AUTH_URL: undefined, NEXT_PUBLIC_APP_URL: undefined,
       VERCEL_ENV: 'production',
       VERCEL_URL: 'shop-abc123.vercel.app',
-      VERCEL_PROJECT_PRODUCTION_URL: 'shop-app-web-tau.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'plain-shop-byjang.vercel.app',
     });
-    expect(auth.options.trustedOrigins).toContain('https://shop-app-web-tau.vercel.app');
+    expect(auth.options.trustedOrigins).toContain('https://plain-shop-byjang.vercel.app');
   });
 
   it('중복을 남기지 않는다', async () => {

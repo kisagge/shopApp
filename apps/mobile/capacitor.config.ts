@@ -14,7 +14,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
  * 3. 네트워크가 없을 때 빈 화면 대신 무언가를 보여 준다 (www/index.html)
  */
 
-const PRODUCTION_URL = 'https://shop-app-web-tau.vercel.app';
+const PRODUCTION_URL = 'https://plain-shop-byjang.vercel.app';
 
 /**
  * 개발 중에는 내 컴퓨터의 서버를 본다.
