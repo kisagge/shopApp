@@ -65,6 +65,7 @@ export * from './search-suggest';
 export * from './review';
 export * from './review-report';
 export * from './cart-sync';
+export * from './cart-line';
 export * from './mail';
 export * from './auth-policy';
 export * from './error-report';

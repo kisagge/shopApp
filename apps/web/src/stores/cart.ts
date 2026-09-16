@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { MAX_QUANTITY } from '@shop/core';
+import { MAX_QUANTITY, swapLineVariant } from '@shop/core';
 
 export interface CartItem {
   readonly variantId: string;
@@ -38,6 +38,8 @@ interface CartState {
   increment: (variantId: string) => void;
   decrement: (variantId: string) => void;
   toggleSelected: (variantId: string) => void;
+  /** 한 줄을 같은 상품의 다른 옵션으로 바꾼다. 규칙은 core 의 swapLineVariant */
+  swapVariant: (fromVariantId: string, to: Omit<CartItem, 'quantity' | 'selected'>) => void;
   setAllSelected: (selected: boolean) => void;
   clear: () => void;
 }
@@ -111,6 +113,9 @@ export const useCartStore = create<CartState>()(
             i.variantId === variantId ? { ...i, selected: !i.selected } : i,
           ),
         })),
+
+      swapVariant: (fromVariantId, to) =>
+        set((s) => ({ items: swapLineVariant(s.items, fromVariantId, to) })),
 
       setAllSelected: (selected) =>
         set((s) => ({ items: s.items.map((i) => ({ ...i, selected })) })),

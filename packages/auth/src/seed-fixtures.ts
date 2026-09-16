@@ -83,6 +83,9 @@ export const SEED_ACCOUNT = {
   /** 받은 주문을 스스로 구매확정한다 — purchase-confirm */
   purchaseConfirmer: 'purchase-confirm@plain.test',
 
+  /** 장바구니에서 옵션을 바꾸고, 지난 주문을 다시 담는다 — cart-reorder. 둘 다 자기 장바구니를 쥔다 */
+  reorderer: 'cart-reorder@plain.test',
+
   /** 자기 리뷰를 쓰고 고친다 — review-edit. 주문을 만들어야 하므로 자기 장바구니를 쥔다 */
   reviewEditor: 'review-edit@plain.test',
 
@@ -112,5 +115,5 @@ export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
   'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
-  'purchaseConfirmer', 'reviewEditor',
+  'purchaseConfirmer', 'reviewEditor', 'reorderer',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

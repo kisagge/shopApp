@@ -53,6 +53,8 @@ export const STATE_FILE = {
   addressEditor: 'test-results/.auth/address-edit.json',
   /** 쿠폰 받기 화면에서 쿠폰을 받는다 — coupon-download */
   couponCollector: 'test-results/.auth/coupon-download.json',
+  /** 장바구니 옵션을 바꾸고 지난 주문을 다시 담는다 — cart-reorder */
+  reorderer: 'test-results/.auth/cart-reorder.json',
 } as const;
 
 /**
@@ -112,6 +114,11 @@ export const RACE_PRODUCT = {
    * 미리 세어 둔 평점을 흔들고, 이 명세는 그 상품의 리뷰 글을 눈으로 찾는다.
    */
   reviewEdit: 'alpaca-shawl-cardigan',
+  /**
+   * 장바구니에서 옵션을 바꾸고, 사서 다시 담는다 — cart-reorder. **옵션이 여럿이고 재고가 넉넉한 자사 브랜드
+   * 상품**이어야 한다: 바꿀 다른 옵션이 있어야 하고, 한 개를 사도 가맹점 재고 알림이 생기지 않아야 한다.
+   */
+  reorder: 'cotton-straight-chino',
 } as const;
 
 export const REVIEW_PRODUCT = {

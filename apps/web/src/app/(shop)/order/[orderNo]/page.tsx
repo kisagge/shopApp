@@ -13,6 +13,7 @@ import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { CancelItemsForm } from '~/components/cancel-items-form';
 import { RepayButton } from '~/components/repay-button';
+import { ReorderButton } from '~/components/reorder-button';
 import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
@@ -558,6 +559,12 @@ export default async function OrderPage({
             {t('receipt.link')}
           </Link>
         )}
+        {/*
+          **다시 사는 길.** 주문 줄은 옵션 id 를 그대로 갖고 있는데 연결한 곳이 없었다.
+          상태를 가리지 않는다 — 취소한 주문을 다시 사려는 것도 자연스럽고, 취소한 줄은
+          담지 않고 그렇다고 말한다(core 의 planReorder).
+        */}
+        <ReorderButton orderNo={order.orderNo} />
         <div className="flex gap-2">
           <Link
             href="/mypage/orders"

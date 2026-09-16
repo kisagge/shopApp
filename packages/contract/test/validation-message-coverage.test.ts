@@ -33,6 +33,8 @@ const EXEMPT: Readonly<Record<string, string>> = {
   cartQuoteResponseSchema: '같은 이유 — 서버가 만드는 응답이다.',
   eventBatchResponseSchema: '같은 이유 — 서버가 만드는 응답이다.',
   cancelItemsPreviewSchema: '같은 이유 — 일부 취소 미리보기는 서버가 계산해 내려주는 응답이다.',
+  cartOptionSchema: '같은 이유 — 장바구니 줄의 바꿀 옵션 하나는 서버가 읽어 내려주는 응답이다.',
+  cartOptionsResponseSchema: '같은 이유 — 바꿀 옵션 목록은 서버가 만드는 응답이다.',
 };
 
 const schemas = Object.entries(contract).filter(([, value]) => isSchema(value));

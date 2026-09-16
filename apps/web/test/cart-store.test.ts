@@ -126,3 +126,42 @@ describe('영속화', () => {
     expect(stored).not.toHaveProperty('subtotal');
   });
 });
+
+describe('옵션 바꾸기', () => {
+  /*
+   * 규칙 자체(자리 지키기, 합치기, 상한)는 core 가 본다. 여기서는 스토어가 그 규칙으로
+   * 줄을 바꾸고, 바꾼 결과가 저장까지 이어지는지를 본다.
+   */
+  const coatL = { ...coat, variantId: 'v-coat-l', optionLabel: '오트밀 / L', salePrice: 299_000 };
+
+  it('줄을 새 옵션으로 다시 적는다 — 수량·자리·선택은 그대로', () => {
+    useCartStore.getState().add(knit);
+    useCartStore.getState().add(coat, 2);
+    useCartStore.getState().toggleSelected('v-coat-m');
+
+    useCartStore.getState().swapVariant('v-coat-m', coatL);
+
+    expect(items().map((i) => i.variantId)).toEqual(['v-knit-l', 'v-coat-l']);
+    expect(find('v-coat-l')).toMatchObject({
+      optionLabel: '오트밀 / L', salePrice: 299_000, quantity: 2, selected: false,
+    });
+  });
+
+  it('바꾼 옵션이 이미 있으면 한 줄로 합친다', () => {
+    useCartStore.getState().add(coatL, 1);
+    useCartStore.getState().add(coat, 2);
+
+    useCartStore.getState().swapVariant('v-coat-m', coatL);
+
+    expect(items()).toHaveLength(1);
+    expect(find('v-coat-l')?.quantity).toBe(3);
+  });
+
+  it('새로 고쳐도 남는다 — 바꾼 줄도 저장된다', () => {
+    useCartStore.getState().add(coat);
+    useCartStore.getState().swapVariant('v-coat-m', coatL);
+
+    const saved = JSON.parse(localStorage.getItem('shop.cart') ?? '{}') as { state?: { items?: { variantId: string }[] } };
+    expect(saved.state?.items?.map((i) => i.variantId)).toEqual(['v-coat-l']);
+  });
+});

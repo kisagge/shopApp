@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import Image from 'next/image';
 import { Badge, Button, Price } from '@shop/ui';
@@ -13,6 +13,7 @@ import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useCartStore, type CartItem } from '~/stores/cart';
 import { useLocale, useT } from '~/lib/i18n/client';
 import { CART_ISSUE_KEY } from '~/lib/i18n/cart-issue';
+import { CartOptionChange } from '~/components/cart-option-change';
 
 export function CartView() {
   const t = useT();
@@ -50,6 +51,8 @@ export function CartView() {
    * 떨어져, 세 줄을 지우려면 탭으로 문서 맨 앞부터 세 번 내려와야 한다.
    */
   const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(items.length);
+  // 옵션을 바꾼 결과. 바꾼 줄은 새로 그려지므로 알림은 줄 바깥에 둔다
+  const [announcement, setAnnouncement] = useState('');
 
   if (items.length === 0) return <EmptyCart headingRef={emptyRef} />;
 
@@ -82,6 +85,8 @@ export function CartView() {
         </button>
       </div>
 
+      <p role="status" className="sr-only">{announcement}</p>
+
       <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-col">
         {items.map((item, index) => (
           <li key={item.variantId} className="border-b border-[var(--border)] px-4 py-5 md:px-0">
@@ -102,6 +107,7 @@ export function CartView() {
               }}
               onIncrement={() => increment(item.variantId)}
               onDecrement={() => decrement(item.variantId)}
+              onOptionChanged={setAnnouncement}
             />
           </li>
         ))}
@@ -147,7 +153,7 @@ function Check({ on }: { on: boolean }) {
 }
 
 function CartRow({
-  item, line, loading, onToggle, onRemove, onIncrement, onDecrement,
+  item, line, loading, onToggle, onRemove, onIncrement, onDecrement, onOptionChanged,
 }: {
   item: CartItem;
   line: CartQuoteLine | undefined;
@@ -156,6 +162,7 @@ function CartRow({
   onRemove: () => void;
   onIncrement: () => void;
   onDecrement: () => void;
+  onOptionChanged: (message: string) => void;
 }) {
   const t = useT();
   const locale = useLocale();
@@ -241,6 +248,16 @@ function CartRow({
         </div>
 
         <p className="text-[11px] text-[var(--fg-muted)]">{item.optionLabel}</p>
+
+        {/*
+          **품절 줄에서 할 수 있는 일이 지우기뿐이었다.** 같은 상품의 다른 옵션으로 바꾸는
+          길을 줄 안에 둔다. 살 수 없는 줄이면 눈에 띄게 — 그게 이 줄의 다음 할 일이다.
+        */}
+        <CartOptionChange
+          item={item}
+          prominent={line !== undefined && (line.issue === 'SOLD_OUT' || line.issue === 'INACTIVE')}
+          onChanged={onOptionChanged}
+        />
 
         {/* 문제는 색이 아니라 문장으로 알린다 */}
         {line?.issue && (

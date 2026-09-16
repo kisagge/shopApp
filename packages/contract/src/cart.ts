@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LINE_ISSUE } from '@shop/core';
+import { LINE_ISSUE, REORDER_SKIP } from '@shop/core';
 import { cuidSchema, discountPercentSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -116,3 +116,71 @@ export const cartQuoteResponseSchema = z.object({
   rewardPoints: wonSchema,
 });
 export type CartQuoteResponse = z.infer<typeof cartQuoteResponseSchema>;
+
+/**
+ * 장바구니 한 줄의 **바꿀 수 있는 옵션들.**
+ *
+ * 줄에 담긴 옵션과 같은 상품의 옵션을 모두 준다. 품절·판매 중지인 옵션도 목록에
+ * 남긴다(`available: false`) — 빼면 "L 은 어디 갔지" 가 된다. 고르지 못하게 하는
+ * 것은 화면이 한다.
+ *
+ * **새 줄을 만들 값까지 함께 준다.** 장바구니는 브라우저가 들고 있어서, 옵션을
+ * 바꾸면 그 줄을 다시 적어야 한다. 가격은 표시용이다 — 결제 금액은 견적이 다시 정한다.
+ */
+export const cartOptionsQuerySchema = z.object({ variantId: cuidSchema });
+
+export const cartOptionSchema = z.object({
+  variantId: z.string(),
+  label: z.string(),
+  unitPrice: wonSchema,
+  stock: z.number().int(),
+  available: z.boolean(),
+});
+export type CartOption = z.infer<typeof cartOptionSchema>;
+
+export const cartOptionsResponseSchema = z.object({
+  productId: z.string(),
+  productName: z.string(),
+  brandName: z.string(),
+  listPrice: wonSchema,
+  imageUrl: z.string().nullable(),
+  blurDataUrl: z.string().nullable(),
+  options: z.array(cartOptionSchema),
+});
+export type CartOptionsResponse = z.infer<typeof cartOptionsResponseSchema>;
+
+/**
+ * 지난 주문 다시 담기.
+ *
+ * **요청에는 지금 장바구니에 담긴 옵션 id 만 싣는다.** 줄 수 상한(이미 담긴 옵션은
+ * 줄이 늘지 않는다)을 서버가 판단하려면 그것만 알면 된다. 무엇을 몇 개 담을지는
+ * 주문이 정한다 — 요청이 정하면 남의 옵션을 끼워 넣을 수 있다.
+ */
+export const reorderRequestSchema = z.object({
+  cartVariantIds: z.array(cuidSchema).max(100, 'valid.tooManyItems').default([]),
+});
+export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
+
+export const reorderResponseSchema = z.object({
+  /** 담을 줄. 장바구니 한 줄을 그대로 만들 수 있는 값이다 */
+  add: z.array(z.object({
+    variantId: z.string(),
+    productId: z.string(),
+    productName: z.string(),
+    brand: z.string(),
+    optionLabel: z.string(),
+    listPrice: wonSchema,
+    salePrice: wonSchema,
+    imageUrl: z.string().nullable(),
+    blurDataUrl: z.string().nullable(),
+    quantity: quantitySchema,
+    reduced: z.boolean(),
+  })),
+  /** 못 담은 줄과 그 까닭. 이름은 주문 때 적어 둔 것이다 — 상품이 지워졌을 수 있다 */
+  skipped: z.array(z.object({
+    productName: z.string(),
+    optionLabel: z.string(),
+    reason: z.enum(REORDER_SKIP),
+  })),
+});
+export type ReorderResponse = z.infer<typeof reorderResponseSchema>;

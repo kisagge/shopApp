@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  calculateCart, discountRateOf, won, ZERO,
+  calculateCart, discountRateOf, won, ZERO, variantUnavailable, type VariantState, type ProductStatus,
   type CartLine, type Coupon, type LineShare, type ShippingPolicy,
   couponOffers, bestCoupon,
 } from '@shop/core';
@@ -87,16 +87,12 @@ export async function quoteCartDetailed(
   const lines: CartQuoteLine[] = input.lines.map((l) => {
     const v = byId.get(l.variantId);
 
-    // 상품이 사라졌거나 내려갔다
-    if (!v || v.product.deletedAt !== null || v.product.status === 'DRAFT') {
+    // 담을 수 없는 줄 — 판단은 옵션 바꾸기·다시 담기와 한 벌이다(core 의 variantUnavailable)
+    const unavailable = variantUnavailable(v ? variantStateOf(v) : null);
+    if (!v || unavailable === 'NOT_FOUND') {
       return emptyLine(l.variantId, l.quantity, 'NOT_FOUND');
     }
-    if (
-      !v.isActive ||
-      v.product.status === 'HIDDEN' ||
-      // 자사 직매입 브랜드는 가맹점이 없다 — 그때는 막지 않는다
-      (v.product.brand.merchant?.status ?? 'APPROVED') !== 'APPROVED'
-    ) {
+    if (unavailable === 'INACTIVE') {
       return emptyLine(l.variantId, l.quantity, 'INACTIVE', v.product.name, v.label);
     }
 
@@ -370,4 +366,25 @@ async function usableCoupons(userId: string | null): Promise<
   });
 
   return rows.map((r) => ({ coupon: toCoupon(r.coupon), name: r.coupon.name, expiresAt: r.expiresAt }));
+}
+
+/**
+ * 옵션 행을 판매 가능 판정의 모양으로 옮긴다. 옵션 바꾸기·다시 담기 창구도 이것을 쓴다 —
+ * 행에서 무엇을 읽는지까지 한 곳에 두어야 판정이 한 벌로 남는다.
+ */
+export function variantStateOf(v: {
+  readonly isActive: boolean;
+  readonly product: {
+    readonly status: ProductStatus;
+    readonly deletedAt: Date | null;
+    readonly brand: { readonly merchant: { readonly status: string } | null };
+  };
+}): VariantState {
+  return {
+    isActive: v.isActive,
+    productStatus: v.product.status,
+    productDeleted: v.product.deletedAt !== null,
+    // 자사 직매입 브랜드는 가맹점이 없다 — 그때는 막지 않는다
+    merchantStatus: v.product.brand.merchant?.status ?? null,
+  };
 }
