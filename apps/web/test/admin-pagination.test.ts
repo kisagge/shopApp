@@ -23,7 +23,8 @@ const product = (id: string) => ({
   id, slug: `p-${id}`, name: '코트', listPrice: 100_000, salePrice: null,
   status: 'ACTIVE', createdAt: new Date('2026-08-01'),
   brand: { name: 'MOOR' }, category: { name: '코트' },
-  variants: [{ stock: 3 }],
+  // _count 는 조회가 함께 고르는 값이다 — 빼 두면 실제와 다른 모양을 검사하게 된다
+  variants: [{ stock: 3, _count: { restockAlerts: 0 } }],
 });
 
 beforeEach(() => {

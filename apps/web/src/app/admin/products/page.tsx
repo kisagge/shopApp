@@ -229,6 +229,16 @@ export default async function AdminProductsPage({
                           {p.totalStock > 0 && p.lowStock && (
                             <span className="block text-[10px] text-warning">임박</span>
                           )}
+                          {/*
+                            **기다리는 사람은 재고 옆에 붙는다.** 무엇을 먼저 채울지는
+                            남은 수만 보고 정할 일이 아니다 — 0 개인 옵션 둘 중 하나는
+                            열두 명이 기다리고 하나는 아무도 안 기다린다.
+                          */}
+                          {p.waitingRestock > 0 && (
+                            <span className="tnum block text-[10px] text-warning">
+                              {p.waitingRestock.toLocaleString('ko-KR')}명 대기
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <Badge tone={STATUS_TONE[p.status] ?? 'neutral'}>

@@ -152,9 +152,16 @@ export default async function AdminProductDetailPage({
           ) : (
             <ul className="flex flex-col gap-2 text-[13px]">
               {product.variants.map((v) => (
-                <li key={v.id} className="flex justify-between">
+                <li key={v.id} className="flex justify-between gap-3">
                   <span>{v.optionLabel}</span>
-                  <span className="tnum">{v.stock}</span>
+                  <span className="flex gap-3">
+                    {v.waitingRestock > 0 && (
+                      <span className="tnum text-[11px] text-warning">
+                        {v.waitingRestock.toLocaleString('ko-KR')}명 대기
+                      </span>
+                    )}
+                    <span className="tnum">{v.stock}</span>
+                  </span>
                 </li>
               ))}
             </ul>

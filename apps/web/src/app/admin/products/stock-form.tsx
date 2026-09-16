@@ -10,6 +10,8 @@ export interface StockRow {
   readonly optionLabel: string;
   readonly stock: number;
   readonly isActive: boolean;
+  /** 이 옵션의 재입고를 기다리는 사람 수 */
+  readonly waitingRestock: number;
 }
 
 /**
@@ -66,6 +68,13 @@ export function StockForm({ productId, variants }: { productId: string; variants
               <th scope="col" className="px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">옵션</th>
               <th scope="col" className="w-32 px-3 py-2.5 text-left text-xs text-[var(--fg-secondary)]">SKU</th>
               <th scope="col" className="w-28 px-3 py-2.5 text-right text-xs text-[var(--fg-secondary)]">재고</th>
+              {/*
+                **얼마나 채울지 정하는 자리에 몇 명이 기다리는지 둔다.** 손님이 품절
+                옵션에 걸어 둔 알림은 행으로 쌓이기만 하고 파는 쪽에는 보인 적이 없었다.
+              */}
+              <th scope="col" className="w-24 px-3 py-2.5 text-right text-xs text-[var(--fg-secondary)]">
+                재입고 대기
+              </th>
               <th scope="col" className="w-20 px-3 py-2.5 text-center text-xs text-[var(--fg-secondary)]">판매</th>
             </tr>
           </thead>
@@ -94,6 +103,16 @@ export function StockForm({ productId, variants }: { productId: string; variants
                     }
                     className="tnum h-10 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-right text-[13px]"
                   />
+                </td>
+                <td className="tnum px-3 py-2.5 text-right text-[13px]">
+                  {r.waitingRestock > 0 ? (
+                    <span className="font-semibold text-warning">
+                      {r.waitingRestock.toLocaleString('ko-KR')}명
+                    </span>
+                  ) : (
+                    // 0 을 숫자로 적으면 기다리는 사람이 있는 줄과 눈으로 구분되지 않는다
+                    <span className="text-[var(--fg-muted)]" aria-label="기다리는 사람 없음">—</span>
+                  )}
                 </td>
                 <td className="px-3 py-2 text-center">
                   <label className="sr-only" htmlFor={`active-${r.id}`}>

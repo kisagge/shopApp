@@ -182,6 +182,14 @@ test('품절 옵션을 골라 재입고 알림을 걸면, 운영이 재고를 �
     // ── 운영: 화면에서 재고를 원래대로 채운다 — 없다가 생긴 옵션이라 알림이 나간다
     await ap.reload();
     await ready(ap);
+    /*
+     * **파는 쪽이 기다리는 사람을 본다.** 이 알림은 행으로 쌓이기만 하고 창구가 없어서,
+     * 무엇을 먼저 채울지 정하는 사람에게 한 번도 닿지 않았다 — 0 개인 옵션 둘 중 하나는
+     * 여럿이 기다리고 하나는 아무도 안 기다린다. 숫자를 못 박지 않는 것은 시드에 남은
+     * 다른 신청까지 셀 수 있어서다. 여기서 보는 것은 **세어서 보여 주는가** 다.
+     */
+    await expect(stockTable.getByRole('row').filter({ hasText: optionLabel }))
+      .toContainText(/[1-9]\d*명/);
     await stockTable.getByLabel(`${optionLabel} 재고 수량`).fill(String(original));
     await ap.getByRole('button', { name: '재고 반영' }).click();
     await expect(ap.getByText(/옵션의 재고를 반영했습니다/)).toBeVisible({ timeout: 15_000 });

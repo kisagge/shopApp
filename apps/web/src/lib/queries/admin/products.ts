@@ -21,6 +21,15 @@ export interface AdminProductRow {
   readonly status: string;
   readonly totalStock: number;
   readonly lowStock: boolean;
+  /**
+   * 이 상품의 재입고를 기다리는 사람 수.
+   *
+   * **아무도 세지 않던 값이다.** 손님이 품절 옵션에 알림을 걸면 행이 쌓이고
+   * `@@index([variantId, notifiedAt])` 까지 만들어 두었는데, 파는 쪽에서는
+   * 그것을 볼 창구가 없었다 — 무엇을 먼저 채울지 정하는 사람에게 가장 직접적인
+   * 숫자인데도. 이미 알림을 받은 건은 빼고 센다. 그건 기다리는 상태가 아니다.
+   */
+  readonly waitingRestock: number;
   readonly createdAt: Date;
   /** 검수를 요청한 시각. 대기줄 정렬에 쓴다. */
   readonly reviewRequestedAt: Date | null;
@@ -73,7 +82,14 @@ export async function getAdminProducts(
       deletedAt: true, archivedBy: true,
       brand: { select: { name: true } },
       category: { select: { name: true } },
-      variants: { select: { stock: true }, where: { isActive: true } },
+      variants: {
+        select: {
+          stock: true,
+          // 기다리는 사람 수. 이미 알림을 받은 건(notifiedAt)은 끝난 건이라 뺀다
+          _count: { select: { restockAlerts: { where: { notifiedAt: null } } } },
+        },
+        where: { isActive: true },
+      },
     },
     });
 
@@ -97,6 +113,7 @@ export async function getAdminProducts(
       status: p.status,
       totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
       lowStock: p.variants.some((v) => v.stock > 0 && v.stock <= LOW_STOCK_THRESHOLD),
+      waitingRestock: p.variants.reduce((s, v) => s + v._count.restockAlerts, 0),
       createdAt: p.createdAt,
       reviewRequestedAt: p.reviewRequestedAt,
       publishRejection: p.publishRejection,
@@ -131,6 +148,8 @@ export interface AdminProductDetail {
     readonly optionLabel: string;
     readonly stock: number;
     readonly isActive: boolean;
+    /** 이 옵션의 재입고를 기다리는 사람 수 — 얼마나 채울지 정하는 자리에 놓는다 */
+    readonly waitingRestock: number;
   }[];
 }
 
@@ -154,7 +173,11 @@ export async function getAdminProductDetail(
       category: { select: { id: true, name: true } },
       variants: {
         orderBy: { sku: 'asc' },
-        select: { id: true, sku: true, label: true, stock: true, isActive: true },
+        select: {
+          id: true, sku: true, label: true, stock: true, isActive: true,
+          // 기다리는 사람. 이미 알림을 받은 건은 끝난 건이라 뺀다
+          _count: { select: { restockAlerts: { where: { notifiedAt: null } } } },
+        },
       },
     },
   });
@@ -170,6 +193,7 @@ export async function getAdminProductDetail(
     publishRejection: p.publishRejection,
     variants: p.variants.map((v) => ({
       id: v.id, sku: v.sku, optionLabel: v.label, stock: v.stock, isActive: v.isActive,
+      waitingRestock: v._count.restockAlerts,
     })),
   };
 }
