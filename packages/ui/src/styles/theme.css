@@ -317,7 +317,7 @@
   }
 
   /* 포커스 링은 절대 제거하지 않는다. 마우스 사용자에게만 숨긴다. */
-  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  :where(a, button, input, select, textarea, [tabindex], [contenteditable]):focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: var(--radius-xs);

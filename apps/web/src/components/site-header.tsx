@@ -67,7 +67,8 @@ export async function SiteHeader() {
           </ul>
         </nav>
 
-        <span className="ml-auto flex shrink-0 items-center gap-4 md:ml-0">
+        {/* span 은 phrasing 콘텐츠만 담는다 — 안에 form 이 들어가므로 div 다 */}
+        <div className="ml-auto flex shrink-0 items-center gap-4 md:ml-0">
           {/* GET 폼이라 자바스크립트 없이도 검색이 된다 */}
           <form method="get" action="/search" role="search" className="hidden sm:block">
             <SearchBox id="site-search" />
@@ -78,7 +79,7 @@ export async function SiteHeader() {
           {/* 좁은 화면에서도 남긴다 — 알림은 놓치면 뜻이 없다 */}
           <NotificationBell />
           <CartBadge />
-        </span>
+        </div>
       </div>
     </header>
   );

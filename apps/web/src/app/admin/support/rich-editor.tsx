@@ -136,7 +136,13 @@ export function RichEditor({
          */
         class:
           'min-h-52 rounded-b-sm border border-t-0 border-[var(--border-strong)] bg-[var(--bg)] p-2.5 ' +
-          'text-[16px] leading-relaxed outline-none sm:text-[13px] ' +
+          /*
+           * **초점 표시를 지우지 않는다.** outline-none 만 걸려 있었는데, 전역 초점 링 선택자는
+           * `[contenteditable]` 을 잡지 않아(tabindex 도 없다) 탭으로 들어와도 지금 어디에 있는지
+           * 화면에 아무 표시가 없었다. axe 는 초점 스타일을 아예 검사하지 못한다.
+           */
+          'text-[16px] leading-relaxed sm:text-[13px] ' +
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] ' +
           // 편집 중에도 결과와 비슷하게 보여야 한다 — 목록이 점 없이 보이면 목록인지 모른다
           '[&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 ' +
           '[&_h2]:text-[17px] [&_h2]:font-semibold [&_h3]:text-[15px] [&_h3]:font-semibold ' +

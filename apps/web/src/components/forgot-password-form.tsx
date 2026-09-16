@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Button, Field } from '@shop/ui';
 import { authClient } from '@shop/auth/client';
 import { useT } from '~/lib/i18n/client';
@@ -12,6 +12,10 @@ export function ForgotPasswordForm() {
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | undefined>(undefined);
   const [sent, setSent] = useState(false);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (sent) resultRef.current?.focus();
+  }, [sent]);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
@@ -46,8 +50,19 @@ export function ForgotPasswordForm() {
   }
 
   if (sent) {
+    /*
+     * **결과가 폼을 대신하므로 초점을 옮긴다.**
+     *
+     * 동작과 동시에 생긴 라이브 영역은 낭독기가 놓치는 일이 흔하다 — 삽입 전부터 있던 영역이라야
+     * 안정적으로 읽힌다. 게다가 제출 단추가 사라져 초점이 <body> 로 떨어진다. 여기서는 패널 자체에
+     * 초점을 옮겨 "메일을 보냈습니다" 를 확실히 읽히게 하고, 키보드 사용자의 자리도 지킨다.
+     */
     return (
-      <div role="status" className="flex flex-col gap-3 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-5">
+      <div
+        ref={resultRef}
+        role="status"
+        tabIndex={-1}
+        className="flex flex-col gap-3 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-5 focus:outline-none">
         <p className="text-sm font-medium">{t('auth.mailSent')}</p>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
           {t('auth.mailSentDetail', { email })}

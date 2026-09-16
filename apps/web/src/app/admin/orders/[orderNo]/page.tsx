@@ -108,7 +108,11 @@ export default async function AdminOrderDetail({
     <>
       <header className="flex min-h-17 flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 sm:py-0 border-b border-[var(--border)] bg-[var(--bg)] px-4 sm:px-8">
         <div className="flex items-center gap-3.5">
-          <Link href="/admin/orders" className="text-sm text-[var(--fg-muted)] no-underline">←</Link>
+          {/* 글리프만 두면 낭독기가 "왼쪽 화살표, 링크" 로 읽거나 통째로 건너뛴다 — 어디로 가는지 적는다 */}
+          <Link href="/admin/orders" className="text-sm text-[var(--fg-muted)] no-underline">
+            <span aria-hidden="true">←</span>
+            <span className="sr-only">주문 목록으로</span>
+          </Link>
           <h1 className="text-[19px] font-semibold tracking-tight">주문 상세</h1>
           <p className="tnum text-[13px] text-[var(--fg-secondary)]">{order.orderNo}</p>
           <Badge tone="neutral">{ORDER_STATUS_LABEL[order.status]}</Badge>

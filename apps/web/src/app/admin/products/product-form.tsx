@@ -188,8 +188,15 @@ export function ProductForm({
             onChange={(e) => set('description', e.target.value)}
             rows={4}
             maxLength={4000}
+            aria-invalid={errors.description ? true : undefined}
+            aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
             className="rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3.5 py-3 text-sm text-[var(--fg)]"
           />
+          {errors.description && (
+            <p id={`${descriptionId}-error`} role="alert" className="text-[11px] text-accent">
+              {errors.description}
+            </p>
+          )}
         </div>
 
         <div className="grid gap-5 sm:grid-cols-2">
@@ -205,6 +212,7 @@ export function ProductForm({
               value={values.brandId}
               onChange={(e) => set('brandId', e.target.value)}
               aria-invalid={errors.brandId ? true : undefined}
+              aria-describedby={errors.brandId ? `${brandId}-error` : undefined}
               className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
             >
               <option value="">선택하세요</option>
@@ -212,6 +220,15 @@ export function ProductForm({
                 <option key={b.id} value={b.id}>{b.label}</option>
               ))}
             </select>
+            {/*
+              **무엇이 잘못됐는지 적는다.** aria-invalid 만 붙어 있어서 낭독기는 "브랜드, 콤보 상자,
+              잘못된 값" 까지만 읽고 이유를 말하지 않았다 — 눈으로 보는 사람에게는 아무 표시도 없었다.
+            */}
+            {errors.brandId && (
+              <p id={`${brandId}-error`} role="alert" className="text-[11px] text-accent">
+                {errors.brandId}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-col gap-2">
@@ -225,6 +242,8 @@ export function ProductForm({
               required
               value={values.categoryId}
               onChange={(e) => set('categoryId', e.target.value)}
+              aria-invalid={errors.categoryId ? true : undefined}
+              aria-describedby={errors.categoryId ? `${categoryId}-error` : undefined}
               className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)]"
             >
               <option value="">선택하세요</option>
@@ -232,6 +251,11 @@ export function ProductForm({
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
             </select>
+            {errors.categoryId && (
+              <p id={`${categoryId}-error`} role="alert" className="text-[11px] text-accent">
+                {errors.categoryId}
+              </p>
+            )}
           </div>
         </div>
       </fieldset>

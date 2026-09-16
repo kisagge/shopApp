@@ -176,7 +176,12 @@ export default async function CategoryPage({ params, searchParams }: Params) {
         />
       </div>
 
-      <section aria-label={t('catalog.productList')} className="pt-8">
+      {/*
+        **제목 단계를 건너뛰지 않는다.** h1 다음이 곧바로 상품 카드의 h3 라, 제목으로 훑어 내려가는
+        사람에게 목록의 소속이 흐려졌다. 홈·기획전은 이미 sr-only h2 를 두고 있다.
+      */}
+      <section aria-labelledby="product-list-title" className="pt-8">
+        <h2 id="product-list-title" className="sr-only">{t('catalog.productList')}</h2>
         {products.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-24">
             <p className="text-[15px] font-medium">{t('empty.title')}</p>

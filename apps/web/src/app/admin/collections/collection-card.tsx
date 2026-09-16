@@ -118,6 +118,13 @@ export function CollectionCard({
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-4">
+          {/*
+            **어느 기획전의 칸인지 제목으로 밝힌다.** 이 목록은 카드마다 같은 모양의 폼이라, 제목이 없으면
+            낭독기로 훑을 때 지금 보는 것이 무엇인지 알 수 없다. 제목 칸(Field)은 고치는 자리이지 이름이
+            아니다. 그리고 이 제목이 있어야 아래 "담긴 상품"(h3)이 단계를 건너뛰지 않는다 — 화면의 제목은
+            h1(기획전) 하나뿐이었다.
+          */}
+          <h2 className="sr-only">{item.title}</h2>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Badge tone={STATUS_TONE[item.status] ?? 'neutral'}>

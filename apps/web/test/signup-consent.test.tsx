@@ -47,6 +47,20 @@ describe('가입 동의', () => {
     expect(read[0]).toHaveAttribute('target', '_blank');
   });
 
+  it('체크박스 이름에 링크 문구가 섞이지 않는다', () => {
+    /*
+     * 처음에는 `<label>` 이 체크박스와 "읽기" 링크를 함께 감쌌다. label 은 대화형 콘텐츠를 담을 수
+     * 없고(HTML 콘텐츠 모델), 그렇게 두면 체크박스 이름이 "이용약관에 동의합니다 읽기" 가 되어
+     * 낭독기가 동의 항목마다 링크 문구를 덧붙여 읽는다. 이름표 안에 탭 정지점도 둘 생긴다.
+     */
+    render(<SignUpForm />);
+
+    const terms = screen.getByLabelText(/이용약관에 동의합니다/);
+    expect(terms.getAttribute('type')).toBe('checkbox');
+    // 이름은 동의 문구까지다 — 읽기는 곁에 선 별개의 링크다
+    expect(terms.closest('label')?.textContent ?? '').not.toContain('읽기');
+  });
+
   it('필수 동의가 없으면 가입을 보내지 않고 그 이유를 말한다', async () => {
     const user = userEvent.setup();
     render(<SignUpForm />);

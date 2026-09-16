@@ -43,6 +43,22 @@ describe('Field', () => {
     expect(screen.queryByText('- 없이 입력하세요')).not.toBeInTheDocument();
   });
 
+  it('가리키는 설명은 실제로 그려진 것뿐이다', () => {
+    /*
+     * describedBy 는 힌트가 있기만 하면 그 id 를 가리키고 있었는데, 힌트는 에러가 있으면 자리를
+     * 내준다 — 둘이 함께 있는 칸은 **없는 id 를 가리켰다.** 끊긴 참조는 검증 도구가 걸고,
+     * 일부 낭독기는 설명을 통째로 버린다.
+     */
+    render(<Field label="계좌번호" hint="숫자만 저장합니다" error="계좌번호는 숫자 8자리 이상입니다" />);
+
+    const input = screen.getByLabelText('계좌번호');
+    const ids = (input.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean);
+    expect(ids.length).toBeGreaterThan(0);
+    for (const id of ids) {
+      expect(document.getElementById(id), `${id} 를 가리키는데 그런 요소가 없다`).not.toBeNull();
+    }
+  });
+
   it('접근성 위반이 없다 (에러 상태 포함)', async () => {
     const { container } = render(<Field label="연락처" required error="형식이 올바르지 않습니다" />);
     await expectNoA11yViolations(container);

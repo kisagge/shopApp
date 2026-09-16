@@ -21,7 +21,13 @@ export function Field({ label, error, hint, className, required, ...props }: Fie
   const id = useId();
   const errorId = `${id}-error`;
   const hintId = `${id}-hint`;
-  const describedBy = [error ? errorId : null, hint ? hintId : null].filter(Boolean).join(' ');
+  /*
+   * **그리는 조건과 같아야 한다.** 힌트는 오류가 있을 때 자리를 내주는데(아래 `hint && !error`),
+   * 여기서는 힌트가 있기만 하면 가리키고 있었다 — 오류와 힌트가 함께 있는 칸은 없는 id 를
+   * 가리키는 셈이라 낭독기가 설명을 통째로 버리기도 한다.
+   */
+  const showHint = hint !== undefined && !error;
+  const describedBy = [error ? errorId : null, showHint ? hintId : null].filter(Boolean).join(' ');
 
   return (
     <div className="flex flex-col gap-2">
@@ -49,7 +55,7 @@ export function Field({ label, error, hint, className, required, ...props }: Fie
         {...props}
       />
 
-      {hint && !error && (
+      {showHint && (
         <p id={hintId} className="text-[11px] text-[var(--fg-muted)]">
           {hint}
         </p>

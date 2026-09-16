@@ -136,6 +136,8 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             page && (
               <>
                 <TrackedProductList listId="search_results" itemCount={page.items.length}>
+                  {/* h1 다음이 곧바로 카드의 h3 가 되지 않게 — 제목 단계는 건너뛰지 않는다 */}
+                  <h2 className="sr-only">{t('catalog.productList')}</h2>
                   <div className="mt-8">
                     <ProductGrid
                       compare

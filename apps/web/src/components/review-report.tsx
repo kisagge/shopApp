@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import { REPORT_REASON, type ReportReason } from '@shop/core';
 import { useT } from '~/lib/i18n/client';
@@ -34,10 +34,33 @@ export function ReviewReport({
    * 않으면 body 로 떨어져 키보드 사용자가 자기 자리를 잃는다.
    */
   const { triggerRef, panelRef } = useDisclosureFocus(open);
+  /** 신고를 마친 뒤 결과로 초점을 옮긴다 — 단추가 사라진 자리를 대신하는 것이 이 글이다 */
+  const resultRef = useRef<HTMLSpanElement>(null);
+  const reportedHere = useRef(false);
+  useEffect(() => {
+    if (done && reportedHere.current) resultRef.current?.focus();
+  }, [done]);
 
   if (done) {
+    /*
+     * **결과가 폼을 대신한다 — 초점과 알림을 둘 다 챙긴다.**
+     *
+     * 예전에는 평범한 span 이었다. 그러면 방금 누른 단추가 사라지면서 초점이 <body> 로 떨어져
+     * 키보드 사용자는 문서 처음부터 다시 훑어 내려와야 하고, 낭독기는 "신고했습니다" 를 아무 말도
+     * 하지 않는다 — 신고가 됐는지 알 길이 없다. 여는 쪽(useDisclosureFocus)은 이미 챙기고 있었는데
+     * 끝나는 쪽만 빠져 있었다.
+     *
+     * 처음부터 신고한 글(alreadyReported)에는 초점을 옮기지 않는다. 화면을 열자마자 초점이 튄다.
+     */
     return (
-      <span className="text-[11px] text-[var(--fg-muted)]">{t('review.reported')}</span>
+      <span
+        ref={resultRef}
+        role="status"
+        tabIndex={-1}
+        className="text-[11px] text-[var(--fg-muted)] focus:outline-none"
+      >
+        {t('review.reported')}
+      </span>
     );
   }
 
@@ -80,6 +103,7 @@ export function ReviewReport({
         setError(await failureMessage(response, t('review.reportFailed')));
         return;
       }
+      reportedHere.current = true;
       setDone(true);
     } catch {
       setError(t('common.networkError'));

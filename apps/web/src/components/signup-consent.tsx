@@ -61,31 +61,37 @@ export function SignupConsent({
         {CONSENT.map((name) => {
           const href = name in DOCUMENT ? DOCUMENT[name as keyof typeof DOCUMENT] : null;
           return (
-            <li key={name}>
-              <label className="flex items-start gap-2.5 text-[13px] leading-relaxed">
-                <input
-                  type="checkbox"
-                  name={`${groupId}-${name}`}
-                  checked={value[name]}
-                  onChange={(e) => onChange({ ...value, [name]: e.target.checked })}
-                  className="mt-0.5"
-                />
-                <span>
+            <li key={name} className="flex items-start gap-2.5 text-[13px] leading-relaxed">
+              {/*
+                **읽기 링크는 이름표 밖에 둔다.** 처음에는 `<label>` 이 체크박스와 링크를 함께 감쌌는데,
+                label 은 대화형 콘텐츠를 담을 수 없다(HTML 콘텐츠 모델). 그렇게 두면 체크박스의 이름이
+                "이용약관에 동의합니다 읽기" 가 되어 낭독기가 동의 항목마다 링크 문구를 덧붙여 읽고,
+                이름표 안에 탭 정지점이 둘 생겨 이동이 꼬인다.
+              */}
+              <input
+                id={`${groupId}-${name}`}
+                type="checkbox"
+                checked={value[name]}
+                onChange={(e) => onChange({ ...value, [name]: e.target.checked })}
+                className="mt-0.5"
+              />
+              <span>
+                <label htmlFor={`${groupId}-${name}`}>
                   <span className="text-[var(--fg-muted)]">
                     {t(CONSENT_REQUIRED[name] ? 'auth.consentRequired' : 'auth.consentOptional')}
                   </span>{' '}
                   {t(`auth.consent.${name}` as const)}
-                  {href && (
-                    <>
-                      {' '}
-                      {/* 새 탭으로 연다 — 읽으러 갔다가 적던 것이 날아가면 안 읽게 된다 */}
-                      <Link href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-                        {t('auth.consentRead')}
-                      </Link>
-                    </>
-                  )}
-                </span>
-              </label>
+                </label>
+                {href && (
+                  <>
+                    {' '}
+                    {/* 새 탭으로 연다 — 읽으러 갔다가 적던 것이 날아가면 안 읽게 된다 */}
+                    <Link href={href} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+                      {t('auth.consentRead')}
+                    </Link>
+                  </>
+                )}
+              </span>
             </li>
           );
         })}

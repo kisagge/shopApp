@@ -210,7 +210,12 @@ export default async function AdminAuditPage({
                             <div className="mt-2 flex flex-col gap-2 md:flex-row">
                               {row.before !== null && (
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 전</h3>
+                                  {/*
+                                    제목이 아니라 **표 칸 안의 이름표**다. h3 로 두면 이 화면의
+                                    제목 단계가 h1 다음에 h3 로 건너뛰고, 낭독기의 제목 목록에는
+                                    줄 수만큼 "변경 전" 이 쌓인다.
+                                  */}
+                                  <p className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 전</p>
                                   <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
                                     {preview(row.before)}
                                   </pre>
@@ -218,7 +223,7 @@ export default async function AdminAuditPage({
                               )}
                               {row.after !== null && (
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 후</h3>
+                                  <p className="text-[10px] font-semibold text-[var(--fg-muted)]">변경 후</p>
                                   <pre className="mt-1 overflow-x-auto rounded-sm bg-[var(--surface)] p-2 text-[11px]">
                                     {preview(row.after)}
                                   </pre>

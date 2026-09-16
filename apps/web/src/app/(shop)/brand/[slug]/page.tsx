@@ -86,7 +86,9 @@ export default async function BrandPage({ params, searchParams }: Params) {
         />
       </div>
 
-      <section aria-label={t('brand.all')} className="pt-8">
+      <section aria-labelledby="brand-products-title" className="pt-8">
+        {/* h1 다음이 곧바로 카드의 h3 가 되지 않게 — 제목 단계는 건너뛰지 않는다 */}
+        <h2 id="brand-products-title" className="sr-only">{t('brand.all')}</h2>
         {products.length === 0 ? (
           <div className="flex flex-col items-center gap-2 py-24">
             <p className="text-[15px] font-medium">{t('brand.empty')}</p>
