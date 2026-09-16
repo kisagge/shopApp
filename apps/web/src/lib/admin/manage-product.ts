@@ -367,7 +367,12 @@ export async function getProductFormOptions(actor: Actor) {
     prisma.category.findMany({
       // 상품은 말단 카테고리에만 붙인다. 상위에 붙이면 목록 필터가 어긋난다.
       where: { children: { none: {} } },
-      orderBy: { slug: 'asc' },
+      /*
+       * **머리 메뉴와 같은 순서로 세운다.** slug 로 줄 세우고 있어서 운영자가 정한
+       * 순서(sortOrder)가 이 목록에서만 뒤집혀 있었다 — 매대에서는 코트·패딩·자켓인데
+       * 폼에서는 영문 주소 순이었다. 이제 순서를 고칠 수 있게 되었으니 더 그렇다.
+       */
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: { id: true, name: true, parent: { select: { name: true } } },
     }),
   ]);

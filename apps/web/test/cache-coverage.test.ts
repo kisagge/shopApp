@@ -44,6 +44,9 @@ const CATALOG_WRITERS = [
    */
   'app/api/admin/brands/route.ts',
   'app/api/admin/brands/[id]/route.ts',
+  // 머리 메뉴와 목록 필터가 카테고리를 읽는다 — 순서만 바꿔도 털어야 한다
+  'app/api/admin/categories/route.ts',
+  'app/api/admin/categories/[id]/route.ts',
   'app/api/admin/products/route.ts',
   'app/api/admin/products/[id]/route.ts',
   'app/api/admin/products/[id]/archive/route.ts',

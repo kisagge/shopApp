@@ -9,6 +9,10 @@ import type { AuditTargetType } from '~/lib/audit';
 /** 사람이 읽는 이름. 없는 동작은 원래 키를 그대로 보여 준다 — 숨기는 것보다 낫다. */
 export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'brand.create': '브랜드 등록',
+  'category.create': '카테고리 등록',
+  'category.update': '카테고리 수정',
+  'category.reorder': '카테고리 순서 변경',
+  'category.delete': '카테고리 삭제',
   'brand.update': '브랜드 수정',
   'product.create': '상품 등록',
   'product.update': '상품 수정',
@@ -115,6 +119,7 @@ const TARGET_LABEL: Readonly<Record<AuditTargetType, string>> = {
   return_address: '반품지',
   policy: '약관·방침',
   brand: '브랜드',
+  category: '카테고리',
   event_log: '이벤트 기록',
   notification: '알림 기록',
   audit: '감사 로그',

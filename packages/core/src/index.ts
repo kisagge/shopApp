@@ -34,6 +34,7 @@ export * from './theme';
 export * from './blur';
 export * from './slug-history';
 export * from './brand';
+export * from './category';
 export * from './collection';
 export * from './facet';
 export * from './web-vitals';

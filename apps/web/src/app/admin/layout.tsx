@@ -17,7 +17,7 @@ interface NavItem {
   readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/returns' | '/admin/products' | '/admin/settlements' | '/admin/audit' | '/admin/policies'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/errors'
-    | '/admin/collections' | '/admin/brands'
+    | '/admin/collections' | '/admin/brands' | '/admin/categories'
     | '/admin/inquiries' | '/admin/support'
     | '/admin/traffic' | '/admin/coupons' | '/admin/shipping' | '/admin/notification-templates' | '/admin/mail-templates';
   readonly label: string;
@@ -38,6 +38,11 @@ const NAV: readonly NavItem[] = [
   { href: '/admin/collections', label: '기획전', permission: 'collection:read' },
   // 가맹점도 들어온다 — 자기 브랜드의 이름과 주소를 고치는 자리다
   { href: '/admin/brands', label: '브랜드', permission: 'product:write' },
+  /*
+   * 카테고리는 매대 전체의 갈래라 가맹점에게 열지 않는다. 메뉴에서 감추는 것만으로는
+   * 모자라서 화면과 API 도 각자 막는다(core 의 canManageCategory).
+   */
+  { href: '/admin/categories', label: '카테고리', permission: 'product:publish' },
   { href: '/admin/coupons', label: '쿠폰', permission: 'coupon:read' },
   // 가맹점에게는 보이지 않는다. 자기 상품의 혹평을 내릴 수 있으면
   // 리뷰가 상품 설명의 일부가 된다.

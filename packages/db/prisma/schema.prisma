@@ -470,11 +470,24 @@ model Category {
   children  Category[] @relation("CategoryTree")
   sortOrder Int        @default(0)
   products  Product[]
+  /// 이 갈래가 쓰던 옛 주소들
+  slugs     CategorySlug[]
 
   createdAt DateTime @default(now())
 
   @@index([parentId, sortOrder])
   @@map("categories")
+}
+
+/// 카테고리가 쓰던 옛 주소. ProductSlug·BrandSlug 와 같은 이유로 둔다.
+model CategorySlug {
+  slug       String   @id
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([categoryId])
+  @@map("category_slugs")
 }
 
 /// 상품을 보관한 쪽. 사람이 아니라 쪽을 적는다 — 역할은 나중에 바뀌고, 누가 했는지는 감사 로그가 갖는다.

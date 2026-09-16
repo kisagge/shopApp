@@ -20,6 +20,7 @@ export * from './product';
 export * from './admin';
 export * from './banner';
 export * from './brand';
+export * from './category';
 export * from './collection';
 export * from './catalog';
 export * from './review';

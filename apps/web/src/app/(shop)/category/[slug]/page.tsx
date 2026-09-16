@@ -1,12 +1,13 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
 import {
-  resolvePriceRange, emptyResultReason,
+  resolvePriceRange, emptyResultReason, slugLookup,
   breadcrumbStructuredData, itemListStructuredData,
 } from '@shop/core';
 import { getCategoryWithChildren } from '~/lib/queries/catalog/products';
+import { getCategorySlugMovedTo } from '~/lib/admin/manage-category';
 import { searchProducts, getFacets, getBrandOptions } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
 import { absoluteUrl } from '~/lib/urls';
@@ -38,7 +39,7 @@ export default async function CategoryPage({ params, searchParams }: Params) {
   // 손으로 친 숫자와 구간 프리셋 중 어느 쪽이 이기는지는 core 가 정한다
   const price = resolvePriceRange(query);
 
-  const [category, page, facets, brands] = await Promise.all([
+  const [loaded, page, facets, brands] = await Promise.all([
     getCategoryWithChildren(slug),
     searchProducts({
       categorySlug: slug,
@@ -54,7 +55,20 @@ export default async function CategoryPage({ params, searchParams }: Params) {
     getFacets({ categorySlug: slug }),
     getBrandOptions({ categorySlug: slug }),
   ]);
-  if (!category) notFound();
+  /*
+   * 옛 주소면 새 주소로 넘기고, 그다음이 404 다 — 상품·기획전·브랜드와 같은 규칙이다.
+   * 순서(지금 주소를 먼저 본다)는 core 가 정한다: 되돌린 경우에 자기 자신으로
+   * 넘기는 고리가 생기지 않게.
+   */
+  const found = slugLookup({
+    current: loaded,
+    // 있는 갈래면 기록을 뒤질 이유가 없다
+    movedTo: loaded ? null : await getCategorySlugMovedTo(slug),
+  });
+  if (found.kind === 'moved') permanentRedirect(`/category/${found.to}`);
+  if (found.kind === 'gone') notFound();
+  // 값을 담아 돌려주는 덕에 여기서부터는 있는 것이 확실하다
+  const category = found.value;
 
   const t = await getT();
   const products = page.items;
