@@ -55,6 +55,8 @@ for (const [name, list, link] of [
   ['상품 수정', '/admin/products', 'a[href^="/admin/products/"]'],
   ['회원 상세', '/admin/users', 'a[href^="/admin/users/"]:not([href$="/points"])'],
   ['회원 포인트', '/admin/users', 'a[href$="/points"]'],
+  // 신청서·지난 기록이 설명 목록과 목록으로 선다. 하위 화면과 안 겹치게 id 로 끝나는 링크만.
+  ['가맹점 상세', '/admin/merchants', 'a[href^="/admin/merchants/"]:not([href$="/return-address"]):not([href$="/settings"])'],
   ['가맹점 반품지', '/admin/merchants', 'a[href$="/return-address"]'],
   ['가맹점 정보', '/admin/merchants', 'a[href$="/settings"]'],
 ] as const) {

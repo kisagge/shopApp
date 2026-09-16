@@ -47,6 +47,14 @@ export const SYSTEM_ACTOR = 'system';
 export interface AuditLogFilter {
   readonly action?: string | undefined;
   readonly targetType?: string | undefined;
+  /**
+   * 그 대상 하나에 무슨 일이 있었나.
+   *
+   * **종류만으로는 답할 수 없는 물음이다.** targetType 이 'merchant' 면 모든
+   * 가맹점의 기록이 섞여 나온다 — "이 가맹점이 왜 정지됐나" 를 보려면 id 로
+   * 좁혀야 한다. 가맹점 상세 화면이 이것을 쓴다.
+   */
+  readonly targetId?: string | undefined;
   /** 사용자 id, 또는 SYSTEM_ACTOR */
   readonly actor?: string | undefined;
   /** 'YYYY-MM-DD' (KST, 그날 포함) */
@@ -71,6 +79,7 @@ export function auditLogWhere(filter: AuditLogFilter) {
   return {
     ...(filter.action ? { action: filter.action } : {}),
     ...(filter.targetType ? { targetType: filter.targetType } : {}),
+    ...(filter.targetId ? { targetId: filter.targetId } : {}),
     ...(filter.actor ? { actorId: filter.actor === SYSTEM_ACTOR ? null : filter.actor } : {}),
     ...(range.from || range.until
       ? {

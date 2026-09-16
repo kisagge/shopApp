@@ -98,6 +98,24 @@ describe('필터', () => {
     expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].where).toEqual({});
   });
 
+  it('대상 하나로 좁힌다 — 종류만으로는 모든 가맹점이 섞여 나온다', async () => {
+    /*
+     * "이 가맹점이 왜 정지됐나" 는 종류(merchant)만 걸어서는 답할 수 없다.
+     * 가맹점 상세 화면의 지난 기록이 이것을 쓴다.
+     */
+    mockPage([row('a-0')]);
+    await getAuditLogs(admin, { targetType: 'merchant', targetId: 'm-1' });
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].where).toEqual({
+      targetType: 'merchant', targetId: 'm-1',
+    });
+  });
+
+  it('대상 id 만 줘도 좁힌다', async () => {
+    mockPage([row('a-0')]);
+    await getAuditLogs(admin, { targetId: 'm-1' });
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].where).toEqual({ targetId: 'm-1' });
+  });
+
   it('동작과 대상으로 좁힌다', async () => {
     mockPage([row('a-0')]);
     await getAuditLogs(admin, { action: 'product.update', targetType: 'product' });

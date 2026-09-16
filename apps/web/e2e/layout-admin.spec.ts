@@ -86,6 +86,8 @@ layoutTests(test, expect, [
   ['회원 상세', '/admin/users', openFirstRow],
   // 원장 표와 조정 폼이 나란히 선다
   ['회원 포인트', '/admin/users', openPointsLink],
+  // 신청서·붙어 있는 것·지난 기록이 위아래로 선다. 표의 첫 링크가 가맹점 이름이다.
+  ['가맹점 상세', '/admin/merchants', openFirstRow],
   // 반품지 폼 — 칸이 좁은 폭에서 겹치지 않는지
   ['가맹점 반품지', '/admin/merchants', openReturnAddressLink],
   // 연락처·계좌 폼과 사업자 정보 폼이 위아래로 선다

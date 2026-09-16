@@ -77,7 +77,13 @@ export default async function AdminMerchantsPage() {
                 {merchants.map((m) => (
                   <tr key={m.id} className="border-b border-[var(--surface-2)] align-top last:border-0">
                     <td className="px-4 py-3">
-                      <span className="block text-[13px]">{m.name}</span>
+                      {/* 한 줄에 다 담을 수 없는 것들(반려 사유·지난 기록)은 상세로 간다 */}
+                      <Link
+                        href={`/admin/merchants/${m.id}`}
+                        className="block text-[13px] text-[var(--fg)] no-underline hover:underline"
+                      >
+                        {m.name}
+                      </Link>
                       <span className="block text-[11px] text-[var(--fg-muted)]">
                         {/*
                           승인 전에는 브랜드가 아직 없다. 그때는 신청서에 적은
