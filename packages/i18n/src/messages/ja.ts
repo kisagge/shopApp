@@ -847,6 +847,8 @@ export const ja: Dictionary = {
   'valid.trackingFormat': '伝票番号は9~20桁の数字です',
   'valid.exchangeOptionRequired': '交換するオプションを選んでください',
   'valid.bizNumberFormat': '事業者登録番号の形式ではありません (000-00-00000)',
+  'valid.bankRequired': '銀行を選んでください',
+  'valid.accountFormat': '口座番号は数字8〜20桁です',
   'valid.couponNameRequired': 'クーポン名をご入力ください',
   'valid.couponCodeRequired': 'クーポンコードをご入力ください',
   'valid.couponCodeFormat': 'コードは英数字4~20文字です',

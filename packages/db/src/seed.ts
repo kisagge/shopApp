@@ -37,6 +37,9 @@ const CATEGORIES = [
 ];
 
 /// 가맹점. PLAIN LABEL 은 자사 브랜드라 가맹점에 속하지 않는다(merchantId = null).
+///
+/// 정산 계좌는 **지어낸 번호**다. 없으면 확정된 정산을 지급할 수 없어서(close-settlement 의 NO_ACCOUNT)
+/// 시드만으로는 정산 한 바퀴를 밟을 수 없다.
 /// 자사 상품은 가맹점이 건드릴 수 없고 운영진만 다룬다 — authz 의 ownsMerchant 참고.
 const MERCHANTS = [
   {
@@ -44,6 +47,7 @@ const MERCHANTS = [
     businessNumber: '000-00-00001', representative: '[대표자명]',
     contactEmail: 'contact@studionoon.test', contactPhone: '02-0000-0001',
     commissionPercent: 15, brands: ['studio-noon'],
+    settlementBank: 'KB', settlementAccount: '00100000000001', settlementHolder: '주식회사 스튜디오눈',
     returnAddress: { recipient: '스튜디오눈 반품담당', phone: '010-0000-0101', postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: '스튜디오눈 물류창고 1층' },
   },
   {
@@ -51,6 +55,7 @@ const MERCHANTS = [
     businessNumber: '000-00-00002', representative: '[대표자명]',
     contactEmail: 'contact@atelierk.test', contactPhone: '02-0000-0002',
     commissionPercent: 18, brands: ['atelier-k'],
+    settlementBank: 'SHINHAN', settlementAccount: '00200000000002', settlementHolder: '아뜰리에케이',
     returnAddress: { recipient: '아뜰리에케이 반품담당', phone: '010-0000-0102', postalCode: '06035', address1: '서울 강남구 가로수길 00', address2: '지하 1층' },
   },
   {
@@ -58,6 +63,7 @@ const MERCHANTS = [
     businessNumber: '000-00-00003', representative: '[대표자명]',
     contactEmail: 'contact@moor.test', contactPhone: '02-0000-0003',
     commissionPercent: 12, brands: ['moor'],
+    settlementBank: 'NH', settlementAccount: '00300000000003', settlementHolder: '무어컴퍼니',
     returnAddress: { recipient: '무어 반품담당', phone: '010-0000-0103', postalCode: '10126', address1: '경기 김포시 고촌읍 아라육로 00', address2: null },
   },
 ];
@@ -665,6 +671,18 @@ async function main(): Promise<void> {
     await prisma.brand.updateMany({
       where: { slug: { in: brands } },
       data: { merchantId: merchant.id },
+    });
+    /*
+     * 계좌는 **비어 있을 때만** 채운다. 이미 적힌 것을 덮으면 화면에서 고친 계좌를 시드가 되돌린다 —
+     * 반품지와 같은 판단이다. 없으면 확정된 정산을 지급할 수 없다.
+     */
+    await prisma.merchant.updateMany({
+      where: { id: merchant.id, settlementAccount: null },
+      data: {
+        settlementBank: data.settlementBank,
+        settlementAccount: data.settlementAccount,
+        settlementHolder: data.settlementHolder,
+      },
     });
     // 반품지가 없으면 이 가맹점 상품의 반품을 승인할 수 없다. 이미 있으면 두어 둔다 — 화면에서 고친 값을 시드가 덮지 않게
     await prisma.returnAddress.upsert({

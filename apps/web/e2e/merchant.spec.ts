@@ -198,3 +198,48 @@ test('가맹점은 자기 반품지만 고친다 — 남의 반품지는 주소�
   });
   expect(platform.status(), '가맹점이 자사 상품 반품지를 고칠 수 있다').toBe(403);
 });
+
+test('가맹점은 자기 정산 계좌를 적고, 사업자 정보는 못 고친다', async ({ page }) => {
+  /*
+   * **돈이 나가는 자리와 돈 받는 주체를 가른다.** 계좌는 가맹점이 적고, 상호·사업자등록번호·대표자는 운영진만 고친다 —
+   * 스스로 바꿀 수 있으면 심사 없이 받는 사람이 바뀐다.
+   */
+  await page.goto('/admin/merchants');
+  await ready(page);
+
+  await page.getByRole('link', { name: /정보 수정/ }).click();
+  await page.waitForURL(/\/admin\/merchants\/[^/]+\/settings$/);
+  await ready(page);
+  await expect(page.getByRole('heading', { name: '스튜디오눈 정보', level: 1 })).toBeVisible();
+
+  // 사업자 정보는 읽기로만 있다 — 고칠 수 있는 것처럼 그리면 화면이 거짓말을 한다
+  await expect(page.getByRole('button', { name: '사업자 정보 저장' })).toHaveCount(0);
+  await expect(page.getByText('운영진에게 알려 주세요')).toBeVisible();
+
+  await page.getByLabel(/^은행/).selectOption('KB');
+  await page.getByLabel(/^계좌번호/).fill('123-4567-8901');
+  await page.getByLabel(/^예금주/).fill('스튜디오눈 주식회사');
+  await page.getByRole('button', { name: '정보 저장' }).click();
+  await expect(page.getByRole('status')).toContainText('저장했습니다');
+
+  // 다시 열어도 적어 둔 값이 있다 — 저장했다는 말만 하고 안 남으면 안 된다
+  await page.reload();
+  await ready(page);
+  await expect(page.getByLabel(/^계좌번호/)).toHaveValue('12345678901');
+
+  const mine = new URL(page.url()).pathname.split('/')[3]!;
+  const business = await page.request.patch(`/api/admin/merchants/${mine}/settings`, {
+    data: { name: '내가 고친 이름', businessName: '내가 고친 상호', businessNumber: '111-11-11111', representative: '나' },
+    failOnStatusCode: false,
+  });
+  expect(business.status(), '가맹점이 사업자 정보를 고칠 수 있다').toBe(403);
+
+  const other = await page.request.put(`/api/admin/merchants/${mine}-not-mine/settings`, {
+    data: {
+      contactEmail: 'me@plain.test', contactPhone: '010-0000-0000',
+      settlementBank: 'KB', settlementAccount: '99999999', settlementHolder: '나',
+    },
+    failOnStatusCode: false,
+  });
+  expect(other.status(), '남의 가맹점 계좌를 고칠 수 있다').toBe(403);
+});

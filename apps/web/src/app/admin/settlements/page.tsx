@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, hasPermission, previousYearMonth, settlementPeriod, isClosedPeriod,
-  SETTLEMENT_STATUS_LABEL, SettlementError, type SettlementStatus,
+  isSettlementBank, SETTLEMENT_BANK_LABEL, SETTLEMENT_STATUS_LABEL, SettlementError, type SettlementStatus,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getSettlements } from '~/lib/queries/admin/settlements';
@@ -12,6 +12,14 @@ import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '정산' };
 export const dynamic = 'force-dynamic';
+
+/**
+ * 은행 이름. 운영 화면은 한국어 한 벌이라 사전을 거치지 않는다 — 여기서는 값이 그대로 뜨는 것만 막는다.
+ * 모르는 값이면 코드를 그대로 적는다: 지어내는 것보다 낫다.
+ */
+function bankLabel(bank: string): string {
+  return isSettlementBank(bank) ? SETTLEMENT_BANK_LABEL[bank] : bank;
+}
 
 /** 기간 끝은 다음 달 1일 00:00 이라 그대로 찍으면 하루 뒤로 보인다 */
 function endLabel(end: Date): string {
@@ -239,7 +247,20 @@ export default async function SettlementsPage({
                       <td className="tnum py-3 text-xs">
                         {adminDate.format(s.periodStart)} ~ {endLabel(s.periodEnd)}
                       </td>
-                      {!actor.merchantId && <td className="py-3 text-[13px]">{s.merchantName}</td>}
+                      {!actor.merchantId && (
+                        <td className="py-3 text-[13px]">
+                          {s.merchantName}
+                          {/*
+                            **보낼 곳을 곁에 적는다.** 지급은 되돌릴 수 없는 단추인데, 그것을 누르는 화면이 돈이 어디로
+                            가는지 말하지 않고 있었다. 번호는 뒤 네 자리만 — 맞는지 가리기에는 그것으로 충분하다.
+                          */}
+                          <span className="tnum block text-[11px] text-[var(--fg-muted)]">
+                            {s.account
+                              ? `${bankLabel(s.account.bank)} ${s.account.tail} · ${s.account.holder}`
+                              : '정산 계좌 미등록'}
+                          </span>
+                        </td>
+                      )}
                       <td className="tnum py-3 text-right text-[13px]">{format(s.grossAmount)}</td>
                       <td className="tnum py-3 text-right text-[13px] text-accent">
                         −{format(s.commissionAmount)}
@@ -256,7 +277,13 @@ export default async function SettlementsPage({
                             <PayButton
                               settlementId={s.id}
                               merchantName={s.merchantName}
-                              disabledReason={s.netAmount < 0 ? '수동 처리' : undefined}
+                              /*
+                                계좌가 없으면 누를 수 없다. 서버도 막지만(close-settlement 의 NO_ACCOUNT),
+                                눌러 보고 나서 거절당하는 화면은 사람을 두 번 헛되게 한다.
+                              */
+                              disabledReason={
+                                s.netAmount < 0 ? '수동 처리' : s.account === null ? '계좌 없음' : undefined
+                              }
                             />
                           ) : (
                             <span className="text-[11px] text-[var(--fg-muted)]">—</span>

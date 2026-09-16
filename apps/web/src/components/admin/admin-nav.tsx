@@ -95,33 +95,41 @@ export function AdminNav({
       {/*
         **앱에서는 머리띠가 상태바 밑으로 들어간다.** 웹뷰는 화면 맨 위부터 그리므로(contentInset
         never) 시계·배터리·카메라 구멍이 메뉴 단추와 겹쳤다. 매장 머리(site-header)는 safe-t 를
-        달고 있었는데 운영 화면을 떼어 내면서 이것만 빠졌다. 높이를 그만큼 늘려야 단추가 눌린다
-        — box-content 로 h-14 를 안쪽 높이로 둔다.
+        달고 있었는데 운영 화면을 떼어 내면서 이것만 빠졌다.
+
+        **그 자리를 어둡게 칠하지 않는다.** 처음에는 띠 전체에 safe-t 를 달아 상태바 자리까지 어두운
+        면으로 덮었는데, iOS 는 상태바 글자색을 앱의 밝기 설정으로 정한다(웹이 못 고친다) — 밝은 모드
+        에서는 검은 글자라 검정 위 검정이 되어 **시계와 배터리가 안 보였다**. 그래서 상태바 자리는
+        화면 바탕색으로 두고, 어두운 띠는 그 아래에서 시작한다. 어두운 모드에서는 바탕도 어둡고
+        글자도 희어 그대로 읽힌다. 브라우저에서는 이 자리가 0 이라 달라지는 것이 없다.
       */}
-      <div className="safe-t sticky top-0 z-30 box-content flex h-14 items-center gap-2 bg-dark-bg px-3 md:hidden">
-        <button
-          ref={buttonRef}
-          type="button"
-          aria-label="관리자 메뉴 열기"
-          aria-expanded={open}
-          aria-controls={PANEL_ID}
-          onClick={() => setOpenedAt(pathname)}
-          className="flex h-11 w-11 items-center justify-center rounded-sm text-n-0"
-        >
-          {/* 아이콘은 장식이다 — 이름과 상태는 버튼이 말한다 */}
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 20 20"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
+      <div className="sticky top-0 z-30 md:hidden">
+        <div className="safe-t bg-[var(--bg)]" />
+        <div className="flex h-14 items-center gap-2 bg-dark-bg px-3">
+          <button
+            ref={buttonRef}
+            type="button"
+            aria-label="관리자 메뉴 열기"
+            aria-expanded={open}
+            aria-controls={PANEL_ID}
+            onClick={() => setOpenedAt(pathname)}
+            className="flex h-11 w-11 items-center justify-center rounded-sm text-n-0"
           >
-            <path d="M2 5h16M2 10h16M2 15h16" />
-          </svg>
-        </button>
-        {wordmark}
+            {/* 아이콘은 장식이다 — 이름과 상태는 버튼이 말한다 */}
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 20 20"
+              className="h-5 w-5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            >
+              <path d="M2 5h16M2 10h16M2 15h16" />
+            </svg>
+          </button>
+          {wordmark}
+        </div>
       </div>
 
       {/*
@@ -141,7 +149,10 @@ export function AdminNav({
         id={PANEL_ID}
         className={
           'fixed inset-y-0 left-0 z-40 flex w-[264px] max-w-[82vw] flex-col gap-7 overflow-y-auto ' +
-          // 서랍도 화면 맨 위부터 덮는다. 닫기 단추가 상태바에 가리지 않게 그만큼 내려 둔다
+          /*
+           * 서랍도 화면 맨 위부터 덮는다. 닫기 단추가 상태바에 가리지 않게 그만큼 내려 둔다.
+           * 상태바 자리 자체는 아래의 띠가 화면 바탕색으로 칠한다 — 머리띠와 같은 이유다.
+           */
           'bg-dark-bg px-4 pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] ' +
           'md:sticky md:top-0 md:h-dvh md:w-[232px] md:max-w-none md:shrink-0' +
           /*
@@ -163,6 +174,13 @@ export function AdminNav({
           띠까지 덮었다 — 첫 항목(대시보드)이 띠 뒤에 숨었고, 닫는 길은 Esc 와
           바깥 누르기뿐이었다. 덮는 것을 막느니 덮고 나서 스스로 닫는다.
         */}
+        {/*
+          상태바 자리. 서랍이 그 위를 덮으므로 여기서도 바탕색으로 칠한다 — 어둡게 덮으면 밝은 모드에서
+          시계와 배터리가 검정 위 검정이 된다. **흐름 밖에 둔다**: 칸으로 넣으면 이 세로 묶음의 간격이
+          한 번 더 들어가 브라우저(안전영역 0)에서 위가 벌어진다.
+        */}
+        <div aria-hidden="true" className="safe-t absolute inset-x-0 top-0 bg-[var(--bg)]" />
+
         <div className="flex items-center gap-2 md:px-1.5">
           <button
             type="button"

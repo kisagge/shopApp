@@ -879,6 +879,8 @@ export const ko = {
   'valid.trackingFormat': '송장번호는 숫자 9~20자리입니다',
   'valid.exchangeOptionRequired': '교환할 옵션을 골라 주세요',
   'valid.bizNumberFormat': '사업자등록번호 형식이 아닙니다 (000-00-00000)',
+  'valid.bankRequired': '은행을 고르세요',
+  'valid.accountFormat': '계좌번호는 숫자 8~20자리입니다',
   'valid.couponNameRequired': '쿠폰 이름을 입력해 주세요',
   'valid.couponCodeRequired': '쿠폰 코드를 입력해 주세요',
   'valid.couponCodeFormat': '코드는 영문·숫자 4~20자입니다',

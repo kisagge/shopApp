@@ -52,6 +52,7 @@ export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';
 export * from './policy';
+export * from './settlement-account';
 export * from './point';
 export * from './recommend';
 export * from './notification';

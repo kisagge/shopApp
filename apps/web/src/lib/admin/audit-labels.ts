@@ -44,6 +44,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'merchant.approved': '입점 승인',
   'merchant.suspended': '가맹점 정지',
   'merchant.terminated': '가맹점 해지',
+  'merchant.updateSettings': '가맹점 연락처·정산 계좌 변경',
+  'merchant.updateBusiness': '가맹점 사업자 정보 변경',
   'user.assignRole': '권한 부여',
   'user.suspend': '이용 정지',
   'user.restore': '정지 해제',

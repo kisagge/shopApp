@@ -851,6 +851,8 @@ export const en: Dictionary = {
   'valid.trackingFormat': 'A tracking number is 9 to 20 digits',
   'valid.exchangeOptionRequired': 'Choose the option to exchange for',
   'valid.bizNumberFormat': 'That is not a valid business number (000-00-00000)',
+  'valid.bankRequired': 'Choose a bank',
+  'valid.accountFormat': 'An account number is 8-20 digits',
   'valid.couponNameRequired': 'Please enter a coupon name',
   'valid.couponCodeRequired': 'Please enter a coupon code',
   'valid.couponCodeFormat': 'A code is 4 to 20 letters or digits',

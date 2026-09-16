@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  won,
+  hasSettlementAccount, won,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 
@@ -214,7 +214,15 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
 
   const before = await prisma.settlement.findUnique({
     where: { id: settlementId },
-    select: { id: true, status: true, netAmount: true, merchant: { select: { name: true } } },
+    select: {
+      id: true, status: true, netAmount: true,
+      merchant: {
+        select: {
+          name: true,
+          settlementBank: true, settlementAccount: true, settlementHolder: true,
+        },
+      },
+    },
   });
   if (!before) {
     throw new SettlementCloseError('NOT_FOUND', 404, '정산 내역을 찾을 수 없습니다.');
@@ -224,6 +232,18 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
   }
   if (before.status !== 'CONFIRMED') {
     throw new SettlementCloseError('NOT_CONFIRMED', 409, '확정되지 않은 정산은 지급할 수 없습니다.');
+  }
+  /*
+   * **계좌 없이 "지급됨" 을 만들지 않는다.**
+   *
+   * 스키마에는 계좌 칸이 처음부터 있었는데 읽는 곳이 없어서, 한 번도 적지 않은 가맹점의 정산도 눌러 지급이 됐다 —
+   * 돈이 어디로 갔다는 말인지 아무도 답할 수 없는 기록이다. 반품지가 없으면 반품을 승인할 수 없게 한 것과 같은 자리다.
+   */
+  if (!hasSettlementAccount(before.merchant)) {
+    throw new SettlementCloseError(
+      'NO_ACCOUNT', 409,
+      `${before.merchant.name} 의 정산 계좌가 없습니다. 가맹점 정보에서 먼저 등록해야 지급할 수 있습니다.`,
+    );
   }
   if (before.netAmount < 0) {
     // 환불이 매출을 넘은 달이다. 돈을 보내는 게 아니라 받아야 하므로

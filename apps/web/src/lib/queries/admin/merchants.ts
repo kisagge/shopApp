@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, type Actor } from '@shop/core';
+import { assertPermission, hasSettlementAccount, type Actor } from '@shop/core';
 import { assertAdminQuery, scopeOf } from './scope';
 
 // ── 가맹점·회원 (슈퍼관리자 화면) ─────────────────────────────
@@ -25,6 +25,8 @@ export interface MerchantRow {
   readonly createdAt: Date;
   /** 반품지를 등록했는가. 없으면 이 가맹점 상품의 반품을 승인할 수 없다 */
   readonly hasReturnAddress: boolean;
+  /** 정산 계좌를 등록했는가. 없으면 확정된 정산을 지급할 수 없다 */
+  readonly hasSettlementAccount: boolean;
 }
 
 export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
@@ -48,6 +50,7 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
       brands: { select: { name: true } },
       _count: { select: { users: true } },
       returnAddress: { select: { id: true } },
+      settlementBank: true, settlementAccount: true, settlementHolder: true,
     },
   });
 
@@ -67,6 +70,7 @@ export async function getMerchants(actor: Actor): Promise<MerchantRow[]> {
     approvedAt: m.approvedAt,
     createdAt: m.createdAt,
     hasReturnAddress: m.returnAddress !== null,
+    hasSettlementAccount: hasSettlementAccount(m),
   }));
 }
 

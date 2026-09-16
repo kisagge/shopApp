@@ -178,11 +178,30 @@ describe('기간 확정', () => {
 });
 
 describe('지급 집행', () => {
+  /** 돈을 보낼 수 있는 가맹점 — 계좌가 없으면 지급 자체가 막힌다 */
+  const payee = {
+    name: '무어',
+    settlementBank: 'KB', settlementAccount: '12345678901', settlementHolder: '무어',
+  };
+
   beforeEach(() => {
     db.settlement.findUnique.mockResolvedValue({
-      id: 's-1', status: 'CONFIRMED', netAmount: 750_000, merchant: { name: '무어' },
+      id: 's-1', status: 'CONFIRMED', netAmount: 750_000, merchant: payee,
     });
     db.settlement.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('정산 계좌가 없으면 지급할 수 없다', async () => {
+    /*
+     * 스키마에는 계좌 칸이 처음부터 있었는데 읽는 곳이 없어서, 한 번도 적지 않은 가맹점의 정산도 눌러 지급이 됐다 —
+     * 돈이 어디로 갔다는 말인지 아무도 답할 수 없는 기록이다.
+     */
+    db.settlement.findUnique.mockResolvedValue({
+      id: 's-1', status: 'CONFIRMED', netAmount: 750_000,
+      merchant: { ...payee, settlementAccount: null },
+    });
+    await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({ code: 'NO_ACCOUNT' });
+    expect(db.settlement.updateMany).not.toHaveBeenCalled();
   });
 
   it('관리자에게는 settlement:pay 가 없다 — 확정과 지급을 나눠 뒀다', async () => {
@@ -196,14 +215,14 @@ describe('지급 집행', () => {
 
   it('확정되지 않은 정산은 지급할 수 없다', async () => {
     db.settlement.findUnique.mockResolvedValue({
-      id: 's-1', status: 'PENDING', netAmount: 1000, merchant: { name: '무어' },
+      id: 's-1', status: 'PENDING', netAmount: 1000, merchant: payee,
     });
     await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({ code: 'NOT_CONFIRMED' });
   });
 
   it('이미 지급된 것은 두 번 나가지 않는다', async () => {
     db.settlement.findUnique.mockResolvedValue({
-      id: 's-1', status: 'PAID', netAmount: 1000, merchant: { name: '무어' },
+      id: 's-1', status: 'PAID', netAmount: 1000, merchant: payee,
     });
     await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({ code: 'ALREADY_PAID' });
   });
@@ -217,7 +236,7 @@ describe('지급 집행', () => {
 
   it('지급액이 음수면 자동 집행하지 않는다', async () => {
     db.settlement.findUnique.mockResolvedValue({
-      id: 's-1', status: 'CONFIRMED', netAmount: -50_000, merchant: { name: '무어' },
+      id: 's-1', status: 'CONFIRMED', netAmount: -50_000, merchant: payee,
     });
     await expect(paySettlement(superAdmin, 's-1')).rejects.toMatchObject({
       code: 'NEGATIVE_AMOUNT',

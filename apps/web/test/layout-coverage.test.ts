@@ -48,6 +48,7 @@ const DYNAMIC: Readonly<Record<string, string>> = {
   '/admin/users/[id]': '회원 표에서 첫 줄의 이름을 눌러 들어간다',
   '/admin/users/[id]/points': '회원 표에서 첫 줄의 포인트 잔액을 눌러 들어간다',
   '/admin/merchants/[id]/return-address': '가맹점 표에서 첫 줄의 반품지 링크를 눌러 들어간다',
+  '/admin/merchants/[id]/settings': '가맹점 표에서 첫 줄의 정보 수정 링크를 눌러 들어간다',
   '/mypage/reviews/[id]/edit': 'review-edit 이 자기 리뷰를 쓰고 그 수정 화면을 네 폭으로 잰다',
 };
 

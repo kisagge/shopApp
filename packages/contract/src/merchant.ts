@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { BUSINESS_NUMBER_PATTERN, normalizeBusinessNumber } from '@shop/core';
+import { BUSINESS_NUMBER_PATTERN, normalizeBusinessNumber, SETTLEMENT_BANK } from '@shop/core';
 
 /**
  * 입점 신청 계약.
@@ -27,3 +27,42 @@ export const applyMerchantSchema = z.object({
   contactPhone: trimmed(20),
 });
 export type ApplyMerchantInput = z.infer<typeof applyMerchantSchema>;
+
+/**
+ * 가맹점 연락처와 정산 계좌.
+ *
+ * **사업자 정보는 여기 없다.** 상호·사업자등록번호·대표자는 정산과 세금계산서의 근거라 가맹점이 스스로 바꾸면 돈 받는
+ * 주체가 심사 없이 바뀐다 — 그쪽은 운영진 몫이고 계약도 따로 둔다(core 의 canEditBusinessInfo).
+ */
+export const merchantSettingsSchema = z.object({
+  contactEmail: z.email('valid.emailFormat').max(120, 'valid.tooLongChars'),
+  contactPhone: trimmed(20),
+  settlementBank: z.enum(SETTLEMENT_BANK, { error: 'valid.bankRequired' }),
+  /**
+   * 계좌번호.
+   *
+   * 숫자와 하이픈만 받는다 — 은행이 쓰는 표기가 그것뿐이고, 그 밖의 글자가 들어오면 대개 붙여 넣다 섞인 것이다.
+   * 저장은 숫자만 남겨 한 모양으로 맞춘다: 같은 계좌가 하이픈 유무로 둘이 되면 바뀌었는지 알 수 없다.
+   */
+  settlementAccount: z
+    .string()
+    .trim()
+    .regex(/^[\d-]+$/, 'valid.accountFormat')
+    .transform((v) => v.replace(/\D/g, ''))
+    .refine((v) => v.length >= 8 && v.length <= 20, 'valid.accountFormat'),
+  settlementHolder: trimmed(20),
+});
+export type MerchantSettingsInput = z.infer<typeof merchantSettingsSchema>;
+
+/** 사업자 정보. 운영진만 고친다 */
+export const merchantBusinessSchema = z.object({
+  name: trimmed(40),
+  businessName: trimmed(60),
+  businessNumber: z
+    .string()
+    .trim()
+    .transform(normalizeBusinessNumber)
+    .refine((v) => BUSINESS_NUMBER_PATTERN.test(v), 'valid.bizNumberFormat'),
+  representative: trimmed(20),
+});
+export type MerchantBusinessInput = z.infer<typeof merchantBusinessSchema>;

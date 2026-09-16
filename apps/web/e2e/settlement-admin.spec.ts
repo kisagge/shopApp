@@ -160,12 +160,17 @@ test('확정하면 초안의 숫자가 그대로 얼어붙는다', async ({ page
   const label = await periodLabel(page);
 
   // 이름 칸에는 "STUDIO NOON 수수료 10%" 처럼 수수료율이 붙어 온다
-  const nameOf = (cell: string): string => cell.replace(/\s*수수료\s*[\d.]+%\s*$/, '').trim();
+  /*
+   * 가맹점 칸에는 이름 아래에 한 줄이 더 있다 — 초안 표는 수수료율, 내역 표는 보낼 곳(은행·뒤 네 자리·예금주).
+   * 이름으로 맞춰 보려면 첫 줄만 읽는다.
+   */
+  const nameOf = (cell: string): string =>
+    cell.split('\n')[0]!.replace(/\s*수수료\s*[\d.]+%\s*$/, '').trim();
   const ofPeriod = async (): Promise<Map<string, number>> =>
     new Map(
       (await rows(page, '확정된 정산 내역'))
         .filter((r) => r[0]!.trim() === label)
-        .map((r) => [r[1]!.trim(), wonOf(r[4]!)]),
+        .map((r) => [nameOf(r[1]!), wonOf(r[4]!)]),
     );
 
   const draft = await rows(page, '정산 미리보기');
