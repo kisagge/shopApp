@@ -27,6 +27,7 @@ const CACHED_READS = [
   'lib/queries/reviews.ts',
   'lib/admin/manage-banner.ts',
   'lib/queries/support.ts',
+  'lib/policies/policy.ts',
 ] as const;
 
 /** 카탈로그를 털어야 하는 쓰기 창구 */
@@ -109,6 +110,9 @@ const SUPPORT_WRITERS = [
   'app/api/admin/support/[id]/route.ts',
 ] as const;
 
+/** 약관·개인정보처리방침을 고치는 창구. 손님 화면이 캐시로 읽으므로 안 털면 시행일에 옛 문서가 걸려 있다 */
+const POLICY_WRITERS = ['app/api/admin/policies/[kind]/route.ts'] as const;
+
 describe('캐싱한 자리', () => {
   it.each(CACHED_READS)('%s 가 캐시를 쓴다', (rel) => {
     expect(read(rel)).toContain('cachedRead');
@@ -173,6 +177,10 @@ describe('무효화한 자리', () => {
     expect(read(rel)).toContain('revalidateSupport()');
   });
 
+  it.each(POLICY_WRITERS)('%s 가 약관·방침을 턴다', (rel) => {
+    expect(read(rel)).toContain('revalidatePolicies()');
+  });
+
   it('무효화를 부르는 라우트는 전부 목록에 있다', () => {
     // 반대 방향도 지킨다. 목록에 없는데 부르면 목록이 낡은 것이다.
     const listed = new Set<string>([
@@ -182,6 +190,7 @@ describe('무효화한 자리', () => {
       ...CRON_WRITERS,
       ...REVIEW_WRITERS,
       ...SUPPORT_WRITERS,
+      ...POLICY_WRITERS,
     ]);
     const found: string[] = [];
 

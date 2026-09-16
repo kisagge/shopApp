@@ -9,6 +9,7 @@ import { prisma } from './client';
 import { assertSeedTarget } from './seed-target';
 import { seedReviews } from './seed-reviews';
 import { seedSupport } from './seed-support';
+import { seedPolicies } from './seed-policies';
 import { seedCollections } from './seed-collections';
 
 /**
@@ -861,6 +862,7 @@ async function main(): Promise<void> {
   await seedCollections();
 
   await seedSupport();
+  await seedPolicies();
 
   await seedReviews();
 

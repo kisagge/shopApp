@@ -32,7 +32,9 @@ export type AuditTargetType =
    */
   | 'shipping'
   /** 반품지. id 는 가맹점 id, 자사 상품을 받는 플랫폼 반품지면 'platform' */
-  | 'return_address';
+  | 'return_address'
+  /** 이용약관·개인정보처리방침. id 는 종류(TERMS·PRIVACY) */
+  | 'policy';
 
 /** 배치처럼 사람이 아닌 행위자 */
 function isSystemActor(actor: Actor): boolean {

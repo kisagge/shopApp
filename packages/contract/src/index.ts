@@ -29,5 +29,6 @@ export * from './merchant';
 export * from './inquiry';
 export * from './rich-text';
 export * from './support';
+export * from './policy';
 export * from './shipping';
 export * from './notification-template';

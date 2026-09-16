@@ -21,6 +21,8 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['로그인', '/login'],
   ['회원가입', '/signup'],
   ['고객센터', '/support'],
+  ['이용약관', '/terms'],
+  ['개인정보처리방침', '/privacy'],
   ['공지', '/support/notice'],
   ['입점 신청', '/merchant/apply'],
   ['없는 주소', '/product/no-such-thing'],

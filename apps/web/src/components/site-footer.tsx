@@ -67,6 +67,27 @@ export async function SiteFooter() {
           </Link>
         </p>
 
+        {/*
+          **약속은 푸터에 둔다.** 결제 화면이 "동의합니다" 를 받는 문서라, 동의하기 전에도 동의한 뒤에도 어느 화면에서든
+          찾을 수 있어야 한다. 개인정보처리방침을 굵게 두는 것은 관례다 — 둘 중 사람들이 찾는 쪽이다.
+        */}
+        <p className="mt-6 flex flex-wrap gap-x-6">
+          <Link
+            href="/terms"
+            prefetch={false}
+            className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+          >
+            {t('policy.TERMS')}
+          </Link>
+          <Link
+            href="/privacy"
+            prefetch={false}
+            className="inline-flex h-9 items-center text-sm font-semibold text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+          >
+            {t('policy.PRIVACY')}
+          </Link>
+        </p>
+
         <p className="mt-4 font-serif text-lg font-medium tracking-[0.18em]">PLAIN</p>
         <p className="mt-3 text-[11px] leading-relaxed text-[var(--fg-muted)]">
           {t('footer.disclaimer')}

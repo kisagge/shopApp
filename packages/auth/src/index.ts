@@ -290,8 +290,18 @@ const options = {
             cookie: null,
             acceptLanguage: ctx?.headers?.get('accept-language') ?? null,
           });
+          /*
+           * **필수 동의를 받은 시각을 남긴다.**
+           *
+           * 가입 화면이 이용약관·개인정보 수집 동의를 필수로 받는다. 그 사실을 계정에 적어 두지 않으면 나중에 "동의를
+           * 받았는가" 에 답할 수 없고, 그 물음은 꼭 필요할 때 온다. 무엇에 동의했는지는 적지 않는다 — 그때 효력이 있던
+           * 방침이 말한다(Policy 의 지난 이력).
+           *
+           * 언어와 같은 갱신에 얹는다. 선택 동의(마케팅 수신)는 가입 직후 화면이 따로 보낸다 — 고르지 않은 것을
+           * 여기서 참으로 적을 수는 없다.
+           */
           await prisma.user
-            .update({ where: { id: user.id }, data: { locale: chosen } })
+            .update({ where: { id: user.id }, data: { locale: chosen, termsAgreedAt: new Date() } })
             .catch(() => null);
 
           try {

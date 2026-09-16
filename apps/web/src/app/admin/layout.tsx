@@ -14,7 +14,7 @@ export const metadata: Metadata = NO_INDEX;
 export const dynamic = 'force-dynamic';
 
 interface NavItem {
-  readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/returns' | '/admin/products' | '/admin/settlements' | '/admin/audit'
+  readonly href: '/admin' | '/admin/notifications' | '/admin/orders' | '/admin/returns' | '/admin/products' | '/admin/settlements' | '/admin/audit' | '/admin/policies'
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/collections'
     | '/admin/inquiries' | '/admin/support'
@@ -43,6 +43,8 @@ const NAV: readonly NavItem[] = [
   // 가맹점도 본다 — 자기 상품 문의는 파는 사람이 답하는 것이 맞다
   { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/support', label: '공지·FAQ', permission: 'support:write' },
+  // 가입·결제 화면이 가리키는 문서다. 공지와 달리 한 벌이고 시행일과 지난 이력이 있다
+  { href: '/admin/policies', label: '약관·방침', permission: 'support:write' },
   { href: '/admin/shipping', label: '배송비', permission: 'shipping:write' },
   // 손님에게 가는 말투라 가맹점에게는 보이지 않는다(authz 의 notification:write)
   { href: '/admin/notification-templates', label: '알림 문구', permission: 'notification:write' },

@@ -23,6 +23,8 @@ export const TAG = {
   collections: 'collections',
   /** 공지·FAQ */
   support: 'support',
+  /** 이용약관·개인정보처리방침 */
+  policies: 'policies',
 } as const;
 
 /**
@@ -110,6 +112,9 @@ export const revalidateCatalog = (): void => bust(TAG.catalog);
 
 /** 공지나 FAQ 가 바뀌었다 */
 export const revalidateSupport = (): void => bust(TAG.support);
+
+/** 약관이나 개인정보처리방침이 바뀌었다 */
+export const revalidatePolicies = (): void => bust(TAG.policies);
 
 /** 배너가 바뀌었다 */
 export const revalidateBanners = (): void => bust(TAG.banners);

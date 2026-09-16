@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
+import { consentSatisfied } from '@shop/core';
 import { authClient } from '@shop/auth/client';
+import { SignupConsent, EMPTY_CONSENT, type ConsentState } from '~/components/signup-consent';
 import { track } from '~/lib/analytics/client';
 import { useIssueText, useT } from '~/lib/i18n/client';
 import { useLazySchema } from '~/lib/form-schema';
@@ -20,6 +22,8 @@ export function SignUpForm() {
   const [values, setValues] = useState({ email: '', name: '', password: '', passwordConfirm: '' });
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldName, string>>>({});
   const [error, setError] = useState<string | null>(null);
+  const [consent, setConsent] = useState<ConsentState>(EMPTY_CONSENT);
+  const [consentError, setConsentError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   const set = (key: FieldName, value: string) => {
@@ -31,6 +35,16 @@ export function SignUpForm() {
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
+
+    /*
+     * **필수 동의를 먼저 본다.** 칸 검사보다 앞이다 — 동의를 안 한 채 보낸 사람에게 비밀번호 규칙부터 말하면, 정작
+     * 막고 있는 것이 무엇인지 끝까지 모른다.
+     */
+    if (!consentSatisfied(consent)) {
+      setConsentError(t('auth.consentNeeded'));
+      return;
+    }
+    setConsentError(null);
 
     const parsed = (await getSchema()).safeParse(values);
     if (!parsed.success) {
@@ -70,6 +84,18 @@ export function SignUpForm() {
       }
       setError(t('auth.signupFailed'));
       return;
+    }
+
+    /*
+     * 선택 동의를 계정에 적는다. **실패해도 가입을 되돌리지 않는다** — 마케팅 수신 하나 때문에 가입이 실패하는 쪽이
+     * 훨씬 나쁘고, 마이페이지에서 언제든 다시 켤 수 있다. 필수 동의 시각은 가입 훅이 서버에서 남긴다.
+     */
+    if (consent.marketing) {
+      await fetch('/api/account/consent', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ marketing: true }),
+      }).catch(() => null);
     }
 
     track('sign_up', { method: 'email' });
@@ -119,6 +145,8 @@ export function SignUpForm() {
         error={fieldErrors.passwordConfirm}
         onChange={(e) => set('passwordConfirm', e.target.value)}
       />
+
+      <SignupConsent value={consent} onChange={setConsent} error={consentError ?? undefined} />
 
       {error && (
         <p role="alert" className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">

@@ -1,8 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useMemo, type FormEvent } from 'react';
 import { Badge, Button, Field } from '@shop/ui';
-import { MIN_POINTS_USE, PAYMENT_METHOD_CODE, orderBlocker } from '@shop/core';
+import { MIN_POINTS_USE, PAYMENT_METHOD_CODE, POLICY_PATH, orderBlocker } from '@shop/core';
 import type { PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { OrderItems } from '~/components/checkout/order-items';
@@ -343,6 +344,19 @@ export function CheckoutForm({
             {t('checkout.agree')}
           </span>
         </button>
+
+        {/*
+          **동의를 받으면 읽을 것을 함께 준다.** 문서로 가는 길이 없는 동의는 무엇에 대한 동의인지 아무도 말할 수 없다.
+          새 탭으로 연다 — 읽으러 갔다가 고른 배송지·쿠폰이 날아가면 안 읽게 된다.
+        */}
+        <p className="mt-2 flex flex-wrap gap-x-4 pl-7 text-[12px] text-[var(--fg-muted)]">
+          <Link href={POLICY_PATH.TERMS} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            {t('policy.TERMS')}
+          </Link>
+          <Link href={POLICY_PATH.PRIVACY} target="_blank" rel="noreferrer" className="underline underline-offset-2">
+            {t('policy.PRIVACY')}
+          </Link>
+        </p>
       </section>
 
       {error && (

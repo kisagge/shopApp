@@ -35,6 +35,8 @@ layoutTests(test, expect, [
   ['로그인', '/login'],
   ['회원가입', '/signup'],
   ['고객센터', '/support'],
+  ['이용약관', '/terms'],
+  ['개인정보처리방침', '/privacy'],
   ['고객센터 문의하기', '/support/ask'],
   ['공지', '/support/notice'],
   ['비밀번호 찾기', '/forgot-password'],

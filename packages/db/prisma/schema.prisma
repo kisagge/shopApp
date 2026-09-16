@@ -67,6 +67,16 @@ model User {
   /// nullable boolean 을 false 로 강제 변환해서 "미결정" 과 "거부" 를 구분할 수 없다.
   analyticsConsent AnalyticsConsent?
 
+  /// 가입할 때 이용약관·개인정보 수집에 동의한 시각.
+  ///
+  /// **무엇에 동의했는지는 적지 않는다.** 그때 효력이 있던 방침이 말한다 — 방침의 지난 이력(PolicyRevision)이 시각으로
+  /// 이어져 있어, 시각 하나면 그날 읽은 문서를 되짚을 수 있다. 사람마다 문서를 복사해 안고 있을 이유가 없다.
+  termsAgreedAt DateTime?
+
+  /// 마케팅 정보 수신에 동의한 시각. null 이면 동의하지 않았거나 철회했다 —
+  /// 선택 동의라 없다고 해서 가입이나 이용에 아무 영향이 없다.
+  marketingAgreedAt DateTime?
+
   /// 이 사람에게 메일을 보낼 때 쓸 말.
   ///
   /// **null 은 "고른 적 없음"** 이다 — analyticsConsent 와 같은 결이다.
@@ -1761,6 +1771,58 @@ model MailTemplate {
 /// 공지는 최근 순으로 쌓이고 FAQ 는 주제별로 묶인다. 표를 나누면 목록·작성·
 /// 수정·삭제가 두 벌이 되는데, 그것을 나눠서 얻는 것은 쓰지 않는 칸 두 개를
 /// 지우는 것뿐이다.
+enum PolicyKind {
+  TERMS
+  PRIVACY
+}
+
+/// 이용약관·개인정보처리방침. 종류마다 **지금 효력을 갖는 한 벌**이다.
+///
+/// 공지·FAQ 와 같은 표에 두지 않았다. 공지는 목록이고 이것은 한 벌이라, 섞으면 공지 목록 질의마다 "이건 빼고" 를 붙여야
+/// 하고 한 번 빠뜨리면 약관이 공지 사이에 끼어 뜬다. 무엇보다 이 표에는 공지에 없는 것이 둘 있다 — 시행일과 지난 이력.
+model Policy {
+  kind PolicyKind @id
+
+  title String
+  /// 서식을 뺀 본문. 목록·검색·meta 가 읽는다(공지와 같은 까닭 — SupportPost.body 주석)
+  body     String
+  /// 서식 있는 본문. core 가 정한 어휘로만 이뤄진 나무다
+  bodyRich Json?
+
+  /// 이 내용이 효력을 갖는 날. **올린 날과 다르다** — 개인정보처리방침은 바꾸기 전에 미리 알려야 해서
+  /// "며칠 뒤부터 이렇게 바뀝니다" 로 먼저 올린다. 그동안 손님이 읽어야 하는 것은 지난 방침이다.
+  effectiveAt DateTime
+
+  updatedAt   DateTime @updatedAt
+  /// 마지막으로 고친 사람. 감사 로그가 진실이고 이건 화면에 보여 줄 값이다.
+  updatedById String?
+
+  revisions PolicyRevision[]
+
+  @@map("policies")
+}
+
+/// 지난 방침. **바뀌기 전 내용을 그대로 남긴다.**
+///
+/// 개인정보처리방침은 지난 것도 볼 수 있어야 하고, 동의 기록이 시각만 갖고 있으므로(User.termsAgreedAt) 그날 무엇에
+/// 동의했는지는 이 표가 답한다. 내용을 덮어쓰면 그 물음에 영영 답할 수 없다.
+model PolicyRevision {
+  id   String     @id @default(cuid())
+  kind PolicyKind
+  policy Policy   @relation(fields: [kind], references: [kind], onDelete: Cascade)
+
+  title    String
+  body     String
+  bodyRich Json?
+  /// 이 내용의 시행일
+  effectiveAt DateTime
+  /// 새 내용으로 바뀐 시각 — 이 내용이 현재 방침이던 기간의 끝이다
+  replacedAt  DateTime @default(now())
+
+  @@index([kind, replacedAt])
+  @@map("policy_revisions")
+}
+
 enum SupportPostKind {
   NOTICE
   FAQ

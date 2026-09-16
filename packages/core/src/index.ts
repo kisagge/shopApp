@@ -51,6 +51,7 @@ export * from './expiry-notice';
 export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';
+export * from './policy';
 export * from './point';
 export * from './recommend';
 export * from './notification';

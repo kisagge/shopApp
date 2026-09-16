@@ -66,6 +66,9 @@ test('처음 온 사람이 가입하고 바로 로그인된 상태가 된다', a
   await page.getByLabel(/^이름/).fill('가입 테스트');
   await page.getByLabel(/^비밀번호\*/).fill('quiet-harbor-42');
   await page.getByLabel(/^비밀번호 확인/).fill('quiet-harbor-42');
+  // 필수 동의 — 폼이 칸 검사보다 먼저 본다
+  await page.getByLabel(/이용약관에 동의합니다/).check();
+  await page.getByLabel(/개인정보 수집/).check();
   await page.getByRole('button', { name: '가입하기' }).click();
 
   await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
@@ -98,6 +101,9 @@ test('이미 가입된 주소는 그 칸에서 알려 준다', async ({ page }) 
   await page.getByLabel(/^이름/).fill('중복 테스트');
   await page.getByLabel(/^비밀번호\*/).fill('quiet-harbor-42');
   await page.getByLabel(/^비밀번호 확인/).fill('quiet-harbor-42');
+  // 필수 동의 — 폼이 칸 검사보다 먼저 본다
+  await page.getByLabel(/이용약관에 동의합니다/).check();
+  await page.getByLabel(/개인정보 수집/).check();
   await page.getByRole('button', { name: '가입하기' }).click();
 
   await expect(page.getByText('이미 가입된 이메일입니다')).toBeVisible();

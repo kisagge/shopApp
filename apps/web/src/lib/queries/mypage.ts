@@ -22,12 +22,14 @@ export interface MyPageSummary {
   readonly wishlistCount: number;
   readonly reviewableCount: number;
   readonly statusCounts: Readonly<Record<(typeof TRACKED_STATUSES)[number], number>>;
+  /** 마케팅 정보 수신에 동의한 상태인가. 철회 토글이 처음 그릴 값이다 */
+  readonly marketingOptIn: boolean;
 }
 
 export async function getMyPageSummary(userId: string): Promise<MyPageSummary | null> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true, email: true, grade: true, pointBalance: true },
+    select: { name: true, email: true, grade: true, pointBalance: true, marketingAgreedAt: true },
   });
   if (!user) return null;
 
@@ -77,6 +79,7 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
     wishlistCount,
     reviewableCount,
     statusCounts,
+    marketingOptIn: user.marketingAgreedAt !== null,
   };
 }
 

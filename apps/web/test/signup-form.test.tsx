@@ -40,6 +40,12 @@ const fill = async (over: Partial<Record<string, string>> = {}) => {
     await user.clear(input);
     if (value) await user.type(input, value);
   }
+  /*
+   * **필수 동의를 함께 켠다.** 폼이 칸 검사보다 동의를 먼저 보기 때문이다 — 안 켜면 여기 있는 검사들이 전부 "동의부터
+   * 하세요" 에서 멈춘다. 동의 자체는 signup-consent 검사가 따로 본다.
+   */
+  await user.click(screen.getByLabelText(/이용약관에 동의합니다/));
+  await user.click(screen.getByLabelText(/개인정보 수집/));
   return user;
 };
 

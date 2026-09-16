@@ -61,6 +61,7 @@ layoutTests(test, expect, [
   ['리뷰 신고', '/admin/reviews'],
   ['문의', '/admin/inquiries'],
   ['고객센터 글', '/admin/support'],
+  ['약관·방침', '/admin/policies'],
   ['배송비', '/admin/shipping'],
   ['알림 문구', '/admin/notification-templates'],
   ['메일 문구', '/admin/mail-templates'],

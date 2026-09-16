@@ -34,6 +34,9 @@ test('이름·연락처를 고치고 비밀번호를 바꾸면, 머리 이름이
   await page.getByLabel(/^이름/).fill('설정 검사');
   await page.getByLabel(/^비밀번호\*/).fill(original);
   await page.getByLabel(/^비밀번호 확인/).fill(original);
+  // 필수 동의 — 폼이 칸 검사보다 먼저 본다
+  await page.getByLabel(/이용약관에 동의합니다/).check();
+  await page.getByLabel(/개인정보 수집/).check();
   await page.getByRole('button', { name: '가입하기' }).click();
   await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
 
