@@ -852,6 +852,7 @@ export const en: Dictionary = {
   'valid.exchangeOptionRequired': 'Choose the option to exchange for',
   'valid.bizNumberFormat': 'That is not a valid business number (000-00-00000)',
   'valid.bankRequired': 'Choose a bank',
+  'valid.commissionRange': 'A commission rate is a whole number from 0 to 50',
   'valid.accountFormat': 'An account number is 8-20 digits',
   'valid.couponNameRequired': 'Please enter a coupon name',
   'valid.couponCodeRequired': 'Please enter a coupon code',

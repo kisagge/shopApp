@@ -172,6 +172,17 @@ describe('기간 확정', () => {
     expect(db.merchant.findMany.mock.calls[0]?.[0].where).toEqual({});
   });
 
+  it('그때의 수수료율을 함께 얼린다', async () => {
+    /*
+     * 금액만 얼려 두면 "몇 퍼센트였는가" 에 답할 것이 없다 — 요율을 바꾼 뒤 지난 기간의 내역을 내려받으면
+     * 새 요율로 다시 계산돼 확정된 행과 어긋났다.
+     */
+    await closeSettlements(admin, '2026-08', AFTER);
+    const written = db.settlement.upsert.mock.calls[0]?.[0];
+    expect(written.create.commissionPercent).toBe(15);
+    expect(written.update.commissionPercent).toBe(15);
+  });
+
   it('형식이 틀린 기간은 거절한다', async () => {
     await expect(closeSettlements(admin, '2026-13', AFTER)).rejects.toThrow();
   });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type FormEvent } from 'react';
+import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { SETTLEMENT_BANK, SETTLEMENT_BANK_LABEL } from '@shop/core';
@@ -39,6 +39,11 @@ export function MerchantSettingsForm({
   businessName: string;
 }) {
   const router = useRouter();
+  /*
+   * 이름표를 잇는 id 는 손으로 적지 않는다. 같은 폼이 한 화면에 둘 이상 그려지면 id 가 겹치고,
+   * 그때 낭독기는 두 칸 중 어느 것을 읽는지 알 수 없다 — 이 저장소의 다른 폼과 같은 규칙이다.
+   */
+  const bankId = useId();
   const [values, setValues] = useState({
     contactEmail: initial.contactEmail,
     contactPhone: initial.contactPhone,
@@ -150,18 +155,18 @@ export function MerchantSettingsForm({
       />
 
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="settlementBank" className="text-xs font-medium text-[var(--fg-secondary)]">
+        <label htmlFor={bankId} className="text-xs font-medium text-[var(--fg-secondary)]">
           은행
           <span className="ml-1 text-accent" aria-hidden="true">*</span>
           <span className="sr-only"> (필수)</span>
         </label>
         <select
           ref={bankRef}
-          id="settlementBank"
+          id={bankId}
           value={values.settlementBank}
           onChange={set('settlementBank')}
           aria-invalid={errors.settlementBank ? true : undefined}
-          aria-describedby={errors.settlementBank ? 'settlementBank-error' : undefined}
+          aria-describedby={errors.settlementBank ? `${bankId}-error` : undefined}
           className="h-11 max-w-[16rem] rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm"
         >
           <option value="">고르세요</option>
@@ -170,7 +175,7 @@ export function MerchantSettingsForm({
           ))}
         </select>
         {errors.settlementBank && (
-          <p id="settlementBank-error" role="alert" className="text-[12px] text-accent">
+          <p id={`${bankId}-error`} role="alert" className="text-[12px] text-accent">
             {errors.settlementBank}
           </p>
         )}

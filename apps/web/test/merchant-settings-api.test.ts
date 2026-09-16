@@ -22,6 +22,7 @@ const db = vi.hoisted(() => ({
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const { PUT, PATCH } = await import('~/app/api/admin/merchants/[id]/settings/route');
+const { PUT: COMMISSION_PUT } = await import('~/app/api/admin/merchants/[id]/commission/route');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -129,5 +130,54 @@ describe('PATCH — 사업자 정보', () => {
   it('없는 가맹점이면 404', async () => {
     db.merchant.findUnique.mockResolvedValue(null);
     expect((await call('PATCH', business)).status).toBe(404);
+  });
+});
+
+describe('PUT /commission — 수수료율', () => {
+  const superAdmin: Actor = { id: 'u-s', role: 'SUPER_ADMIN', merchantId: null };
+  const body = { commissionPercent: 12, reason: '2026년 재계약' };
+
+  const callCommission = (input: unknown, id = 'm-a') =>
+    COMMISSION_PUT(
+      new Request(`http://localhost/api/admin/merchants/${id}/commission`, {
+        method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+
+  it('슈퍼관리자만 바꾼다 — 입점을 승인하는 사람이 조건도 정한다', async () => {
+    getActor.mockResolvedValue(superAdmin);
+    expect((await callCommission(body)).status).toBe(200);
+    expect(db.merchant.update.mock.calls[0]![0].data).toEqual({ commissionPercent: 12 });
+  });
+
+  it('관리자는 못 바꾼다 — 요율을 내리고 지급까지 집행하는 길을 한 사람이 완결하면 안 된다', async () => {
+    getActor.mockResolvedValue(admin);
+    expect((await callCommission(body)).status).toBe(403);
+    expect(db.merchant.update).not.toHaveBeenCalled();
+  });
+
+  it('가맹점은 자기 몫을 자기가 정하지 못한다', async () => {
+    getActor.mockResolvedValue(merchant);
+    expect((await callCommission(body)).status).toBe(403);
+  });
+
+  it('절반을 넘는 요율과 빈 사유는 거절한다', async () => {
+    getActor.mockResolvedValue(superAdmin);
+    const response = await callCommission({ commissionPercent: 80, reason: '  ' });
+    expect(response.status).toBe(400);
+    const failed = (await response.json()) as { fields: Record<string, string> };
+    expect(Object.keys(failed.fields).sort()).toEqual(['commissionPercent', 'reason']);
+    expect(db.merchant.update).not.toHaveBeenCalled();
+  });
+
+  it('바뀐 값과 사유를 감사 로그에 남긴다', async () => {
+    // 숫자만 바뀐 기록은 "왜 이 요율이 됐는가" 에 답하지 못한다
+    getActor.mockResolvedValue(superAdmin);
+    await callCommission(body);
+    const logged = recordAudit.mock.calls[0]![0];
+    expect(logged).toMatchObject({ action: 'merchant.commission', targetType: 'merchant', targetId: 'm-a' });
+    expect(logged.before).toEqual({ commissionPercent: 15 });
+    expect(logged.after).toEqual({ commissionPercent: 12, reason: '2026년 재계약' });
   });
 });

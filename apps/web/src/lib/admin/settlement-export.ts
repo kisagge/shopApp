@@ -51,6 +51,22 @@ export async function exportSettlementLines(
   });
   const merchantName = new Map(merchants.map((m) => [m.id, m.name]));
 
+  /*
+   * **확정된 기간은 그때의 요율로 적는다.**
+   *
+   * 예전에는 가맹점의 **지금** 요율로 다시 계산했다. 그러면 요율을 바꾼 뒤 지난달 파일을 받았을 때 확정된 정산
+   * 행과 수수료가 어긋난다 — 둘 다 우리가 준 숫자인데 서로 다르면 가맹점은 어느 쪽도 믿을 수 없다.
+   * 아직 확정하지 않은 기간은 확정될 때의 요율이 곧 지금 요율이므로 그대로 쓴다.
+   */
+  const frozen = new Map(
+    (
+      await prisma.settlement.findMany({
+        where: { periodStart: period.start, periodEnd: period.end, ...(scope ? { merchantId: scope } : {}) },
+        select: { merchantId: true, commissionPercent: true },
+      })
+    ).map((s) => [s.merchantId, s.commissionPercent]),
+  );
+
   const saleWhere = settlementSaleWhere(period, scope);
   const deductionWhere = settlementDeductionWhere(period, scope);
   const [saleCount, deductionCount] = await Promise.all([
@@ -103,9 +119,10 @@ export async function exportSettlementLines(
   for (const m of merchants) {
     const t = totals.get(m.id);
     if (!t) continue;
-    const amounts = calculateSettlement({ gross: won(t.gross), commissionPercent: m.commissionPercent, refund: won(t.refund) });
+    const percent = frozen.get(m.id) ?? m.commissionPercent;
+    const amounts = calculateSettlement({ gross: won(t.gross), commissionPercent: percent, refund: won(t.refund) });
     rows.push(['합계 · 판매', m.name, '', '', '', '', '', amounts.grossAmount]);
-    rows.push([`합계 · 수수료 ${m.commissionPercent}%`, m.name, '', '', '', '', '', 0 - amounts.commissionAmount]);
+    rows.push([`합계 · 수수료 ${percent}%`, m.name, '', '', '', '', '', 0 - amounts.commissionAmount]);
     rows.push(['합계 · 차감', m.name, '', '', '', '', '', 0 - amounts.refundAmount]);
     rows.push(['합계 · 지급액', m.name, '', '', '', '', '', amounts.netAmount]);
   }

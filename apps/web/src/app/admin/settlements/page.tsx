@@ -264,6 +264,10 @@ export default async function SettlementsPage({
                       <td className="tnum py-3 text-right text-[13px]">{format(s.grossAmount)}</td>
                       <td className="tnum py-3 text-right text-[13px] text-accent">
                         −{format(s.commissionAmount)}
+                        {/* **그때의 요율이다.** 요율을 바꿔도 확정된 이 숫자는 그대로다 */}
+                        <span className="block text-[11px] text-[var(--fg-muted)]">
+                          {s.commissionPercent}%
+                        </span>
                       </td>
                       <td className="tnum py-3 text-right text-[13px] font-semibold">{format(s.netAmount)}</td>
                       <td className="py-3 text-center">

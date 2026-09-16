@@ -1,11 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { canEditBusinessInfo, canEditMerchantSettings, hasSettlementAccount } from '@shop/core';
+import {
+  canEditBusinessInfo, canEditCommission, canEditMerchantSettings,
+  commissionAppliesFrom, hasSettlementAccount,
+} from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchantSettings } from '~/lib/admin/merchant-settings';
 import { MerchantSettingsForm } from '~/components/admin/merchant-settings-form';
 import { MerchantBusinessForm } from '~/components/admin/merchant-business-form';
+import { MerchantCommissionForm } from '~/components/admin/merchant-commission-form';
 
 export const metadata: Metadata = { title: '가맹점 정보' };
 export const dynamic = 'force-dynamic';
@@ -70,6 +74,34 @@ export default async function MerchantSettingsPage({ params }: { params: Promise
               settlementHolder: merchant.settlementHolder,
             }}
           />
+        </section>
+
+        <section
+          aria-labelledby="commission-title"
+          className="flex max-w-[560px] flex-col gap-5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-5 sm:p-6"
+        >
+          <div className="flex flex-col gap-1.5">
+            <h2 id="commission-title" className="text-base font-semibold">수수료율</h2>
+            <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
+              판매액에서 떼는 몫입니다. 지금은 <span className="tnum">{merchant.commissionPercent}</span>% 입니다.
+            </p>
+          </div>
+
+          {canEditCommission(actor) ? (
+            <MerchantCommissionForm
+              merchantId={merchant.id}
+              initial={merchant.commissionPercent}
+              appliesFrom={commissionAppliesFrom(new Date())}
+            />
+          ) : (
+            /*
+             * 관리자에게도 읽기로만 보여 준다. 요율은 입점을 승인하는 사람이 정한다 —
+             * 요율을 내리고 지급까지 집행하는 길을 한 사람이 완결하지 못하게 나눠 둔 것이다.
+             */
+            <p className="text-[13px] text-[var(--fg-secondary)]">
+              수수료율은 슈퍼관리자만 바꿀 수 있습니다.
+            </p>
+          )}
         </section>
 
         <section

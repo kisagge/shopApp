@@ -53,6 +53,7 @@ export * from './mail-template';
 export * from './support';
 export * from './policy';
 export * from './settlement-account';
+export * from './commission';
 export * from './point';
 export * from './recommend';
 export * from './notification';

@@ -57,6 +57,18 @@ const SUPER_ONLY: readonly SuperOnly[] = [
       }),
     missing: 'MERCHANT_NOT_FOUND',
   },
+  {
+    /*
+     * **요율은 플랫폼이 가져가는 몫이다.** 관리자가 요율을 내리고 지급까지 집행할 수 있으면
+     * 확정과 지급을 갈라 둔 뜻이 없어진다 — 입점을 승인하는 사람이 조건도 정한다.
+     */
+    what: '수수료율 변경',
+    call: (request) =>
+      request.put(`/api/admin/merchants/${NOWHERE}/commission`, {
+        data: { commissionPercent: 0, reason: '검사가 보내는 요청입니다' },
+      }),
+    missing: 'NOT_FOUND',
+  },
 ];
 
 test.describe('서버가 막는다 — 화면에서 감추는 것과 다른 이야기다', () => {

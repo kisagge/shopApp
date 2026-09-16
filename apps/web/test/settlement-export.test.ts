@@ -11,6 +11,8 @@ import type { Actor } from '@shop/core';
 const db = vi.hoisted(() => ({
   merchant: { findMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { count: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  // 확정된 기간은 그때 얼린 요율로 적는다 — 가맹점의 지금 요율이 아니다
+  settlement: { findMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -30,6 +32,8 @@ const line = (orderNo: string, subtotal: number, over: Record<string, unknown> =
 beforeEach(() => {
   vi.clearAllMocks();
   db.merchant.findMany.mockResolvedValue([{ id: 'm-a', name: '무어', commissionPercent: 15 }]);
+  // 아직 확정하지 않은 기간 — 그때는 가맹점의 지금 요율이 곧 확정될 요율이다
+  db.settlement.findMany.mockResolvedValue([]);
   db.orderItem.count.mockResolvedValue(3);
   db.orderItem.findMany
     .mockResolvedValueOnce([line('20260810-0000001', 100_000), line('20260811-0000002', 33_333)])
@@ -98,5 +102,27 @@ describe('범위', () => {
 
   it('틀린 기간은 거절한다', async () => {
     await expect(exportSettlementLines(admin, '2026-13')).rejects.toThrow();
+  });
+});
+
+describe('확정된 기간의 요율', () => {
+  it('얼려 둔 요율로 적는다 — 가맹점의 지금 요율이 아니다', async () => {
+    /*
+     * 요율을 바꾼 뒤 지난달 파일을 받았을 때 확정된 정산 행과 수수료가 어긋나면, 둘 다 우리가 준 숫자인데
+     * 가맹점은 어느 쪽도 믿을 수 없다.
+     */
+    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', commissionPercent: 10 }]);
+
+    const rows = await exportSettlementLines(admin, '2026-08');
+    const commission = rows.find((r) => String(r[0]).startsWith('합계 · 수수료'));
+
+    expect(commission?.[0]).toBe('합계 · 수수료 10%');
+    // 133,333 의 10% 는 13,333 (버림)
+    expect(commission?.[7]).toBe(-13_333);
+  });
+
+  it('확정 전이면 지금 요율로 적는다 — 확정될 때의 요율이 그것이다', async () => {
+    const rows = await exportSettlementLines(admin, '2026-08');
+    expect(rows.find((r) => String(r[0]).startsWith('합계 · 수수료'))?.[0]).toBe('합계 · 수수료 15%');
   });
 });

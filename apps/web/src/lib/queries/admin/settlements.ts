@@ -15,6 +15,8 @@ export interface SettlementRow {
   readonly refundAmount: Won;
   readonly netAmount: Won;
   readonly status: string;
+  /** 그때의 수수료율. 지금 요율이 아니다 — 확정은 숫자와 함께 요율도 얼린다 */
+  readonly commissionPercent: number;
   /**
    * 보낼 곳. **가려서 내보낸다** — 목록은 "그 계좌가 맞는지" 를 가리는 자리이고, 전체 번호가 필요한 자리가 아니다.
    * 계좌가 없으면 null 이고, 그때는 지급 자체가 막힌다.
@@ -33,7 +35,7 @@ export async function getSettlements(actor: Actor): Promise<SettlementRow[]> {
     select: {
       id: true, periodStart: true, periodEnd: true,
       grossAmount: true, commissionAmount: true, refundAmount: true, netAmount: true,
-      status: true,
+      status: true, commissionPercent: true,
       merchant: {
         select: {
           name: true,
@@ -46,6 +48,7 @@ export async function getSettlements(actor: Actor): Promise<SettlementRow[]> {
   return rows.map((s) => ({
     id: s.id,
     merchantName: s.merchant.name,
+    commissionPercent: s.commissionPercent,
     account: hasSettlementAccount(s.merchant)
       ? {
           bank: s.merchant.settlementBank!,

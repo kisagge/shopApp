@@ -175,6 +175,8 @@ export async function closeSettlements(
     const data = {
       grossAmount: d.grossAmount,
       commissionAmount: d.commissionAmount,
+      // 금액과 함께 **그때의 요율**도 얼린다 — 나중에 요율이 바뀌어도 이 행이 무엇으로 계산됐는지 남는다
+      commissionPercent: d.commissionPercent,
       refundAmount: d.refundAmount,
       netAmount: d.netAmount,
       status: 'CONFIRMED' as const,

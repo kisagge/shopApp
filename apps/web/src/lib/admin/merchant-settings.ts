@@ -1,10 +1,12 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canEditBusinessInfo, canEditMerchantSettings, ForbiddenError, maskAccount,
+  canEditBusinessInfo, canEditCommission, canEditMerchantSettings, ForbiddenError, maskAccount,
   type Actor,
 } from '@shop/core';
-import type { MerchantBusinessInput, MerchantSettingsInput } from '@shop/contract';
+import type {
+  MerchantBusinessInput, MerchantCommissionInput, MerchantSettingsInput,
+} from '@shop/contract';
 
 /**
  * 가맹점 정보와 정산 계좌.
@@ -125,4 +127,41 @@ export async function updateMerchantBusiness(
     }
     throw error;
   }
+}
+
+/**
+ * 수수료율 변경.
+ *
+ * **이미 확정한 정산은 건드리지 않는다.** 확정은 그때의 숫자와 요율을 얼리는 일이라(settlement 의
+ * commissionPercent), 여기서 바꾼 값은 아직 확정하지 않은 기간부터 쓰인다.
+ *
+ * 사유를 함께 남긴다 — 숫자만 바뀐 기록은 "왜 이 요율이 됐는가" 에 답하지 못한다.
+ */
+export async function updateMerchantCommission(
+  actor: Actor,
+  merchantId: string,
+  input: MerchantCommissionInput,
+): Promise<{ before: number; after: number; reason: string; merchantName: string }> {
+  if (!canEditCommission(actor)) {
+    throw new ForbiddenError(actor, 'merchant:approve');
+  }
+
+  const before = await prisma.merchant.findUnique({
+    where: { id: merchantId },
+    select: { name: true, commissionPercent: true },
+  });
+  if (!before) throw new MerchantSettingsError('NOT_FOUND', 404);
+
+  const after = await prisma.merchant.update({
+    where: { id: merchantId },
+    data: { commissionPercent: input.commissionPercent },
+    select: { commissionPercent: true },
+  });
+
+  return {
+    before: before.commissionPercent,
+    after: after.commissionPercent,
+    reason: input.reason,
+    merchantName: before.name,
+  };
 }

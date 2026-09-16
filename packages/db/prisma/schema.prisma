@@ -233,6 +233,9 @@ model Settlement {
   grossAmount      Int
   /// 떼어 간 수수료
   commissionAmount Int
+  /// **그때의 수수료율.** 금액만 얼려 두면 "몇 퍼센트였는가" 에 답할 것이 없다 —
+  /// 요율을 바꾼 뒤 지난 기간의 내역을 내려받으면 새 요율로 다시 계산돼 확정된 행과 어긋났다.
+  commissionPercent Int @default(0)
   /// 환불·반품으로 차감된 금액
   refundAmount     Int @default(0)
   /// 실제 지급액 = gross - commission - refund

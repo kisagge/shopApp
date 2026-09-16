@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { BUSINESS_NUMBER_PATTERN, normalizeBusinessNumber, SETTLEMENT_BANK } from '@shop/core';
+import {
+  BUSINESS_NUMBER_PATTERN, COMMISSION_MAX_PERCENT, COMMISSION_MIN_PERCENT,
+  normalizeBusinessNumber, SETTLEMENT_BANK,
+} from '@shop/core';
 
 /**
  * 입점 신청 계약.
@@ -66,3 +69,18 @@ export const merchantBusinessSchema = z.object({
   representative: trimmed(20),
 });
 export type MerchantBusinessInput = z.infer<typeof merchantBusinessSchema>;
+
+/**
+ * 수수료율 변경.
+ *
+ * **사유를 함께 받는다.** 요율은 플랫폼이 가져가는 몫이라, 숫자만 바뀐 기록은 나중에 "왜 12% 가 됐는가" 에 답하지
+ * 못한다 — 감사 로그에 사유까지 남겨야 그 판단을 다시 볼 수 있다.
+ */
+export const merchantCommissionSchema = z.object({
+  commissionPercent: z
+    .int('valid.commissionRange')
+    .min(COMMISSION_MIN_PERCENT, 'valid.commissionRange')
+    .max(COMMISSION_MAX_PERCENT, 'valid.commissionRange'),
+  reason: trimmed(200),
+});
+export type MerchantCommissionInput = z.infer<typeof merchantCommissionSchema>;

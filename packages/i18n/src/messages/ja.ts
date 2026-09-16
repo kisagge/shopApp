@@ -848,6 +848,7 @@ export const ja: Dictionary = {
   'valid.exchangeOptionRequired': '交換するオプションを選んでください',
   'valid.bizNumberFormat': '事業者登録番号の形式ではありません (000-00-00000)',
   'valid.bankRequired': '銀行を選んでください',
+  'valid.commissionRange': '手数料率は0〜50の整数です',
   'valid.accountFormat': '口座番号は数字8〜20桁です',
   'valid.couponNameRequired': 'クーポン名をご入力ください',
   'valid.couponCodeRequired': 'クーポンコードをご入力ください',
