@@ -5,6 +5,7 @@ import {
   type Actor, type ModerationState, type ReportReason,
   offsetOf,
 } from '@shop/core';
+import { clampToLastPage } from './paged';
 
 /**
  * 리뷰 관리 조회.
@@ -222,17 +223,20 @@ export async function getAdminReviews(
       ? { deletedAt: { not: null }, ...mine, ...search }
       : { deletedAt: null, ...mine, ...search };
 
-  const [raw, total] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.review.findMany({
       where,
       // 같은 시각에 들어온 리뷰의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: PAGE_SIZE,
-      skip: offsetOf(query.page ?? 1, PAGE_SIZE),
+      skip: offsetOf(at, PAGE_SIZE),
       select: reviewSelect,
-    }) as Promise<RawReview[]>,
-    prisma.review.count({ where }),
-  ]);
+    }) as Promise<RawReview[]>;
+
+  const [first, total] = await Promise.all([readAt(page), prisma.review.count({ where })]);
+  // 검색어를 좁히거나 탭을 옮기면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const raw = await clampToLastPage(first, { page, pageSize: PAGE_SIZE, total }, readAt);
 
   return {
     rows: raw.map(toRow),

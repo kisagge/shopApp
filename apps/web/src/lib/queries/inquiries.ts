@@ -6,6 +6,7 @@ import {
   canReadInquiry, canAnswerInquiry, assertPermission,
   type Actor, type InquiryTopic,
 } from '@shop/core';
+import { clampToLastPage } from './paged';
 
 /**
  * 상품 문의 조회.
@@ -154,7 +155,8 @@ export async function getAdminInquiries(
   const scoped = inquiryScope(actor);
   const where = { ...scoped, ...(query.unanswered ? { answeredAt: null } : {}) };
 
-  const [rows, pending, total] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.inquiry.findMany({
       where,
       /*
@@ -165,7 +167,7 @@ export async function getAdminInquiries(
         ? [{ createdAt: 'asc' as const }, { id: 'asc' as const }]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
       take: ADMIN_INQUIRY_PAGE_SIZE,
-      skip: offsetOf(query.page ?? 1, ADMIN_INQUIRY_PAGE_SIZE),
+      skip: offsetOf(at, ADMIN_INQUIRY_PAGE_SIZE),
       select: {
         id: true, content: true, isPrivate: true, createdAt: true,
         answer: true, answeredAt: true,
@@ -174,10 +176,15 @@ export async function getAdminInquiries(
         author: { select: { name: true } },
         images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
       },
-    }),
+    });
+
+  const [first, pending, total] = await Promise.all([
+    readAt(page),
     prisma.inquiry.count({ where: { ...scoped, answeredAt: null } }),
     prisma.inquiry.count({ where }),
   ]);
+  // 미답변만 보기로 좁히면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: ADMIN_INQUIRY_PAGE_SIZE, total }, readAt);
 
   return {
     rows: rows.map((row) => ({

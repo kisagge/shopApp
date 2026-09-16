@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { assertPermission, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
 import { assertAdminQuery, scopeOf } from './scope';
+import { clampToLastPage } from '../paged';
 
 // ── 가맹점·회원 (슈퍼관리자 화면) ─────────────────────────────
 
@@ -116,21 +117,24 @@ export async function getAdminUsers(
       }
     : {};
 
-  const [rows, total] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.user.findMany({
     where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take,
-    skip: offsetOf(query.page ?? 1, take),
+    skip: offsetOf(at, take),
     select: {
       id: true, name: true, email: true, role: true, createdAt: true, deletedAt: true,
       suspendedAt: true, suspendedReason: true, pointBalance: true,
       merchant: { select: { id: true, name: true } },
       _count: { select: { orders: true } },
     },
-    }),
-    prisma.user.count({ where }),
-  ]);
+    });
+
+  const [first, total] = await Promise.all([readAt(page), prisma.user.count({ where })]);
+  // 검색어를 좁히면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
   return {
     rows: rows.map((u) => ({

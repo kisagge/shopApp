@@ -6,6 +6,7 @@ import { won, type Actor, type Won, type ProductStatus, type ProductArchiver, LO
 import {
   assertAdminQuery, scopeOf, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
 } from './scope';
+import { clampToLastPage } from '../paged';
 
 // ── 상품 ──────────────────────────────────────────────────────
 
@@ -50,8 +51,8 @@ export async function getAdminProducts(
     ? archivedWhere
     : { ...scoped, ...(query.status ? { status: query.status } : {}) };
 
-  // 목록·전체 수·탭 숫자(대기·보관)는 서로 기다릴 이유가 없다 — 한 번에 묻는다
-  const [rows, total, awaitingReview, archivedCount] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.product.findMany({
     where,
     /*
@@ -65,7 +66,7 @@ export async function getAdminProducts(
         ? [{ reviewRequestedAt: 'asc' as const }, { id: 'asc' as const }]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
     take,
-    skip: offsetOf(query.page ?? 1, take),
+    skip: offsetOf(at, take),
     select: {
       id: true, slug: true, name: true, listPrice: true, salePrice: true,
       status: true, createdAt: true, reviewRequestedAt: true, publishRejection: true,
@@ -74,12 +75,18 @@ export async function getAdminProducts(
       category: { select: { name: true } },
       variants: { select: { stock: true }, where: { isActive: true } },
     },
-    }),
+    });
+
+  // 목록·전체 수·탭 숫자(대기·보관)는 서로 기다릴 이유가 없다 — 한 번에 묻는다
+  const [first, total, awaitingReview, archivedCount] = await Promise.all([
+    readAt(page),
     prisma.product.count({ where }),
     // 탭에 붙는 숫자. 필터와 무관하게 범위 안의 대기·보관 건수를 센다.
     prisma.product.count({ where: { ...scoped, status: 'PENDING_REVIEW' } }),
     prisma.product.count({ where: archivedWhere }),
   ]);
+  // 탭을 옮기면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
   return {
     rows: rows.map((p) => ({

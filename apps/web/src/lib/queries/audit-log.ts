@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { assertPermission, offsetOf, readDateRange, type Actor, type UserRole } from '@shop/core';
+import { clampToLastPage } from './paged';
 
 /**
  * 감사 로그 조회.
@@ -101,22 +102,25 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
 
   const where = auditLogWhere(query);
 
-  const [rows, total] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.adminAuditLog.findMany({
     where,
     // id 를 함께 정렬해야 같은 밀리초에 들어온 행의 순서가 고정된다.
     // 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다.
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take,
-    skip: offsetOf(query.page ?? 1, take),
+    skip: offsetOf(at, take),
     select: {
       id: true, actorRole: true, action: true, targetType: true, targetId: true,
       before: true, after: true, createdAt: true, actorLabel: true,
       actor: { select: { name: true, email: true } },
     },
-    }),
-    prisma.adminAuditLog.count({ where }),
-  ]);
+    });
+
+  const [first, total] = await Promise.all([readAt(page), prisma.adminAuditLog.count({ where })]);
+  // 기간·동작으로 좁히면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
   // 필터 선택지는 실제로 쌓인 값에서 뽑는다. 상수로 두면 새 동작을 추가할 때
   // 목록에 넣는 것을 잊는다.

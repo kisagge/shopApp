@@ -6,6 +6,7 @@ import {
   offsetOf,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, PAGE_SIZE } from './scope';
+import { clampToLastPage } from '../paged';
 
 /** 목록이 보는 칸 — 진행 중 전부, 한 단계, 끝남 */
 export type ReturnQueueView = 'OPEN' | ReturnStage;
@@ -72,12 +73,13 @@ export async function getReturnQueue(
   };
   const done = view === 'DONE';
 
-  const [rows, ...counts] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.returnRequest.findMany({
       where: { ...base, ...stageWhere(view) },
       orderBy: done ? [{ resolvedAt: 'desc' as const }, { id: 'desc' as const }] : [{ requestedAt: 'asc' as const }, { id: 'asc' as const }],
       take,
-      skip: offsetOf(query.page ?? 1, take),
+      skip: offsetOf(at, take),
       select: {
         id: true, type: true, reason: true, status: true, itemIds: true, receivedAt: true, requestedAt: true, resolvedAt: true,
         order: {
@@ -88,9 +90,17 @@ export async function getReturnQueue(
           },
         },
       },
-    }),
+    });
+
+  const [first, ...counts] = await Promise.all([
+    readAt(page),
     ...RETURN_QUEUE_VIEW.map((v) => prisma.returnRequest.count({ where: { ...base, ...stageWhere(v) } })),
   ]);
+
+  // 지금 보고 있는 갈래의 전체 건수. 쪽 수가 이 값에서 나온다
+  const total = counts[RETURN_QUEUE_VIEW.indexOf(view)] ?? 0;
+  // 탭을 옮기면 쪽 수가 줄어든다 — 그때 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
   return {
     rows: rows.map((r) => {
@@ -112,8 +122,7 @@ export async function getReturnQueue(
         myTurn: isMyReturnTurn(actor, stage, lines.map((l) => l.merchantId)),
       };
     }),
-    // 지금 보고 있는 갈래의 전체 건수. 쪽 수가 이 값에서 나온다
-    total: counts[RETURN_QUEUE_VIEW.indexOf(view)] ?? 0,
+    total,
     counts: Object.fromEntries(RETURN_QUEUE_VIEW.map((v, i) => [v, counts[i] ?? 0])) as Record<ReturnQueueView, number>,
   };
 }

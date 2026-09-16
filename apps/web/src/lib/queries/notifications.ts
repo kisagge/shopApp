@@ -4,6 +4,7 @@ import {
   CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND, offsetOf, notificationCutoff,
   type NotificationKind,
 } from '@shop/core';
+import { clampToLastPage } from './paged';
 
 /**
  * 내 알림.
@@ -96,18 +97,8 @@ export async function getMyNotifications(
     });
 
   const [first, total] = await Promise.all([read(page), prisma.notification.count({ where })]);
-
-  /*
-   * **범위를 넘었으면 마지막 쪽을 보여 준다.**
-   *
-   * 주소는 손으로 고칠 수 있고, 즐겨찾기에 담아 둔 쪽은 알림이 지워지면서 사라진다.
-   * 그때 빈 화면을 주면 "왜 아무것도 없지" 로 끝난다 — 쪽 번호는 마지막 쪽을 가리켜
-   * 그리는데 목록만 비어 있으니 더 그렇다(core 의 clampPage 가 적어 둔 뜻이다).
-   *
-   * 넘쳤을 때만 한 번 더 읽는다. 세고 나서 읽으면 멀쩡한 쪽까지 왕복이 하나 늘어난다.
-   */
-  const lastPage = Math.max(Math.ceil(total / NOTIFICATION_PAGE_SIZE), 1);
-  const rows = first.length === 0 && total > 0 && page > lastPage ? await read(lastPage) : first;
+  // 즐겨찾기에 담아 둔 쪽은 알림이 지워지면서 사라진다 — 그때 빈 화면 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: NOTIFICATION_PAGE_SIZE, total }, read);
 
   return {
     total,

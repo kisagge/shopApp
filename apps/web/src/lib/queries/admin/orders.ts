@@ -8,6 +8,7 @@ import {
 import {
   assertAdminQuery, scopeOf, maskName, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
 } from './scope';
+import { clampToLastPage } from '../paged';
 
 // ── 주문 ──────────────────────────────────────────────────────
 
@@ -85,13 +86,14 @@ export async function getAdminOrders(
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
   const where = adminOrderWhere(scope, query);
 
-  const [rows, total] = await Promise.all([
+  const page = query.page ?? 1;
+  const readAt = (at: number) =>
     prisma.order.findMany({
       where,
       // 같은 시각에 들어온 주문의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다
       orderBy: [{ placedAt: 'desc' }, { id: 'desc' }],
       take,
-      skip: offsetOf(query.page ?? 1, take),
+      skip: offsetOf(at, take),
       select: {
         id: true, orderNo: true, status: true, placedAt: true, payable: true,
         user: { select: { name: true } },
@@ -101,9 +103,11 @@ export async function getAdminOrders(
           select: { productName: true, subtotal: true },
         },
       },
-    }),
-    prisma.order.count({ where }),
-  ]);
+    });
+
+  const [first, total] = await Promise.all([readAt(page), prisma.order.count({ where })]);
+  // 즐겨찾기에 담아 둔 쪽은 주문이 보관되면 사라진다 — 빈 표 대신 마지막 쪽을 준다
+  const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
   return {
     rows: rows.map((o) => ({
