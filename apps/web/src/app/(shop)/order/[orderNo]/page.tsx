@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
   isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber, canConfirmPurchase, isOpenReturn,
-  returnAddressLine,
+  returnAddressLine, awaitingDeposit, depositExpired,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -20,7 +20,7 @@ import { ReturnRequestForm } from '~/components/return-request-form';
 import { approvedReturnDestinations } from '~/lib/orders/return-address';
 import { getOrderForUser, getExchangeOptions } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
-import { formatMoney, formatNumber, type MessageKey } from '@shop/i18n';
+import { formatMoney, formatNumber, formatDateTime, type MessageKey } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { ORDER_STATUS_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
@@ -60,6 +60,17 @@ export default async function OrderPage({
    * 스스로 정하다 서버와 갈려서 승인이 500 이 났던 적이 있다.
    */
   const repayable = isRepayable(order.status, order.payment?.status ?? null);
+
+  /*
+   * 입금할 곳. 계좌번호가 없으면(옛 주문이나 PG 가 안 준 경우) 보여 줄 것이 없다 —
+   * 빈 칸이 늘어선 덩이는 "번호가 사라졌다" 로 읽힌다.
+   */
+  const pay = order.payment;
+  const deposit =
+    pay && awaitingDeposit(pay.method, pay.status) && pay.virtualAccount
+      ? { bank: pay.virtualBank, account: pay.virtualAccount, dueDate: pay.virtualDueDate }
+      : null;
+  const expired = deposit !== null && depositExpired(deposit.dueDate);
   const decided = repayable ? serverPaymentMode() : null;
   /** 결제를 걸 수 있는 방식. 막혀 있으면 단추를 세우지 않는다 — 눌러도 될 일이 없다 */
   const repayMode = decided && decided.mode !== 'blocked' ? decided.mode : null;
@@ -202,6 +213,59 @@ export default async function OrderPage({
           >
             {paymentFailed ? t('repay.failedNotice') : t('repay.pendingNotice')}
           </p>
+        )}
+
+        {/*
+          **입금할 곳.**
+
+          계좌 셋을 결제 때 저장해 두고 읽는 곳이 없어서, 이 화면은 "결제가 확인되면
+          배송 준비를 시작합니다" 만 말했다. 번호를 볼 수 있는 곳은 결제 직후 한 번
+          뜨는 응답과 메일뿐이라, 탭을 닫았거나 메일이 스팸함에 갔으면 **그 주문은
+          화면에서 입금할 방법이 없었다.**
+
+          여기는 재결제 안내(위)와 겹치지 않는다 — 입금 대기는 isRepayable 이 일부러
+          빼는 자리다. 할 일이 송금이지 재결제가 아니라서 맞는 판단인데, 그것이
+          "아무 말도 안 한다" 가 되어 있었다.
+        */}
+        {deposit && (
+          <section
+            aria-labelledby="deposit-title"
+            className="max-w-[420px] rounded-sm border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3"
+          >
+            <h2 id="deposit-title" className="text-[13px] font-semibold">
+              {expired ? t('deposit.expiredHeading') : t('deposit.heading')}
+            </h2>
+            <p
+              role="status"
+              className="mt-1 text-[12px] leading-relaxed text-[var(--fg-secondary)]"
+            >
+              {expired ? t('deposit.expiredNotice') : t('deposit.notice')}
+            </p>
+
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
+              {deposit.bank && (
+                <>
+                  <dt className="text-[var(--fg-muted)]">{t('deposit.bank')}</dt>
+                  <dd>{deposit.bank}</dd>
+                </>
+              )}
+              <dt className="text-[var(--fg-muted)]">{t('deposit.account')}</dt>
+              {/* 옮겨 적는 번호다 — 자릿수가 흔들리지 않게 tnum 을 준다 */}
+              <dd className="tnum font-medium">{deposit.account}</dd>
+              {deposit.dueDate && (
+                <>
+                  <dt className="text-[var(--fg-muted)]">{t('deposit.due')}</dt>
+                  <dd className="tnum">
+                    <time dateTime={deposit.dueDate.toISOString()}>
+                      {formatDateTime(locale, deposit.dueDate)}
+                    </time>
+                  </dd>
+                </>
+              )}
+              <dt className="text-[var(--fg-muted)]">{t('deposit.amount')}</dt>
+              <dd className="tnum font-medium">{money(order.payable)}</dd>
+            </dl>
+          </section>
         )}
       </div>
 

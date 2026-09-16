@@ -31,7 +31,17 @@ export async function getOrderForUser(orderNo: string, userId: string) {
       pointsUsed: true, shippingFee: true, payable: true, rewardPoints: true,
       recipient: true, recipientPhone: true, postalCode: true,
       address1: true, address2: true, deliveryMemo: true,
-      payment: { select: { method: true, status: true } },
+      /*
+       * 가상계좌 셋을 함께 읽는다. 저장만 하고 읽지 않아서, 입금 대기 주문이
+       * 어느 은행 몇 번 계좌인지 화면에서 볼 길이 없었다 — 결제 직후 한 번과
+       * 메일이 전부였고, 탭을 닫으면 그 주문은 화면에서 입금할 수 없었다.
+       */
+      payment: {
+        select: {
+          method: true, status: true,
+          virtualAccount: true, virtualBank: true, virtualDueDate: true,
+        },
+      },
       // 돌려준 돈. 일부 취소한 주문은 결제완료인 채로 남으므로 상태만으로는 안 보인다
       refunds: {
         orderBy: { createdAt: 'asc' },

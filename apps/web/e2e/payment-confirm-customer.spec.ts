@@ -112,7 +112,27 @@ test('가상계좌는 결제완료가 아니라 입금대기다', async ({ page 
   await expect(page.getByText('입금대기').first()).toBeVisible();
   await expect(page.getByText('결제완료')).toHaveCount(0);
 
-  await undo(page, orderNoOf(page.url()));
+  /*
+   * **어디로 얼마를 보낼지 화면에 있는가.**
+   *
+   * 계좌 셋(은행·번호·기한)을 결제 때 저장해 두고 읽는 곳이 없었다. 볼 수 있는
+   * 자리는 결제 직후 한 번 뜨는 응답과 메일뿐이라, **탭을 닫았거나 메일이
+   * 스팸함에 갔으면 그 주문은 화면에서 입금할 방법이 없었다.** 돈이 걸린 자리다.
+   *
+   * 여기서 보는 것은 "다시 열어도 남아 있는가" 라서 새로고침한 뒤에 본다 —
+   * 결제 직후의 응답이 아니라 저장된 값을 읽는지가 요점이다.
+   */
+  const orderNo = orderNoOf(page.url());
+  await page.reload();
+  await ready(page);
+
+  const deposit = page.getByRole('region', { name: '입금할 곳' });
+  await expect(deposit, '입금할 계좌가 주문 화면에 없다').toBeVisible();
+  await expect(deposit.getByText('계좌번호')).toBeVisible();
+  // 옮겨 적을 번호가 실제로 있어야 한다 — 이름표만 있고 값이 비면 소용없다
+  await expect(deposit).toContainText(/\d{4}/);
+
+  await undo(page, orderNo);
 });
 
 /**

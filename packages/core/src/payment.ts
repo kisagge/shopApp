@@ -122,3 +122,28 @@ export function assertPaymentAmount(expected: Won, received: number): void {
     );
   }
 }
+
+/**
+ * 입금할 곳을 보여 줘야 하는 주문인가.
+ *
+ * **계좌를 받아 두고 보여 주지 않고 있었다.** 가상계좌 셋(은행·계좌번호·기한)을 결제
+ * 때 저장하는데 읽는 곳이 어디에도 없었다 — 주문 화면은 "결제가 확인되면 배송 준비를
+ * 시작합니다" 만 말했다. 번호를 볼 수 있는 곳은 결제 직후 한 번 뜨는 응답과 메일뿐이라,
+ * 탭을 닫았거나 메일이 스팸함에 갔으면 **그 주문은 화면에서 입금할 방법이 없었다.**
+ *
+ * **재결제와는 다른 자리다.** isRepayable 이 입금 대기를 빼는 것은 맞다 — 그때 할 일은
+ * 송금이지 재결제가 아니고, 다시 걸면 이미 받은 계좌를 버리게 된다. 다만 "재결제가
+ * 아니다" 가 "아무 말도 안 한다" 가 되어 있었다.
+ *
+ * 기한이 지난 것도 보여 준다. 만료됐다는 사실 자체가 알아야 할 소식이고, 그때 할 일
+ * (다시 주문하거나 취소)을 화면이 안내할 수 있다.
+ */
+export const awaitingDeposit = (
+  method: PaymentMethodCode | null,
+  status: PaymentStatusCode | null,
+): boolean =>
+  method === 'VIRTUAL_ACCOUNT' && (status === 'WAITING_FOR_DEPOSIT' || status === 'EXPIRED');
+
+/** 입금 기한이 지났는가. 기한이 없으면 지나지 않은 것으로 본다 */
+export const depositExpired = (dueDate: Date | null, now: Date = new Date()): boolean =>
+  dueDate !== null && dueDate.getTime() <= now.getTime();
