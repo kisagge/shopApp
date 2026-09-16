@@ -14,6 +14,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'category.reorder': '카테고리 순서 변경',
   'category.delete': '카테고리 삭제',
   'brand.update': '브랜드 수정',
+  'brand.logo.set': '브랜드 로고 올림',
+  'brand.logo.remove': '브랜드 로고 뗌',
   'product.create': '상품 등록',
   'product.update': '상품 수정',
   'product.duplicate': '상품 복제',

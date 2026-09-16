@@ -4,6 +4,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { listBrands } from '~/lib/admin/manage-brand';
 import { BrandRowForm } from './brand-row-form';
 import { NewBrandForm } from './new-brand-form';
+import { BrandLogoForm } from './brand-logo-form';
+import { isStorageConfigured } from '~/lib/storage';
 
 export const metadata: Metadata = { title: '브랜드' };
 export const dynamic = 'force-dynamic';
@@ -23,13 +25,14 @@ export default async function BrandsPage() {
   const actor = await requireAdmin('product:write');
   const brands = await listBrands(actor);
   const canCreate = canCreateBrand(actor);
+  const storageConfigured = isStorageConfigured();
 
   return (
     <>
       <header className="flex min-h-17 flex-wrap items-center justify-between gap-x-6 gap-y-2 border-b border-[var(--border)] bg-[var(--bg)] px-4 py-3 sm:px-8 sm:py-0">
         <h1 className="text-[19px] font-semibold tracking-tight">브랜드 {brands.length}</h1>
         <p className="text-[13px] text-[var(--fg-muted)]">
-          이름과 주소는 매대에 그대로 뜹니다. 주소를 바꿔도 옛 주소는 새 주소로 넘어갑니다.
+          이름·주소·로고는 매대에 그대로 뜹니다. 주소를 바꿔도 옛 주소는 새 주소로 넘어갑니다.
         </p>
       </header>
 
@@ -54,6 +57,12 @@ export default async function BrandsPage() {
                   merchantName={b.merchantName}
                   productCount={b.productCount}
                   slugIsGenerated={b.slugIsGenerated}
+                />
+                <BrandLogoForm
+                  brandId={b.id}
+                  brandName={b.name}
+                  logoUrl={b.logoUrl}
+                  storageConfigured={storageConfigured}
                 />
               </li>
             ))}

@@ -1,9 +1,10 @@
 import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
-  assertPermission, canCreateBrand, canEditBrand, isSlugTaken, merchantScope,
+  assertPermission, brandLogoObjectKey, canCreateBrand, canEditBrand, isSlugTaken, merchantScope,
   type Actor,
 } from '@shop/core';
+import { uploadImageFiles, discardImageKeys, type ImageFile } from '~/lib/images/upload-files';
 import {
   BRAND_ERROR_MESSAGE,
   type BrandErrorCode, type CreateBrandInput, type UpdateBrandInput,
@@ -36,6 +37,8 @@ export interface BrandRow {
   /** 이 브랜드를 가진 가맹점. 자사 브랜드면 없다 */
   readonly merchantName: string | null;
   readonly productCount: number;
+  /** 매장 브랜드 화면 머리에 뜨는 로고. 없으면 null */
+  readonly logoUrl: string | null;
   /** 지금 보는 사람이 고칠 수 있는가 */
   readonly editable: boolean;
   /**
@@ -58,7 +61,7 @@ export async function listBrands(actor: Actor): Promise<BrandRow[]> {
     where: scope === undefined ? {} : scope === null ? {} : { merchantId: scope },
     orderBy: [{ name: 'asc' }],
     select: {
-      id: true, name: true, slug: true,
+      id: true, name: true, slug: true, logoUrl: true,
       merchant: { select: { name: true } },
       _count: { select: { products: { where: { deletedAt: null } } } },
     },
@@ -70,6 +73,7 @@ export async function listBrands(actor: Actor): Promise<BrandRow[]> {
     slug: b.slug,
     merchantName: b.merchant?.name ?? null,
     productCount: b._count.products,
+    logoUrl: b.logoUrl,
     editable: true,
     slugIsGenerated: GENERATED_SLUG.test(b.slug),
   }));
@@ -109,6 +113,7 @@ export async function createBrand(actor: Actor, input: CreateBrandInput): Promis
       ...created,
       merchantName: null,
       productCount: 0,
+      logoUrl: null,
       editable: true,
       slugIsGenerated: false,
     };
@@ -137,7 +142,7 @@ export async function updateBrand(
   const before = await prisma.brand.findUnique({
     where: { id: brandId },
     select: {
-      id: true, name: true, slug: true, merchantId: true,
+      id: true, name: true, slug: true, merchantId: true, logoUrl: true,
       merchant: { select: { name: true } },
       _count: { select: { products: { where: { deletedAt: null } } } },
     },
@@ -177,6 +182,7 @@ export async function updateBrand(
       ...after,
       merchantName: before.merchant?.name ?? null,
       productCount: before._count.products,
+      logoUrl: before.logoUrl,
       editable: true,
       slugIsGenerated: GENERATED_SLUG.test(after.slug),
     };
@@ -186,6 +192,71 @@ export async function updateBrand(
     }
     throw error;
   }
+}
+
+/** 로고를 바꾸거나 지울 때, 고칠 수 있는 브랜드인지 보고 지금 키를 읽는다 */
+async function loadForLogo(actor: Actor, brandId: string) {
+  assertPermission(actor, 'product:write');
+  const brand = await prisma.brand.findUnique({
+    where: { id: brandId },
+    select: { id: true, merchantId: true, logoUrl: true, logoKey: true },
+  });
+  if (!brand) throw new BrandError('BRAND_NOT_FOUND', 404);
+  if (!canEditBrand(actor, brand.merchantId)) throw new BrandError('BRAND_NOT_ALLOWED', 403);
+  return brand;
+}
+
+/**
+ * 로고를 올린다(있으면 바꾼다).
+ *
+ * **매장은 로고를 그리는데 올리는 곳이 없었다.** 브랜드 화면 머리에 `logoUrl` 자리가
+ * 있고 조회도 그 값을 읽지만, 쓰는 코드가 한 줄도 없어서 모든 브랜드가 이름만 떴다.
+ *
+ * 순서가 요점이다.
+ * 1. **올린다.** 검사·다듬기(위치 정보 제거)·실패 시 되돌리기는 리뷰·문의 사진과 같은 길이다.
+ * 2. **적는다.** 적기가 실패하면 방금 올린 것을 지운다 — 주인 없는 파일이 남는다.
+ * 3. **옛 파일을 지운다.** 적은 뒤에 지운다. 먼저 지우면 적기가 실패했을 때 화면에 깨진
+ *    로고가 남는다. 옛 키가 없으면(이 칸이 생기기 전 주소만 적힌 로고) 지우지 않는다 —
+ *    우리가 올린 것인지 알 수 없다.
+ */
+export async function setBrandLogo(
+  actor: Actor,
+  brandId: string,
+  file: ImageFile,
+): Promise<{ logoUrl: string; replaced: boolean }> {
+  const brand = await loadForLogo(actor, brandId);
+
+  const [uploaded] = await uploadImageFiles(
+    [file],
+    (contentType, token) => brandLogoObjectKey({ brandId, contentType, token }),
+    'brand-logo',
+  );
+  const { url, key } = uploaded!;
+
+  try {
+    await prisma.brand.update({ where: { id: brandId }, data: { logoUrl: url, logoKey: key } });
+  } catch (error) {
+    await discardImageKeys([key], 'brand-logo');
+    throw error;
+  }
+
+  if (brand.logoKey) await discardImageKeys([brand.logoKey], 'brand-logo');
+  return { logoUrl: url, replaced: brand.logoUrl !== null };
+}
+
+/**
+ * 로고를 뗀다. 없으면 아무것도 하지 않는다 — 두 번 눌러도 같은 결과다.
+ *
+ * 적은 것을 먼저 비우고 파일은 그 뒤에 지운다. 파일 지우기가 실패해도 화면에는 로고가
+ * 사라져 있어야 한다(남은 파일은 눈에 보이는 피해가 없다).
+ */
+export async function removeBrandLogo(actor: Actor, brandId: string): Promise<{ removed: boolean }> {
+  const brand = await loadForLogo(actor, brandId);
+  if (brand.logoUrl === null) return { removed: false };
+
+  await prisma.brand.update({ where: { id: brandId }, data: { logoUrl: null, logoKey: null } });
+  if (brand.logoKey) await discardImageKeys([brand.logoKey], 'brand-logo');
+  return { removed: true };
 }
 
 /** 옛 주소가 가리키는 지금 주소. 없으면 null — 매대가 넘길 때 쓴다 */

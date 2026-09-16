@@ -428,7 +428,11 @@ model Brand {
   id      String  @id @default(cuid())
   name    String  @unique
   slug    String  @unique
+  /// 브랜드 화면 머리에 뜨는 로고. 한동안 **그리기만 하고 쓰는 곳이 없었다.**
   logoUrl String?
+  /// 로고 파일의 저장소 키. 주소만 두면 로고를 바꿀 때 옛 파일을 지울 길이 없다 —
+  /// 주소에서 키를 거꾸로 뽑으면 저장소 주소 규칙이 바뀌는 날 엉뚱한 것을 지운다.
+  logoKey String?
 
   /// 브랜드를 운영하는 가맹점. 가맹점의 권한 범위는 이 관계를 타고 결정된다.
   /// 자사 직매입 브랜드는 null 이고, 그때는 관리자만 다룰 수 있다.

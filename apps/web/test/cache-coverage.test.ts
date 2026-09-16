@@ -44,6 +44,8 @@ const CATALOG_WRITERS = [
    */
   'app/api/admin/brands/route.ts',
   'app/api/admin/brands/[id]/route.ts',
+  // 브랜드 화면 머리가 로고를 읽는다 — 안 털면 바꾼 로고가 한 시간 동안 옛것으로 뜬다
+  'app/api/admin/brands/[id]/logo/route.ts',
   // 머리 메뉴와 목록 필터가 카테고리를 읽는다 — 순서만 바꿔도 털어야 한다
   'app/api/admin/categories/route.ts',
   'app/api/admin/categories/[id]/route.ts',

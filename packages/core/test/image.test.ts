@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  sniffImageType, verifyImageBytes, imageObjectKey, resequence, defaultAlt, isImageContentType, ImageError, MAX_IMAGE_BYTES, reviewImageObjectKey, MAX_IMAGES_PER_REVIEW, MAX_IMAGES_PER_PRODUCT,
+  sniffImageType, verifyImageBytes, imageObjectKey, resequence, defaultAlt, isImageContentType, ImageError, MAX_IMAGE_BYTES, reviewImageObjectKey, brandLogoObjectKey, MAX_IMAGES_PER_REVIEW, MAX_IMAGES_PER_PRODUCT,
 } from '../src/image';
 
 const bytes = (...values: number[]) => new Uint8Array(values);
@@ -138,6 +138,23 @@ describe('대체 텍스트 기본값', () => {
     // 같은 문장이 반복되면 스크린리더로 훑을 때 구분이 안 된다
     expect(defaultAlt({ brandName: 'MOOR', productName: '울 코트', index: 2 }))
       .toBe('MOOR 울 코트 상세 이미지 2');
+  });
+});
+
+describe('브랜드 로고 키', () => {
+  const ok = { brandId: 'b-1', contentType: 'image/png' as const, token: 'abcd1234efgh' };
+
+  it('브랜드 아래에 둔다 — 상품 사진과 섞으면 "로고만 정리" 가 안 된다', () => {
+    expect(brandLogoObjectKey(ok)).toBe('brands/b-1/abcd1234efgh.png');
+  });
+
+  it('형식마다 확장자가 따라간다', () => {
+    expect(brandLogoObjectKey({ ...ok, contentType: 'image/webp' })).toMatch(/\.webp$/);
+  });
+
+  it('이상한 토큰은 거절한다 — 경로 탈출이 여기서 나온다', () => {
+    expect(() => brandLogoObjectKey({ ...ok, token: '../../etc/passwd' })).toThrow();
+    expect(() => brandLogoObjectKey({ ...ok, token: 'short' })).toThrow();
   });
 });
 

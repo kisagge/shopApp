@@ -172,6 +172,18 @@ export function reviewImageObjectKey(input: {
 }
 
 /**
+ * 브랜드 로고의 저장 키. 브랜드 아래에 둔다 — 상품 사진과 섞으면 "로고만 정리" 가 안 된다.
+ *
+ * **바꿀 때마다 새 키다.** 같은 키에 덮어쓰면 CDN·브라우저가 옛 로고를 한동안 계속 보여 준다.
+ */
+export function brandLogoObjectKey(input: { brandId: string; contentType: ImageContentType; token: string }): string {
+  if (!/^[A-Za-z0-9_-]{8,64}$/.test(input.token)) {
+    throw new ImageError('CONTENT_MISMATCH');
+  }
+  return `brands/${input.brandId}/${input.token}.${EXTENSION[input.contentType]}`;
+}
+
+/**
  * 1:1 문의 사진의 저장 키. 쓴 사람 아래에 둔다 — 문의가 지워지거나 계정을 닫을 때 그 사람의 것을 한 번에 찾는다.
  * 파일 이름은 쓰지 않는다(경로 탈출·덮어쓰기). 토큰은 추측할 수 없게 — 비공개 문의의 사진도 주소는 공개 저장소에 있다.
  */
