@@ -7,6 +7,7 @@ import {
   searchTextFor, sellingPriceOf, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
+import { notifyProductReviewed } from '~/lib/notifications/product-review';
 import { recordAudit } from '~/lib/audit';
 import {
   PRODUCT_ERROR_MESSAGE,
@@ -450,6 +451,18 @@ export async function reviewProduct(
         }
       : { status: 'DRAFT', reviewRequestedAt: null, publishRejection: reason },
     select: { id: true, name: true, status: true, publishRejection: true },
+  });
+
+  /*
+   * **고친 뒤에 알린다.** 알림이 실패해도 검수는 끝난 것이고, 되돌릴 일이
+   * 아니다(함수 스스로 삼킨다). 재입고 알림을 재고 트랜잭션 밖에서 부르는
+   * 것과 같은 자리다.
+   */
+  await notifyProductReviewed({
+    productId: after.id,
+    productName: after.name,
+    approved: input.approve,
+    reason,
   });
 
   return { before, after };

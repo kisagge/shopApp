@@ -1741,6 +1741,10 @@ enum NotificationKind {
   COUPON_ISSUED
   /// 가맹점 상품의 옵션 재고가 기준 아래로 내려갔다 — 운영 알림함에만 뜬다
   STOCK_LOW
+  /// 올린 상품이 매대에 올라갔다 — 운영 알림함에만 뜬다
+  PRODUCT_APPROVED
+  /// 올린 상품이 되돌아왔다. 사유를 함께 싣는다 — 운영 알림함에만 뜬다
+  PRODUCT_REJECTED
   /// 내 리뷰에 판매자가 답했다
   REVIEW_REPLIED
   /// 교환한 상품을 보냈다

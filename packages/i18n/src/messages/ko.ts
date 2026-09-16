@@ -1157,6 +1157,8 @@ export const ko = {
   'mail.pointsExpiring.view': '적립금 보기',
   'notif.COUPON_ISSUED': '{couponName} 쿠폰이 도착했습니다',
   'notif.STOCK_LOW': '{productName} · {optionLabel} 재고가 {stock}개 남았습니다',
+  'notif.PRODUCT_APPROVED': '{productName} 검수를 통과했습니다 — 매대에 올라갔습니다',
+  'notif.PRODUCT_REJECTED': '{productName} 검수에서 되돌아왔습니다 — {reason}',
   'notif.REVIEW_REPLIED': '{productName} 리뷰에 판매자가 답글을 남겼습니다.',
 } as const satisfies Record<string, Message>;
 

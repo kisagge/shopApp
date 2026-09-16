@@ -1123,5 +1123,7 @@ export const ja: Dictionary = {
   'mail.pointsExpiring.view': 'ポイントを見る',
   'notif.COUPON_ISSUED': '{couponName} クーポンが届きました',
   'notif.STOCK_LOW': '{productName} · {optionLabel} の在庫が残り{stock}点です',
+  'notif.PRODUCT_APPROVED': '{productName} の審査を通過し、公開されました',
+  'notif.PRODUCT_REJECTED': '{productName} の審査で差し戻されました — {reason}',
   'notif.REVIEW_REPLIED': '{productName} のレビューに販売者が返信しました。',
 };

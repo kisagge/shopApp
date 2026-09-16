@@ -40,9 +40,14 @@ export default async function AdminNotificationsPage() {
         <h1 id="console-notif-heading" className="text-[19px] font-semibold tracking-tight">
           알림
         </h1>
-        {/* 기준값을 손으로 적지 않는다 — 대시보드·상품 화면과 같은 곳에서 온다 */}
+        {/*
+          이 알림함에 무엇이 오는지 적는다. 한동안 재고 부족 하나뿐이라 그 기준만
+          적혀 있었는데, 검수 결과가 더해졌다 — 비워 두면 왜 여기 떴는지 모른다.
+          기준값은 손으로 적지 않는다: 대시보드·상품 화면과 같은 곳에서 온다.
+        */}
         <p className="text-[13px] text-[var(--fg-muted)]">
-          옵션 재고가 <b className="tnum">{LOW_STOCK_THRESHOLD}개</b> 이하로 내려가면 알려 드립니다
+          상품 검수 결과와, 옵션 재고가 <b className="tnum">{LOW_STOCK_THRESHOLD}개</b> 이하로
+          내려간 것을 알려 드립니다
         </p>
       </header>
 

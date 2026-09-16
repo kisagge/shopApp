@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CONSOLE_NOTIFICATION_KIND } from '@shop/core';
 
 /**
  * 매장 알림함과 운영 알림함이 서로를 건드리지 않는다.
@@ -43,9 +44,21 @@ describe('읽기', () => {
     expect(kindsIn(notification.findMany.mock.calls[0])).not.toContain('STOCK_LOW');
   });
 
-  it('운영 알림함에는 재고 부족만 있다', async () => {
+  it('운영 알림함에는 운영 몫만 있다', async () => {
+    /*
+     * 목록을 여기 손으로 적지 않는다. 한동안 재고 부족 하나뿐이었는데 검수
+     * 결과가 더해졌고, 손으로 적어 두면 종류를 더할 때마다 여기가 함께 틀린다.
+     * 가리는 규칙 자체(둘이 겹치지 않고 합치면 전체)는 core 검사가 본다.
+     */
     await getMyNotifications('u-1', 'console');
-    expect(kindsIn(notification.findMany.mock.calls[0])).toEqual(['STOCK_LOW']);
+    expect(kindsIn(notification.findMany.mock.calls[0])).toEqual([...CONSOLE_NOTIFICATION_KIND]);
+  });
+
+  it('검수 결과는 매장 알림함에 뜨지 않는다 — 손님으로 온 자리에서 들을 말이 아니다', async () => {
+    await getMyNotifications('u-1');
+    const kinds = kindsIn(notification.findMany.mock.calls[0]);
+    expect(kinds).not.toContain('PRODUCT_APPROVED');
+    expect(kinds).not.toContain('PRODUCT_REJECTED');
   });
 });
 
@@ -55,9 +68,9 @@ describe('세기', () => {
     expect(kindsIn(notification.count.mock.calls[0])).not.toContain('STOCK_LOW');
   });
 
-  it('운영 뱃지는 재고 부족을 센다', async () => {
+  it('운영 뱃지는 운영 몫을 센다', async () => {
     await countUnread('u-1', 'console');
-    expect(kindsIn(notification.count.mock.calls[0])).toEqual(['STOCK_LOW']);
+    expect(kindsIn(notification.count.mock.calls[0])).toEqual([...CONSOLE_NOTIFICATION_KIND]);
   });
 });
 
@@ -78,7 +91,7 @@ describe('읽음 처리', () => {
     await markRead(
       new Request('http://localhost/api/notifications/read?box=console', { method: 'POST' }),
     );
-    expect(kindsIn(notification.updateMany.mock.calls[0])).toEqual(['STOCK_LOW']);
+    expect(kindsIn(notification.updateMany.mock.calls[0])).toEqual([...CONSOLE_NOTIFICATION_KIND]);
   });
 
   it('모르는 알림함 이름은 매장으로 본다', async () => {

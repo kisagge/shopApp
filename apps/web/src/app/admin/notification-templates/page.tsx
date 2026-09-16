@@ -21,6 +21,8 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   RESTOCKED: '재입고',
   COUPON_ISSUED: '쿠폰 지급',
   STOCK_LOW: '재고 부족',
+  PRODUCT_APPROVED: '상품 검수 승인',
+  PRODUCT_REJECTED: '상품 검수 반려',
   REVIEW_REPLIED: '리뷰 답글',
   EXCHANGE_SHIPPED: '교환 상품 발송',
   ORDER_CANCELLED: '주문 취소',
@@ -38,6 +40,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
 const PARAM_LABEL: Record<string, string> = {
   orderNo: '주문번호',
   productName: '상품 이름',
+  reason: '반려 사유',
   optionLabel: '옵션',
   couponName: '쿠폰 이름',
   stock: '남은 재고',

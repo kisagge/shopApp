@@ -20,6 +20,17 @@ export const NOTIFICATION_KIND = [
    * 손실이고, 재입고에는 며칠이 걸린다 — 알아채는 시점이 늦을수록 비는 날이 길다.
    */
   'STOCK_LOW',
+  /**
+   * 올린 상품이 매대에 올라갔다 / 되돌아왔다.
+   *
+   * **되돌릴 때 사유는 이미 받고 있었다.** reviewProduct 는 사유 없는 반려를
+   * 막고(REJECT_REASON_REQUIRED) 그 글을 상품 행에 적어 두는데, 적어 두기만
+   * 했다 — 가맹점은 자기 상품을 다시 열어 봐야 그것을 본다. 검수는 며칠 걸리는
+   * 일이라 다시 열어 볼 이유가 없고, 그래서 사유를 쓴 뜻("무엇을 고쳐야 할지
+   * 알려 준다")이 닿지 않았다. 사유를 알림에 실어 보낸다.
+   */
+  'PRODUCT_APPROVED',
+  'PRODUCT_REJECTED',
   /** 내 리뷰에 판매자가 답했다. 답은 늦게 달리는 일이 많아, 알리지 않으면 쓴 사람은 다시 와서 볼 일이 없다 */
   'REVIEW_REPLIED',
   /**
@@ -56,7 +67,12 @@ export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
  *
  * 둘은 겹치지 않고, 합치면 전체와 같아야 한다 — 검사가 지킨다.
  */
-export const CONSOLE_NOTIFICATION_KIND = ['STOCK_LOW'] as const satisfies readonly NotificationKind[];
+export const CONSOLE_NOTIFICATION_KIND = [
+  'STOCK_LOW',
+  // 검수 결과는 상품을 올린 사람이 들을 말이다 — 손님으로 온 자리에 뜰 것이 아니다
+  'PRODUCT_APPROVED',
+  'PRODUCT_REJECTED',
+] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>
     !(CONSOLE_NOTIFICATION_KIND as readonly string[]).includes(kind),
@@ -115,4 +131,25 @@ export const NOTIFICATION_RETENTION_DAYS = 90;
 /** 이 시각보다 오래된 알림은 지워도 된다 */
 export function notificationCutoff(now: Date, days = NOTIFICATION_RETENTION_DAYS): Date {
   return new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+}
+
+/**
+ * 알림 한 줄에 실을 사유의 길이.
+ *
+ * **반려 사유는 500자까지 받는다.** 그 길이를 알림 한 줄에 그대로 실으면 목록이
+ * 한 건으로 가득 찬다. 알림이 하는 일은 "무슨 일이 있었는지" 를 스치며 알리는
+ * 것이고, 전문은 상품 화면에 있다 — 눌러서 간다.
+ */
+export const NOTICE_REASON_MAX = 80;
+
+/**
+ * 사유를 알림에 실을 수 있게 줄인다.
+ *
+ * **줄였다는 것을 보이게 한다.** 그냥 자르면 문장이 끝난 줄 알고, 뒤에 붙은
+ * 조건을 못 보고 같은 실수를 되풀이한다. 줄 바꿈도 한 칸으로 만든다 — 목록의
+ * 한 줄에 들어가야 한다.
+ */
+export function shortenReason(reason: string, max = NOTICE_REASON_MAX): string {
+  const flat = reason.replace(/\s+/g, ' ').trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 1).trimEnd()}…`;
 }

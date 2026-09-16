@@ -1127,5 +1127,7 @@ export const en: Dictionary = {
   'mail.pointsExpiring.view': 'View my points',
   'notif.COUPON_ISSUED': 'You received a coupon: {couponName}',
   'notif.STOCK_LOW': 'Low stock: {productName} · {optionLabel} has {stock} left',
+  'notif.PRODUCT_APPROVED': '{productName} passed review and is now live',
+  'notif.PRODUCT_REJECTED': '{productName} was sent back from review — {reason}',
   'notif.REVIEW_REPLIED': 'The seller replied to your review of {productName}.',
 };

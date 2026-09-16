@@ -20,6 +20,13 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/*
+ * 검수 결과 알림은 갈아 끼운다. 여기서 볼 것은 **부르는가** 이지 누구에게
+ * 닿는가가 아니다 — 받는 사람을 고르는 일은 product-review-notice 검사가 본다.
+ */
+const notifyProductReviewed = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/product-review', () => ({ notifyProductReviewed }));
+
 const {
   createProduct, updateProduct, updateStock, createVariant, getProductFormOptions,
   reviewProduct,
@@ -440,6 +447,44 @@ describe('게시 검수 처리', () => {
     const data = db.product.update.mock.calls[0]![0].data;
     expect(data.status).toBe('DRAFT');
     expect(data.publishRejection).toBe('사진이 흐립니다');
+  });
+
+  it('승인하면 올린 쪽에 알린다 — 안 알리면 며칠째 대기줄인 줄 안다', async () => {
+    await reviewProduct(admin, 'p-1', { approve: true });
+
+    expect(notifyProductReviewed).toHaveBeenCalledWith(
+      expect.objectContaining({ productId: 'p-1', approved: true }),
+    );
+  });
+
+  it('반려하면 사유를 실어 알린다', async () => {
+    /*
+     * **사유는 진작 받고 있었는데 닿지 않았다.** 상품 행에 적어 두기만 해서,
+     * 가맹점은 자기 상품을 다시 열어 봐야 그것을 봤다. 검수는 며칠 걸리는
+     * 일이라 다시 열어 볼 이유가 없다.
+     */
+    await reviewProduct(admin, 'p-1', { approve: false, reason: '사진이 흐립니다' });
+
+    expect(notifyProductReviewed).toHaveBeenCalledWith(
+      expect.objectContaining({ approved: false, reason: '사진이 흐립니다' }),
+    );
+  });
+
+  it('처리하지 못한 검수는 알리지 않는다', async () => {
+    // 대기줄에 없는 상품 — 아무 일도 일어나지 않았는데 알림이 가면 안 된다
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'ACTIVE', publishedAt: new Date(),
+    });
+
+    await expect(reviewProduct(admin, 'p-1', { approve: true })).rejects.toThrow();
+    expect(notifyProductReviewed).not.toHaveBeenCalled();
+  });
+
+  it('사유 없는 반려도 알리지 않는다', async () => {
+    await expect(
+      reviewProduct(admin, 'p-1', { approve: false, reason: '  ' }),
+    ).rejects.toThrow();
+    expect(notifyProductReviewed).not.toHaveBeenCalled();
   });
 
   it('대기줄에 없는 상품은 처리하지 않는다', async () => {
