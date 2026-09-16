@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  MERCHANT_STATUS, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
+  MERCHANT_STATUS, merchantStatusNeedsReason, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
 } from '@shop/core';
 import { cuidSchema } from './common';
 
@@ -19,9 +19,10 @@ export const updateMerchantStatusSchema = z
     status: z.enum(MERCHANT_STATUS),
     reason: z.string().trim().max(300, 'valid.tooLongChars').default(''),
   })
-  // 승인은 이유가 없어도 되지만 **불이익을 주는 처분에는 이유를 남긴다.**
-  // 정지된 가맹점이 왜 정지됐는지 아무도 모르는 상태가 되면 안 된다.
-  .refine((v) => v.status === 'APPROVED' || v.status === 'PENDING' || v.reason.length > 0, {
+  // 어느 처분에 이유가 필요한지는 **core 가 정한다.** 여기와 운영 화면이 각자
+  // `SUSPENDED · TERMINATED` 를 적어 두고 있었는데, 상태가 하나 늘 때 한쪽만
+  // 고치면 화면은 사유를 안 받고 서버가 튕긴다.
+  .refine((v) => !merchantStatusNeedsReason(v.status) || v.reason.length > 0, {
     message: 'valid.suspendNeedsReason',
     path: ['reason'],
   });
@@ -52,6 +53,7 @@ export type AssignRoleInput = z.infer<typeof assignRoleSchema>;
 export const ADMIN_ERROR = [
   'MERCHANT_NOT_FOUND', 'USER_NOT_FOUND', 'CANNOT_CHANGE_OWN_ROLE',
   'CANNOT_EDIT_SUPER_ADMIN', 'MERCHANT_NOT_APPROVED', 'USER_CLOSED',
+  'MERCHANT_STATUS_NOT_ALLOWED',
   'CHANGED_MEANWHILE', 'CANNOT_SUSPEND_SELF', 'CANNOT_SUSPEND_STAFF', 'ALREADY_SUSPENDED', 'NOT_SUSPENDED',
   'POINTS_USER_CLOSED', 'INSUFFICIENT_POINTS',
 ] as const;
@@ -63,6 +65,11 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
   CANNOT_CHANGE_OWN_ROLE: '자기 권한은 바꿀 수 없습니다',
   CANNOT_EDIT_SUPER_ADMIN: '슈퍼관리자 계정은 수정할 수 없습니다',
   MERCHANT_NOT_APPROVED: '승인되지 않은 가맹점에는 계정을 붙일 수 없습니다',
+  /*
+   * 장사하던 가맹점을 '반려' 하거나, 끝난 줄(해지·반려)을 되살리려 했다.
+   * 다시 들어오려면 새로 신청해야 한다 — 끝난 줄을 되살리면 그때의 판단이 지워진다.
+   */
+  MERCHANT_STATUS_NOT_ALLOWED: '지금 상태에서 바꿀 수 없는 상태입니다',
   USER_CLOSED: '탈퇴한 계정에는 권한을 줄 수 없습니다',
   /*
    * 읽은 뒤 쓰기 전에 대상이 바뀌었다.

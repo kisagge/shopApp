@@ -21,6 +21,8 @@ export const NOTIFICATION_PARAMS = {
   PRODUCT_APPROVED: ['productName'],
   /** 사유를 함께 싣는다 — 이것이 없으면 "되돌아왔다" 만 알고 무엇을 고칠지는 모른다 */
   PRODUCT_REJECTED: ['productName', 'reason'],
+  MERCHANT_APPROVED: ['merchantName'],
+  MERCHANT_REJECTED: ['merchantName', 'reason'],
   REVIEW_REPLIED: ['productName'],
   EXCHANGE_SHIPPED: ['orderNo'],
   ORDER_CANCELLED: ['orderNo'],
@@ -45,6 +47,7 @@ export const NOTIFICATION_SAMPLE_PARAMS: Readonly<Record<string, string>> = {
   count: '2',
   date: '2026-09-22',
   reason: '대표 이미지에 다른 브랜드 로고가 보입니다',
+  merchantName: '스튜디오 눈',
 };
 
 /** 알림 한 줄의 상한. 머리의 알림 목록과 앱 알림에 한눈에 들어가야 한다 */

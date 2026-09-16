@@ -23,6 +23,13 @@ const db = vi.hoisted(() => {
 });
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/*
+ * 입점 심사 결과 알림은 갈아 끼운다. 여기서 볼 것은 **부르는가** 이지 누구에게
+ * 닿는가가 아니다 — 받는 사람을 고르는 일은 merchant-decision 검사가 본다.
+ */
+const notifyMerchantDecision = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/merchant-decision', () => ({ notifyMerchantDecision }));
+
 const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/merchant/apply', () => ({ activateApprovedMerchant: activate }));
 
@@ -229,12 +236,24 @@ describe('승인하면 계정과 브랜드가 이어진다', () => {
   });
 
   it('정지·해지에는 부르지 않는다', async () => {
+    // 정지·해지는 **장사하던** 가맹점에 내리는 처분이다(심사 중인 신청은 반려한다)
+    db.merchant.findUnique.mockResolvedValue({
+      id: MERCHANT_ID, name: '무어', status: 'APPROVED', approvedAt: new Date('2026-01-01'),
+    });
+
     for (const s of ['SUSPENDED', 'TERMINATED'] as const) {
       activate.mockClear();
       // 불이익을 주는 처분에는 사유가 필요하다(계약이 강제한다)
       await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '시험' }));
       expect(activate, s).not.toHaveBeenCalled();
     }
+  });
+
+  it('반려에도 부르지 않는다 — 계정을 만들 이유가 없다', async () => {
+    await updateMerchantStatus(
+      superAdmin, MERCHANT_ID, status({ status: 'REJECTED', reason: '서류 미비' }),
+    );
+    expect(activate).not.toHaveBeenCalled();
   });
 });
 
@@ -296,12 +315,106 @@ describe('입점 승인 — 두 사람이 동시에', () => {
   });
 
   it('승인이 아니면 승인일을 건드리지 않는다', async () => {
+    db.merchant.findUnique.mockResolvedValue({
+      id: MERCHANT_ID, name: '무어', status: 'APPROVED', approvedAt: new Date('2026-01-01'),
+    });
+
     await updateMerchantStatus(
       superAdmin,
       MERCHANT_ID,
       status({ status: 'SUSPENDED', reason: '정산 서류 미비' }),
     );
     expect(db.merchant.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 갈 수 있는 곳인가.
+ *
+ * **반려라는 상태가 없어서 해지를 반려 대신 쓰고 있었다.** 그래서 한 번도 승인된
+ * 적 없는 신청이 "해지" 로 적혔고, 나중에 읽는 사람은 이 가맹점이 장사를 하다
+ * 그만둔 것인지 애초에 들어온 적이 없는 것인지 가릴 수 없었다.
+ */
+describe('상태 전이', () => {
+  const asStatus = (current: string) =>
+    db.merchant.findUnique.mockResolvedValue({
+      id: MERCHANT_ID, name: '무어', status: current, approvedAt: null,
+    });
+
+  it('심사 중인 신청은 승인하거나 반려한다', async () => {
+    for (const s of ['APPROVED', 'REJECTED'] as const) {
+      asStatus('PENDING');
+      await expect(
+        updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '사유' })),
+        s,
+      ).resolves.toBeTruthy();
+    }
+  });
+
+  it('심사 중인 신청은 정지·해지할 수 없다 — 그건 반려다', async () => {
+    for (const s of ['SUSPENDED', 'TERMINATED'] as const) {
+      asStatus('PENDING');
+      await expect(
+        updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '사유' })),
+        s,
+      ).rejects.toMatchObject({ code: 'MERCHANT_STATUS_NOT_ALLOWED', status: 409 });
+    }
+  });
+
+  it('장사하던 가맹점은 반려할 수 없다 — 그건 해지다', async () => {
+    asStatus('APPROVED');
+    await expect(
+      updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'REJECTED', reason: '사유' })),
+    ).rejects.toMatchObject({ code: 'MERCHANT_STATUS_NOT_ALLOWED' });
+  });
+
+  it('끝난 줄은 되살리지 않는다 — 다시 들어오려면 새로 신청한다', async () => {
+    /*
+     * 되살리면 그때의 판단이 지워진다. 새로 신청하면 새 줄이 생기고, 지난 줄은
+     * 그대로 남는다.
+     */
+    for (const from of ['REJECTED', 'TERMINATED'] as const) {
+      asStatus(from);
+      await expect(
+        updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' })),
+        from,
+      ).rejects.toMatchObject({ code: 'MERCHANT_STATUS_NOT_ALLOWED' });
+    }
+  });
+
+  it('같은 상태로 다시 눌러도 막지 않는다 — 아무 일도 일어나지 않는다', async () => {
+    asStatus('APPROVED');
+    await expect(
+      updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' })),
+    ).resolves.toBeTruthy();
+  });
+});
+
+describe('심사 결과를 신청자에게', () => {
+  it('승인하면 알린다 — 계정만 만들어 주고 아무 말도 안 했다', async () => {
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
+
+    expect(notifyMerchantDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ merchantId: MERCHANT_ID, status: 'APPROVED' }),
+    );
+  });
+
+  it('반려하면 사유를 실어 알린다 — 그 글이 감사 로그에만 남았다', async () => {
+    await updateMerchantStatus(
+      superAdmin, MERCHANT_ID, status({ status: 'REJECTED', reason: '브랜드 서류가 없습니다' }),
+    );
+
+    expect(notifyMerchantDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'REJECTED', reason: '브랜드 서류가 없습니다' }),
+    );
+  });
+
+  it('막힌 전이에서는 알리지 않는다 — 아무 일도 일어나지 않았다', async () => {
+    await expect(
+      updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'TERMINATED', reason: '사유' })),
+    ).rejects.toThrow();
+
+    expect(notifyMerchantDecision).not.toHaveBeenCalled();
   });
 });
 

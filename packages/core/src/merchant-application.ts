@@ -66,14 +66,18 @@ export function brandSlugOf(name: string): string {
  * 계약을 가져오면 Zod 384KB 가 브라우저 번들에 딸려 들어온다.
  * 계약은 이 목록으로 스키마를 만들고, 화면은 목록만 가져간다.
  */
-export const MERCHANT_STATUS = ['PENDING', 'APPROVED', 'SUSPENDED', 'TERMINATED'] as const;
+export const MERCHANT_STATUS = ['PENDING', 'APPROVED', 'REJECTED', 'SUSPENDED', 'TERMINATED'] as const;
 export type MerchantStatus = (typeof MERCHANT_STATUS)[number];
 
 /**
  * 아직 살아 있는 신청 — 이 상태면 다시 낼 수 없다.
  *
- * **해지(TERMINATED)만 빠진다.** 해지된 경우는 다시 낼 수 있어야 한다 —
- * 고쳐서 다시 오는 길을 막으면 반려가 곧 영구 거절이 된다.
+ * **끝난 것들이 빠진다 — 해지(TERMINATED)와 반려(REJECTED).** 둘 다 다시 낼 수 있어야
+ * 한다: 고쳐서 다시 오는 길을 막으면 반려가 곧 영구 거절이 된다.
+ *
+ * 한동안 반려라는 상태가 없어서 **해지를 반려 대신 쓰고 있었다.** 그래서 한 번도
+ * 승인된 적 없는 신청이 "해지" 로 적혔고, 감사 로그를 읽는 사람은 이 가맹점이
+ * 장사를 하다 그만둔 것인지 애초에 들어온 적이 없는 것인지 가릴 수 없었다.
  *
  * **목록에서 빼는 쪽으로 적는다.** `['PENDING', 'APPROVED', 'SUSPENDED']` 라고
  * 적으면 상태가 하나 늘 때 조용히 빠진다 — 새 상태가 '살아 있는 것' 인데도
@@ -83,7 +87,7 @@ export type MerchantStatus = (typeof MERCHANT_STATUS)[number];
  * 화면과 서버가 각자 `['PENDING', 'APPROVED', 'SUSPENDED']` 를 적고 있었다.
  * 값이 같아서 조용했지만 둘 중 하나만 고치면 어긋난다.
  */
-const CLOSED_STATUS: readonly MerchantStatus[] = ['TERMINATED'];
+const CLOSED_STATUS: readonly MerchantStatus[] = ['TERMINATED', 'REJECTED'];
 
 export const OPEN_MERCHANT_STATUS: readonly MerchantStatus[] = MERCHANT_STATUS.filter(
   (s) => !CLOSED_STATUS.includes(s),
@@ -95,9 +99,43 @@ export const isOpenApplication = (status: MerchantStatus): boolean =>
 export const MERCHANT_STATUS_LABEL: Readonly<Record<MerchantStatus, string>> = {
   PENDING: '승인 대기',
   APPROVED: '정상',
+  REJECTED: '반려',
   SUSPENDED: '일시 정지',
   TERMINATED: '해지',
 };
+
+/**
+ * 사유를 받아야 하는 처분인가.
+ *
+ * **불이익을 주는 처분에는 이유를 남긴다.** 정지된 가맹점이 왜 정지됐는지 아무도
+ * 모르는 상태가 되면 안 되고, 반려도 마찬가지다 — 이유 없이 되돌리면 같은 신청이
+ * 그대로 다시 들어온다(상품 검수와 같은 이유다).
+ *
+ * **계약과 화면이 같은 것을 두 번 적고 있었다.** 계약의 refine 과 운영 화면의
+ * `needsReason` 이 각자 `SUSPENDED · TERMINATED` 를 적어 두었다. 값이 같아서
+ * 조용했지만, 상태가 하나 늘 때 한쪽만 고치면 화면은 사유를 안 받고 서버가 튕긴다.
+ */
+export const merchantStatusNeedsReason = (status: MerchantStatus): boolean =>
+  status === 'REJECTED' || status === 'SUSPENDED' || status === 'TERMINATED';
+
+/**
+ * 지금 상태에서 갈 수 있는 곳.
+ *
+ * **반려는 승인 대기에서만 간다.** 장사를 하던 가맹점을 "반려" 하는 것은 말이 안
+ * 된다 — 그건 해지다. 반대로 한 번도 승인된 적 없는 신청을 해지라고 적으면 나중에
+ * 둘을 가릴 수 없다.
+ *
+ * 끝난 상태(해지·반려)에서는 아무 데도 가지 않는다. 다시 들어오려면 새로 신청하고,
+ * 그러면 새 줄이 생긴다 — 끝난 줄을 되살리면 그때의 판단이 지워진다.
+ */
+export function nextMerchantStatuses(current: MerchantStatus): readonly MerchantStatus[] {
+  if (CLOSED_STATUS.includes(current)) return [];
+  if (current === 'PENDING') return ['APPROVED', 'REJECTED'];
+  return ['APPROVED', 'SUSPENDED', 'TERMINATED'];
+}
+
+export const canMoveMerchantTo = (current: MerchantStatus, next: MerchantStatus): boolean =>
+  nextMerchantStatuses(current).includes(next);
 
 export const MERCHANT_APPLICATION_ERROR = {
   ALREADY_MERCHANT: '이미 가맹점 계정입니다.',

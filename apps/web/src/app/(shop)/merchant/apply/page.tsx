@@ -92,12 +92,30 @@ export default async function MerchantApplyPage() {
         </section>
       ) : (
         <>
+          {/*
+            **반려와 해지를 가려 말한다.** 한동안 반려라는 상태가 없어서 해지를
+            대신 썼고, 그래서 이 안내(merch.rejected)가 해지에 붙어 있었다.
+            지금은 둘이 갈렸고, 반려에는 **무엇을 고쳐야 하는지**까지 적는다 —
+            그러라고 심사에서 사유를 받는다.
+          */}
+          {application?.status === 'REJECTED' && (
+            <div
+              role="status"
+              className="mb-6 flex flex-col gap-1.5 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px]"
+            >
+              <p>{t('merch.rejected')}</p>
+              {application.rejectionReason && (
+                <p className="text-[var(--fg-secondary)]">{application.rejectionReason}</p>
+              )}
+            </div>
+          )}
+
           {application?.status === 'TERMINATED' && (
             <p
               role="status"
               className="mb-6 rounded-sm border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[13px]"
             >
-              {t('merch.rejected')}
+              {t('merch.terminated')}
             </p>
           )}
           <MerchantApplyForm defaultEmail={session.email} />

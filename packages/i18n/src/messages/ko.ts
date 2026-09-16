@@ -749,6 +749,7 @@ export const ko = {
   'merch.merchantConsole': '가맹점 화면',
   'merch.approvedTail': '을 쓰실 수 있습니다.',
   'merch.rejected': '지난 신청은 반려되었습니다. 내용을 고쳐 다시 신청하실 수 있습니다.',
+  'merch.terminated': '지난 입점은 해지되었습니다. 다시 신청하실 수 있습니다.',
 
   'offline.heading': '연결할 수 없습니다',
   'offline.note': '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
@@ -1159,6 +1160,8 @@ export const ko = {
   'notif.STOCK_LOW': '{productName} · {optionLabel} 재고가 {stock}개 남았습니다',
   'notif.PRODUCT_APPROVED': '{productName} 검수를 통과했습니다 — 매대에 올라갔습니다',
   'notif.PRODUCT_REJECTED': '{productName} 검수에서 되돌아왔습니다 — {reason}',
+  'notif.MERCHANT_APPROVED': '{merchantName} 입점이 승인되었습니다 — 이제 상품을 올릴 수 있습니다',
+  'notif.MERCHANT_REJECTED': '{merchantName} 입점 신청이 반려되었습니다 — {reason}',
   'notif.REVIEW_REPLIED': '{productName} 리뷰에 판매자가 답글을 남겼습니다.',
 } as const satisfies Record<string, Message>;
 

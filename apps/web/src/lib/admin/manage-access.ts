@@ -1,7 +1,11 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, canAssignRole, canEditUser, canSuspendUser, type Actor, type UserRole } from '@shop/core';
+import {
+  assertPermission, canAssignRole, canEditUser, canSuspendUser, canMoveMerchantTo,
+  type Actor, type UserRole,
+} from '@shop/core';
 import { activateApprovedMerchant } from '~/lib/merchant/apply';
+import { notifyMerchantDecision } from '~/lib/notifications/merchant-decision';
 import {
   ADMIN_ERROR_MESSAGE,
   type AdminErrorCode,
@@ -57,6 +61,15 @@ export async function updateMerchantStatus(
   if (!before) throw new AccessError('MERCHANT_NOT_FOUND', 404);
 
   /*
+   * **갈 수 있는 곳인가.** 장사하던 가맹점을 "반려" 하면 나중에 읽는 사람이 이
+   * 가맹점이 들어온 적이 있는지 없는지 가릴 수 없고, 끝난 줄(해지·반려)을
+   * 되살리면 그때의 판단이 지워진다. 화면도 안 보여 주지만 화면만 믿지 않는다.
+   */
+  if (before.status !== input.status && !canMoveMerchantTo(before.status, input.status)) {
+    throw new AccessError('MERCHANT_STATUS_NOT_ALLOWED', 409);
+  }
+
+  /*
    * **최초 승인일은 비어 있을 때만 찍는다 — 쓰는 순간에 확인한다.**
    *
    * 읽어 온 approvedAt 으로 판단하면, 두 사람이 동시에 승인할 때 둘 다
@@ -74,7 +87,16 @@ export async function updateMerchantStatus(
     }
     return tx.merchant.update({
       where: { id: merchantId },
-      data: { status: input.status },
+      /*
+       * **반려 사유는 행에 남긴다.** 알림에는 한 줄에 들어갈 만큼만 줄여 싣고,
+       * 전문은 신청 화면이 보여 준다 — 무엇을 고쳐 다시 낼지 알아야 한다.
+       * 반려가 아닌 처분에서는 지운다: 지난 반려의 이유가 정상 가맹점 화면에
+       * 남아 있으면 지금 상태를 잘못 읽는다.
+       */
+      data: {
+        status: input.status,
+        rejectionReason: input.status === 'REJECTED' ? input.reason : null,
+      },
       select: { id: true, name: true, status: true, approvedAt: true },
     });
   });
@@ -89,6 +111,18 @@ export async function updateMerchantStatus(
   if (input.status === 'APPROVED') {
     await activateApprovedMerchant(merchantId);
   }
+
+  /*
+   * **결과를 신청한 사람에게 알린다.** 승인은 계정과 브랜드까지 만들어 주면서
+   * 아무 말도 안 했고, 반려 사유는 감사 로그에만 남아 신청자에게 닿지 않았다.
+   * 트랜잭션 밖이고 스스로 실패를 삼킨다 — 알림이 안 갔다고 처분을 무를 일이 아니다.
+   */
+  await notifyMerchantDecision({
+    merchantId,
+    merchantName: after.name,
+    status: after.status,
+    reason: input.reason,
+  });
 
   return { before, after };
 }

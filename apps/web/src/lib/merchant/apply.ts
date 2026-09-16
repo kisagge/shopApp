@@ -27,6 +27,8 @@ export interface ApplicationView {
   readonly status: MerchantStatus;
   readonly createdAt: Date;
   readonly approvedAt: Date | null;
+  /** 반려 사유. 반려가 아니면 null — 지난 반려의 이유가 남아 있으면 지금 상태를 잘못 읽는다 */
+  readonly rejectionReason: string | null;
 }
 
 /** 내가 낸 신청. 없으면 null. */
@@ -36,7 +38,7 @@ export async function getMyApplication(userId: string): Promise<ApplicationView 
     orderBy: { createdAt: 'desc' },
     select: {
       id: true, name: true, brandName: true, status: true,
-      createdAt: true, approvedAt: true,
+      createdAt: true, approvedAt: true, rejectionReason: true,
     },
   });
 }
@@ -94,7 +96,7 @@ export async function applyForMerchant(
     },
     select: {
       id: true, name: true, brandName: true, status: true,
-      createdAt: true, approvedAt: true,
+      createdAt: true, approvedAt: true, rejectionReason: true,
     },
   });
 }

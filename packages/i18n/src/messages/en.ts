@@ -725,6 +725,7 @@ export const en: Dictionary = {
   'merch.merchantConsole': 'merchant console',
   'merch.approvedTail': '.',
   'merch.rejected': 'Your last application was declined. You can revise it and apply again.',
+  'merch.terminated': 'Your previous store was closed. You can apply again.',
 
   'offline.heading': 'You are offline',
   'offline.note': 'Check your connection and try again.',
@@ -1129,5 +1130,7 @@ export const en: Dictionary = {
   'notif.STOCK_LOW': 'Low stock: {productName} · {optionLabel} has {stock} left',
   'notif.PRODUCT_APPROVED': '{productName} passed review and is now live',
   'notif.PRODUCT_REJECTED': '{productName} was sent back from review — {reason}',
+  'notif.MERCHANT_APPROVED': '{merchantName} was approved — you can list products now',
+  'notif.MERCHANT_REJECTED': '{merchantName} application was declined — {reason}',
   'notif.REVIEW_REPLIED': 'The seller replied to your review of {productName}.',
 };

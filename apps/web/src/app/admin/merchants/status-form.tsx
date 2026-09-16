@@ -3,7 +3,9 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-import { MERCHANT_STATUS, MERCHANT_STATUS_LABEL } from '@shop/core';
+import {
+  MERCHANT_STATUS_LABEL, merchantStatusNeedsReason, nextMerchantStatuses,
+} from '@shop/core';
 import type { MerchantStatusInput } from '@shop/contract';
 
 /**
@@ -29,7 +31,15 @@ export function MerchantStatusForm({
 
   const statusId = useId();
   const reasonId = useId();
-  const needsReason = next === 'SUSPENDED' || next === 'TERMINATED';
+  // 규칙은 core 가 쥔다 — 계약의 refine 과 같은 것을 두 번 적지 않는다
+  const needsReason = merchantStatusNeedsReason(next);
+
+  /*
+   * **갈 수 없는 곳은 아예 안 보여 준다.** 장사하던 가맹점을 "반려" 하는 것은 말이
+   * 안 되고(그건 해지다), 끝난 줄은 되살리지 않는다. 고를 수 있게 두고 서버가
+   * 튕기면, 누른 사람은 자기가 무엇을 잘못했는지 모른다.
+   */
+  const choices = [...new Set([status, ...nextMerchantStatuses(status)])];
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -67,7 +77,7 @@ export function MerchantStatusForm({
           onChange={(e) => setNext(e.target.value as MerchantStatusInput)}
           className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
         >
-          {MERCHANT_STATUS.map((s) => (
+          {choices.map((s) => (
             <option key={s} value={s}>{MERCHANT_STATUS_LABEL[s]}</option>
           ))}
         </select>

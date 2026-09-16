@@ -167,6 +167,9 @@ model Address {
 enum MerchantStatus {
   PENDING
   APPROVED
+  /// 심사에서 되돌린 것. 해지(TERMINATED)와 다르다 — 한 번도 장사한 적이 없다.
+  /// 둘 다 다시 신청할 수 있다(core OPEN_MERCHANT_STATUS).
+  REJECTED
   SUSPENDED
   TERMINATED
 }
@@ -175,6 +178,10 @@ model Merchant {
   id     String         @id @default(cuid())
   name   String         @unique
   status MerchantStatus @default(PENDING)
+
+  /// 반려 사유. 알림에는 줄여 싣고 전문은 여기 둔다 — 신청 화면이 이것을 보여 준다.
+  /// 상품 검수의 publishRejection 과 같은 결이다.
+  rejectionReason String?
 
   // ── 사업자 정보
   businessName   String
@@ -1745,6 +1752,10 @@ enum NotificationKind {
   PRODUCT_APPROVED
   /// 올린 상품이 되돌아왔다. 사유를 함께 싣는다 — 운영 알림함에만 뜬다
   PRODUCT_REJECTED
+  /// 입점 신청이 승인됐다 — 매장 알림함에 뜬다(신청은 매장에서 했다)
+  MERCHANT_APPROVED
+  /// 입점 신청이 반려됐다. 사유를 함께 싣는다 — 반려된 사람에게는 운영 화면이 없다
+  MERCHANT_REJECTED
   /// 내 리뷰에 판매자가 답했다
   REVIEW_REPLIED
   /// 교환한 상품을 보냈다

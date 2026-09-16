@@ -721,6 +721,7 @@ export const ja: Dictionary = {
   'merch.merchantConsole': '加盟店画面',
   'merch.approvedTail': 'をご利用いただけます。',
   'merch.rejected': '前回の申請は却下されました。内容を修正して再度申請できます。',
+  'merch.terminated': '前回の出店は終了しました。再度申請できます。',
 
   'offline.heading': '接続できません',
   'offline.note': 'ネットワークの状態をご確認のうえ、もう一度お試しください。',
@@ -1125,5 +1126,7 @@ export const ja: Dictionary = {
   'notif.STOCK_LOW': '{productName} · {optionLabel} の在庫が残り{stock}点です',
   'notif.PRODUCT_APPROVED': '{productName} の審査を通過し、公開されました',
   'notif.PRODUCT_REJECTED': '{productName} の審査で差し戻されました — {reason}',
+  'notif.MERCHANT_APPROVED': '{merchantName} の出店が承認されました — 商品を登録できます',
+  'notif.MERCHANT_REJECTED': '{merchantName} の出店申請が却下されました — {reason}',
   'notif.REVIEW_REPLIED': '{productName} のレビューに販売者が返信しました。',
 };
