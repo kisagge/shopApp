@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminInquiries } from '~/lib/queries/inquiries';
 import { InquiryAnswerForm } from '~/components/admin/inquiry-answer-form';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 
 /** 문의함 한 쪽 크기. 조회의 ADMIN_INQUIRY_PAGE_SIZE 와 같아야 쪽 수가 맞는다 */
 const INQUIRY_PAGE_SIZE = 25;

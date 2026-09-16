@@ -7,7 +7,7 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin/orders';
 import { ORDER_STATUS } from '@shop/core';
 import { isOrderStatus } from '~/lib/queries/mypage';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 import { OrderBulkActions } from './order-bulk-actions';
 

@@ -3,7 +3,8 @@ import Link from 'next/link';
 import { formatDateTime } from '@shop/i18n';
 import { LOW_STOCK_THRESHOLD } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getMyNotifications } from '~/lib/queries/notifications';
+import { getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
+import { PageNav } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
 import { getNotificationTemplates } from '~/lib/notifications/templates';
@@ -22,14 +23,23 @@ export const dynamic = 'force-dynamic';
  * 지금은 재고 부족 하나뿐이다. 대시보드에도 "재고 부족" 이 뜨지만 **열어야
  * 안다** — 품절은 곧바로 매출 손실이고, 재입고에는 며칠이 걸린다.
  */
-export default async function AdminNotificationsPage() {
+export default async function AdminNotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const actor = await requireAdmin('admin:access');
 
-  const [items, locale, t] = await Promise.all([
-    getMyNotifications(actor.id, 'console'),
+  const { page: pageParam } = await searchParams;
+  // 범위를 벗어난 값은 core 가 당긴다(pageNav). 여기서는 숫자로만 만든다.
+  const page = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
+
+  const [notifications, locale, t] = await Promise.all([
+    getMyNotifications(actor.id, 'console', page),
     getLocale(),
     getT(),
   ]);
+  const items = notifications.rows;
   // 운영이 고친 문구. 이미 온 알림도 이것으로 읽힌다 — 알림에는 문장이 아니라 값만 저장한다
   const templates = await getNotificationTemplates(locale);
   const hadUnread = items.some((n) => n.unread);
@@ -112,6 +122,17 @@ export default async function AdminNotificationsPage() {
             })}
           </ul>
         )}
+
+        {/* 서른 개 뒤로 갈 길이 없었다 — 운영 목록과 같은 셈법을 쓴다 */}
+        <PageNav
+          page={page}
+          total={notifications.total}
+          pageSize={NOTIFICATION_PAGE_SIZE}
+          hrefOf={(n) => ({
+            pathname: '/admin/notifications',
+            ...(n === 1 ? {} : { query: { page: String(n) } }),
+          })}
+        />
       </div>
     </>
   );

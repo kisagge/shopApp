@@ -8,7 +8,7 @@ import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin/merchan
 import { RoleForm } from './role-form';
 import { SuspendForm } from './suspend-form';
 import { suspendBlocked } from './suspend-blocked';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 
 /** 회원 목록의 한 쪽 크기. 조회 기본값과 같아야 쪽 수가 맞는다 */
 const USER_PAGE_SIZE = 25;

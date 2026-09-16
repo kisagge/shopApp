@@ -8,7 +8,7 @@ import { getReturnQueue, isReturnQueueView, RETURN_QUEUE_VIEW, type ReturnQueueV
 import { RETURN_REASON_KEY, RETURN_TYPE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { getReturnAddress } from '~/lib/orders/return-address';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 
 export const metadata: Metadata = { title: '반품·교환' };

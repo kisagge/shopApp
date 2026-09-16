@@ -25,6 +25,8 @@ export type AuditTargetType =
   | 'error_group'
   /** 알림 문구 템플릿. id 는 '<종류>:<말>' */
   | 'notification_template'
+  /** 알림함의 행 — 보존 기간이 지나 지운 것. id 는 'retention' */
+  | 'notification'
   /** 메일 문구 템플릿. id 는 '<종류>:<말>' */
   | 'mail_template'
   /*

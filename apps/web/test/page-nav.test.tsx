@@ -2,7 +2,7 @@
 import { render, screen } from './render';
 import { describe, it, expect } from 'vitest';
 
-const { PageNav } = await import('~/app/admin/page-nav');
+const { PageNav } = await import('~/components/page-nav');
 
 /**
  * 쪽 번호 — « ‹ 1 2 3 4 5 › »

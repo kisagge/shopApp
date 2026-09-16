@@ -3,7 +3,8 @@ import { getViewer } from '~/lib/viewer';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { redirect } from 'next/navigation';
 import { formatDateTime } from '@shop/i18n';
-import { getMyNotifications } from '~/lib/queries/notifications';
+import { getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
+import { PageNav } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
 import { getNotificationTemplates } from '~/lib/notifications/templates';
@@ -16,15 +17,24 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT())('notif.heading'), ...NO_INDEX };
 }
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/notifications');
 
-  const [items, locale, t] = await Promise.all([
-    getMyNotifications(user.id),
+  const { page: pageParam } = await searchParams;
+  // 범위를 벗어난 값은 core 가 당긴다(pageNav). 여기서는 숫자로만 만든다.
+  const page = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
+
+  const [notifications, locale, t] = await Promise.all([
+    getMyNotifications(user.id, 'customer', page),
     getLocale(),
     getT(),
   ]);
+  const items = notifications.rows;
   // 운영이 고친 문구. 이미 온 알림도 이것으로 읽힌다 — 알림에는 문장이 아니라 값만 저장한다
   const templates = await getNotificationTemplates(locale);
 
@@ -100,6 +110,21 @@ export default async function NotificationsPage() {
           })}
         </ul>
       )}
+
+      {/*
+        **서른한 번째 알림은 볼 길이 없었다.** 서른 개를 잘라 오고 그게 끝이라,
+        그 아래는 주소로도 못 갔다 — 알림은 지워지지도 않으니 쌓이기만 했다.
+        운영 목록과 같은 셈법을 쓴다(core 의 pagination).
+      */}
+      <PageNav
+        page={page}
+        total={notifications.total}
+        pageSize={NOTIFICATION_PAGE_SIZE}
+        hrefOf={(n) => ({
+          pathname: '/mypage/notifications',
+          ...(n === 1 ? {} : { query: { page: String(n) } }),
+        })}
+      />
     </div>
   );
 }

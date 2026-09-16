@@ -9,7 +9,7 @@ import {
 } from '~/lib/queries/admin-reviews';
 import { ReviewModeration } from '~/components/admin/review-moderation';
 import { ReviewReplyForm } from '~/components/admin/review-reply-form';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 
 /** 리뷰 목록 한 쪽 크기. 조회의 PAGE_SIZE 와 같아야 쪽 수가 맞는다 */
 const REVIEW_PAGE_SIZE = 25;

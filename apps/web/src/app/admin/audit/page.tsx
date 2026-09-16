@@ -5,7 +5,7 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAuditLogs, type AuditLogPage } from '~/lib/queries/audit-log';
 import { actionLabel as labelOf, targetLabel } from '~/lib/admin/audit-labels';
 import { AuditExport } from './audit-export';
-import { PageNav } from '../page-nav';
+import { PageNav } from '~/components/page-nav';
 
 /** 감사 로그 한 쪽 크기. 조회 기본값과 같아야 쪽 수가 맞는다 */
 const AUDIT_PAGE_SIZE = 25;
