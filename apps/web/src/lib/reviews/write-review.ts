@@ -3,8 +3,8 @@ import { prisma } from '@shop/db';
 import { discardReviewImages } from './images';
 import { grantReviewReward } from './reward';
 import {
-  ImageError, isReviewableStatus, planReviewImages, ratingScore, reviewChanged,
-  REVIEW_ERROR_MESSAGE, type ReviewErrorCode,
+  ImageError, canWriteReview, isReviewableStatus, planReviewImages, ratingScore, reviewChanged,
+  REVIEW_ERROR_MESSAGE, type Actor, type ReviewErrorCode,
 } from '@shop/core';
 import type { CreateReviewInput, UpdateReviewInput } from '@shop/contract';
 
@@ -74,9 +74,16 @@ async function recountRating(tx: typeof prisma, productId: string): Promise<void
  * 도는 것이 파일이 남는 것보다 낫다.
  */
 export async function assertCanReview(
-  userId: string,
+  actor: Actor,
   orderItemId: string,
 ): Promise<{ productId: string }> {
+  /*
+   * **파는 사람의 계정인가를 먼저 본다.** 주문을 읽기도 전에 끝나는 판단이고,
+   * 사진을 올리기 전에 걸러야 하는 것도 이쪽이 먼저다. 왜 막는지는 core 의
+   * canWriteReview 에 적었다.
+   */
+  if (!canWriteReview(actor)) throw new ReviewError('SELLER_CANNOT_REVIEW', 403);
+
   const item = await prisma.orderItem.findUnique({
     where: { id: orderItemId },
     select: {
@@ -91,7 +98,7 @@ export async function assertCanReview(
 
   if (!item) throw new ReviewError('NOT_PURCHASED', 404);
   // 남의 주문 항목 id 를 알아내도 쓸 수 없다
-  if (item.order.userId !== userId) throw new ReviewError('NOT_PURCHASED', 403);
+  if (item.order.userId !== actor.id) throw new ReviewError('NOT_PURCHASED', 403);
   if (!isReviewableStatus(item.order.status)) {
     throw new ReviewError('NOT_DELIVERED', 409);
   }
@@ -109,7 +116,7 @@ export async function assertCanReview(
 }
 
 export async function createReview(
-  userId: string,
+  actor: Actor,
   input: CreateReviewInput,
   /**
    * 이미 올라간 사진. 자격 검사를 통과한 뒤에 올린 것만 들어온다.
@@ -119,7 +126,8 @@ export async function createReview(
    */
   images: readonly { url: string; key: string; blurDataUrl: string | null }[] = [],
 ): Promise<ReviewRow & { earnedPoints: number }> {
-  const { productId } = await assertCanReview(userId, input.orderItemId);
+  const { productId } = await assertCanReview(actor, input.orderItemId);
+  const userId = actor.id;
 
   return prisma.$transaction(async (tx) => {
     const review = await tx.review.create({

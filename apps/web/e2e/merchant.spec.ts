@@ -28,6 +28,21 @@ test('쿠폰은 플랫폼 비용이라 가맹점이 만들지 않는다', async 
   expect(new URL(page.url()).pathname).not.toBe('/admin/coupons');
 });
 
+test('가맹점 계정으로는 리뷰를 쓸 수 없고, 화면이 그 까닭을 말한다', async ({ page }) => {
+  /*
+   * `review:write` 는 처음부터 가맹점에게 주지 않았는데 **어디서도 검사하지
+   * 않았다.** 가맹점이 자기 상품을 사서 자기가 별 다섯을 쓰면 그 별점이 상품
+   * 정렬 점수로 곧장 들어가고, 리뷰 적립금까지 자기가 받는다.
+   *
+   * 막는 것만으로는 부족하다. 목록이 그냥 비면 "쓸 것이 없다" 로 읽혀 고장처럼
+   * 보인다 — 왜 안 되는지를 화면이 말해야 한다.
+   */
+  await page.goto('/mypage/reviews');
+
+  await expect(page.getByText('판매자 계정으로는 리뷰를 쓸 수 없습니다')).toBeVisible();
+  await expect(page.getByRole('button', { name: '리뷰 등록' })).toHaveCount(0);
+});
+
 test('가맹점은 자기 상품의 평을 읽되 내리지는 못한다', async ({ page }) => {
   /*
    * **한동안 아예 못 들어왔다.** 그때 여기 적어 둔 이유는 "자기 상품의 혹평을

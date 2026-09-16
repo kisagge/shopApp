@@ -3,7 +3,7 @@ import { getViewer } from '~/lib/viewer';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
-import { REVIEW_REWARD } from '@shop/core';
+import { REVIEW_REWARD, canWriteReview } from '@shop/core';
 import { formatNumber } from '@shop/i18n';
 import { getMyReviews, getReviewableItems } from '~/lib/queries/reviews';
 import { ReviewForm } from './review-form';
@@ -34,7 +34,7 @@ export default async function MyReviewsPage({
   if (!user) redirect('/login?next=/mypage/reviews');
 
   const [items, mine, t, params] = await Promise.all([
-    getReviewableItems(user.id),
+    getReviewableItems(user),
     getMyReviews(user.id),
     getT(),
     searchParams,
@@ -89,7 +89,12 @@ export default async function MyReviewsPage({
 
         {items.length === 0 ? (
           <p className="py-14 text-center text-[13px] text-[var(--fg-muted)]">
-            {t('my.reviewNone')}
+            {/*
+              **없는 것과 못 쓰는 것을 가른다.** 파는 사람 계정에는 배송이 끝난 주문이
+              있어도 목록이 비는데, 거기에 "쓸 리뷰가 없습니다" 를 띄우면 화면이 거짓을
+              말한다 — 왜 안 보이는지 알 길이 없어 고장으로 읽힌다.
+            */}
+            {canWriteReview(user) ? t('my.reviewNone') : t('my.reviewSellerAccount')}
           </p>
         ) : (
           <ul className="flex flex-col gap-8">

@@ -367,6 +367,7 @@ export const ja: Dictionary = {
 
   'my.reviewLead': '配送が完了した商品にレビューを書けます。',
   'my.reviewNone': '今レビューを書ける商品がありません。',
+  'my.reviewSellerAccount': '販売者アカウントではレビューを書けません。お客様として購入された場合は個人アカウントをご利用ください。',
   'my.reviews': 'マイレビュー',
   'my.reviewToWrite': 'レビューできる商品',
   'my.reviewsWritten': '書いたレビュー',

@@ -3,7 +3,8 @@ import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import {
   gradeProgress, won, ORDER_STATUS, expiringSoonAmount, pointExpirySchedule, REVIEWABLE_STATUS,
-  type PointExpiryDay,
+  canWriteReview,
+  type Actor, type PointExpiryDay,
   type DateRange, type MemberGrade, type MyOrderSearchTerm, type OrderStatus, type Won,
 } from '@shop/core';
 
@@ -26,7 +27,8 @@ export interface MyPageSummary {
   readonly marketingOptIn: boolean;
 }
 
-export async function getMyPageSummary(userId: string): Promise<MyPageSummary | null> {
+export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | null> {
+  const userId = actor.id;
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { name: true, email: true, grade: true, pointBalance: true, marketingAgreedAt: true },
@@ -50,15 +52,22 @@ export async function getMyPageSummary(userId: string): Promise<MyPageSummary | 
     }),
     prisma.userCoupon.count({ where: { userId, usedAt: null, expiresAt: { gt: now } } }),
     prisma.wishlistItem.count({ where: { userId } }),
-    // 배송완료됐는데 아직 리뷰를 안 쓴 항목
-    prisma.orderItem.count({
-      where: {
-        order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
-        review: null,
-        // 취소·반품된 줄은 셈에서 뺀다 — 목록(getReviewableItems)과 같은 조건이어야 숫자가 맞는다
-        canceledAt: null,
-      },
-    }),
+    /*
+     * 배송완료됐는데 아직 리뷰를 안 쓴 항목.
+     *
+     * **파는 사람에게는 세지 않는다.** 목록(getReviewableItems)과 같은 조건이어야
+     * 숫자가 맞는데, 그 목록은 파는 사람에게 비어 있다 — 뱃지에 3 이 떠서 들어가면
+     * 아무것도 없는 화면을 만난다. 취소·반품된 줄을 빼는 것도 같은 이유다.
+     */
+    canWriteReview(actor)
+      ? prisma.orderItem.count({
+        where: {
+          order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
+          review: null,
+          canceledAt: null,
+        },
+      })
+      : 0,
   ]);
 
   const statusCounts = Object.fromEntries(

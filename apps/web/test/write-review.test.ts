@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { REVIEW_REWARD } from '@shop/core';
+import { REVIEW_REWARD, type Actor } from '@shop/core';
 
 const tx = vi.hoisted(() => ({
   review: {
@@ -38,6 +38,8 @@ const { createReview, updateReview, deleteReview, restoreReview } =
   await import('~/lib/reviews/write-review');
 
 const USER = 'u-buyer';
+/** 리뷰를 쓰는 사람 — 손님 계정이다. 파는 사람은 쓰지 못한다(canWriteReview) */
+const BUYER: Actor = { id: USER, role: 'CUSTOMER', merchantId: null };
 const input = {
   orderItemId: 'oi-1', rating: 5, content: '아주 좋습니다 정말로요',
   sizeFit: 'TRUE' as const, height: 175, weight: 70,
@@ -61,14 +63,44 @@ beforeEach(() => {
   tx.pointTransaction.aggregate.mockResolvedValue({ _sum: { amount: null } });
 });
 
+describe('파는 사람은 쓰지 못한다', () => {
+  /** 가맹점 담당자. 자기 상품을 사서 배송까지 받았다 */
+  const seller: Actor = { id: USER, role: 'MERCHANT', merchantId: 'm-a' };
+
+  it('가맹점 계정은 자기가 산 것에도 못 쓴다', async () => {
+    /*
+     * 별점은 상품 정렬 점수로 곧장 들어가고 리뷰 적립금까지 따라온다 — 자기 상품을
+     * 사서 자기가 별 다섯을 주면 매대의 차례를 스스로 바꾼다.
+     */
+    await expect(createReview(seller, input)).rejects.toMatchObject({
+      code: 'SELLER_CANNOT_REVIEW', status: 403,
+    });
+    expect(tx.review.create).not.toHaveBeenCalled();
+  });
+
+  it('주문을 읽기도 전에 끝난다 — 사진이 저장소에 남지 않는다', async () => {
+    /*
+     * 자격 검사는 사진을 올리기 전에 돈다(창구가 assertCanReview 를 먼저 부른다).
+     * 이 판단이 주문 조회보다 뒤에 있으면 헛일을 한 뒤에 막는 셈이다.
+     */
+    await expect(createReview(seller, input)).rejects.toThrow();
+    expect(db.orderItem.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('적립금도 나가지 않는다', async () => {
+    await expect(createReview(seller, input)).rejects.toThrow();
+    expect(tx.pointTransaction.create).not.toHaveBeenCalled();
+  });
+});
+
 describe('구매 확인', () => {
   it('산 사람은 쓸 수 있다', async () => {
-    await expect(createReview(USER, input)).resolves.toMatchObject({ id: 'r-1' });
+    await expect(createReview(BUYER, input)).resolves.toMatchObject({ id: 'r-1' });
   });
 
   it('남의 주문 항목 id 를 알아내도 쓸 수 없다', async () => {
     db.orderItem.findUnique.mockResolvedValue(item({ order: { userId: 'u-other', status: 'DELIVERED' } }));
-    await expect(createReview(USER, input)).rejects.toMatchObject({
+    await expect(createReview(BUYER, input)).rejects.toMatchObject({
       code: 'NOT_PURCHASED', status: 403,
     });
     expect(db.$transaction).not.toHaveBeenCalled();
@@ -76,7 +108,7 @@ describe('구매 확인', () => {
 
   it('없는 주문 항목이면 404', async () => {
     db.orderItem.findUnique.mockResolvedValue(null);
-    await expect(createReview(USER, input)).rejects.toMatchObject({ status: 404 });
+    await expect(createReview(BUYER, input)).rejects.toMatchObject({ status: 404 });
   });
 });
 
@@ -86,13 +118,13 @@ describe('배송 완료 확인', () => {
     async (status) => {
       // 받지도 않은 물건의 후기는 상품이 아니라 기대에 대한 것이다
       db.orderItem.findUnique.mockResolvedValue(item({ order: { userId: USER, status } }));
-      await expect(createReview(USER, input)).rejects.toMatchObject({ code: 'NOT_DELIVERED' });
+      await expect(createReview(BUYER, input)).rejects.toMatchObject({ code: 'NOT_DELIVERED' });
     },
   );
 
   it('구매확정 뒤에도 쓸 수 있다', async () => {
     db.orderItem.findUnique.mockResolvedValue(item({ order: { userId: USER, status: 'CONFIRMED' } }));
-    await expect(createReview(USER, input)).resolves.toBeDefined();
+    await expect(createReview(BUYER, input)).resolves.toBeDefined();
   });
 
   it('주문이 배송완료여도 반품·취소로 돈이 돌아간 줄에는 쓸 수 없다', async () => {
@@ -101,14 +133,14 @@ describe('배송 완료 확인', () => {
      * 니트에 후기가 붙으면 산 사람의 후기가 아니다. id 를 알고 직접 보내는 요청도 막는다.
      */
     db.orderItem.findUnique.mockResolvedValue(item({ canceledAt: new Date('2026-09-12') }));
-    await expect(createReview(USER, input)).rejects.toMatchObject({ code: 'NOT_PURCHASED' });
+    await expect(createReview(BUYER, input)).rejects.toMatchObject({ code: 'NOT_PURCHASED' });
   });
 });
 
 describe('중복 방지', () => {
   it('같은 주문 항목에 두 번 쓸 수 없다', async () => {
     db.orderItem.findUnique.mockResolvedValue(item({ review: { id: 'r-old' } }));
-    await expect(createReview(USER, input)).rejects.toMatchObject({
+    await expect(createReview(BUYER, input)).rejects.toMatchObject({
       code: 'ALREADY_REVIEWED', status: 409,
     });
   });
@@ -118,14 +150,14 @@ describe('평점 집계', () => {
   it('증감이 아니라 원본을 다시 센다', async () => {
     // 증감은 한 번 어긋나면 스스로 알아채지 못한다.
     // 포인트 잔액에서 이미 겪은 문제다.
-    await createReview(USER, input);
+    await createReview(BUYER, input);
     expect(tx.review.aggregate).toHaveBeenCalledWith(
       expect.objectContaining({ where: { productId: 'p-1', deletedAt: null } }),
     );
   });
 
   it('세 값을 함께 갱신한다', async () => {
-    await createReview(USER, input);
+    await createReview(BUYER, input);
     // 9 / 2 = 4.5 → 450
     expect(tx.product.update.mock.calls[0]?.[0].data).toEqual({
       ratingSum: 9, reviewCount: 2, ratingScore: 450,
@@ -148,7 +180,7 @@ describe('평점 집계', () => {
   });
 
   it('리뷰 쓰기와 같은 트랜잭션에서 돈다', async () => {
-    await createReview(USER, input);
+    await createReview(BUYER, input);
     expect(db.$transaction).toHaveBeenCalledOnce();
   });
 });
@@ -254,7 +286,7 @@ describe('삭제', () => {
 
 describe('리뷰 사진', () => {
   it('올린 주소와 키를 함께 저장한다', async () => {
-    await createReview(USER, input, [
+    await createReview(BUYER, input, [
       { url: 'https://cdn.test/reviews/oi-1/a.png', key: 'reviews/oi-1/a.png', blurDataUrl: 'data:image/webp;base64,AAAA' },
       { url: 'https://cdn.test/reviews/oi-1/b.png', key: 'reviews/oi-1/b.png', blurDataUrl: null },
     ]);
@@ -287,7 +319,7 @@ describe('리뷰 사진', () => {
   });
 
   it('사진이 없으면 빈 배열로 남는다', async () => {
-    await createReview(USER, input);
+    await createReview(BUYER, input);
 
     expect(tx.review.create).toHaveBeenCalledWith(expect.objectContaining({
       data: expect.objectContaining({ images: { create: [] } }),
@@ -411,7 +443,7 @@ describe('수정할 때의 사진', () => {
 describe('리뷰 적립', () => {
   it('글이 올라가는 그 트랜잭션 안에서 나간다', async () => {
     // 밖에서 주면 글은 올라갔는데 적립이 실패하는 구간이 생긴다 — 아무도 모르는 채로
-    const written = await createReview(USER, input);
+    const written = await createReview(BUYER, input);
 
     expect(db.$transaction).toHaveBeenCalledOnce();
     expect(tx.pointTransaction.create.mock.calls[0]?.[0].data).toMatchObject({
@@ -421,7 +453,7 @@ describe('리뷰 적립', () => {
   });
 
   it('사진을 함께 올리면 더 준다', async () => {
-    const withPhoto = await createReview(USER, input, [
+    const withPhoto = await createReview(BUYER, input, [
       { url: 'https://cdn/a.webp', key: 'k-a', blurDataUrl: null },
     ]);
     const plain = tx.pointTransaction.create.mock.calls[0]?.[0].data.amount as number;

@@ -371,6 +371,7 @@ export const en: Dictionary = {
 
   'my.reviewLead': 'You can review anything that has been delivered.',
   'my.reviewNone': 'Nothing to review right now.',
+  'my.reviewSellerAccount': 'Seller accounts cannot write reviews. If you bought this as a shopper, please use your personal account.',
   'my.reviews': 'My reviews',
   'my.reviewToWrite': 'Waiting for a review',
   'my.reviewsWritten': 'Reviews you wrote',

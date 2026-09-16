@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
 import {
-  ratingBreakdown, sizeFitSummary, averageRating, isSizeFit, REVIEWABLE_STATUS, type SizeFit,
+  ratingBreakdown, sizeFitSummary, averageRating, isSizeFit, canWriteReview,
+  REVIEWABLE_STATUS, type Actor, type SizeFit,
 } from '@shop/core';
 import type { ReviewSort } from '@shop/contract';
 
@@ -308,11 +309,18 @@ export interface ReviewableItem {
   readonly deliveredAt: Date | null;
 }
 
-/** 리뷰를 쓸 수 있는 주문 항목 — 배송이 끝났고 아직 안 쓴 것 */
-export async function getReviewableItems(userId: string): Promise<ReviewableItem[]> {
+/**
+ * 리뷰를 쓸 수 있는 주문 항목 — 배송이 끝났고 아직 안 쓴 것.
+ *
+ * **파는 사람에게는 빈 목록이다.** 서버가 막는 것(assertCanReview)을 화면이 권하면,
+ * 폼을 채워 보내고 나서야 403 을 본다. 목록을 비우는 김에 조회도 하지 않는다.
+ */
+export async function getReviewableItems(actor: Actor): Promise<ReviewableItem[]> {
+  if (!canWriteReview(actor)) return [];
+
   const items = await prisma.orderItem.findMany({
     where: {
-      order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
+      order: { userId: actor.id, status: { in: [...REVIEWABLE_STATUS] } },
       review: null,
       /*
        * 돈이 돌아간 줄은 산 것이 아니다. 주문은 배송완료여도 그 줄은 출고 전에 취소됐거나 받은 뒤

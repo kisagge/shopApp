@@ -12,7 +12,7 @@ import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
 
-/** 리뷰 작성. 산 사람만, 배송이 끝난 뒤, 주문 항목당 하나. */
+/** 리뷰 작성. 산 사람만, 배송이 끝난 뒤, 주문 항목당 하나. 파는 사람의 계정은 쓰지 못한다(canWriteReview). */
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) {
@@ -51,11 +51,11 @@ export async function POST(request: Request): Promise<NextResponse> {
   let uploaded: UploadedImage[] = [];
   try {
     if (files.length > 0) {
-      await assertCanReview(user.id, parsed.data.orderItemId);
+      await assertCanReview(user, parsed.data.orderItemId);
       uploaded = await uploadReviewImages(parsed.data.orderItemId, files);
     }
 
-    const review = await createReview(user.id, parsed.data, uploaded);
+    const review = await createReview(user, parsed.data, uploaded);
     // 별점과 리뷰 수가 목록에도 나온다
     revalidateReviews();
     return NextResponse.json(review, { status: 201 });

@@ -20,7 +20,7 @@ export default async function PointsPage() {
   if (!session) redirect('/login?next=/mypage/points');
 
   const [summary, history, expiry, locale, t] = await Promise.all([
-    getMyPageSummary(session.id),
+    getMyPageSummary(session),
     getPointHistory(session.id),
     getPointExpiry(session.id),
     getLocale(),

@@ -24,7 +24,7 @@ export default async function MyPage() {
   if (!session) redirect('/login?next=/mypage');
 
   const [summary, recent, locale, t] = await Promise.all([
-    getMyPageSummary(session.id),
+    getMyPageSummary(session),
     getMyOrders(session.id, undefined, 1),
     getLocale(),
     getT(),

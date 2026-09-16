@@ -137,8 +137,27 @@ test('품절 옵션을 골라 재입고 알림을 걸면, 운영이 재고를 �
       }
       throw new Error(`옵션 ${value} 를 못 찾았다`);
     };
-    await pickByKeyboard(color!);
-    if (size) await pickByKeyboard(size);
+    /*
+     * **한 번 고르고 마는 대신 될 때까지 다시 고른다.**
+     *
+     * 품절 표시는 **이미 고른 다른 그룹과 조합해** 정해진다(product-options 의 availability) —
+     * 색을 고르기 전의 L 은 다른 색에 재고가 있으면 품절이 아니다. 그래서 색 고르기가
+     * 한 번 미끄러지면(새로 고친 직후 아직 React 가 붙기 전에 누르면 그 상태가 버려진다)
+     * 사이즈만 골라진 채 이름에 "품절" 이 안 붙고, 그 모습은 "재고를 0 으로 못 내렸다" 와
+     * 똑같이 보인다. 실제로 그렇게 한 번 졌다.
+     */
+    await expect.poll(async () => {
+      await pickByKeyboard(color!);
+      if (size) await pickByKeyboard(size);
+      const marked = await page
+        .getByRole('radio', { checked: true, name: new RegExp(`${size ?? color} 품절`) })
+        .count();
+      if (marked === 0) {
+        await page.reload();
+        await ready(page);
+      }
+      return marked;
+    }, { timeout: 20_000 }).toBe(1);
     await expect(page.getByRole('radio', { checked: true, name: new RegExp(`${size ?? color} 품절`) })).toBeFocused();
     await expect(page.getByRole('status').filter({ hasText: `${optionLabel} 은(는) 품절입니다.` })).toHaveCount(1);
     await expect(page.getByRole('button', { name: '장바구니 담기' })).toHaveCount(0);

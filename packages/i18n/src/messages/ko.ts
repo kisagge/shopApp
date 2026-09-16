@@ -384,6 +384,7 @@ export const ko = {
 
   'my.reviewLead': '배송이 완료된 상품에 후기를 남길 수 있습니다.',
   'my.reviewNone': '지금 리뷰를 쓸 수 있는 상품이 없습니다.',
+  'my.reviewSellerAccount': '판매자 계정으로는 리뷰를 쓸 수 없습니다. 손님으로 사신 것이라면 개인 계정으로 써 주세요.',
   'my.reviews': '내 리뷰',
   'my.reviewToWrite': '쓸 수 있는 상품',
   'my.reviewsWritten': '내가 쓴 리뷰',

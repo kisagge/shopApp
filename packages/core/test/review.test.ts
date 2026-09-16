@@ -1,8 +1,40 @@
 import { describe, it, expect } from 'vitest';
 import {
   averageRating, ratingScore, ratingBreakdown, sizeFitSummary,
-  isReviewableStatus, isSizeFit, planReviewImages, reviewChanged, RATING_MAX, RATING_MIN,
+  isReviewableStatus, isSizeFit, planReviewImages, reviewChanged, canWriteReview,
+  RATING_MAX, RATING_MIN,
 } from '../src/review';
+import type { Actor } from '../src/authz';
+
+describe('누가 리뷰를 쓰는가', () => {
+  const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
+  const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
+  const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
+  const superAdmin: Actor = { id: 'u-s', role: 'SUPER_ADMIN', merchantId: null };
+
+  it('손님은 쓴다', () => {
+    expect(canWriteReview(customer)).toBe(true);
+  });
+
+  it('파는 사람은 못 쓴다 — 자기 상품에 자기가 별을 주면 매대의 차례가 바뀐다', () => {
+    /*
+     * 별점은 상품 정렬 점수(ratingScore)로 곧장 들어가고, 리뷰 적립금까지 따라온다.
+     * `review:write` 는 처음부터 가맹점에게 주지 않았는데 **어디서도 검사하지 않아서**
+     * 실제로는 아무것도 막지 않았다 — 34개 권한 중 유일하게 강제 지점이 0이었다.
+     */
+    expect(canWriteReview(merchant)).toBe(false);
+  });
+
+  it('남의 브랜드도 마찬가지다 — 자기 상품만 가리지 않는다', () => {
+    // 파는 사람의 계정으로 쓴 평은 그것이 칭찬이든 혹평이든 무엇인지 확신할 수 없다
+    expect(canWriteReview({ ...merchant, merchantId: 'm-other' })).toBe(false);
+  });
+
+  it('운영진은 쓸 수 있다 — 권한 목록이 그렇게 정해 두었다', () => {
+    expect(canWriteReview(admin)).toBe(true);
+    expect(canWriteReview(superAdmin)).toBe(true);
+  });
+});
 
 describe('평균 평점', () => {
   it('리뷰가 없으면 undefined — 0.0 은 나쁜 상품처럼 보인다', () => {

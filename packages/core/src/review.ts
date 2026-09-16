@@ -1,9 +1,29 @@
 import type { OrderStatus } from './order-state';
 import { MAX_IMAGES_PER_REVIEW } from './image';
+import { hasPermission, type Actor } from './authz';
 
 /**
  * 리뷰 규칙. 순수 로직만.
  */
+
+/**
+ * 리뷰를 쓸 수 있는 사람인가.
+ *
+ * **파는 사람은 이 매대의 평을 쓰지 않는다.** `review:write` 는 처음부터 고객과
+ * 운영진에게만 줬는데(authz), **어디서도 검사하지 않았다** — 34개 권한 중 유일하게
+ * 강제 지점이 0인 권한이었다. 선언만 하고 연결하지 않으면 없는 규칙이다.
+ *
+ * 열어 두면 가맹점이 **자기 상품을 사서 자기가 별 다섯을 쓴다.** 그 별점은
+ * 상품 정렬 점수(ratingScore)로 곧장 들어가 매대의 차례를 바꾸고, 리뷰 적립금까지
+ * 자기가 받는다. 남의 브랜드도 마찬가지다 — 경쟁 상품에 혹평을 남길 수 있다.
+ *
+ * **자기 상품만 막지 않는다.** 파는 사람의 계정으로 쓴 평은 그것이 무엇인지 아무도
+ * 확신할 수 없다. 손님으로 살 일이 있으면 손님 계정으로 산다.
+ *
+ * 이미 써 둔 평을 고치는 것은 막지 않는다 — 쓰지 못하게 하는 것이지, 자기가 한 말을
+ * 거두지 못하게 하는 것이 아니다. 가맹점이 되기 전에 쓴 평이 그렇다.
+ */
+export const canWriteReview = (actor: Actor): boolean => hasPermission(actor, 'review:write');
 
 export const RATING_MIN = 1;
 export const RATING_MAX = 5;
@@ -174,6 +194,8 @@ export const REVIEW_ERROR = [
   'ALREADY_REVIEWED',
   'REVIEW_NOT_FOUND',
   'NOT_OWN_REVIEW',
+  /** 파는 사람의 계정이다 — canWriteReview 를 보라 */
+  'SELLER_CANNOT_REVIEW',
 ] as const;
 export type ReviewErrorCode = (typeof REVIEW_ERROR)[number];
 
@@ -183,4 +205,5 @@ export const REVIEW_ERROR_MESSAGE: Readonly<Record<ReviewErrorCode, string>> = {
   ALREADY_REVIEWED: '이미 리뷰를 쓴 주문입니다',
   REVIEW_NOT_FOUND: '리뷰를 찾을 수 없습니다',
   NOT_OWN_REVIEW: '자기 리뷰만 고칠 수 있습니다',
+  SELLER_CANNOT_REVIEW: '판매자 계정으로는 리뷰를 쓸 수 없습니다. 손님으로 사신 것이라면 개인 계정으로 써 주세요.',
 };
