@@ -241,9 +241,25 @@ describe('견적에 문제가 있으면 주문을 만들지 않는다', () => {
     await expect(createOrder(request(), user)).rejects.toMatchObject({ code: 'OUT_OF_STOCK' });
   });
 
-  it('살 수 있는 게 하나도 없으면 EMPTY_ORDER 다', async () => {
+  it('한 줄짜리 주문이 품절되면 품절이라고 말한다 — 빈 주문이 아니다', async () => {
+    /*
+     * **이 검사가 거꾸로 적혀 있었다.** 품절이면 수량이 0 으로 깎이면서 issue 도
+     * 함께 서는데, 빈 주문 검사가 앞에 있어서 "주문할 수 있는 상품이 없습니다" 가
+     * 나갔다 — 손님 눈앞에는 상품이 있는데.
+     *
+     * 마지막 한 개를 두 사람이 동시에 사는 e2e 가 잡았다. 여기서는 못 잡았는데,
+     * 잡을 수가 없었다: 이 검사는 견적을 통째로 흉내 내므로 **내가 적어 넣은 값**을
+     * 확인할 뿐이다. 그때 적어 넣은 기대값이 곧 버그였다.
+     */
     quoteCart.mockResolvedValue(quote({
       lines: [{ ...quote().lines[0]!, quantity: 0, issue: 'SOLD_OUT' }],
+    }));
+    await expect(createOrder(request(), user)).rejects.toMatchObject({ code: 'OUT_OF_STOCK' });
+  });
+
+  it('탈이 없는데 살 것도 없으면 EMPTY_ORDER 다 — 위에서 안 걸린 경우의 그물', async () => {
+    quoteCart.mockResolvedValue(quote({
+      lines: [{ ...quote().lines[0]!, quantity: 0, issue: null }],
     }));
     await expect(createOrder(request(), user)).rejects.toMatchObject({ code: 'EMPTY_ORDER' });
   });

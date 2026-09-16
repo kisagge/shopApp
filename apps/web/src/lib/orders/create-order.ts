@@ -108,15 +108,26 @@ export async function createOrder(
     user,
   );
 
-  const buyable = quote.lines.filter((l) => l.quantity > 0);
-  if (buyable.length === 0) throw new OrderError('EMPTY_ORDER');
-
-  // 품절·판매중지가 하나라도 있으면 주문을 만들지 않는다. 나머지만 조용히
-  // 처리하면 사용자가 무엇을 샀는지 모른 채 결제하게 된다.
+  /*
+   * **왜 안 되는지를 먼저 말한다.**
+   *
+   * 품절이면 수량이 0 으로 깎이면서 issue 도 함께 선다(queries/cart). 그런데
+   * 빈 주문 검사가 앞에 있어서, 한 줄짜리 주문이 품절되면 "주문할 수 있는
+   * 상품이 없습니다" 가 나갔다 — 손님 눈앞에는 상품이 있는데. 마지막 한 개를
+   * 두 사람이 동시에 사는 검사가 이걸 잡았다: 진 쪽이 품절이 아니라 빈 주문을
+   * 받았다(막는 것은 제대로 막고 있었고, 말이 틀렸다).
+   *
+   * 품절·판매중지가 하나라도 있으면 주문을 만들지 않는다. 나머지만 조용히
+   * 처리하면 사용자가 무엇을 샀는지 모른 채 결제하게 된다.
+   */
   const broken = quote.lines.filter((l) => l.issue !== null);
   if (broken.length > 0) {
     throw new OrderError('OUT_OF_STOCK', broken.map((l) => l.variantId));
   }
+
+  // 살 수 있는 줄이 하나도 없다 — 위에서 걸리지 않은 경우를 위한 그물이다
+  const buyable = quote.lines.filter((l) => l.quantity > 0);
+  if (buyable.length === 0) throw new OrderError('EMPTY_ORDER');
 
   if (input.pointsToUse !== undefined && quote.pointsUsed < input.pointsToUse) {
     throw new OrderError('INSUFFICIENT_POINTS');
