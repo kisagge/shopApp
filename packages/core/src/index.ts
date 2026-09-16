@@ -33,6 +33,7 @@ export * from './rich-text';
 export * from './theme';
 export * from './blur';
 export * from './slug-history';
+export * from './brand';
 export * from './collection';
 export * from './facet';
 export * from './web-vitals';

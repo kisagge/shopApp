@@ -12,6 +12,7 @@ import { expectNoA11yViolations } from './axe';
 const PAGES: readonly (readonly [string, string])[] = [
   ['대시보드', '/admin'],
   ['트래픽', '/admin/traffic'],
+  ['브랜드', '/admin/brands'],
   ['주문', '/admin/orders'],
   ['반품·교환', '/admin/returns'],
   ['상품', '/admin/products'],

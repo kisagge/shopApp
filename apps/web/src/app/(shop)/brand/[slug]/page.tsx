@@ -1,9 +1,10 @@
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import { catalogQuerySchema } from '@shop/contract';
-import { resolvePriceRange, emptyResultReason } from '@shop/core';
+import { resolvePriceRange, emptyResultReason, slugLookup } from '@shop/core';
 import { getBrandBySlug } from '~/lib/queries/catalog/brands';
+import { getBrandSlugMovedTo } from '~/lib/admin/manage-brand';
 import { searchProducts, getFacets } from '~/lib/queries/catalog/search';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
@@ -39,9 +40,25 @@ export default async function BrandPage({ params, searchParams }: Params) {
   // 손으로 친 숫자와 구간 프리셋 중 어느 쪽이 이기는지는 core 가 정한다
   const price = resolvePriceRange(query);
 
-  const [brand, t] = await Promise.all([getBrandBySlug(slug), getT()]);
-  // 정지된 가맹점의 브랜드는 조회가 주지 않는다 — 목록에서만 빼면 뒷문이 된다
-  if (!brand) notFound();
+  const [loaded, t] = await Promise.all([getBrandBySlug(slug), getT()]);
+
+  /*
+   * 옛 주소면 새 주소로 넘기고, 그다음이 404 다 — 상품·기획전과 같은 규칙이다.
+   *
+   * **판단은 core 가 한다(slugLookup).** 되돌린 경우가 있어서다: a → b 로 바꿨다가
+   * 다시 a 로 돌아오면 a 는 지금 주소이면서 기록에도 남아 있고, 기록을 먼저 보면
+   * 자기 자신으로 넘기는 고리가 생긴다. 그 순서를 세 화면이 각자 적는 대신
+   * 한 곳에서 정한다.
+   *
+   * 정지된 가맹점의 브랜드는 조회가 아예 주지 않는다 — 목록에서만 빼면 뒷문이 된다.
+   */
+  // 있는 브랜드면 기록을 뒤질 이유가 없다 — 멀쩡한 화면에 왕복을 하나 더 얹지 않는다
+  const movedTo = loaded ? null : await getBrandSlugMovedTo(slug);
+  const found = slugLookup({ current: loaded, movedTo });
+  if (found.kind === 'moved') permanentRedirect(`/brand/${found.to}`);
+  if (found.kind === 'gone') notFound();
+  // 값을 담아 돌려주는 덕에 여기서부터는 있는 것이 확실하다
+  const brand = found.value;
 
   const [page, facets] = await Promise.all([
     searchProducts({

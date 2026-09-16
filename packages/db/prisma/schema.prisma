@@ -436,11 +436,28 @@ model Brand {
   merchant   Merchant? @relation(fields: [merchantId], references: [id])
 
   products Product[]
+  /// 이 브랜드가 쓰던 옛 주소들
+  slugs    BrandSlug[]
 
   createdAt DateTime @default(now())
 
   @@index([merchantId])
   @@map("brands")
+}
+
+/// 브랜드가 쓰던 옛 주소. ProductSlug·CollectionSlug 와 같은 이유로 둔다.
+///
+/// 한글 이름으로 입점하면 자동 생성 브랜드의 주소가 `brand-a1b2c3d4` 가 된다.
+/// 그걸 사람이 읽을 수 있는 주소로 고치는 순간 그때까지 나간 링크가 죽는데,
+/// 화면에는 멀쩡한 404 가 나와서 아무도 사고인 줄 모른다.
+model BrandSlug {
+  slug      String   @id
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([brandId])
+  @@map("brand_slugs")
 }
 
 model Category {

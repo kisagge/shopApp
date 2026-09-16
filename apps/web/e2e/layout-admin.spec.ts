@@ -61,6 +61,8 @@ layoutTests(test, expect, [
   ['정산', '/admin/settlements'],
   ['회원', '/admin/users'],
   ['가맹점', '/admin/merchants'],
+  // 이름·주소 칸이 좁은 폭에서 위아래로 서는지
+  ['브랜드', '/admin/brands'],
   ['쿠폰', '/admin/coupons'],
   ['배너', '/admin/banners'],
   ['기획전', '/admin/collections'],

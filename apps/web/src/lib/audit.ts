@@ -16,6 +16,8 @@ import { hashIp } from './analytics/server';
 export type AuditTargetType =
   | 'order' | 'product' | 'user' | 'merchant' | 'settlement' | 'coupon' | 'banner'
   | 'collection'
+  /** 브랜드 — 이름과 주소를 고친 기록 */
+  | 'brand'
   | 'event_log' | 'review' | 'support_post'
   /** 운영진이 내린 문의. 예전에는 'review' 로 적혀 대상 필터에서 리뷰로 묶였다 */
   | 'inquiry'
