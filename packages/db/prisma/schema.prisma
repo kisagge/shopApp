@@ -1537,6 +1537,9 @@ model EventLog {
 
   /// mobile | tablet | desktop. 원본 User-Agent 는 저장하지 않는다.
   deviceType String?
+  /// web | ios | android. 셸이 말해 준다 — iOS 웹뷰는 UA 로 사파리와 구분되지 않는다.
+  /// 이 컬럼이 생기기 전 행과 서버가 직접 적은 이벤트는 null 이다.
+  platform   String?
   /// 일별 솔트로 해시한 IP. 원본은 저장하지 않고 봇 판별에만 쓴다.
   ipHash     String?
 

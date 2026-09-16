@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { fanOut, type EventSink, type TrackedEvent } from '@shop/core';
+import { fanOut, toClientPlatform, type EventSink, type TrackedEvent } from '@shop/core';
 import type { EventInput } from '@shop/contract';
 import { dbSink } from './sinks/db';
 import { consoleSink } from './sinks/console';
@@ -50,7 +50,7 @@ export interface CollectionContext {
 
 /** 검증된 입력을 저장 가능한 형태로 옮긴다. 서버가 정하는 값은 여기서 덮어쓴다. */
 export function toTrackedEvent(input: EventInput, ctx: CollectionContext): TrackedEvent {
-  const { name, occurredAt, sessionId, anonymousId, path, referrer, ...rest } = input;
+  const { name, occurredAt, sessionId, anonymousId, path, referrer, platform, ...rest } = input;
   const props = rest as Record<string, unknown>;
 
   const pick = (key: string): string | null => {
@@ -86,6 +86,13 @@ export function toTrackedEvent(input: EventInput, ctx: CollectionContext): Track
     value: pickNum('value'),
     quantity: pickNum('quantity'),
     deviceType: ctx.deviceType,
+    /*
+     * **이것만은 브라우저가 말한 것을 그대로 받는다.** 서버가 알 방법이 없다 —
+     * iOS 웹뷰의 UA 는 사파리와 구분되지 않는다. 돈이 걸린 값도 아니라
+     * (원칙 1 은 purchase·refund 에 걸리는 말이다) 지어내 봐야 자기 쪽
+     * 성능 통계만 흐려진다. 아는 말이 아니면 null 로 둔다.
+     */
+    platform: toClientPlatform(platform),
     ipHash: ctx.ipHash,
     props,
   };
@@ -100,11 +107,16 @@ export const recordEvents = (events: readonly TrackedEvent[]): Promise<void> => 
  * 매출 이벤트는 이 경로로만 들어온다.
  */
 export function recordServerEvent(
-  event: Omit<TrackedEvent, 'deviceType' | 'ipHash' | 'referrer'> &
-    Partial<Pick<TrackedEvent, 'deviceType' | 'ipHash' | 'referrer'>>,
+  event: Omit<TrackedEvent, 'deviceType' | 'platform' | 'ipHash' | 'referrer'> &
+    Partial<Pick<TrackedEvent, 'deviceType' | 'platform' | 'ipHash' | 'referrer'>>,
 ): Promise<void> {
+  /*
+   * platform 은 기본이 null 이다. 이 이벤트를 적는 것은 주문 확정·환불
+   * 코드이지 사람이 든 화면이 아니라, 무엇으로 들어왔는지 알 자리가 아니다.
+   * 'web' 으로 적으면 없는 사실을 지어내는 것이 된다.
+   */
   return recordEvents([
-    { referrer: null, deviceType: null, ipHash: null, ...event },
+    { referrer: null, deviceType: null, platform: null, ipHash: null, ...event },
   ]);
 }
 

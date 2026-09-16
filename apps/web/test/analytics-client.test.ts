@@ -206,3 +206,59 @@ describe('앱이 쓰는 트래커', () => {
     expect(sent).toEqual([]);
   });
 });
+
+describe('어디서 들어왔는지를 함께 보낸다', () => {
+  /*
+   * **이것 없이는 앱이 느린지 아닌지를 말할 수 없다.** 이벤트에 붙던 구분은
+   * UA 에서 뽑은 기기 종류뿐이라 앱 웹뷰가 모바일 브라우저와 같은 칸에
+   * 들어갔다. 앱은 켤 때마다 웹뷰를 차게 띄우는 값이 더 붙는데, 섞이면
+   * 그게 앱 탓인지 화면 탓인지 가릴 수 없다.
+   */
+  const platformOf = (body: string) =>
+    (JSON.parse(body) as { events: { platform: unknown }[] }).events.map((e) => e.platform);
+
+  it('셸이 말한 것을 봉투에 싣는다', () => {
+    const t = makeTransport();
+    const tracker = new AnalyticsTracker({
+      transport: t.transport, batchSize: 1, platform: () => 'ios',
+    });
+    tracker.track('page_view');
+
+    expect(platformOf(t.posted[0]!)).toEqual(['ios']);
+  });
+
+  it('브라우저에서는 web 이다', () => {
+    // 셸 전역이 없으면 @shop/native 가 'web' 을 돌려준다
+    const t = makeTransport();
+    const tracker = new AnalyticsTracker({ transport: t.transport, batchSize: 1 });
+    tracker.track('page_view');
+
+    expect(platformOf(t.posted[0]!)).toEqual(['web']);
+  });
+
+  it('이벤트마다 다시 묻는다 — 만들 때 한 번 읽으면 앱이 통째로 web 이 된다', () => {
+    /*
+     * 트래커는 모듈이 불릴 때 만들어진다. 그 시점에 셸이 아직 전역을
+     * 주입하지 않았으면, 한 번 읽어 둔 값은 영영 'web' 이다.
+     */
+    let current = 'web';
+    const t = makeTransport();
+    const tracker = new AnalyticsTracker({
+      transport: t.transport, batchSize: 1, platform: () => current as 'web' | 'android',
+    });
+
+    tracker.track('page_view');
+    current = 'android';
+    tracker.track('page_view');
+
+    expect([...platformOf(t.posted[0]!), ...platformOf(t.posted[1]!)]).toEqual(['web', 'android']);
+  });
+
+  it('모르는 값은 싣지 않는다 — 없는 칸을 만들지 않는다', () => {
+    const t = makeTransport();
+    const tracker = new AnalyticsTracker({ transport: t.transport, batchSize: 1, platform: () => null });
+    tracker.track('page_view');
+
+    expect(platformOf(t.posted[0]!)).toEqual([null]);
+  });
+});

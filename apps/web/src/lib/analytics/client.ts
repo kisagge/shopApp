@@ -3,8 +3,15 @@
  * 딸려 오고, 이 파일은 루트 레이아웃에 있어서 **모든 화면이 그것을 받는다.**
  */
 import {
-  isServerOnlyEvent, requiresConsent, MAX_EVENTS_PER_BATCH, type EventName,
+  isServerOnlyEvent, requiresConsent, toClientPlatform,
+  MAX_EVENTS_PER_BATCH, type ClientPlatform, type EventName,
 } from '@shop/core';
+/*
+ * **@shop/native 는 의존성이 0개라 여기 들어와도 된다.** Capacitor 가 웹뷰에
+ * 주입해 주는 전역을 직접 읽을 뿐이라, 브라우저로 들어온 사람에게 나가는
+ * 것은 함수 한 줌이다. @capacitor/* 를 import 하면 그렇지 않다.
+ */
+import { nativePlatform } from '@shop/native';
 import { getLocalConsent } from './consent';
 import { getAnonymousId, getSessionId } from './session';
 
@@ -35,6 +42,8 @@ export interface TrackerOptions {
   hasConsent?: () => boolean;
   transport?: Transport;
   now?: () => number;
+  /** 어디서 들어온 방문인가. 기본은 셸에게 묻는다(브라우저면 'web'). */
+  platform?: () => ClientPlatform | null;
   onDropped?: (name: string, reason: 'server-only' | 'no-consent') => void;
 }
 
@@ -65,6 +74,7 @@ interface QueuedEvent {
   anonymousId: string;
   path: string;
   referrer: string | null;
+  platform: ClientPlatform | null;
   [key: string]: unknown;
 }
 
@@ -75,6 +85,7 @@ export class AnalyticsTracker {
   readonly #hasConsent: () => boolean;
   readonly #transport: Transport;
   readonly #now: () => number;
+  readonly #platform: () => ClientPlatform | null;
   readonly #onDropped: ((name: string, reason: 'server-only' | 'no-consent') => void) | undefined;
 
   #queue: QueuedEvent[] = [];
@@ -88,6 +99,12 @@ export class AnalyticsTracker {
     this.#hasConsent = options.hasConsent ?? (() => true);
     this.#transport = options.transport ?? defaultTransport;
     this.#now = options.now ?? (() => Date.now());
+    /*
+     * **이벤트마다 읽는다.** 한 번 읽어 두지 않는 이유는 트래커가 모듈이
+     * 불릴 때 만들어지기 때문이다 — 그 시점에 셸이 아직 전역을 주입하지
+     * 않았으면 앱에서 온 방문이 통째로 'web' 으로 적힌다.
+     */
+    this.#platform = options.platform ?? (() => toClientPlatform(nativePlatform()));
     this.#onDropped = options.onDropped;
   }
 
@@ -118,6 +135,7 @@ export class AnalyticsTracker {
       anonymousId: getAnonymousId(),
       path: typeof location === 'undefined' ? '/' : location.pathname,
       referrer: typeof document === 'undefined' || document.referrer === '' ? null : document.referrer,
+      platform: this.#platform(),
     });
 
     if (this.#queue.length >= this.#batchSize) {

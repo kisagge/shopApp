@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { MAX_EVENTS_PER_BATCH, WEB_VITAL } from '@shop/core';
+import { CLIENT_PLATFORM, MAX_EVENTS_PER_BATCH, WEB_VITAL } from '@shop/core';
 import { cuidSchema, orderNoSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -30,6 +30,19 @@ const base = z.object({
   anonymousId: clientIdSchema,
   path: pathSchema,
   referrer: z.string().max(1024, 'valid.tooLongChars').nullish(),
+  /**
+   * 브라우저인가, 앱 웹뷰인가.
+   *
+   * **여기만은 클라이언트가 말하는 것을 받는다.** 나머지 신뢰할 값들(userId ·
+   * receivedAt · ipHash)은 서버가 덮어쓰지만, 이건 서버가 알 방법이 없다 —
+   * iOS 웹뷰의 UA 는 사파리와 구분되지 않는다. 그리고 돈이 걸린 값이 아니다
+   * (원칙 1 은 purchase · refund 에 걸리는 말이다). 지어내 봐야 자기 쪽
+   * 성능 통계가 흐려질 뿐이다.
+   *
+   * 안 보내도 받는다. 배포 직후에는 옛 스크립트를 쥔 화면이 남아 있고, 그것
+   * 때문에 이벤트를 통째로 버리면 잃는 쪽이 더 크다.
+   */
+  platform: z.enum(CLIENT_PLATFORM).optional(),
 });
 
 const ev = <N extends string, S extends z.ZodRawShape>(name: N, shape: S) =>

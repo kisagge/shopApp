@@ -155,6 +155,25 @@ describe('POST /api/events — 정상 수집', () => {
     expect(JSON.stringify(events[0])).not.toContain('Mozilla');
   });
 
+  it('어디서 들어왔는지는 브라우저가 말한 것을 받는다', async () => {
+    /*
+     * **여기만 예외다.** userId·receivedAt·ipHash 는 서버가 덮어쓰지만, 이건
+     * 서버가 알 방법이 없다 — iOS 웹뷰의 UA 는 사파리와 구분되지 않는다.
+     * 돈이 걸린 값도 아니라(원칙 1 은 purchase·refund 에 걸린다) 지어내 봐야
+     * 자기 쪽 성능 통계만 흐려진다.
+     */
+    await post({ events: [{ ...envelope, name: 'page_view', platform: 'ios' }] });
+    const [events] = recordEvents.mock.calls[0]!;
+    expect(events[0].platform).toBe('ios');
+  });
+
+  it('안 보내면 web 으로 접지 않고 비워 둔다', async () => {
+    // 'web' 으로 적으면 없는 사실을 지어내는 것이 된다
+    await post({ events: [{ ...envelope, name: 'page_view' }] });
+    const [events] = recordEvents.mock.calls[0]!;
+    expect(events[0].platform).toBeNull();
+  });
+
   it('집계 축을 컬럼으로 뽑아 준다', async () => {
     await post({
       events: [{ ...envelope, name: 'add_to_cart', productId: 'cmtgrsyc8000hx9oh6tozfnvx', variantId: 'cmtgrsydv0011x9ohazcdqo6p', quantity: 3 }],

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { COMMERCE_EVENT, DIAGNOSTIC_EVENT } from '@shop/core';
+import { CLIENT_PLATFORM, COMMERCE_EVENT, DIAGNOSTIC_EVENT } from '@shop/core';
 import { eventInputSchema, eventBatchSchema, MAX_EVENTS_PER_BATCH } from '../src/events';
 
 const envelope = {
@@ -91,6 +91,37 @@ describe('eventInputSchema', () => {
     expect(eventInputSchema.safeParse({ ...base, value: 405_000 }).success).toBe(true);
     expect(eventInputSchema.safeParse({ ...base, value: 405_000.5 }).success).toBe(false);
     expect(eventInputSchema.safeParse({ ...base, value: -1 }).success).toBe(false);
+  });
+});
+
+describe('어디서 들어왔는가', () => {
+  const pv = { ...envelope, name: 'page_view' as const };
+
+  it('아는 플랫폼은 받는다', () => {
+    for (const platform of CLIENT_PLATFORM) {
+      expect(eventInputSchema.safeParse({ ...pv, platform }).success, platform).toBe(true);
+    }
+  });
+
+  it('없어도 받는다 — 배포 직후에는 옛 스크립트를 쥔 화면이 남아 있다', () => {
+    /*
+     * 안 보낸다고 이벤트를 통째로 버리면, 하필 새 값이 필요한 시점의
+     * 방문들이 통계에서 사라진다. 잃는 쪽이 더 크다.
+     */
+    expect(eventInputSchema.safeParse(pv).success).toBe(true);
+  });
+
+  it('모르는 값은 거부한다 — 조용히 들어오면 칸이 하나 더 생긴다', () => {
+    expect(eventInputSchema.safeParse({ ...pv, platform: 'electron' }).success).toBe(false);
+    expect(eventInputSchema.safeParse({ ...pv, platform: 'IOS' }).success).toBe(false);
+    expect(eventInputSchema.safeParse({ ...pv, platform: 1 }).success).toBe(false);
+  });
+
+  it('속성이 따로 있는 이벤트에도 똑같이 붙는다 — 봉투에 있는 값이다', () => {
+    const r = eventInputSchema.safeParse({
+      ...envelope, name: 'view_item', productId: 'cmtgrsyc8000hx9oh6tozfnvx', platform: 'android',
+    });
+    expect(r.success).toBe(true);
   });
 });
 

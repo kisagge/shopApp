@@ -29,6 +29,7 @@ export const dbSink: EventSink = {
         value: e.value,
         quantity: e.quantity,
         deviceType: e.deviceType,
+        platform: e.platform,
         ipHash: e.ipHash,
         /**
          * props 는 이벤트마다 모양이 다른 자유 형식이라 Readonly 로 들고 있는데,

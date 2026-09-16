@@ -7,6 +7,8 @@
  * 이 파일에는 I/O 가 없다. 정책만 둔다.
  */
 
+import type { ClientPlatform } from './client-platform';
+
 export const COMMERCE_EVENT = [
   'view_item_list',
   'view_item',
@@ -208,6 +210,11 @@ export interface TrackedEvent {
   readonly quantity: number | null;
   /** mobile | tablet | desktop. 원본 User-Agent 는 저장하지 않는다. */
   readonly deviceType: string | null;
+  /**
+   * 브라우저인가, 앱 웹뷰인가. 셸이 말해 준다 — iOS 웹뷰는 UA 로 사파리와
+   * 구분되지 않아 서버가 알 방법이 없다. 서버가 직접 적는 이벤트는 null 이다.
+   */
+  readonly platform: ClientPlatform | null;
   /** 일별 솔트로 해시한 IP. 봇 판별에만 쓴다. */
   readonly ipHash: string | null;
   readonly props: Readonly<Record<string, unknown>>;

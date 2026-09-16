@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
-import { VITAL_THRESHOLD, formatVital } from '@shop/core';
+import {
+  VITAL_THRESHOLD, formatVital, CLIENT_PLATFORM, CLIENT_PLATFORM_LABEL,
+} from '@shop/core';
 
 export const metadata: Metadata = { title: '트래픽 추이' };
 export const dynamic = 'force-dynamic';
@@ -97,10 +99,98 @@ export default async function TrafficPage() {
             ))}
           </ul>
 
-          {vitals.every((v) => v.samples === 0) && (
+          {vitals.every((v) => v.samples === 0) ? (
             <p className="mt-4 text-[12px] text-[var(--fg-muted)]">
               아직 모인 값이 없습니다. 방문이 있어야 쌓입니다 — 지어내지 않습니다.
             </p>
+          ) : (
+            /*
+              **앱과 모바일 웹을 갈라 놓는다.** 위의 타일은 전부 섞은 값이라
+              "앱이 느린가" 에 답하지 못한다. 앱은 켤 때마다 웹뷰를 차게 띄우는
+              값이 더 붙는데, 섞여 있으면 그게 앱 탓인지 화면 탓인지 모른다.
+
+              타일이 아니라 표인 이유는 이 자리가 **견주어 보는 자리**이기
+              때문이다. 같은 지표를 세 칸에 나란히 놓아야 차이가 눈에 든다.
+            */
+            <div
+              className="table-scroll mt-6"
+              tabIndex={0}
+              role="region"
+              aria-label="플랫폼별 실사용자 성능"
+            >
+              <table className="data-table border-collapse text-[13px]">
+                <caption className="mb-2 text-left text-[12px] text-[var(--fg-muted)]">
+                  어디서 들어왔는지로 나눈 같은 값. 앱 웹뷰는 브라우저가 쥔 것을 하나도
+                  물려받지 못해 같은 화면이라도 값이 다릅니다. 어디서 왔는지 모르는
+                  방문(이 구분이 생기기 전에 쌓인 것)은 위 타일에만 들어갑니다.
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="py-2 text-left font-medium text-[var(--fg-muted)]">
+                      지표
+                    </th>
+                    {CLIENT_PLATFORM.map((p) => (
+                      <th
+                        key={p}
+                        scope="col"
+                        className="py-2 text-right font-medium text-[var(--fg-muted)]"
+                      >
+                        {CLIENT_PLATFORM_LABEL[p]}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {vitals.map((v) => (
+                    <tr key={v.metric} className="border-b border-[var(--border)] last:border-0">
+                      <th
+                        scope="row"
+                        className="py-2 text-left text-[11px] font-medium tracking-[0.08em]"
+                      >
+                        {v.metric}
+                      </th>
+                      {CLIENT_PLATFORM.map((p) => {
+                        const cell = v.byPlatform[p];
+                        return (
+                          <td key={p} className="tnum py-2 text-right">
+                            {cell.p75 === null ? (
+                              <span className="text-[var(--fg-muted)]">—</span>
+                            ) : (
+                              <>
+                                <span
+                                  className={
+                                    cell.rating === 'good'
+                                      ? 'text-success'
+                                      : cell.rating === 'poor'
+                                        ? 'text-accent'
+                                        : 'text-warning'
+                                  }
+                                >
+                                  {formatVital(v.metric, cell.p75)}
+                                  {v.metric !== 'CLS' && (
+                                    <span className="ml-0.5 text-[11px] font-normal">ms</span>
+                                  )}
+                                </span>
+                                {/* 색만으로 말하지 않는다 — 위 타일과 같은 규칙 */}
+                                <span className="block text-[10px] text-[var(--fg-muted)]">
+                                  {cell.rating === 'good'
+                                    ? '좋음'
+                                    : cell.rating === 'poor'
+                                      ? '나쁨'
+                                      : '개선 필요'}
+                                  {' · 표본 '}
+                                  {cell.samples.toLocaleString('ko-KR')}
+                                </span>
+                              </>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
 

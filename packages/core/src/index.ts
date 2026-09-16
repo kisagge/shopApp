@@ -15,6 +15,7 @@ export * from './coupon-policy';
 export * from './return-request';
 export * from './events';
 export * from './event-rollup';
+export * from './client-platform';
 export * from './order-number';
 export * from './order-draft';
 export * from './payment';

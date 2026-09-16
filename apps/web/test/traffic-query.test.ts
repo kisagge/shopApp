@@ -155,6 +155,69 @@ describe('실사용자 성능', () => {
     expect(JSON.stringify(vitals)).toContain('9007');
   });
 
+
+  it('전체 줄과 플랫폼 줄을 한 질의에서 받는다', async () => {
+    /*
+     * 전체와 플랫폼 셋을 따로 물으면 같은 표를 네 번 훑는다.
+     * grouping sets 로 한 번에 받는다 — 전체 줄은 platform 이 null 로 온다.
+     */
+    await getWebVitals(admin, 28, NOW);
+
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    const sql = db.$queryRaw.mock.calls[0]![0].join('?');
+    expect(sql).toContain('grouping sets');
+  });
+
+  it('앱과 웹을 갈라 놓는다', async () => {
+    /*
+     * **섞여 있으면 앱이 느린지 아닌지를 말할 수 없다.** 앱은 켤 때마다
+     * 웹뷰를 차게 띄우는 값이 더 붙는데, 그것이 모바일 웹 숫자에 묻힌다.
+     */
+    db.$queryRaw.mockResolvedValue([
+      { metric: 'LCP', platform: null, p75: 2400, samples: 100n },
+      { metric: 'LCP', platform: 'web', p75: 1900, samples: 70n },
+      { metric: 'LCP', platform: 'android', p75: 4600, samples: 30n },
+    ]);
+
+    const { vitals } = await getWebVitals(admin, 28, NOW);
+    const lcp = vitals.find((v) => v.metric === 'LCP')!;
+
+    expect(lcp.p75, '전체는 platform 이 null 인 줄이다').toBe(2400);
+    expect(lcp.byPlatform.web.p75).toBe(1900);
+    expect(lcp.byPlatform.android.p75).toBe(4600);
+    // LCP 는 4000ms 를 넘어야 나쁨이다(VITAL_THRESHOLD)
+    expect(lcp.byPlatform.android.rating).toBe('poor');
+    expect(lcp.byPlatform.web.rating).toBe('good');
+  });
+
+  it('표본이 없는 플랫폼도 자리를 지킨다 — 0 이 아니라 없음이다', async () => {
+    // 0 을 돌려주면 "아주 빠름" 으로 읽힌다
+    db.$queryRaw.mockResolvedValue([
+      { metric: 'LCP', platform: 'web', p75: 1900, samples: 70n },
+    ]);
+
+    const { vitals } = await getWebVitals(admin, 28, NOW);
+    const lcp = vitals.find((v) => v.metric === 'LCP')!;
+
+    expect(lcp.byPlatform.ios).toEqual({ p75: null, rating: null, samples: 0 });
+  });
+
+  it('어디서 왔는지 모르는 방문은 전체에만 든다', async () => {
+    /*
+     * 이 구분이 생기기 전에 쌓인 행과 서버가 직접 적은 이벤트는 platform 이
+     * 없다. 어느 칸에 넣어도 거짓이 되므로 전체에만 둔다.
+     */
+    db.$queryRaw.mockResolvedValue([
+      { metric: 'TTFB', platform: null, p75: 500, samples: 50n },
+    ]);
+
+    const { vitals } = await getWebVitals(admin, 28, NOW);
+    const ttfb = vitals.find((v) => v.metric === 'TTFB')!;
+
+    expect(ttfb.samples).toBe(50);
+    expect(ttfb.byPlatform.web.samples + ttfb.byPlatform.ios.samples + ttfb.byPlatform.android.samples).toBe(0);
+  });
+
   it('구간 시작을 함께 돌려준다', async () => {
     const { since } = await getWebVitals(admin, 7, NOW);
     expect(NOW.getTime() - since.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
