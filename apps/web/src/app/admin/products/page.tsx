@@ -8,7 +8,8 @@ import {
 import { ProductReview } from '~/components/admin/product-review';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminProducts } from '~/lib/queries/admin/products';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 import { StockBulkActions } from './stock-bulk-actions';
 import { RestoreProductButton } from './restore-button';
 import { adminTimestamp } from '~/lib/admin/date-format';
@@ -25,30 +26,30 @@ const STATUS_TONE: Record<string, 'success' | 'danger' | 'info' | 'neutral'> = {
 export default async function AdminProductsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ cursor?: string; status?: string; view?: string; archived?: string; restored?: string }>;
+  searchParams: Promise<{ page?: string; status?: string; view?: string; archived?: string; restored?: string }>;
 }) {
   const actor = await requireAdmin('product:read');
-  const { cursor, status, view, archived: justArchived, restored: justRestored } = await searchParams;
+  const { page: pageParam, status, view, archived: justArchived, restored: justRestored } = await searchParams;
+  const asked = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
 
   // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다.
   const archivedView = view === 'archived';
   const filter: ProductStatus | undefined = !archivedView && status === 'PENDING_REVIEW' ? status : undefined;
 
-  const page = await getAdminProducts(actor, { cursor, status: filter, archived: archivedView });
-  const products = page.rows;
+  const result = await getAdminProducts(actor, { page: asked, status: filter, archived: archivedView });
+  const products = result.rows;
   const canWrite = hasPermission(actor, 'product:write');
   const canPublish = hasPermission(actor, 'product:publish');
 
-  const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/products' as const,
-        query: {
-          ...(filter ? { status: filter } : {}),
-          ...(archivedView ? { view: 'archived' } : {}),
-          cursor: page.nextCursor,
-        },
-      }
-    : null;
+  // 필터를 유지한 채 쪽을 넘긴다. 하나라도 빠뜨리면 넘기는 순간 조건이 풀린다
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/products' as const,
+    query: {
+      ...(filter ? { status: filter } : {}),
+      ...(archivedView ? { view: 'archived' } : {}),
+      ...(n > 1 ? { page: String(n) } : {}),
+    },
+  });
 
   return (
     <>
@@ -56,7 +57,7 @@ export default async function AdminProductsPage({
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">상품 관리</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            <span className="tnum font-semibold text-[var(--fg-secondary)]">{page.total}</span>개
+            <span className="tnum font-semibold text-[var(--fg-secondary)]">{result.total}</span>개
             {actor.merchantId && ' · 내 브랜드만'}
           </p>
         </div>
@@ -92,11 +93,11 @@ export default async function AdminProductsPage({
                 }`}
               >
                 {tab === 'archived' ? '보관함' : tab === 'all' ? '전체' : '검수 대기'}
-                {tab === 'PENDING_REVIEW' && page.awaitingReview > 0 && (
-                  <span className="ml-1.5 text-accent">{page.awaitingReview}</span>
+                {tab === 'PENDING_REVIEW' && result.awaitingReview > 0 && (
+                  <span className="ml-1.5 text-accent">{result.awaitingReview}</span>
                 )}
-                {tab === 'archived' && page.archivedCount > 0 && (
-                  <span className="tnum ml-1.5 text-[var(--fg-muted)]">{page.archivedCount}</span>
+                {tab === 'archived' && result.archivedCount > 0 && (
+                  <span className="tnum ml-1.5 text-[var(--fg-muted)]">{result.archivedCount}</span>
                 )}
               </Link>
             );
@@ -254,7 +255,7 @@ export default async function AdminProductsPage({
           )}
         </div>
         <div className="mt-5">
-          <Pager href={nextHref} label="이전 상품 더 보기" hasRows={products.length > 0} />
+          <PageNav page={asked} total={result.total} pageSize={PAGE_SIZE} hrefOf={hrefOf} />
         </div>
       </div>
     </>

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from './render';
+import { render, screen, cleanup } from './render';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -44,9 +44,29 @@ describe('이름이 상태를 말한다', () => {
     expect(screen.getByRole('button', { name: /램스울 니트/ })).toBeDefined();
   });
 
-  it('하트 글리프는 접근성 트리에서 감춘다', () => {
+  it('하트는 그림이고, 접근성 트리에서 감춘다', () => {
+    /*
+     * **글자가 아니라 그림이다.** 예전에는 ♥ 와 ♡ 두 문자를 켜고 껐는데, 그 둘은 서로 다른 글자라 기기마다
+     * 다른 폰트에서 온다 — 안드로이드는 찬 하트를 컬러 이모지로 그려서 앱에서 켠 것과 끈 것의 크기·굵기가
+     * 달라 보였다(PC 는 둘 다 같은 폰트라 티가 안 났다).
+     */
     const { container } = setup();
-    expect(container.querySelector('[aria-hidden="true"]')?.textContent).toBe('♡');
+    const icon = container.querySelector('svg');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    expect(container.textContent).not.toContain('♡');
+  });
+
+  it('켠 것과 끈 것이 같은 모양이다 — 채우기만 다르다', () => {
+    const off = setup().container.querySelector('svg');
+    cleanup();
+    const on = setup({ initialWishlisted: true }).container.querySelector('svg');
+
+    expect(on?.querySelector('path')?.getAttribute('d')).toBe(
+      off?.querySelector('path')?.getAttribute('d'),
+    );
+    expect(on?.getAttribute('viewBox')).toBe(off?.getAttribute('viewBox'));
+    expect(off?.getAttribute('fill')).toBe('none');
+    expect(on?.getAttribute('fill')).toBe('currentColor');
   });
 });
 

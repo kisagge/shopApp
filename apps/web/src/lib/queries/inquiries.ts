@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
+  offsetOf,
   hasPermission,
   canReadInquiry, canAnswerInquiry, assertPermission,
   type Actor, type InquiryTopic,
@@ -136,16 +137,24 @@ export async function countPendingInquiries(actor: Actor): Promise<number> {
   return prisma.inquiry.count({ where: { ...inquiryScope(actor), answeredAt: null } });
 }
 
+/**
+ * 운영 문의함 한 쪽 크기.
+ *
+ * 예전에는 26을 받아 25만 그리는 방식이었다(한 줄 더 받아 다음 쪽이 있는지 보는 커서식). 쪽 번호로 바꾸면서
+ * 그 한 줄이 필요 없어졌다 — 전체 수를 따로 센다.
+ */
+const ADMIN_INQUIRY_PAGE_SIZE = 25;
+
 export async function getAdminInquiries(
   actor: Actor,
-  query: { unanswered?: boolean; cursor?: string | undefined } = {},
-): Promise<{ rows: AdminInquiryRow[]; nextCursor: string | null; pending: number }> {
+  query: { unanswered?: boolean; page?: number } = {},
+): Promise<{ rows: AdminInquiryRow[]; total: number; pending: number }> {
   assertPermission(actor, 'inquiry:answer');
 
   const scoped = inquiryScope(actor);
   const where = { ...scoped, ...(query.unanswered ? { answeredAt: null } : {}) };
 
-  const [rows, pending] = await Promise.all([
+  const [rows, pending, total] = await Promise.all([
     prisma.inquiry.findMany({
       where,
       /*
@@ -155,8 +164,8 @@ export async function getAdminInquiries(
       orderBy: query.unanswered
         ? [{ createdAt: 'asc' as const }, { id: 'asc' as const }]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
-      take: 26,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take: ADMIN_INQUIRY_PAGE_SIZE,
+      skip: offsetOf(query.page ?? 1, ADMIN_INQUIRY_PAGE_SIZE),
       select: {
         id: true, content: true, isPrivate: true, createdAt: true,
         answer: true, answeredAt: true,
@@ -167,13 +176,11 @@ export async function getAdminInquiries(
       },
     }),
     prisma.inquiry.count({ where: { ...scoped, answeredAt: null } }),
+    prisma.inquiry.count({ where }),
   ]);
 
-  const hasMore = rows.length > 25;
-  const page = hasMore ? rows.slice(0, 25) : rows;
-
   return {
-    rows: page.map((row) => ({
+    rows: rows.map((row) => ({
       id: row.id,
       productId: row.product?.id ?? null,
       productName: row.product?.name ?? null,
@@ -187,7 +194,7 @@ export async function getAdminInquiries(
       answeredAt: row.answeredAt,
       imageUrls: row.images.map((i) => i.url),
     })),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
     pending,
   };
 }

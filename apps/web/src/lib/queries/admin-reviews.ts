@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   assertPermission, merchantScope, moderationState, reportPriority,
   type Actor, type ModerationState, type ReportReason,
+  offsetOf,
 } from '@shop/core';
 
 /**
@@ -53,7 +54,8 @@ export interface AdminReviewRow {
 
 export interface AdminReviewList {
   readonly rows: readonly AdminReviewRow[];
-  readonly nextCursor: string | null;
+  /** 조건에 맞는 전체 줄 수. 대기줄(reported)은 한 번에 보여 주므로 줄 수와 같다 */
+  readonly total: number;
   /** 대기줄에 남은 건수. 탭에 붙는다. */
   readonly pending: number;
   /** 대기줄이 상한에 걸렸는가 */
@@ -156,7 +158,7 @@ function toRow(raw: RawReview): AdminReviewRow {
 
 export async function getAdminReviews(
   actor: Actor,
-  query: { tab?: ReviewTab; q?: string | undefined; cursor?: string | undefined } = {},
+  query: { tab?: ReviewTab; q?: string | undefined; page?: number } = {},
 ): Promise<AdminReviewList> {
   assertPermission(actor, 'review:read');
 
@@ -212,7 +214,7 @@ export async function getAdminReviews(
       // 점수가 같으면 오래 기다린 것부터. 새 신고가 계속 앞을 막으면 안 된다.
       .sort((a, b) => b.priority - a.priority || a.createdAt.getTime() - b.createdAt.getTime());
 
-    return { rows, nextCursor: null, pending, capped };
+    return { rows, total: rows.length, pending, capped };
   }
 
   const where =
@@ -220,21 +222,21 @@ export async function getAdminReviews(
       ? { deletedAt: { not: null }, ...mine, ...search }
       : { deletedAt: null, ...mine, ...search };
 
-  const raw = (await prisma.review.findMany({
-    where,
-    // 같은 시각에 들어온 리뷰의 순서가 흔들리면 커서가 행을 건너뛴다
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: PAGE_SIZE + 1,
-    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
-    select: reviewSelect,
-  })) as RawReview[];
-
-  const hasMore = raw.length > PAGE_SIZE;
-  const page = hasMore ? raw.slice(0, PAGE_SIZE) : raw;
+  const [raw, total] = await Promise.all([
+    prisma.review.findMany({
+      where,
+      // 같은 시각에 들어온 리뷰의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: PAGE_SIZE,
+      skip: offsetOf(query.page ?? 1, PAGE_SIZE),
+      select: reviewSelect,
+    }) as Promise<RawReview[]>,
+    prisma.review.count({ where }),
+  ]);
 
   return {
-    rows: page.map(toRow),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    rows: raw.map(toRow),
+    total,
     pending,
     capped: false,
   };

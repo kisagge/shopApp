@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, hasSettlementAccount, type Actor } from '@shop/core';
+import { assertPermission, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
 import { assertAdminQuery, scopeOf } from './scope';
 
 // ── 가맹점·회원 (슈퍼관리자 화면) ─────────────────────────────
@@ -94,43 +94,46 @@ export interface AdminUserRow {
 
 export interface AdminUserPage {
   readonly rows: readonly AdminUserRow[];
-  readonly nextCursor: string | null;
+  /** 조건에 맞는 전체 회원 수. 쪽 수가 이 값에서 나온다 */
+  readonly total: number;
 }
 
 export async function getAdminUsers(
   actor: Actor,
-  query: { q?: string | undefined; cursor?: string | undefined; take?: number } = {},
+  query: { q?: string | undefined; page?: number; take?: number } = {},
 ): Promise<AdminUserPage> {
   assertPermission(actor, 'user:read');
 
   const take = Math.min(query.take ?? 25, 50);
   const q = query.q?.trim();
 
-  const rows = await prisma.user.findMany({
-    where: q
-      ? {
-          OR: [
-            { email: { contains: q, mode: 'insensitive' } },
-            { name: { contains: q, mode: 'insensitive' } },
-          ],
-        }
-      : {},
+  const where = q
+    ? {
+        OR: [
+          { email: { contains: q, mode: 'insensitive' as const } },
+          { name: { contains: q, mode: 'insensitive' as const } },
+        ],
+      }
+    : {};
+
+  const [rows, total] = await Promise.all([
+    prisma.user.findMany({
+    where,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: take + 1,
-    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    take,
+    skip: offsetOf(query.page ?? 1, take),
     select: {
       id: true, name: true, email: true, role: true, createdAt: true, deletedAt: true,
       suspendedAt: true, suspendedReason: true, pointBalance: true,
       merchant: { select: { id: true, name: true } },
       _count: { select: { orders: true } },
     },
-  });
-
-  const hasMore = rows.length > take;
-  const page = hasMore ? rows.slice(0, take) : rows;
+    }),
+    prisma.user.count({ where }),
+  ]);
 
   return {
-    rows: page.map((u) => ({
+    rows: rows.map((u) => ({
       id: u.id, name: u.name, email: u.email, role: u.role,
       merchantId: u.merchant?.id ?? null,
       merchantName: u.merchant?.name ?? null,
@@ -141,7 +144,7 @@ export async function getAdminUsers(
       suspendedReason: u.suspendedReason,
       pointBalance: u.pointBalance,
     })),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
   };
 }
 

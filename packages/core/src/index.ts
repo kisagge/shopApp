@@ -54,6 +54,7 @@ export * from './support';
 export * from './policy';
 export * from './settlement-account';
 export * from './commission';
+export * from './pagination';
 export * from './point';
 export * from './recommend';
 export * from './notification';

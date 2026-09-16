@@ -99,11 +99,10 @@ describe('getReturnQueue', () => {
     expect((await getReturnQueue(admin, {}, NOW)).rows[0]).toMatchObject({ stage: 'REFUND', myTurn: true });
   });
 
-  it('끝난 신청에는 기다린 날이 없다. 다음 쪽이 있으면 커서를 준다', async () => {
-    db.returnRequest.findMany.mockResolvedValue([row({ id: 'a', status: 'COMPLETED', resolvedAt: NOW }), row({ id: 'b' })]);
+  it('끝난 신청에는 기다린 날이 없다', async () => {
+    db.returnRequest.findMany.mockResolvedValue([row({ id: 'a', status: 'COMPLETED', resolvedAt: NOW })]);
     const page = await getReturnQueue(admin, { view: 'DONE', take: 1 }, NOW);
     expect(page.rows).toHaveLength(1);
     expect(page.rows[0]?.waitingDays).toBeNull();
-    expect(page.nextCursor).toBe('a');
   });
 });

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { track } from '~/lib/analytics/client';
 import { useT } from '~/lib/i18n/client';
+import { HeartIcon } from './heart-icon';
 
 /**
  * 찜 버튼.
@@ -49,7 +50,9 @@ export function WishlistButton({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const box = size === 'md' ? 'h-11 w-11 text-[20px]' : 'h-9 w-9 text-[16px]';
+  const box = size === 'md' ? 'h-11 w-11' : 'h-9 w-9';
+  // 하트는 그림이라 글자 크기가 아니라 그림 크기로 정한다
+  const glyphSize = size === 'md' ? 'h-5 w-5' : 'h-4 w-4';
 
   const skin =
     variant === 'floating'
@@ -103,8 +106,8 @@ export function WishlistButton({
         }
         className={`flex items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${skin} ${box}`}
       >
-        <span aria-hidden="true" className={wishlisted ? 'text-accent' : glyph}>
-          {wishlisted ? '♥' : '♡'}
+        <span className={wishlisted ? 'text-accent' : glyph}>
+          <HeartIcon filled={wishlisted} className={glyphSize} />
         </span>
       </button>
       {error && (

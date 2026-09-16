@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { won, type Actor, type Won, type ProductStatus, type ProductArchiver, LOW_STOCK_THRESHOLD,
+  offsetOf,
 } from '@shop/core';
 import {
   assertAdminQuery, scopeOf, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
@@ -31,7 +32,7 @@ export interface AdminProductRow {
 export async function getAdminProducts(
   actor: Actor,
   query: {
-    cursor?: string | undefined;
+    page?: number;
     take?: number;
     status?: ProductStatus | undefined;
     /** 보관함을 본다. 상태 필터와 함께 쓰지 않는다 — 보관한 상품은 상태와 상관없이 한 곳에 모인다 */
@@ -63,8 +64,8 @@ export async function getAdminProducts(
       : query.status === 'PENDING_REVIEW'
         ? [{ reviewRequestedAt: 'asc' as const }, { id: 'asc' as const }]
         : [{ createdAt: 'desc' as const }, { id: 'desc' as const }],
-    take: take + 1,
-    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    take,
+    skip: offsetOf(query.page ?? 1, take),
     select: {
       id: true, slug: true, name: true, listPrice: true, salePrice: true,
       status: true, createdAt: true, reviewRequestedAt: true, publishRejection: true,
@@ -80,11 +81,8 @@ export async function getAdminProducts(
     prisma.product.count({ where: archivedWhere }),
   ]);
 
-  const hasMore = rows.length > take;
-  const page = hasMore ? rows.slice(0, take) : rows;
-
   return {
-    rows: page.map((p) => ({
+    rows: rows.map((p) => ({
       id: p.id, slug: p.slug, name: p.name,
       brandName: p.brand.name, categoryName: p.category.name,
       listPrice: won(p.listPrice),
@@ -98,7 +96,6 @@ export async function getAdminProducts(
       archivedAt: p.deletedAt,
       archivedBy: p.archivedBy,
     })),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     total,
     awaitingReview,
     archivedCount,

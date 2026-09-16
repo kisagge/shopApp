@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   won, readOrderSearch, readDateRange,
   type Actor, type Won, type OrderStatus,
+  offsetOf,
 } from '@shop/core';
 import {
   assertAdminQuery, scopeOf, maskName, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
@@ -75,7 +76,7 @@ export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) 
 export async function getAdminOrders(
   actor: Actor,
   query: AdminOrderFilter & {
-    cursor?: string | undefined;
+    page?: number;
     take?: number;
   } = {},
 ): Promise<Paged<AdminOrderRow>> {
@@ -87,10 +88,10 @@ export async function getAdminOrders(
   const [rows, total] = await Promise.all([
     prisma.order.findMany({
       where,
-      // 같은 시각에 들어온 주문의 순서가 흔들리면 커서가 행을 건너뛴다
+      // 같은 시각에 들어온 주문의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다
       orderBy: [{ placedAt: 'desc' }, { id: 'desc' }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take,
+      skip: offsetOf(query.page ?? 1, take),
       select: {
         id: true, orderNo: true, status: true, placedAt: true, payable: true,
         user: { select: { name: true } },
@@ -104,11 +105,8 @@ export async function getAdminOrders(
     prisma.order.count({ where }),
   ]);
 
-  const hasMore = rows.length > take;
-  const page = hasMore ? rows.slice(0, take) : rows;
-
   return {
-    rows: page.map((o) => ({
+    rows: rows.map((o) => ({
       orderNo: o.orderNo,
       status: o.status,
       placedAt: o.placedAt,
@@ -117,7 +115,6 @@ export async function getAdminOrders(
       itemCount: o.items.length,
       firstItemName: o.items[0]?.productName ?? '(상품 없음)',
     })),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
     total,
   };
 }

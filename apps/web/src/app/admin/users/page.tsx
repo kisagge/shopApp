@@ -8,7 +8,10 @@ import { getAdminUsers, getApprovedMerchants } from '~/lib/queries/admin/merchan
 import { RoleForm } from './role-form';
 import { SuspendForm } from './suspend-form';
 import { suspendBlocked } from './suspend-blocked';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+
+/** 회원 목록의 한 쪽 크기. 조회 기본값과 같아야 쪽 수가 맞는다 */
+const USER_PAGE_SIZE = 25;
 import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '회원' };
@@ -21,24 +24,24 @@ const TONE: Record<string, 'success' | 'info' | 'neutral'> = {
 export default async function AdminUsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; cursor?: string }>;
+  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const actor = await requireAdmin('user:read');
   const params = await searchParams;
 
   const canAssign = hasPermission(actor, 'user:assignRole');
   const canSuspend = hasPermission(actor, 'user:write');
+  const asked = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
   const [page, merchants] = await Promise.all([
-    getAdminUsers(actor, { q: params.q, cursor: params.cursor }),
+    getAdminUsers(actor, { q: params.q, page: asked }),
     canAssign ? getApprovedMerchants(actor) : Promise.resolve([]),
   ]);
 
-  const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/users' as const,
-        query: { ...(params.q ? { q: params.q } : {}), cursor: page.nextCursor },
-      }
-    : null;
+  // 검색어를 유지한 채 쪽을 넘긴다
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/users' as const,
+    query: { ...(params.q ? { q: params.q } : {}), ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   return (
     <>
@@ -181,7 +184,7 @@ export default async function AdminUsersPage({
           )}
         </div>
 
-        <Pager href={nextHref} label="다음 회원 더 보기" hasRows={page.rows.length > 0} />
+        <PageNav page={asked} total={page.total} pageSize={USER_PAGE_SIZE} hrefOf={hrefOf} />
       </div>
     </>
   );

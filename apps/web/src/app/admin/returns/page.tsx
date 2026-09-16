@@ -8,7 +8,8 @@ import { getReturnQueue, isReturnQueueView, RETURN_QUEUE_VIEW, type ReturnQueueV
 import { RETURN_REASON_KEY, RETURN_TYPE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { getReturnAddress } from '~/lib/orders/return-address';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 
 export const metadata: Metadata = { title: '반품·교환' };
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ const VIEW_LABEL: Readonly<Record<ReturnQueueView, string>> = { OPEN: '진행 �
 export default async function AdminReturnsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ view?: string; type?: string; cursor?: string }>;
+  searchParams: Promise<{ view?: string; type?: string; page?: string }>;
 }) {
   const actor = await requireAdmin('return:resolve');
   const params = await searchParams;
@@ -34,16 +35,19 @@ export default async function AdminReturnsPage({
   const view: ReturnQueueView = isReturnQueueView(params.view) ? params.view : 'OPEN';
   const type = (RETURN_TYPE as readonly string[]).includes(params.type ?? '') ? (params.type as ReturnType) : undefined;
 
+  const asked = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
   const [page, t, myReturnAddress] = await Promise.all([
-    getReturnQueue(actor, { view, type, cursor: params.cursor }),
+    getReturnQueue(actor, { view, type, page: asked }),
     getT(),
     // 가맹점은 반품지가 없으면 승인 자체를 못 한다 — 대기열에서 먼저 말해 준다
     actor.merchantId ? getReturnAddress(actor.merchantId) : Promise.resolve(null),
   ]);
   const query = (v: ReturnQueueView) => ({ ...(v !== 'OPEN' ? { view: v } : {}), ...(type ? { type } : {}) });
-  const nextHref = page.nextCursor
-    ? { pathname: '/admin/returns' as const, query: { ...query(view), cursor: page.nextCursor } }
-    : null;
+  // 갈래와 종류를 유지한 채 쪽을 넘긴다
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/returns' as const,
+    query: { ...query(view), ...(n > 1 ? { page: String(n) } : {}) },
+  });
   const myTurnCount = page.rows.filter((r) => r.myTurn).length;
 
   return (
@@ -168,7 +172,7 @@ export default async function AdminReturnsPage({
             </div>
           )}
         </div>
-        <Pager href={nextHref} label="다음 신청 더 보기" hasRows={page.rows.length > 0} />
+        <PageNav page={asked} total={page.total} pageSize={PAGE_SIZE} hrefOf={hrefOf} />
       </div>
     </>
   );

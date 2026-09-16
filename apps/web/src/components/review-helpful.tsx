@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { HeartIcon } from './heart-icon';
 import { useT } from '~/lib/i18n/client';
 import { failureMessage } from '~/lib/client/failure-message';
 
@@ -81,7 +82,7 @@ export function ReviewHelpful({
         }`}
       >
         {/* 아이콘은 장식이다 — 이름과 상태는 버튼이 말한다 */}
-        <span aria-hidden="true">{pressed ? '♥' : '♡'}</span>
+        <HeartIcon filled={pressed} className="h-3.5 w-3.5" />
         <span aria-hidden="true">
           {t('review.helpful')} <span className="tnum">{count}</span>
         </span>

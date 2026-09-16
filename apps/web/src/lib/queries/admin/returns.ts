@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   isMyReturnTurn, returnStageOf, RETURN_STAGE,
   type Actor, type ReturnReason, type ReturnStage, type ReturnType,
+  offsetOf,
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, PAGE_SIZE } from './scope';
 
@@ -29,7 +30,7 @@ export interface ReturnQueueRow {
 
 export interface ReturnQueuePage {
   readonly rows: readonly ReturnQueueRow[];
-  readonly nextCursor: string | null;
+  readonly total: number;
   /** 탭에 붙는 수 — 범위 안에서, 종류 필터를 따른다 */
   readonly counts: Readonly<Record<ReturnQueueView, number>>;
 }
@@ -57,7 +58,7 @@ export function stageWhere(view: ReturnQueueView) {
  */
 export async function getReturnQueue(
   actor: Actor,
-  query: { view?: ReturnQueueView | undefined; type?: ReturnType | undefined; cursor?: string | undefined; take?: number } = {},
+  query: { view?: ReturnQueueView | undefined; type?: ReturnType | undefined; page?: number; take?: number } = {},
   now: Date = new Date(),
 ): Promise<ReturnQueuePage> {
   assertAdminQuery(actor, 'order:read');
@@ -75,8 +76,8 @@ export async function getReturnQueue(
     prisma.returnRequest.findMany({
       where: { ...base, ...stageWhere(view) },
       orderBy: done ? [{ resolvedAt: 'desc' as const }, { id: 'desc' as const }] : [{ requestedAt: 'asc' as const }, { id: 'asc' as const }],
-      take: take + 1,
-      ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+      take,
+      skip: offsetOf(query.page ?? 1, take),
       select: {
         id: true, type: true, reason: true, status: true, itemIds: true, receivedAt: true, requestedAt: true, resolvedAt: true,
         order: {
@@ -91,11 +92,8 @@ export async function getReturnQueue(
     ...RETURN_QUEUE_VIEW.map((v) => prisma.returnRequest.count({ where: { ...base, ...stageWhere(v) } })),
   ]);
 
-  const hasMore = rows.length > take;
-  const page = hasMore ? rows.slice(0, take) : rows;
-
   return {
-    rows: page.map((r) => {
+    rows: rows.map((r) => {
       // 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다 — 주문 상세와 같은 규칙
       const lines = r.order.items.filter((i) =>
         r.itemIds.length > 0 ? r.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED');
@@ -114,7 +112,8 @@ export async function getReturnQueue(
         myTurn: isMyReturnTurn(actor, stage, lines.map((l) => l.merchantId)),
       };
     }),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    // 지금 보고 있는 갈래의 전체 건수. 쪽 수가 이 값에서 나온다
+    total: counts[RETURN_QUEUE_VIEW.indexOf(view)] ?? 0,
     counts: Object.fromEntries(RETURN_QUEUE_VIEW.map((v, i) => [v, counts[i] ?? 0])) as Record<ReturnQueueView, number>,
   };
 }

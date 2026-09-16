@@ -5,7 +5,10 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAuditLogs, type AuditLogPage } from '~/lib/queries/audit-log';
 import { actionLabel as labelOf, targetLabel } from '~/lib/admin/audit-labels';
 import { AuditExport } from './audit-export';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+
+/** 감사 로그 한 쪽 크기. 조회 기본값과 같아야 쪽 수가 맞는다 */
+const AUDIT_PAGE_SIZE = 25;
 import { adminDateTime } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '감사 로그' };
@@ -23,7 +26,7 @@ interface SearchParams {
   readonly actor?: string;
   readonly from?: string;
   readonly to?: string;
-  readonly cursor?: string;
+  readonly page?: string;
 }
 
 const FIELD = 'h-10 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]';
@@ -46,10 +49,13 @@ export default async function AdminAuditPage({
     ...(params.to ? { to: params.to } : {}),
   };
 
+  // 주소는 손으로 고칠 수 있다 — 범위 밖이면 조회가 가장 가까운 쪽으로 당긴다
+  const asked = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
+
   let page: AuditLogPage;
   let rangeError: string | null = null;
   try {
-    page = await getAuditLogs(actor, { ...filter, cursor: params.cursor || undefined });
+    page = await getAuditLogs(actor, { ...filter, page: asked });
   } catch (error) {
     if (!(error instanceof OrderSearchError)) throw error;
     // 날짜가 틀리면 기간 없이 보여 주지 않는다 — 조건이 빠진 목록을 조건대로 본 것으로 읽는다
@@ -59,9 +65,10 @@ export default async function AdminAuditPage({
 
   // 쿼리는 객체로 넘긴다. 문자열로 붙이면 typedRoutes 가 검사할 수 없고
   // 값에 들어간 특수문자를 인코딩하는 것도 직접 챙겨야 한다.
-  const nextHref = page.nextCursor
-    ? { pathname: '/admin/audit' as const, query: { ...filter, cursor: page.nextCursor } }
-    : null;
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/audit' as const,
+    query: { ...filter, ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   const filtered = Object.keys(filter).length > 0;
 
@@ -241,7 +248,7 @@ export default async function AdminAuditPage({
           )}
         </div>
 
-        <Pager href={nextHref} label="이전 기록 더 보기" hasRows={page.rows.length > 0} />
+        <PageNav page={asked} total={page.total} pageSize={AUDIT_PAGE_SIZE} hrefOf={hrefOf} />
       </div>
     </>
   );

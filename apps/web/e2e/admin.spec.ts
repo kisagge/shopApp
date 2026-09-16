@@ -322,3 +322,34 @@ test('브라우저에서 난 오류가 오류함에 쌓이고, 처리하면 목�
   await ready(page);
   await expect(page.getByRole('article', { name: 'E2ETestError' })).toContainText(message);
 });
+
+test('목록은 쪽 번호로 넘긴다 — 조건을 쥔 채로', async ({ page }) => {
+  /*
+   * **운영 목록은 훑고 처리하는 자리다.** "더 보기" 로만 내려가면 일곱 쪽 뒤의 주문을 보려고 여섯 번을 눌러야 하고,
+   * 지금 어디쯤인지도 알 수 없었다. 여기서 보는 것은 번호가 실제로 동작하는가와, **넘겨도 필터가 풀리지 않는가**다.
+   */
+  // 줄이 여러 쪽이어야 번호가 뜬다 — 한 쪽뿐이면 그리지 않는 것이 이 조각의 규칙이다(구매확정은 시드가 넉넉히 만든다)
+  await page.goto('/admin/orders?status=CONFIRMED');
+  await ready(page);
+
+  const nav = page.getByRole('navigation', { name: '쪽 이동' });
+  await expect(nav).toBeVisible();
+
+  // 첫 쪽에서는 앞으로 가는 화살표가 링크가 아니다 — 눌러도 같은 자리인 링크를 두지 않는다
+  await expect(nav.getByRole('link', { name: '이전 쪽' })).toHaveCount(0);
+
+  const firstRow = () => page.locator('table tbody tr').first().innerText();
+  const onPage1 = await firstRow();
+
+  await nav.getByRole('link', { name: '2쪽' }).click();
+  await page.waitForURL(/page=2/);
+  await ready(page);
+
+  // 조건이 풀리면 넘기는 순간 다른 목록을 보게 된다
+  expect(new URL(page.url()).searchParams.get('status')).toBe('CONFIRMED');
+  expect(await firstRow(), '쪽을 넘겼는데 같은 줄이 그대로다').not.toBe(onPage1);
+
+  // 지금 쪽은 링크가 아니라 aria-current 로 말한다
+  await expect(page.getByRole('navigation', { name: '쪽 이동' }).getByText('2', { exact: true }))
+    .toHaveAttribute('aria-current', 'page');
+});

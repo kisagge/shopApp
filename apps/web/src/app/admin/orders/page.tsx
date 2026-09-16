@@ -7,7 +7,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin/orders';
 import { ORDER_STATUS } from '@shop/core';
 import { isOrderStatus } from '~/lib/queries/mypage';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 import { OrderBulkActions } from './order-bulk-actions';
 
 export const metadata: Metadata = { title: '주문 관리' };
@@ -30,11 +31,11 @@ export default async function AdminOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    status?: string; cursor?: string; q?: string; from?: string; to?: string;
+    status?: string; page?: string; q?: string; from?: string; to?: string;
   }>;
 }) {
   const actor = await requireAdmin('order:read');
-  const { status, cursor, q, from, to } = await searchParams;
+  const { status, page: pageParam, q, from, to } = await searchParams;
   const filter = status && isOrderStatus(status) ? status : undefined;
 
   /**
@@ -44,15 +45,18 @@ export default async function AdminOrdersPage({
    * 주문이 없는 것인지 조건이 틀린 것인지 알 수 없다. 무엇이 잘못됐는지
    * 말해 주고 목록은 계속 보여 준다.
    */
-  let page;
+  // 주소는 손으로 고칠 수 있다 — 범위 밖이면 가장 가까운 쪽으로 당긴다(clampPage 는 조회 뒤에 다시 본다)
+  const asked = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
+
+  let result;
   let searchError: string | null = null;
   try {
-    page = await getAdminOrders(actor, { status: filter, cursor, q, from, to });
+    result = await getAdminOrders(actor, { status: filter, page: asked, q, from, to });
   } catch (error) {
     searchError = error instanceof OrderSearchError ? error.message : '검색 조건을 확인해 주세요.';
-    page = await getAdminOrders(actor, { status: filter });
+    result = await getAdminOrders(actor, { status: filter, page: asked });
   }
-  const orders = page.rows;
+  const orders = result.rows;
 
   // 필터·검색을 유지한 채 다음 쪽으로 간다. 하나라도 빠뜨리면 넘기는 순간 조건이 풀린다.
   const kept = {
@@ -62,12 +66,10 @@ export default async function AdminOrdersPage({
     ...(to ? { to } : {}),
   };
 
-  const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/orders' as const,
-        query: { ...kept, cursor: page.nextCursor },
-      }
-    : null;
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/orders' as const,
+    query: { ...kept, ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   const searching = Boolean(q || from || to);
 
@@ -77,7 +79,7 @@ export default async function AdminOrdersPage({
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">주문 관리</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            <span className="tnum font-semibold text-[var(--fg-secondary)]">{page.total}</span>건
+            <span className="tnum font-semibold text-[var(--fg-secondary)]">{result.total}</span>건
             {actor.merchantId && ' · 내 가맹점 상품이 포함된 주문만'}
           </p>
         </div>
@@ -252,7 +254,7 @@ export default async function AdminOrdersPage({
           )}
         </div>
         <div className="mt-5">
-          <Pager href={nextHref} label="이전 주문 더 보기" hasRows={orders.length > 0} />
+          <PageNav page={asked} total={result.total} pageSize={PAGE_SIZE} hrefOf={hrefOf} />
         </div>
       </div>
     </>

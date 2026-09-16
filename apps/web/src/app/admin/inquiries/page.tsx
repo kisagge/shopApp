@@ -3,7 +3,10 @@ import Link from 'next/link';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminInquiries } from '~/lib/queries/inquiries';
 import { InquiryAnswerForm } from '~/components/admin/inquiry-answer-form';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+
+/** 문의함 한 쪽 크기. 조회의 ADMIN_INQUIRY_PAGE_SIZE 와 같아야 쪽 수가 맞는다 */
+const INQUIRY_PAGE_SIZE = 25;
 import { getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
 import { adminDateTime } from '~/lib/admin/date-format';
@@ -15,7 +18,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminInquiriesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; cursor?: string }>;
+  searchParams: Promise<{ tab?: string; page?: string }>;
 }) {
   const actor = await requireAdmin('inquiry:answer');
   const t = await getT();
@@ -23,17 +26,13 @@ export default async function AdminInquiriesPage({
 
   // 기본은 미답변이다. 이 화면은 목록이 아니라 처리할 일감이다.
   const unanswered = params.tab !== 'all';
-  const page = await getAdminInquiries(actor, {
-    unanswered,
-    cursor: params.cursor || undefined,
-  });
+  const asked = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
+  const page = await getAdminInquiries(actor, { unanswered, page: asked });
 
-  const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/inquiries' as const,
-        query: { ...(unanswered ? {} : { tab: 'all' }), cursor: page.nextCursor },
-      }
-    : null;
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/inquiries' as const,
+    query: { ...(unanswered ? {} : { tab: 'all' }), ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   return (
     <>
@@ -149,7 +148,7 @@ export default async function AdminInquiriesPage({
           </ul>
         )}
 
-        <Pager href={nextHref} label="이전 문의 더 보기" hasRows={page.rows.length > 0} />
+        <PageNav page={asked} total={page.total} pageSize={INQUIRY_PAGE_SIZE} hrefOf={hrefOf} />
       </div>
     </>
   );

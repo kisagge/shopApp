@@ -38,7 +38,7 @@ describe('반품·교환 대기열 화면', () => {
   it('반품 처리 권한으로 열고, 모르는 칸·종류는 무시한다', async () => {
     await renderPage({ view: 'NOPE', type: 'X' });
     expect(requireAdmin).toHaveBeenCalledWith('return:resolve');
-    expect(getReturnQueue.mock.calls[0]?.[1]).toEqual({ view: 'OPEN', type: undefined, cursor: undefined });
+    expect(getReturnQueue.mock.calls[0]?.[1]).toEqual({ view: 'OPEN', type: undefined, page: 1 });
   });
 
   it('단계 탭마다 수를 붙이고 지금 칸을 표시한다', async () => {

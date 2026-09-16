@@ -55,40 +55,28 @@ describe('권한', () => {
   });
 });
 
-describe('커서 페이지네이션', () => {
-  it('한 쪽 더 읽어 다음 쪽 존재를 판단한다', async () => {
-    mockPage(Array.from({ length: 4 }, (_, i) => row(`a-${i}`)));
+describe('쪽 번호 페이지네이션', () => {
+  it('한 쪽만큼만 읽는다 — 다음 쪽이 있는지는 전체 수가 말한다', async () => {
+    mockPage([row('a-0'), row('a-1'), row('a-2')]);
     const page = await getAuditLogs(admin, { take: 3 });
 
-    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].take).toBe(4);
-    // 한 쪽 더 읽었지만 돌려주는 것은 요청한 만큼만
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].take).toBe(3);
     expect(page.rows).toHaveLength(3);
-    expect(page.nextCursor).toBe('a-2');
   });
 
-  it('마지막 쪽이면 커서가 없다', async () => {
-    mockPage([row('a-0'), row('a-1')]);
-    const page = await getAuditLogs(admin, { take: 3 });
-    expect(page.rows).toHaveLength(2);
-    expect(page.nextCursor).toBeNull();
-  });
-
-  it('커서를 받으면 그 행 다음부터 읽는다', async () => {
+  it('쪽 번호만큼 건너뛴다', async () => {
     mockPage([row('a-9')]);
-    await getAuditLogs(admin, { cursor: 'a-5' });
-    const args = db.adminAuditLog.findMany.mock.calls[0]?.[0];
-    expect(args.cursor).toEqual({ id: 'a-5' });
-    // skip:1 이 없으면 커서 행이 다음 쪽 첫 줄로 다시 나온다
-    expect(args.skip).toBe(1);
+    await getAuditLogs(admin, { page: 3, take: 25 });
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].skip).toBe(50);
   });
 
-  it('첫 쪽에는 커서를 넘기지 않는다', async () => {
+  it('첫 쪽은 건너뛰지 않는다', async () => {
     mockPage([row('a-0')]);
     await getAuditLogs(admin);
-    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].cursor).toBeUndefined();
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].skip).toBe(0);
   });
 
-  it('정렬은 시각과 id 두 축이다 — 같은 밀리초에서 순서가 흔들리면 커서가 깨진다', async () => {
+  it('정렬은 시각과 id 두 축이다 — 같은 밀리초에서 순서가 흔들리면 쪽을 넘길 때 행이 겹친다', async () => {
     mockPage([row('a-0')]);
     await getAuditLogs(admin);
     expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].orderBy).toEqual([
@@ -99,7 +87,7 @@ describe('커서 페이지네이션', () => {
   it('take 는 상한을 넘지 못한다', async () => {
     mockPage([row('a-0')]);
     await getAuditLogs(admin, { take: 5000 });
-    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].take).toBe(51);
+    expect(db.adminAuditLog.findMany.mock.calls[0]?.[0].take).toBe(50);
   });
 });
 

@@ -153,12 +153,14 @@ describe('대기줄', () => {
     expect(page.rows).toHaveLength(200);
   });
 
-  it('대기줄은 페이지를 넘기지 않는다', async () => {
+  it('대기줄은 쪽을 넘기지 않는다 — 상한까지 한 번에 보여 주는 일감이다', async () => {
     db.review.findMany.mockResolvedValue([raw({ reports: [report()] })]);
 
-    const page = await getAdminReviews(ADMIN, { tab: 'reported' });
+    const page = await getAdminReviews(ADMIN, { tab: 'reported', page: 3 });
 
-    expect(page.nextCursor).toBeNull();
+    // 쪽 번호를 줘도 건너뛰지 않는다
+    expect(db.review.findMany.mock.calls.at(-1)?.[0].skip).toBeUndefined();
+    expect(page.total).toBe(page.rows.length);
   });
 });
 
@@ -177,13 +179,16 @@ describe('탭', () => {
     expect(db.review.findMany.mock.calls[0]![0].where).toMatchObject({ deletedAt: null });
   });
 
-  it('전체 탭은 커서로 넘긴다', async () => {
-    db.review.findMany.mockResolvedValue(Array.from({ length: 26 }, () => raw()));
+  it('전체 탭은 쪽 번호로 넘긴다', async () => {
+    db.review.findMany.mockResolvedValue(Array.from({ length: 25 }, () => raw()));
 
-    const page = await getAdminReviews(ADMIN, { tab: 'all' });
+    const page = await getAdminReviews(ADMIN, { tab: 'all', page: 2 });
 
     expect(page.rows).toHaveLength(25);
-    expect(page.nextCursor).toBe('r-25');
+    // 둘째 쪽은 한 묶음을 건너뛴다
+    const args = db.review.findMany.mock.calls.at(-1)?.[0];
+    expect(args.skip).toBe(25);
+    expect(args.take).toBe(25);
   });
 });
 

@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, readDateRange, type Actor, type UserRole } from '@shop/core';
+import { assertPermission, offsetOf, readDateRange, type Actor, type UserRole } from '@shop/core';
 
 /**
  * 감사 로그 조회.
@@ -31,7 +31,8 @@ export interface AuditLogRow {
 export interface AuditLogPage {
   readonly rows: readonly AuditLogRow[];
   /** 다음 쪽 커서. null 이면 마지막 쪽 */
-  readonly nextCursor: string | null;
+  /** 조건에 맞는 전체 줄 수. 쪽 수가 이 값에서 나온다 */
+  readonly total: number;
   readonly filters: {
     readonly actions: readonly string[];
     readonly targetTypes: readonly string[];
@@ -54,7 +55,7 @@ export interface AuditLogFilter {
 }
 
 export interface AuditLogQuery extends AuditLogFilter {
-  readonly cursor?: string | undefined;
+  readonly page?: number;
   readonly take?: number;
 }
 
@@ -91,22 +92,22 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
 
   const where = auditLogWhere(query);
 
-  const rows = await prisma.adminAuditLog.findMany({
+  const [rows, total] = await Promise.all([
+    prisma.adminAuditLog.findMany({
     where,
     // id 를 함께 정렬해야 같은 밀리초에 들어온 행의 순서가 고정된다.
-    // 순서가 흔들리면 커서가 행을 건너뛰거나 되풀이한다.
+    // 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다.
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: take + 1,
-    ...(query.cursor ? { cursor: { id: query.cursor }, skip: 1 } : {}),
+    take,
+    skip: offsetOf(query.page ?? 1, take),
     select: {
       id: true, actorRole: true, action: true, targetType: true, targetId: true,
       before: true, after: true, createdAt: true, actorLabel: true,
       actor: { select: { name: true, email: true } },
     },
-  });
-
-  const hasMore = rows.length > take;
-  const page = hasMore ? rows.slice(0, take) : rows;
+    }),
+    prisma.adminAuditLog.count({ where }),
+  ]);
 
   // 필터 선택지는 실제로 쌓인 값에서 뽑는다. 상수로 두면 새 동작을 추가할 때
   // 목록에 넣는 것을 잊는다.
@@ -123,8 +124,8 @@ export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Pro
   ]);
 
   return {
-    rows: page.map(toRow),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    rows: rows.map(toRow),
+    total,
     filters: {
       actions: actions.map((a) => a.action),
       targetTypes: targetTypes.map((t) => t.targetType),

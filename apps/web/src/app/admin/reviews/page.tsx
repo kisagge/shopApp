@@ -9,7 +9,10 @@ import {
 } from '~/lib/queries/admin-reviews';
 import { ReviewModeration } from '~/components/admin/review-moderation';
 import { ReviewReplyForm } from '~/components/admin/review-reply-form';
-import { Pager } from '../pager';
+import { PageNav } from '../page-nav';
+
+/** 리뷰 목록 한 쪽 크기. 조회의 PAGE_SIZE 와 같아야 쪽 수가 맞는다 */
+const REVIEW_PAGE_SIZE = 25;
 import { getT } from '~/lib/i18n/server';
 import { REPORT_REASON_KEY } from '~/lib/i18n/enum-labels';
 import { adminDateTime } from '~/lib/admin/date-format';
@@ -27,7 +30,7 @@ const STATE_STYLE: Readonly<Record<ModerationState, string>> = {
 interface SearchParams {
   readonly tab?: string;
   readonly q?: string;
-  readonly cursor?: string;
+  readonly page?: string;
 }
 
 export default async function AdminReviewsPage({
@@ -57,18 +60,14 @@ export default async function AdminReviewsPage({
   const tab: ReviewTab = tabs.includes(asked) ? asked : tabs[0]!;
   const q = params.q?.trim() || undefined;
 
-  const page = await getAdminReviews(actor, {
-    tab,
-    q,
-    cursor: params.cursor || undefined,
-  });
+  const askedPage = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
+  const page = await getAdminReviews(actor, { tab, q, page: askedPage });
 
-  const nextHref = page.nextCursor
-    ? {
-        pathname: '/admin/reviews' as const,
-        query: { tab, ...(q ? { q } : {}), cursor: page.nextCursor },
-      }
-    : null;
+  // 갈래와 검색어를 유지한 채 쪽을 넘긴다
+  const hrefOf = (n: number) => ({
+    pathname: '/admin/reviews' as const,
+    query: { tab, ...(q ? { q } : {}), ...(n > 1 ? { page: String(n) } : {}) },
+  });
 
   return (
     <>
@@ -254,7 +253,10 @@ export default async function AdminReviewsPage({
           </ul>
         )}
 
-        <Pager href={nextHref} label="이전 리뷰 더 보기" hasRows={page.rows.length > 0 && tab !== 'reported'} />
+        {/* 대기줄(reported)은 쪽을 넘기지 않는다 — 상한까지 한 번에 보여 주는 일감이다 */}
+        {tab !== 'reported' && (
+          <PageNav page={askedPage} total={page.total} pageSize={REVIEW_PAGE_SIZE} hrefOf={hrefOf} />
+        )}
       </div>
     </>
   );
