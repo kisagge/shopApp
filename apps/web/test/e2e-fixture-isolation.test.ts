@@ -196,3 +196,28 @@ describe('재고를 흔드는 명세', () => {
     }
   });
 });
+
+/**
+ * **브랜드 이름을 바꾸는 명세가 고른 브랜드는 다른 명세가 이름으로 부르지 않는다.**
+ *
+ * 이름을 바꿔 둔 그 잠깐 동안 매대·검색·운영 화면의 그 브랜드 이름이 달라진다. 다른 명세가 그
+ * 이름을 찾고 있었다면 이유 없이 진다 — 상품 이름을 바꾸는 명세와 같은 사정이다.
+ */
+describe('브랜드 이름을 흔드는 명세', () => {
+  const brandOf = (source: string): string | null => /const BRAND = '([^']+)'/.exec(source)?.[1] ?? null;
+  const renamers = specs.filter((s) => brandOf(s.source) !== null);
+
+  it('이름을 바꾸는 명세를 실제로 찾아낸다', () => {
+    expect(renamers.map((s) => s.name)).toContain('slug-history.spec.ts');
+  });
+
+  it('바꾸는 브랜드를 다른 명세가 이름으로 부르지 않는다', () => {
+    for (const renamer of renamers) {
+      const brand = brandOf(renamer.source)!;
+      const others = specs
+        .filter((s) => s.name !== renamer.name && s.source.toLowerCase().includes(brand.toLowerCase()))
+        .map((s) => s.name);
+      expect(others, `${renamer.name} 이 이름을 바꾸는 "${brand}" 를 다른 명세가 부른다`).toEqual([]);
+    }
+  });
+});

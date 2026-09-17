@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ForbiddenError, type Actor } from '@shop/core';
+import { ForbiddenError, searchTextFor, type Actor } from '@shop/core';
 import { createBrandSchema, updateBrandSchema } from '@shop/contract';
 
 const tx = vi.hoisted(() => ({
   brand: { update: vi.fn<(...a: any[]) => any>() },
   brandSlug: { upsert: vi.fn<(...a: any[]) => any>() },
+  product: { findMany: vi.fn<(...a: any[]) => any>() },
+  // 태그 템플릿으로 불린다 — 조각과 값을 그대로 받아 둔다
+  $executeRaw: vi.fn<(...a: any[]) => any>(),
 }));
 const db = vi.hoisted(() => ({
   brand: {
@@ -15,7 +18,14 @@ const db = vi.hoisted(() => ({
   brandSlug: { findUnique: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
-vi.mock('@shop/db', () => ({ prisma: db, Prisma: { PrismaClientKnownRequestError: class {} } }));
+vi.mock('@shop/db', () => ({
+  prisma: db,
+  Prisma: {
+    PrismaClientKnownRequestError: class {},
+    sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings: [...strings], values }),
+    join: (items: unknown[]) => ({ joined: items }),
+  },
+}));
 
 const { listBrands, createBrand, updateBrand, getBrandSlugMovedTo } =
   await import('~/lib/admin/manage-brand');
@@ -47,6 +57,8 @@ beforeEach(() => {
   db.brandSlug.findUnique.mockResolvedValue(null);
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.brand.update.mockResolvedValue({ id: 'b-1', name: 'MOOR', slug: 'moor-seoul' });
+  tx.product.findMany.mockResolvedValue([]);
+  tx.$executeRaw.mockResolvedValue(0);
 });
 
 describe('누가 보는가', () => {
@@ -144,6 +156,65 @@ describe('주소 바꾸기', () => {
     await expect(
       updateBrand(admin, 'b-1', update({ slug: 'old-name' })),
     ).resolves.toBeTruthy();
+  });
+});
+
+describe('이름 바꾸기 — 상품 검색 문자열', () => {
+  /*
+   * 상품 검색은 상품 행에 복사해 둔 "상품명 + 브랜드명" 을 본다. 이름을 바꾸는 화면을 만들면서 그
+   * 복사본을 고치지 않아, 새 이름으로 검색하면 그 브랜드 상품이 하나도 안 나왔다.
+   */
+  beforeEach(() => {
+    db.brand.findUnique.mockResolvedValue(brandRow());
+    tx.brand.update.mockResolvedValue({ id: 'b-1', name: 'MOOR SEOUL', slug: 'moor' });
+    tx.product.findMany.mockResolvedValue([
+      { id: 'p-1', name: '울 코트' },
+      { id: 'p-2', name: 'Wide Slacks' },
+    ]);
+  });
+
+  /** $executeRaw 에 넘어간 VALUES 줄들 — (id, 읽은 상품명, 새 검색 문자열) */
+  const writtenRows = () => {
+    const values = tx.$executeRaw.mock.calls[0]!.slice(1) as unknown[];
+    const joined = values.find((v): v is { joined: { values: unknown[] }[] } =>
+      typeof v === 'object' && v !== null && 'joined' in v);
+    return joined!.joined.map((row) => row.values);
+  };
+
+  it('그 브랜드 상품마다 새 이름으로 검색 문자열을 다시 적는다 — 규칙은 core 의 것', async () => {
+    await updateBrand(admin, 'b-1', update({ name: 'MOOR SEOUL' }));
+
+    expect(tx.product.findMany).toHaveBeenCalledWith({ where: { brandId: 'b-1' }, select: { id: true, name: true } });
+    expect(writtenRows()).toEqual([
+      ['p-1', '울 코트', searchTextFor({ name: '울 코트', brandName: 'MOOR SEOUL' })],
+      ['p-2', 'Wide Slacks', searchTextFor({ name: 'Wide Slacks', brandName: 'MOOR SEOUL' })],
+    ]);
+  });
+
+  it('한 문장으로 쓰고, 그사이 상품 이름이 바뀐 줄은 건드리지 않는다', async () => {
+    await updateBrand(admin, 'b-1', update({ name: 'MOOR SEOUL' }));
+
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1);
+    const sql = (tx.$executeRaw.mock.calls[0]![0] as string[]).join('?');
+    expect(sql).toMatch(/p\.name = v\.name/);
+    expect(sql).toMatch(/p\."brandId" = /);
+  });
+
+  it('주소만 바꾸면 검색 문자열을 건드리지 않는다', async () => {
+    tx.brand.update.mockResolvedValue({ id: 'b-1', name: 'MOOR', slug: 'moor-seoul' });
+
+    await updateBrand(admin, 'b-1', update({ slug: 'moor-seoul' }));
+
+    expect(tx.product.findMany).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+  });
+
+  it('상품이 없는 브랜드면 쓸 것이 없다', async () => {
+    tx.product.findMany.mockResolvedValue([]);
+
+    await updateBrand(admin, 'b-1', update({ name: 'MOOR SEOUL' }));
+
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 });
 

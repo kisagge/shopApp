@@ -125,3 +125,48 @@ test('쓴 적 없는 주소는 그대로 404 다', async ({ page }) => {
   const response = await page.goto('/product/no-such-product-ever');
   expect(response?.status()).toBe(404);
 });
+
+/**
+ * **브랜드 이름을 바꾸면 새 이름으로 그 브랜드 상품이 찾힌다.**
+ *
+ * 상품 검색은 상품 행에 복사해 둔 문자열(상품명 + 브랜드명)을 본다 — 두 테이블에 걸친 OR 는 색인을
+ * 못 타서다. 브랜드 이름을 고치는 화면을 만들면서 그 복사본을 함께 고치지 않아, 이름을 바꾼 브랜드는
+ * **새 이름으로 검색하면 하나도 안 나왔다.** 고치는 쪽은 원시 SQL 한 문장이라 흉내 낸 단위 검사로는
+ * 실제로 도는지 알 수 없다 — 여기서 진짜 DB 로 본다.
+ *
+ * ATELIER K 를 고른 것은 **어느 명세도 이 이름을 부르지 않아서**다(e2e-fixture-isolation 이 지킨다).
+ * 바꾼 이름에 옛 이름을 남기지 않는다 — 남기면 옛 이름으로도 찾혀 새 이름이 먹었는지 가릴 수 없다.
+ */
+const BRAND = 'ATELIER K';
+
+test('브랜드 이름을 바꾸면 새 이름으로 그 브랜드 상품이 검색된다', async ({ page }) => {
+  const token = `zqbrand${Date.now()}`;
+  const renamed = `E2E ${token}`;
+  const products = page.locator('main a[href^="/product/"]');
+
+  // 바꾸기 전: 이 낱말로는 아무것도 없다 — 있으면 겨룬 것이 없다
+  await page.goto(`/search?q=${token}`);
+  await expect(page.getByText('검색 결과가 없습니다')).toBeVisible();
+
+  await page.goto('/admin/brands');
+  await page.getByLabel(`${BRAND} 이름`).fill(renamed);
+  const saved = page.waitForResponse((r) => /\/api\/admin\/brands\/[^/]+$/.test(r.url()) && r.request().method() === 'PATCH');
+  await page.getByLabel(`${BRAND} 이름`).locator('xpath=ancestor::form').getByRole('button', { name: '저장' }).click();
+  const response = await saved;
+  expect(response.ok(), await response.text()).toBe(true);
+  const brandId = /\/api\/admin\/brands\/([^/]+)$/.exec(response.url())![1]!;
+
+  try {
+    await page.goto(`/search?q=${token}`);
+    await expect(products.first()).toBeVisible();
+  } finally {
+    const back = await page.request.patch(`/api/admin/brands/${brandId}`, { data: { name: BRAND } });
+    expect(back.ok(), await back.text()).toBe(true);
+  }
+
+  // 되돌리면 옛 이름으로 다시 찾히고, 바꿨던 이름으로는 안 찾힌다
+  await page.goto(`/search?q=${token}`);
+  await expect(page.getByText('검색 결과가 없습니다')).toBeVisible();
+  await page.goto(`/search?q=${encodeURIComponent('atelier k')}`);
+  await expect(products.first()).toBeVisible();
+});

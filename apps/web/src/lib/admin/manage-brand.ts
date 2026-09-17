@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma, Prisma } from '@shop/db';
 import {
   assertPermission, brandLogoObjectKey, canCreateBrand, canEditBrand, isSlugTaken, merchantScope,
+  searchTextFor,
   type Actor,
 } from '@shop/core';
 import { uploadImageFiles, discardImageKeys, type ImageFile } from '~/lib/images/upload-files';
@@ -168,7 +169,7 @@ export async function updateBrand(
           update: { brandId },
         });
       }
-      return tx.brand.update({
+      const updated = await tx.brand.update({
         where: { id: brandId },
         data: {
           ...(input.name === undefined ? {} : { name: input.name }),
@@ -176,6 +177,11 @@ export async function updateBrand(
         },
         select: { id: true, name: true, slug: true },
       });
+      // 이름이 바뀌면 그 브랜드 상품의 검색 문자열도 같은 트랜잭션에서 고친다 — 아래 함수의 주석
+      if (updated.name !== before.name) {
+        await refreshProductSearchText(tx, brandId, updated.name);
+      }
+      return updated;
     });
 
     return {
@@ -192,6 +198,33 @@ export async function updateBrand(
     }
     throw error;
   }
+}
+
+/**
+ * 한 브랜드 상품들의 검색 문자열을 브랜드의 새 이름으로 다시 적는다.
+ *
+ * **브랜드명은 상품 행에 복사돼 있다**(searchText = 상품명 + 브랜드명). 검색이 두 테이블에 걸친 OR 를
+ * 쓰면 색인을 못 타서 그렇게 했고, 스키마 주석은 "브랜드명을 바꾸는 화면이 생기면 그 브랜드의 상품을
+ * 함께 갱신해야 한다" 고 적어 두었다. 화면을 만들면서 그것을 빠뜨려, 이름을 바꾼 브랜드는 **새 이름으로
+ * 검색하면 상품이 하나도 안 나오고 옛 이름으로는 계속 나왔다.**
+ *
+ * · **값은 core 규칙(searchTextFor)으로 만든다.** SQL 의 lower() 로 다시 적으면 규칙이 두 곳이 된다.
+ * · **한 문장으로 쓴다.** 한 브랜드에 상품이 수백 개일 수 있는데, 한 줄씩 고치면 트랜잭션이 길어진다.
+ * · **그사이 상품 이름이 바뀐 줄은 건드리지 않는다.** 읽은 이름과 지금 이름이 같을 때만 쓴다 — 아니면
+ *   옛 상품 이름으로 덮는다. 이름을 바꾼 쪽이 제 검색 문자열을 이미 적었다.
+ * · 보관한 상품도 고친다. 되돌렸을 때 옛 이름으로 남아 있으면 같은 구멍이 다시 난다.
+ */
+async function refreshProductSearchText(tx: Prisma.TransactionClient, brandId: string, brandName: string): Promise<number> {
+  const products = await tx.product.findMany({ where: { brandId }, select: { id: true, name: true } });
+  if (products.length === 0) return 0;
+
+  const rows = products.map((p) =>
+    Prisma.sql`(${p.id}::text, ${p.name}::text, ${searchTextFor({ name: p.name, brandName })}::text)`);
+  return tx.$executeRaw`
+    UPDATE "products" AS p
+       SET "searchText" = v.text
+      FROM (VALUES ${Prisma.join(rows)}) AS v(id, name, text)
+     WHERE p.id = v.id AND p.name = v.name AND p."brandId" = ${brandId}`;
 }
 
 /** 로고를 바꾸거나 지울 때, 고칠 수 있는 브랜드인지 보고 지금 키를 읽는다 */
