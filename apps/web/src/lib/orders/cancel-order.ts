@@ -30,7 +30,7 @@ function loadOrder(db: Pick<typeof prisma, 'order'>, orderNo: string, actor: Act
   return db.order.findFirst({
     where: { orderNo, ...(staff ? {} : { userId: actor.id }) },
     select: {
-      id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
+      id: true, orderNo: true, status: true, userId: true, browserSessionId: true, placedAt: true,
       pointsUsed: true, payable: true, usedCouponId: true,
       items: { select: { id: true, variantId: true, quantity: true, canceledAt: true } },
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
@@ -82,6 +82,19 @@ export async function cancelOrder(
    * 배치도 같은 이유로 한 건도 못 풀었을 것**이다.
    */
   gateway?: PaymentGateway,
+  /**
+   * 잠근 뒤 다시 읽은 주문으로 한 번 더 묻는다.
+   *
+   * **배치가 쓰라고 있는 자리다.** 결제 대기 주문을 푸는 배치는 "아직 승인을 부른 적 없는 주문" 만
+   * 풀어야 하는데, 그 판단을 잠그기 전에 하면 그사이 결제가 끝난 주문을 취소하고 환불까지 해 버린다.
+   * 여기서 막으면 잠금 안에서 본 값으로 판단한다.
+   */
+  precondition?: (order: {
+    status: OrderStatus;
+    placedAt: Date;
+    paymentStatus: string | null;
+    hasPaymentKey: boolean;
+  }) => boolean,
 ): Promise<CancelResult> {
   const isStaff = canRefundOrder(actor);
 
@@ -109,6 +122,14 @@ export async function cancelOrder(
       const order = await loadOrder(tx, orderNo, actor, isStaff);
       if (!order) throw new CancelError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
       assertCancellable(order.status, isStaff);
+      if (precondition !== undefined && !precondition({
+        status: order.status,
+        placedAt: order.placedAt,
+        paymentStatus: order.payment?.status ?? null,
+        hasPaymentKey: Boolean(order.payment?.pgPaymentKey),
+      })) {
+        throw new CancelError('PRECONDITION_FAILED', '그사이 주문이 바뀌어 취소하지 않았습니다.');
+      }
 
       // 상태머신이 허용하지 않는 전이는 여기서 막힌다
       nextStatus = transition(order.status, 'CANCELLED');

@@ -88,7 +88,14 @@ export async function releaseAbandonedHolds(
     }
 
     try {
-      await cancelOrder(order.orderNo, CRON_ACTOR, HOLD_EXPIRED_REASON);
+      /*
+       * **잠근 뒤에 한 번 더 묻는다.** 위 판단과 실제 취소 사이에 결제가 끝날 수 있다 — 그러면
+       * 방금 돈을 낸 주문을 배치가 취소하고 환불까지 하게 된다. 같은 규칙(core)을 잠금 안에서 다시 본다.
+       */
+      await cancelOrder(
+        order.orderNo, CRON_ACTOR, HOLD_EXPIRED_REASON, undefined,
+        (locked) => isAbandonedHold(locked, now, minutes),
+      );
       orderNos.push(order.orderNo);
       // 손님은 입금하려던 주문이 사라진 것을 모른다 — 배치가 한 일이라 알림함에도 남는다. 실패해도 던지지 않는다
       await notifyAfterSale({ kind: 'ORDER_CANCELLED', orderNo: order.orderNo, actorId: CRON_ACTOR.id });

@@ -118,3 +118,45 @@ describe('결제 대기 주문 풀기', () => {
     expect(where.placedAt.lt.getTime()).toBe(NOW.getTime() - 5 * 60 * 1000);
   });
 });
+
+/**
+ * **잠근 뒤에 한 번 더 묻는다.**
+ *
+ * 위에서 "풀어도 되는가" 를 본 것과 실제로 취소하는 것 사이에 결제가 끝날 수 있다. 그 사이를 그대로 두면
+ * 방금 돈을 낸 주문을 배치가 취소하고 환불까지 한다. 같은 규칙을 잠금 안에서 다시 보라고 넘긴다.
+ */
+describe('잠근 뒤 다시 보는 조건', () => {
+  const lockedCheck = () => cancelOrder.mock.calls[0]![4] as (o: {
+    status: string; placedAt: Date; paymentStatus: string | null; hasPaymentKey: boolean;
+  }) => boolean;
+
+  beforeEach(() => {
+    db.order.findMany.mockResolvedValue([row()]);
+  });
+
+  it('취소에 조건을 함께 넘긴다', async () => {
+    await releaseAbandonedHolds(NOW);
+    expect(typeof lockedCheck()).toBe('function');
+  });
+
+  it('잠근 뒤에도 결제 대기 그대로면 푼다', async () => {
+    await releaseAbandonedHolds(NOW);
+    expect(lockedCheck()({
+      status: 'PENDING', placedAt: minutesAgo(60), paymentStatus: 'READY', hasPaymentKey: false,
+    })).toBe(true);
+  });
+
+  it('그사이 결제가 끝났으면 풀지 않는다 — 방금 낸 돈을 돌려보내지 않는다', async () => {
+    await releaseAbandonedHolds(NOW);
+    expect(lockedCheck()({
+      status: 'PAID', placedAt: minutesAgo(60), paymentStatus: 'DONE', hasPaymentKey: true,
+    })).toBe(false);
+  });
+
+  it('그사이 승인이 시작됐으면(결제 키가 생겼으면) 풀지 않는다', async () => {
+    await releaseAbandonedHolds(NOW);
+    expect(lockedCheck()({
+      status: 'PENDING', placedAt: minutesAgo(60), paymentStatus: 'IN_PROGRESS', hasPaymentKey: true,
+    })).toBe(false);
+  });
+});

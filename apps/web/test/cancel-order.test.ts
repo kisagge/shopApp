@@ -340,6 +340,32 @@ describe('그사이 들어온 일부 취소', () => {
     expect(tx.orderRefund.create.mock.calls[0]![0].data).toMatchObject({ itemIds: ['i-1'] });
   });
 
+  /*
+   * 배치가 쓰는 자리다. 잠그기 전에 "풀어도 되는 주문인가" 를 보면, 그사이 결제가 끝난 주문을 취소하고
+   * 환불까지 하게 된다. 잠금 안에서 다시 읽은 값으로 묻는다.
+   */
+  it('잠근 뒤 값으로 한 번 더 묻고, 아니라고 하면 아무것도 바꾸지 않는다', async () => {
+    const g = gateway();
+    const asked: { status: string; hasPaymentKey: boolean }[] = [];
+
+    await expect(cancelOrder('20260831-1234567', admin, '기한 지남', g, (locked) => {
+      asked.push({ status: locked.status, hasPaymentKey: locked.hasPaymentKey });
+      return false;
+    })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+
+    // 잠근 뒤 읽은 주문을 준다 — 처음 읽은 값이 아니다
+    expect(asked).toEqual([{ status: 'PAID', hasPaymentKey: true }]);
+    expect(g.cancel).not.toHaveBeenCalled();
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+    expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('그렇다고 하면 그대로 취소한다', async () => {
+    await expect(cancelOrder('20260831-1234567', customer, '변심', gateway(), () => true)).resolves.toMatchObject({
+      status: 'REFUNDED',
+    });
+  });
+
   it('잠근 뒤 보니 이미 취소됐으면 결제 취소를 부르지 않는다', async () => {
     read.findOrder.mockReset();
     read.findOrder

@@ -5,6 +5,7 @@ const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Pro
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
 const tx = vi.hoisted(() => ({
+  $queryRaw: vi.fn<(...a: any[]) => any>(),
   order: { updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
@@ -25,7 +26,7 @@ const deferred: (() => Promise<void>)[] = [];
 const afterResponse = vi.hoisted(() => vi.fn<(w: () => Promise<void>) => any>((w) => w()));
 vi.mock('~/lib/api/after-response', () => ({ afterResponse }));
 
-const { confirmPayment, ConfirmError } = await import('~/lib/orders/confirm-payment');
+const { confirmPayment } = await import('~/lib/orders/confirm-payment');
 
 const user = { id: 'u-1' };
 
@@ -56,6 +57,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.order.findFirst.mockResolvedValue(order());
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
+  // 잠근 뒤 다시 읽은 주문. 달리 보이게 할 때만 검사에서 바꾼다
+  tx.$queryRaw.mockResolvedValue([{ status: 'PENDING' }]);
   tx.order.updateMany.mockResolvedValue({ count: 1 });
 });
 
@@ -99,11 +102,39 @@ describe('멱등 — 결제창이 콜백을 두 번 부르는 일은 흔하다',
     ).rejects.toMatchObject({ code: 'ALREADY_PROCESSED' });
   });
 
-  it('그 사이 다른 요청이 먼저 처리했으면(조건부 UPDATE 0건) 거절한다', async () => {
-    tx.order.updateMany.mockResolvedValue({ count: 0 });
+  /*
+   * **승인은 주문을 잠근 뒤에 부른다.** 예전에는 "아직 대기인가" 를 잠그기 전에 보고 승인을 먼저 불렀다.
+   * 그 사이 결제 대기 주문을 푸는 배치가 이 주문을 취소하면 카드는 긁혔는데 쓰기는 0건이 되어, 결제 키조차
+   * 남지 않았다 — 돌려주려면 PG 기록을 뒤져야 했다.
+   */
+  it('잠근 뒤 보니 대기가 아니면 승인을 부르지 않는다 — 긁고 나서 버리지 않는다', async () => {
+    tx.$queryRaw.mockResolvedValue([{ status: 'CANCELLED' }]);
+    const g = gateway();
+
     await expect(
-      confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway()),
-    ).rejects.toBeInstanceOf(ConfirmError);
+      confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, g),
+    ).rejects.toMatchObject({ code: 'ALREADY_PROCESSED' });
+    expect(g.confirm).not.toHaveBeenCalled();
+    expect(tx.payment.update).not.toHaveBeenCalled();
+  });
+
+  it('잠근 다음에 승인을 부른다 — 부르는 동안 배치가 기다린다', async () => {
+    const g = gateway();
+    await confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, g);
+
+    expect(tx.$queryRaw).toHaveBeenCalledOnce();
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]!)
+      .toBeLessThan((g.confirm as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]!);
+  });
+
+  it('그사이 주문이 사라졌으면 승인을 부르지 않는다', async () => {
+    tx.$queryRaw.mockResolvedValue([]);
+    const g = gateway();
+
+    await expect(
+      confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, g),
+    ).rejects.toMatchObject({ code: 'ORDER_NOT_FOUND' });
+    expect(g.confirm).not.toHaveBeenCalled();
   });
 });
 
@@ -111,7 +142,7 @@ describe('승인 성공', () => {
   it('주문을 PAID 로 옮기고 이력을 남긴다', async () => {
     await confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway());
     expect(tx.order.updateMany).toHaveBeenCalledWith({
-      where: { id: 'o-1', status: 'PENDING' },
+      where: { id: 'o-1' },
       data: { status: 'PAID', paidAt: expect.any(Date) },
     });
     expect(tx.orderStatusLog.create.mock.calls[0]![0].data).toMatchObject({
@@ -183,7 +214,8 @@ describe('실패', () => {
 
   it('승인 후 DB 반영이 실패하면 대사할 수 있게 남긴다 — 돈은 이미 빠져나갔다', async () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    db.$transaction.mockRejectedValue(new Error('DB 다운'));
+    // 승인이 난 **뒤에** 무너진다 — 그 자리가 돈만 나가고 기록이 없는 자리다
+    tx.payment.update.mockRejectedValueOnce(new Error('DB 다운'));
     await expect(
       confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway()),
     ).rejects.toThrow('DB 다운');

@@ -13,6 +13,7 @@ vi.mock('@shop/mail', () => ({ getMailer: () => ({ name: 'fake', send }) }));
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent: vi.fn(() => Promise.resolve()) }));
 
 const tx = vi.hoisted(() => ({
+  $queryRaw: vi.fn<(...a: any[]) => any>(() => Promise.resolve([{ status: 'PENDING' }])),
   order: { updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },

@@ -4,7 +4,7 @@ import { afterResponse } from '~/lib/api/after-response';
 import { deliverOrderNotice, orderLocale, shipToLine } from '~/lib/orders/notify';
 import {
   assertPaymentAmount, isPaidStatus, transition, won,
-  PaymentError, type PaymentGateway, type Won,
+  PaymentError, type OrderStatus, type PaymentGateway, type Won,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
@@ -17,6 +17,9 @@ export interface ConfirmResult {
   /** 이미 처리된 요청을 다시 받았는지 */
   readonly alreadyConfirmed: boolean;
 }
+
+/** 승인이 오래 걸려도 주문 잠금을 무한히 쥐지 않는다 */
+const CONFIRM_LOCK_MS = 20_000;
 
 export class ConfirmError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -69,33 +72,51 @@ export async function confirmPayment(
     };
   }
 
+  // 잠그기 전에 한 번 본다 — 이미 끝난 주문으로 잠금을 쥐지 않는다(진짜 판단은 잠근 뒤에)
   if (order.status !== 'PENDING') {
     throw new ConfirmError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
   }
 
-  // ── 금액은 주문에 저장된 값이 진실이다
+  // ── 금액은 주문에 저장된 값이 진실이다. 승인을 부르기 전에 본다
   assertPaymentAmount(order.payable as Won, input.amount);
 
-  const result = await gateway.confirm({
-    paymentKey: input.paymentKey,
-    orderNo: order.orderNo,
-    amount: order.payable as Won,
-  });
-
-  // 가상계좌는 입금 전이라 주문은 아직 PENDING 이다.
-  // 카드·계좌이체는 승인 즉시 PAID 로 넘어간다.
-  const paid = isPaidStatus(result.status);
-  const nextOrderStatus = paid ? transition(order.status, 'PAID') : order.status;
+  let result: Awaited<ReturnType<PaymentGateway['confirm']>> | undefined;
+  let paid = false;
+  let nextOrderStatus: OrderStatus = order.status;
 
   try {
     await prisma.$transaction(async (tx) => {
+      /*
+       * **주문을 잠그고 그 안에서 승인을 부른다.**
+       *
+       * 예전에는 "아직 결제 대기인가" 를 잠그기 전에 보고, 승인을 부른 뒤에야 조건부 UPDATE 로 썼다.
+       * 그 사이에 결제 대기 주문을 푸는 배치가 이 주문을 취소하면 **카드는 긁혔는데 쓰기가 0건**이 되어,
+       * 결제 키조차 우리 쪽에 남지 않았다 — 돌려주려면 PG 기록을 뒤져야 한다. 잠그면 배치가 기다린다.
+       */
+      const locked = await tx.$queryRaw<{ status: string }[]>`
+        SELECT status FROM orders WHERE id = ${order.id} FOR UPDATE
+      `;
+      if (locked.length === 0) throw new ConfirmError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+      if (locked[0]!.status !== 'PENDING') {
+        throw new ConfirmError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+      }
+
+      result = await gateway.confirm({
+        paymentKey: input.paymentKey,
+        orderNo: order.orderNo,
+        amount: order.payable as Won,
+      });
+
+      // 가상계좌는 입금 전이라 주문은 아직 PENDING 이다.
+      // 카드·계좌이체는 승인 즉시 PAID 로 넘어간다.
+      paid = isPaidStatus(result.status);
+      nextOrderStatus = paid ? transition(order.status, 'PAID') : order.status;
+
       if (paid) {
-        // 조건부 UPDATE. 그 사이 다른 요청이 먼저 처리했으면 0건이 나온다.
-        const { count } = await tx.order.updateMany({
-          where: { id: order.id, status: 'PENDING' },
+        await tx.order.updateMany({
+          where: { id: order.id },
           data: { status: nextOrderStatus, paidAt: result.approvedAt ?? new Date() },
         });
-        if (count === 0) throw new ConfirmError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
 
         await tx.orderItem.updateMany({
           where: { orderId: order.id },
@@ -123,14 +144,19 @@ export async function confirmPayment(
           rawResponse: result.raw as object,
         },
       });
-    });
+    }, { timeout: CONFIRM_LOCK_MS, maxWait: CONFIRM_LOCK_MS });
   } catch (error) {
     // 승인은 났는데 DB 반영이 실패했다. 돈은 이미 빠져나갔으므로 반드시 남긴다.
-    console.error('[payment] 승인 후 DB 반영 실패 — 수동 대사 필요', {
-      orderNo: order.orderNo, paymentKey: result.paymentKey, amount: result.amount,
-    }, error);
+    if (result !== undefined) {
+      console.error('[payment] 승인 후 DB 반영 실패 — 수동 대사 필요', {
+        orderNo: order.orderNo, paymentKey: result.paymentKey, amount: result.amount,
+      }, error);
+    }
     throw error;
   }
+
+  // 트랜잭션이 끝났으면 승인 결과가 있다 — 없으면 위에서 던졌다
+  const approved = result!;
 
   /**
    * 승인 뒤에 붙는 일 — **응답을 막지 않는다.**
@@ -155,7 +181,7 @@ export async function confirmPayment(
         // 주문 생성 시점에 기록하면 결제되지 않은 주문까지 매출로 잡힌다.
         await recordServerEvent({
           name: 'purchase',
-          occurredAt: result.approvedAt ?? new Date(),
+          occurredAt: approved.approvedAt ?? new Date(),
           // 조회·담기와 **같은 세션**으로 찍어야 퍼널이 이어진다.
           // 주문 세션을 못 받았을 때만 주문번호로 대신한다(그 건은 퍼널에서 빠진다).
           sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
@@ -167,7 +193,7 @@ export async function confirmPayment(
           merchantId: null,
           value: order.payable,
           quantity: order.items.reduce((sum, i) => sum + i.quantity, 0),
-          props: { provider: gateway.provider, method: result.method },
+          props: { provider: gateway.provider, method: approved.method },
         });
       } catch (error) {
         console.error('[payment] 매출 기록 실패 — 결제는 성립했다', {
@@ -197,12 +223,12 @@ export async function confirmPayment(
       items: order.items,
       payable: order.payable,
       shipTo: shipToLine(order),
-      ...(result.virtualAccount
+      ...(approved.virtualAccount
         ? {
             virtualAccount: {
-              bank: result.virtualAccount.bank,
-              accountNumber: result.virtualAccount.accountNumber,
-              dueDate: result.virtualAccount.dueDate ?? null,
+              bank: approved.virtualAccount.bank,
+              accountNumber: approved.virtualAccount.accountNumber,
+              dueDate: approved.virtualAccount.dueDate ?? null,
             },
           }
         : {}),
@@ -212,12 +238,12 @@ export async function confirmPayment(
   return {
     orderNo: order.orderNo,
     orderStatus: nextOrderStatus,
-    paymentStatus: result.status,
-    virtualAccount: result.virtualAccount
+    paymentStatus: approved.status,
+    virtualAccount: approved.virtualAccount
       ? {
-          bank: result.virtualAccount.bank,
-          accountNumber: result.virtualAccount.accountNumber,
-          dueDate: result.virtualAccount.dueDate?.toISOString() ?? null,
+          bank: approved.virtualAccount.bank,
+          accountNumber: approved.virtualAccount.accountNumber,
+          dueDate: approved.virtualAccount.dueDate?.toISOString() ?? null,
         }
       : null,
     alreadyConfirmed: false,
