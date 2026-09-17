@@ -4,7 +4,7 @@ import { TrackedLink as Link } from '~/components/tracked-link';
 import { redirect } from 'next/navigation';
 import { formatDateTime } from '@shop/i18n';
 import { getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
-import { PageNav } from '~/components/page-nav';
+import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
 import { getNotificationTemplates } from '~/lib/notifications/templates';
@@ -120,6 +120,8 @@ export default async function NotificationsPage({
         page={page}
         total={notifications.total}
         pageSize={NOTIFICATION_PAGE_SIZE}
+        label={t('pager.label')}
+        labels={pageNavLabels(t)}
         hrefOf={(n) => ({
           pathname: '/mypage/notifications',
           ...(n === 1 ? {} : { query: { page: String(n) } }),

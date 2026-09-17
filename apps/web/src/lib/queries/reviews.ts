@@ -1,9 +1,10 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
+import { clampToLastPage } from './paged';
 import {
   ratingBreakdown, sizeFitSummary, averageRating, isSizeFit, canWriteReview,
-  REVIEWABLE_STATUS, type Actor, type SizeFit,
+  REVIEWABLE_STATUS, offsetOf, type Actor, type SizeFit,
 } from '@shop/core';
 import type { ReviewSort } from '@shop/contract';
 
@@ -277,15 +278,26 @@ function toMyReview(r: MyReviewRow): MyReview {
   };
 }
 
-export async function getMyReviews(userId: string): Promise<MyReview[]> {
-  const rows = await prisma.review.findMany({
-    where: { userId, deletedAt: null },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: 50,
-    select: myReviewSelect,
-  });
+/** 내 리뷰 한 쪽의 줄 수 */
+export const MY_REVIEW_PAGE_SIZE = 20;
 
-  return rows.map(toMyReview);
+/** 내가 쓴 리뷰. 예전에는 50건에서 잘렸고 그 뒤가 있다는 표시도 없었다 — 쪽으로 넘긴다 */
+export async function getMyReviews(
+  userId: string,
+  page = 1,
+): Promise<{ items: MyReview[]; total: number }> {
+  const where = { userId, deletedAt: null };
+  const read = (at: number) =>
+    prisma.review.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: offsetOf(at, MY_REVIEW_PAGE_SIZE),
+      take: MY_REVIEW_PAGE_SIZE,
+      select: myReviewSelect,
+    });
+  const [first, total] = await Promise.all([read(page), prisma.review.count({ where })]);
+  const rows = await clampToLastPage(first, { page, pageSize: MY_REVIEW_PAGE_SIZE, total }, read);
+  return { items: rows.map(toMyReview), total };
 }
 
 /** 고칠 리뷰 하나. 내 글이 아니거나 운영진이 내린 글이면 없는 것과 같다 */

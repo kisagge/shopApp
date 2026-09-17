@@ -13,16 +13,18 @@ import { readDateRange, readMyOrderSearch } from '@shop/core';
  */
 
 const findMany = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/db', () => ({ prisma: { order: { findMany } } }));
+const count = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('@shop/db', () => ({ prisma: { order: { findMany, count } } }));
 vi.mock('~/lib/grade/effective', () => ({ getEffectiveGrade: vi.fn() }));
 
-const { getMyOrders } = await import('~/lib/queries/mypage');
+const { getMyOrders, MY_ORDER_PAGE_SIZE } = await import('~/lib/queries/mypage');
 
 /** 마지막 호출의 where */
 const lastWhere = (): Record<string, any> => findMany.mock.calls.at(-1)![0].where;
 
 beforeEach(() => {
   findMany.mockReset().mockResolvedValue([]);
+  count.mockReset().mockResolvedValue(0);
 });
 
 describe('내 주문 좁히기', () => {
@@ -106,5 +108,52 @@ describe('내 주문 좁히기', () => {
     expect(where['items']).toBeDefined();
     expect(where['placedAt']).toBeDefined();
     expect(where['userId']).toBe('u-1');
+  });
+});
+
+/**
+ * **스물한 번째 주문부터 볼 길이 없었다.** 쪽 번호로 넘긴다 — 센 수와 읽은 줄이 같은 조건이어야 번호가 맞는다.
+ */
+describe('쪽 넘기기', () => {
+  const row = (orderNo: string) => ({
+    orderNo, status: 'PAID', placedAt: new Date('2026-09-01'), payable: 10_000,
+    items: [{ productName: '코트', brandName: 'MOOR', optionLabel: 'M' }],
+  });
+
+  it('쪽 번호만큼 건너뛰고, 센 수를 함께 준다', async () => {
+    count.mockResolvedValue(45);
+    findMany.mockResolvedValue([row('A')]);
+
+    const page = await getMyOrders('u-1', {}, { page: 3 });
+
+    expect(findMany.mock.calls[0]![0]).toMatchObject({ skip: MY_ORDER_PAGE_SIZE * 2, take: MY_ORDER_PAGE_SIZE });
+    expect(page.total).toBe(45);
+    expect(page.items.map((o) => o.orderNo)).toEqual(['A']);
+  });
+
+  it('세는 조건과 읽는 조건이 같다 — 다르면 번호가 거짓말을 한다', async () => {
+    await getMyOrders('u-1', { search: readMyOrderSearch('코트') }, { page: 2 });
+    expect(count.mock.calls[0]![0].where).toEqual(lastWhere());
+  });
+
+  it('같은 시각의 주문이 쪽마다 흔들리지 않게 주문번호로 한 번 더 줄 세운다', async () => {
+    await getMyOrders('u-1');
+    expect(findMany.mock.calls[0]![0].orderBy).toEqual([{ placedAt: 'desc' }, { orderNo: 'desc' }]);
+  });
+
+  it('없는 쪽을 달라면 빈 화면 대신 마지막 쪽을 준다', async () => {
+    count.mockResolvedValue(25);
+    findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([row('LAST')]);
+
+    const page = await getMyOrders('u-1', {}, { page: 9 });
+
+    // 25건이면 두 쪽 — 둘째 쪽을 다시 읽는다
+    expect(findMany.mock.calls[1]![0].skip).toBe(MY_ORDER_PAGE_SIZE);
+    expect(page.items.map((o) => o.orderNo)).toEqual(['LAST']);
+  });
+
+  it('마이페이지 첫 화면은 한 건만 읽는다', async () => {
+    await getMyOrders('u-1', undefined, { take: 1 });
+    expect(findMany.mock.calls[0]![0]).toMatchObject({ skip: 0, take: 1 });
   });
 });

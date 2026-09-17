@@ -1,8 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
+import { clampToLastPage } from './paged';
 import {
-  gradeProgress, won, ORDER_STATUS, expiringSoonAmount, pointExpirySchedule, REVIEWABLE_STATUS,
+  gradeProgress, won, ORDER_STATUS, offsetOf, expiringSoonAmount, pointExpirySchedule, REVIEWABLE_STATUS,
   canWriteReview,
   type Actor, type PointExpiryDay,
   type DateRange, type MemberGrade, type MyOrderSearchTerm, type OrderStatus, type Won,
@@ -117,11 +118,26 @@ export interface MyOrderFilter {
   readonly range?: DateRange;
 }
 
+/** 주문 내역 한 쪽의 줄 수 */
+export const MY_ORDER_PAGE_SIZE = 20;
+
+/**
+ * 목록 한 쪽.
+ *
+ * **잘라 놓고 말하지 않았다.** 주문은 최근 20건, 포인트는 30건, 리뷰는 50건, 문의는 10건까지만 보였고
+ * 그 뒤가 있다는 표시도 없었다 — 오래 산 손님일수록 지난 주문을 찾을 길이 없었다. 전체 수를 함께 싣고
+ * 쪽 번호로 넘긴다(알림함·운영 목록과 같은 PageNav).
+ */
+export interface MyPage<T> {
+  readonly items: readonly T[];
+  readonly total: number;
+}
+
 export async function getMyOrders(
   userId: string,
   filter: MyOrderFilter = {},
-  take = 20,
-): Promise<MyOrderSummary[]> {
+  options: { page?: number; take?: number } = {},
+): Promise<MyPage<MyOrderSummary>> {
   const { statuses, search, range } = filter;
 
   /*
@@ -156,25 +172,35 @@ export async function getMyOrders(
         }
       : {};
 
-  const orders = await prisma.order.findMany({
-    where: {
-      userId,
-      ...(statuses && statuses.length > 0 ? { status: { in: [...statuses] } } : {}),
-      ...searchWhere,
-      ...placedAt,
-    },
-    orderBy: { placedAt: 'desc' },
-    take,
-    select: {
-      orderNo: true, status: true, placedAt: true, payable: true,
-      items: {
-        select: { productName: true, brandName: true, optionLabel: true },
-        orderBy: { id: 'asc' },
+  const where = {
+    userId,
+    ...(statuses && statuses.length > 0 ? { status: { in: [...statuses] } } : {}),
+    ...searchWhere,
+    ...placedAt,
+  };
+  const size = options.take ?? MY_ORDER_PAGE_SIZE;
+  const page = options.page ?? 1;
+  const read = (at: number) =>
+    prisma.order.findMany({
+      where,
+      // 같은 시각에 들어온 주문이 쪽을 넘길 때 겹치거나 빠지지 않게 주문번호로 한 번 더 줄 세운다
+      orderBy: [{ placedAt: 'desc' }, { orderNo: 'desc' }],
+      skip: offsetOf(at, size),
+      take: size,
+      select: {
+        orderNo: true, status: true, placedAt: true, payable: true,
+        items: {
+          select: { productName: true, brandName: true, optionLabel: true },
+          orderBy: { id: 'asc' },
+        },
       },
-    },
-  });
+    });
 
-  return orders.map((o) => ({
+  const [first, total] = await Promise.all([read(page), prisma.order.count({ where })]);
+  // 즐겨찾기에 담아 둔 쪽은 조건을 바꾸거나 주문이 줄면 사라진다 — 빈 화면 대신 마지막 쪽을 준다
+  const orders = await clampToLastPage(first, { page, pageSize: size, total }, read);
+
+  const items = orders.map((o) => ({
     orderNo: o.orderNo,
     status: o.status,
     placedAt: o.placedAt,
@@ -184,6 +210,7 @@ export async function getMyOrders(
     firstItemBrand: o.items[0]?.brandName ?? '',
     firstItemOption: o.items[0]?.optionLabel ?? '',
   }));
+  return { items, total };
 }
 
 export const isOrderStatus = (value: string): value is OrderStatus =>
@@ -196,13 +223,22 @@ export interface PointEntry {
   readonly createdAt: Date;
 }
 
-export async function getPointHistory(userId: string, take = 30): Promise<PointEntry[]> {
-  return prisma.pointTransaction.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    take,
-    select: { amount: true, reason: true, note: true, createdAt: true },
-  });
+/** 포인트 내역 한 쪽의 줄 수 */
+export const POINT_HISTORY_PAGE_SIZE = 30;
+
+export async function getPointHistory(userId: string, page = 1): Promise<MyPage<PointEntry>> {
+  const read = (at: number) =>
+    prisma.pointTransaction.findMany({
+      where: { userId },
+      // 같은 순간에 적힌 줄(취소 환불과 쿠폰 복원 등)이 쪽마다 흔들리지 않게 id 로 마저 가른다
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: offsetOf(at, POINT_HISTORY_PAGE_SIZE),
+      take: POINT_HISTORY_PAGE_SIZE,
+      select: { amount: true, reason: true, note: true, createdAt: true },
+    });
+  const [first, total] = await Promise.all([read(page), prisma.pointTransaction.count({ where: { userId } })]);
+  const items = await clampToLastPage(first, { page, pageSize: POINT_HISTORY_PAGE_SIZE, total }, read);
+  return { items, total };
 }
 
 /**

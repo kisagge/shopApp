@@ -184,7 +184,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
         </ol>
       </nav>
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_452px] lg:gap-10">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,1fr)_452px] lg:gap-10">
         <ProductGallery images={product.images} name={product.name} />
 
         <div className="flex flex-col gap-5">

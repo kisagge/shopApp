@@ -9,7 +9,8 @@ import {
   type DateRange, type OrderStatus,
 } from '@shop/core';
 import { formatMoney } from '@shop/i18n';
-import { getMyOrders } from '~/lib/queries/mypage';
+import { getMyOrders, MY_ORDER_PAGE_SIZE } from '~/lib/queries/mypage';
+import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
 import { ORDER_STATUS_KEY } from '~/lib/i18n/enum-labels';
@@ -30,12 +31,14 @@ const toneFor = (status: OrderStatus) =>
 export default async function MyOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; from?: string; to?: string; page?: string }>;
 }) {
   const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/orders');
 
-  const { status, q, from, to } = await searchParams;
+  const { status, q, from, to, page: pageParam } = await searchParams;
+  // 범위를 벗어난 값은 조회와 core 가 당긴다. 여기서는 숫자로만 만든다(알림함과 같다)
+  const pageNo = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
   /*
    * 알 수 없는 값이 오면 필터를 무시한다. 던지면 URL 을 만져 본 사용자에게
    * 에러 화면이 뜨는데, 그건 과한 반응이다.
@@ -62,7 +65,7 @@ export default async function MyOrdersPage({
   }
 
   const [orders, locale, t] = await Promise.all([
-    getMyOrders(session.id, { statuses, search, range }),
+    getMyOrders(session.id, { statuses, search, range }, { page: pageNo }),
     getLocale(),
     getT(),
   ]);
@@ -209,7 +212,7 @@ export default async function MyOrdersPage({
         )}
       </form>
 
-      {orders.length === 0 ? (
+      {orders.items.length === 0 ? (
         <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
           {narrowed
             ? t('order.emptySearch')
@@ -221,7 +224,7 @@ export default async function MyOrdersPage({
         </p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {orders.map((o) => (
+          {orders.items.map((o) => (
             <li key={o.orderNo}>
               <article className="rounded-sm border border-[var(--border)] p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
@@ -255,6 +258,21 @@ export default async function MyOrdersPage({
           ))}
         </ul>
       )}
+
+      <div className="mt-8">
+        {/* 넘겨도 보던 탭·검색어·기간은 그대로 — withStatus 가 만든 조건 위에 쪽만 얹는다 */}
+        <PageNav
+          page={pageNo}
+          total={orders.total}
+          pageSize={MY_ORDER_PAGE_SIZE}
+          label={t('pager.label')}
+          labels={pageNavLabels(t)}
+          hrefOf={(n) => {
+            const base = withStatus(filter);
+            return { ...base, query: { ...base.query, ...(n === 1 ? {} : { page: String(n) }) } };
+          }}
+        />
+      </div>
     </div>
   );
 }

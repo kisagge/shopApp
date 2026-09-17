@@ -1,6 +1,30 @@
 import Link from 'next/link';
 import type { ComponentProps } from 'react';
 import { pageNav } from '@shop/core';
+import type { Translator } from '@shop/i18n';
+
+export interface PageNavLabels {
+  readonly first: string;
+  readonly prev: string;
+  readonly next: string;
+  readonly last: string;
+  readonly page: (n: number) => string;
+}
+
+const KO_LABELS: PageNavLabels = {
+  first: '첫 쪽', prev: '이전 쪽', next: '다음 쪽', last: '마지막 쪽', page: (n) => `${n}쪽`,
+};
+
+/** 손님 화면이 넘기는 이름 — 사전에서 꺼낸다 */
+export function pageNavLabels(t: Translator): PageNavLabels {
+  return {
+    first: t('pager.first'),
+    prev: t('pager.prev'),
+    next: t('pager.next'),
+    last: t('pager.last'),
+    page: (n) => t('pager.page', { page: n }),
+  };
+}
 
 /**
  * 쪽 번호 — « ‹ 1 2 3 4 5 › »
@@ -16,6 +40,7 @@ export function PageNav({
   pageSize,
   hrefOf,
   label = '쪽 이동',
+  labels = KO_LABELS,
 }: {
   page: number;
   /** 조건에 맞는 전체 줄 수 */
@@ -27,6 +52,11 @@ export function PageNav({
    */
   hrefOf: (page: number) => ComponentProps<typeof Link>['href'];
   label?: string;
+  /**
+   * 화살표·번호의 이름. **손님 화면은 번역한 이름을 넘긴다** — 운영 화면은 한국어만 쓰므로 기본값을 둔다.
+   * 예전에는 한국어로 박혀 있어 영어·일본어 손님의 낭독기가 "첫 쪽" 을 읽었다.
+   */
+  labels?: PageNavLabels;
 }) {
   const nav = pageNav({ page, total, pageSize });
   // 한 쪽뿐이면 그릴 것이 없다 — 늘 같은 자리로 가는 번호 하나는 길이 아니다
@@ -51,8 +81,8 @@ export function PageNav({
   return (
     <nav aria-label={label} className="flex justify-center">
       <ul className="flex flex-wrap items-center gap-1.5">
-        <li>{arrow(1, nav.hasPrev, '«', '첫 쪽')}</li>
-        <li>{arrow(nav.page - 1, nav.hasPrev, '‹', '이전 쪽')}</li>
+        <li>{arrow(1, nav.hasPrev, '«', labels.first)}</li>
+        <li>{arrow(nav.page - 1, nav.hasPrev, '‹', labels.prev)}</li>
 
         {nav.pages.map((n) => (
           <li key={n}>
@@ -65,15 +95,15 @@ export function PageNav({
                 {n}
               </span>
             ) : (
-              <Link href={hrefOf(n)} aria-label={`${n}쪽`} className={idle}>
+              <Link href={hrefOf(n)} aria-label={labels.page(n)} className={idle}>
                 {n}
               </Link>
             )}
           </li>
         ))}
 
-        <li>{arrow(nav.page + 1, nav.hasNext, '›', '다음 쪽')}</li>
-        <li>{arrow(nav.totalPages, nav.hasNext, '»', '마지막 쪽')}</li>
+        <li>{arrow(nav.page + 1, nav.hasNext, '›', labels.next)}</li>
+        <li>{arrow(nav.totalPages, nav.hasNext, '»', labels.last)}</li>
       </ul>
     </nav>
   );

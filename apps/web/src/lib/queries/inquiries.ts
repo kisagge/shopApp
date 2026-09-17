@@ -241,25 +241,34 @@ export interface MyInquiryRow {
  *
  * 비공개 여부를 여기서는 보지 않는다 — 내 글이다.
  */
+/** 내 문의 한 쪽의 줄 수 */
+export const MY_INQUIRY_PAGE_SIZE = 10;
+
+/*
+ * **다음 쪽으로 갈 길이 없었다.** 커서를 받게 만들어 놓고 화면이 한 번도 넘기지 않아, 열한 번째 문의부터는
+ * 볼 수 없었다. 다른 마이페이지 목록과 같이 쪽 번호로 넘긴다.
+ */
 export async function getMyInquiries(
   userId: string,
-  options: { cursor?: string | undefined } = {},
-): Promise<{ items: MyInquiryRow[]; nextCursor: string | null }> {
-  const rows = await prisma.inquiry.findMany({
-    where: { authorId: userId, deletedAt: null },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: PAGE_SIZE + 1,
-    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
-    select: {
-      id: true, content: true, isPrivate: true, topic: true, createdAt: true,
-      answer: true, answeredAt: true,
-      product: { select: { name: true, slug: true } },
-      images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
-    },
-  });
+  pageNo = 1,
+): Promise<{ items: MyInquiryRow[]; total: number }> {
+  const where = { authorId: userId, deletedAt: null };
+  const read = (at: number) =>
+    prisma.inquiry.findMany({
+      where,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      skip: offsetOf(at, MY_INQUIRY_PAGE_SIZE),
+      take: MY_INQUIRY_PAGE_SIZE,
+      select: {
+        id: true, content: true, isPrivate: true, topic: true, createdAt: true,
+        answer: true, answeredAt: true,
+        product: { select: { name: true, slug: true } },
+        images: { orderBy: { sortOrder: 'asc' }, select: { url: true } },
+      },
+    });
 
-  const hasMore = rows.length > PAGE_SIZE;
-  const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;
+  const [first, total] = await Promise.all([read(pageNo), prisma.inquiry.count({ where })]);
+  const page = await clampToLastPage(first, { page: pageNo, pageSize: MY_INQUIRY_PAGE_SIZE, total }, read);
 
   return {
     items: page.map((row) => ({
@@ -274,6 +283,6 @@ export async function getMyInquiries(
       answeredAt: row.answeredAt,
       imageUrls: row.images.map((i) => i.url),
     })),
-    nextCursor: hasMore ? (page.at(-1)?.id ?? null) : null,
+    total,
   };
 }

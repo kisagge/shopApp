@@ -91,7 +91,7 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
           </p>
         )}
 
-        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
           <div className="flex flex-col gap-6">
             <section aria-labelledby="user-profile" className={card}>
               <h2 id="user-profile" className="text-[15px] font-semibold tracking-tight">기본 정보</h2>

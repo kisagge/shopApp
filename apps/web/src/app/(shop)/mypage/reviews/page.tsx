@@ -5,7 +5,8 @@ import { redirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { REVIEW_REWARD, canWriteReview } from '@shop/core';
 import { formatNumber } from '@shop/i18n';
-import { getMyReviews, getReviewableItems } from '~/lib/queries/reviews';
+import { getMyReviews, getReviewableItems, MY_REVIEW_PAGE_SIZE } from '~/lib/queries/reviews';
+import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { ReviewForm } from './review-form';
 import { ReviewStars } from '~/components/review-stars';
 import { ReviewActions } from '~/components/review-actions';
@@ -28,16 +29,17 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZ
 export default async function MyReviewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; edited?: string; earned?: string }>;
+  searchParams: Promise<{ saved?: string; edited?: string; earned?: string; page?: string }>;
 }) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/reviews');
 
-  const [items, mine, t, params] = await Promise.all([
+  const params = await searchParams;
+  const pageNo = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
+  const [items, mine, t] = await Promise.all([
     getReviewableItems(user),
-    getMyReviews(user.id),
+    getMyReviews(user.id, pageNo),
     getT(),
-    searchParams,
   ]);
   // 방금 등록한 뒤 — 폼은 목록에서 빠져 사라지므로 결과는 화면이 남긴다(review-form)
   const saved = params.saved === '1';
@@ -147,16 +149,16 @@ export default async function MyReviewsPage({
 
       <section aria-labelledby="reviews-written" className="mt-14">
         <h2 id="reviews-written" className="mb-5 text-[15px] font-semibold">
-          {t('my.reviewsWritten')} <span className="tnum text-[var(--fg-muted)]">{mine.length}</span>
+          {t('my.reviewsWritten')} <span className="tnum text-[var(--fg-muted)]">{mine.total}</span>
         </h2>
 
-        {mine.length === 0 ? (
+        {mine.items.length === 0 ? (
           <p className="py-14 text-center text-[13px] text-[var(--fg-muted)]">
             {t('my.reviewsWrittenNone')}
           </p>
         ) : (
           <ul className="flex flex-col">
-            {mine.map((review) => (
+            {mine.items.map((review) => (
               <li key={review.id} className="border-t border-[var(--border)] py-6">
                 <article>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -207,6 +209,17 @@ export default async function MyReviewsPage({
             ))}
           </ul>
         )}
+        <div className="mt-6">
+          {/* 한 번만 말하는 알림(saved·edited·earned)은 넘길 때 들고 가지 않는다 */}
+          <PageNav
+            page={pageNo}
+            total={mine.total}
+            pageSize={MY_REVIEW_PAGE_SIZE}
+            label={t('pager.label')}
+            labels={pageNavLabels(t)}
+            hrefOf={(n) => ({ pathname: '/mypage/reviews', ...(n === 1 ? {} : { query: { page: String(n) } }) })}
+          />
+        </div>
       </section>
     </div>
   );

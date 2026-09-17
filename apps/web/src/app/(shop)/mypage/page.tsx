@@ -23,13 +23,14 @@ export default async function MyPage() {
   const session = await getViewer();
   if (!session) redirect('/login?next=/mypage');
 
-  const [summary, recent, locale, t] = await Promise.all([
+  const [summary, recentPage, locale, t] = await Promise.all([
     getMyPageSummary(session),
-    getMyOrders(session.id, undefined, 1),
+    getMyOrders(session.id, undefined, { take: 1 }),
     getLocale(),
     getT(),
   ]);
   if (!summary) redirect('/login');
+  const recent = recentPage.items;
 
   const { gradeProgress: gp } = summary;
 

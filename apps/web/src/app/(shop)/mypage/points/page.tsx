@@ -3,7 +3,8 @@ import { getViewer } from '~/lib/viewer';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import type { Metadata } from 'next';
 import { EXPIRY_NOTICE_DAYS, isPointReason } from '@shop/core';
-import { getPointHistory, getMyPageSummary, getPointExpiry } from '~/lib/queries/mypage';
+import { getPointHistory, getMyPageSummary, getPointExpiry, POINT_HISTORY_PAGE_SIZE } from '~/lib/queries/mypage';
+import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { PointExpirySchedule } from '~/components/point-expiry-schedule';
 import { formatDate, formatNumber } from '@shop/i18n';
 import { POINT_REASON_KEY } from '~/lib/i18n/enum-labels';
@@ -15,13 +16,19 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = 'force-dynamic';
 
-export default async function PointsPage() {
+export default async function PointsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await getViewer();
   if (!session) redirect('/login?next=/mypage/points');
+  const { page: pageParam } = await searchParams;
+  const pageNo = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
 
   const [summary, history, expiry, locale, t] = await Promise.all([
     getMyPageSummary(session),
-    getPointHistory(session.id),
+    getPointHistory(session.id, pageNo),
     getPointExpiry(session.id),
     getLocale(),
     getT(),
@@ -58,7 +65,7 @@ export default async function PointsPage() {
 
       <section aria-labelledby="history-title" className="mt-8">
         <h2 id="history-title" className="mb-3.5 text-[15px] font-semibold">{t('my.pointsHistory')}</h2>
-        {history.length === 0 ? (
+        {history.items.length === 0 ? (
           <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
             {t('my.pointsEmpty')}
           </p>
@@ -76,7 +83,7 @@ export default async function PointsPage() {
               </tr>
             </thead>
             <tbody>
-              {history.map((h, i) => (
+              {history.items.map((h, i) => (
                 <tr key={i} className="border-b border-[var(--surface-2)]">
                   <td className="py-3">
                     {/* 모르는 사유가 오면 값을 그대로 보여 준다 — 열쇠 이름을 내보내지 않는다 */}
@@ -102,6 +109,16 @@ export default async function PointsPage() {
             </tbody>
           </table>
         )}
+        <div className="mt-6">
+          <PageNav
+            page={pageNo}
+            total={history.total}
+            pageSize={POINT_HISTORY_PAGE_SIZE}
+            label={t('pager.label')}
+            labels={pageNavLabels(t)}
+            hrefOf={(n) => ({ pathname: '/mypage/points', ...(n === 1 ? {} : { query: { page: String(n) } }) })}
+          />
+        </div>
       </section>
     </div>
   );

@@ -116,3 +116,50 @@ describe('자리 훑기의 범위', () => {
     expect(Object.entries(DYNAMIC).filter(([, how]) => how.trim().length < 10)).toEqual([]);
   });
 });
+
+/**
+ * **화면 뼈대 격자는 좁은 화면에서도 칸 폭을 0 부터 잡는다.**
+ *
+ * `grid xl:grid-cols-[…]` 만 적으면 좁은 화면의 칸은 기본(auto)이라 **안에 든 것의 최소 폭**만큼 넓어진다. 가로로
+ * 굴리는 표(table-scroll)도 그 칸이 먼저 넓어지니 굴릴 일이 없고, 화면 전체가 옆으로 밀린다. 주문 상세(취소 주문의
+ * 표)·회원 포인트(긴 이메일)가 그렇게 375px 검사에서 졌다 — 목록 맨 위에 어떤 줄이 오느냐에 따라 가끔만.
+ *
+ * 넓은 화면에서만 칸을 나누는 격자에는 좁은 화면의 칸(`grid-cols-[minmax(0,1fr)]`)도 적는다.
+ */
+describe('격자 칸', () => {
+  /** 좁은 화면의 칸을 적지 않아도 되는 격자와 그 이유 */
+  const ALLOWED: Readonly<Record<string, string>> = {
+    'src/app/admin/products/variant-form.tsx': '입력칸 세 개짜리 폼 줄이다. 안에 줄바꿈 안 되는 글자나 표가 없다.',
+  };
+
+  const files: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (name.endsWith('.tsx')) files.push(full);
+    }
+  };
+  walk(join(WEB, 'src'));
+
+  it('넓은 화면에서만 칸을 나누는 격자는 좁은 화면의 칸도 적는다', () => {
+    const offenders: string[] = [];
+    for (const file of files) {
+      const rel = file.slice(WEB.length + 1);
+      if (rel in ALLOWED) continue;
+      for (const m of readFileSync(file, 'utf8').matchAll(/className="([^"]*)"/g)) {
+        const classes = m[1]!.split(/\s+/);
+        if (!classes.includes('grid')) continue;
+        const responsive = classes.some((c) => /^(sm|md|lg|xl|2xl):grid-cols-\[/.test(c));
+        const base = classes.some((c) => c.startsWith('grid-cols-'));
+        if (responsive && !base) offenders.push(`${rel}: ${m[1]}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it('검사가 실제로 격자를 찾는다', () => {
+    const found = files.some((f) => /className="grid grid-cols-\[minmax\(0,1fr\)\][^"]*xl:grid-cols-\[/.test(readFileSync(f, 'utf8')));
+    expect(found).toBe(true);
+  });
+});

@@ -121,7 +121,7 @@ export default async function AdminOrderDetail({
         </div>
       </header>
 
-      <div className="grid gap-5 p-8 xl:grid-cols-[minmax(0,1fr)_372px]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 p-4 sm:p-8 xl:grid-cols-[minmax(0,1fr)_372px]">
         {/*
           **받은 돈을 돌려줘야 하는 주문.** 취소한 뒤에 가상계좌로 입금이 들어왔다. 입금 뒤 환불은 손님
           계좌가 있어야 해서 자동으로 못 한다 — 맨 위에 세워 놓친 채 지나가지 않게 한다. 가맹점은

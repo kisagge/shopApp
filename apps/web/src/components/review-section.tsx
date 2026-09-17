@@ -59,7 +59,7 @@ export function ReviewSection({
         </p>
       ) : (
         <>
-          <div className="mt-6 grid gap-8 md:grid-cols-[220px_1fr_240px]">
+          <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 md:grid-cols-[220px_minmax(0,1fr)_240px]">
             <div className="flex flex-col items-center justify-center gap-1 rounded-md bg-[var(--surface)] p-6">
               <span className="tnum text-[40px] leading-none font-semibold">
                 {summary.average?.toFixed(1) ?? '—'}

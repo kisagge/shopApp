@@ -3,7 +3,8 @@ import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { formatDateTime } from '@shop/i18n';
-import { getMyInquiries } from '~/lib/queries/inquiries';
+import { getMyInquiries, MY_INQUIRY_PAGE_SIZE } from '~/lib/queries/inquiries';
+import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { TOPIC_KEY } from '~/lib/i18n/support';
 import { NO_INDEX } from '~/lib/no-index';
@@ -15,12 +16,18 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: (await getT())('support.myInquiries'), ...NO_INDEX };
 }
 
-export default async function MyInquiriesPage() {
+export default async function MyInquiriesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/inquiries');
+  const { page: pageParam } = await searchParams;
+  const pageNo = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
 
   const [page, locale, t] = await Promise.all([
-    getMyInquiries(user.id),
+    getMyInquiries(user.id, pageNo),
     getLocale(),
     getT(),
   ]);
@@ -107,6 +114,16 @@ export default async function MyInquiriesPage() {
           ))}
         </ul>
       )}
+      <div className="mt-8">
+        <PageNav
+          page={pageNo}
+          total={page.total}
+          pageSize={MY_INQUIRY_PAGE_SIZE}
+          label={t('pager.label')}
+          labels={pageNavLabels(t)}
+          hrefOf={(n) => ({ pathname: '/mypage/inquiries', ...(n === 1 ? {} : { query: { page: String(n) } }) })}
+        />
+      </div>
     </div>
   );
 }

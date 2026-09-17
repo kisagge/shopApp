@@ -64,7 +64,7 @@ export default async function AdminProductDetailPage({
         )}
       </header>
 
-      <div className="grid gap-6 p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 p-4 sm:p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         <section
           aria-labelledby="product-edit"
           className="h-fit rounded-md border border-[var(--border)] bg-[var(--bg)] p-7 xl:col-start-1 xl:row-span-2 xl:row-start-1"

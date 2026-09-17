@@ -2,7 +2,9 @@
 import { render, screen } from './render';
 import { describe, it, expect } from 'vitest';
 
-const { PageNav } = await import('~/components/page-nav');
+import { createTranslator } from '@shop/i18n/all';
+
+const { PageNav, pageNavLabels } = await import('~/components/page-nav');
 
 /**
  * 쪽 번호 — « ‹ 1 2 3 4 5 › »
@@ -73,5 +75,41 @@ describe('쪽 번호', () => {
     nav(3);
     const first = screen.getByRole('link', { name: '첫 쪽' });
     expect(first.getAttribute('href')).toBe('/admin/orders?page=1');
+  });
+});
+
+/**
+ * **손님 화면은 손님의 말로 읽는다.** 이름이 한국어로 박혀 있어 영어·일본어 손님의 낭독기가 "첫 쪽" 을 읽었다.
+ * 마이페이지 목록(주문·포인트·리뷰·문의·알림)이 사전의 이름을 넘긴다.
+ */
+describe('번역한 이름', () => {
+  const enNav = (page: number) => {
+    const t = createTranslator('en');
+    return render(
+      <PageNav
+        page={page}
+        total={100}
+        pageSize={10}
+        label={t('pager.label')}
+        labels={pageNavLabels(t)}
+        hrefOf={(n) => ({ pathname: '/mypage/orders' as const, query: { page: String(n) } })}
+      />,
+    );
+  };
+
+  it('화살표와 번호가 넘긴 이름으로 읽힌다', () => {
+    enNav(5);
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'First page' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Previous page' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Next page' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Last page' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Page 6' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: '첫 쪽' })).toBeNull();
+  });
+
+  it('넘기지 않으면 운영 화면처럼 한국어로 읽힌다', () => {
+    nav(3);
+    expect(screen.getByRole('link', { name: '4쪽' })).toBeInTheDocument();
   });
 });
