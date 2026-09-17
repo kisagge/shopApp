@@ -127,6 +127,9 @@ const BANNERS = [
   },
 ];
 
+/** 사진을 두 장 받는 상품 — 상품 화면의 작은 사진 단추를 검사가 누를 수 있게(e2e shopping) */
+const GALLERY_SEED_SLUG = 'wool-varsity-blouson';
+
 const PRODUCTS: SeedProduct[] = [
   {
     slug: 'oversized-wool-coat', name: '오버사이즈 울 블렌드 코트',
@@ -767,6 +770,22 @@ async function main(): Promise<void> {
          */
         alt: `${brand.name} ${p.name}`,
         sortOrder: 0,
+      },
+    });
+    /*
+     * **한 상품에는 두 장.** 상품 화면은 사진이 두 장 이상일 때만 작은 사진 단추를 그린다. 모두 한 장이면
+     * 그 단추를 누르는 검사(e2e shopping — 작은 사진을 누르면 큰 사진이 바뀐다)가 CI 에서 볼 것이 없다.
+     * 위와 같이 사진이 없던 상품에만 넣는다 — 진짜 사진을 올린 상품은 건드리지 않는다.
+     */
+    if (imageCount === 0 && p.slug === GALLERY_SEED_SLUG) await prisma.productImage.upsert({
+      where: { id: `seedimg2${product.id}` },
+      update: {},
+      create: {
+        id: `seedimg2${product.id}`,
+        productId: product.id,
+        url: '/seed/product-detail.png',
+        alt: `${brand.name} ${p.name} 상세`,
+        sortOrder: 1,
       },
     });
 

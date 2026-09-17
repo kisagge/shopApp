@@ -27,6 +27,8 @@ const FILES = [
   { name: 'collection.png', width: 1200, height: 800, tone: 'clay', variant: 0 },
   { name: 'banner.png', width: 1600, height: 900, tone: 'sand', variant: 1 },
   { name: 'product.png', width: 800, height: 1000, tone: 'stone', variant: 2 },
+  // 한 상품의 두 번째 사진 — 상품 화면의 작은 사진 단추를 검사가 누를 수 있게. 첫 장과 달라 보여야 한다
+  { name: 'product-detail.png', width: 800, height: 1000, tone: 'clay', variant: 3 },
 ];
 
 mkdirSync(OUT, { recursive: true });

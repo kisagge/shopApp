@@ -136,6 +136,8 @@ export const ja: Dictionary = {
   'product.inquiries': '商品への問い合わせ',
   'product.notFound': '商品が見つかりません',
   'product.photoCredit': '写真',
+  'product.gallery': '商品写真 {count}枚',
+  'product.galleryShow': '{index}枚目の写真を表示',
   'product.allSoldOut': '全オプション売り切れ',
   'product.rewardLabel': 'ポイント',
   'product.rewardValue': 'ご購入で{points}Pたまります ({percent}%)',

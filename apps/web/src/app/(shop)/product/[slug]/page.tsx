@@ -1,13 +1,11 @@
 import { Suspense } from 'react';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
-import Image from 'next/image';
 import type { Metadata } from 'next';
 import { Badge, Price } from '@shop/ui';
 import {
   GRADE_REWARD_PERCENT, percentOf,
   productStructuredData, breadcrumbStructuredData,
-  isBlurDataUrl,
 } from '@shop/core';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { headers } from 'next/headers';
@@ -16,6 +14,7 @@ import { absoluteUrl } from '~/lib/urls';
 import { getSubscribedVariantIds } from '~/lib/restock/query';
 import { getProductBySlug, getProductSlugMovedTo } from '~/lib/queries/catalog/products';
 import { ProductOptions } from '~/components/product-options';
+import { ProductGallery } from '~/components/product-gallery';
 import { ProductReviews } from '~/components/product-reviews';
 import { ProductInquiries } from '~/components/product-inquiries';
 import { SectionSkeleton, StripSkeleton } from '~/components/section-skeleton';
@@ -186,57 +185,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
       </nav>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_452px] lg:gap-10">
-        {/*
-          **role="img" 를 걷어냈다.** 이 칸에 붙여 두었더니 안쪽이 통째로 그림
-          하나가 되어, 아래 사진 출처 링크가 낭독기에는 없는 것이 되고 키보드로는
-          잡히는 상태가 됐다 — 초점은 가는데 무엇에 왔는지 들리지 않는다.
-
-          사진이 있으면 그 img 의 대체 텍스트가 이미 이름을 말하고, 없으면 옆의
-          h1 이 말한다. 자리표시 글자는 장식이라 감춘 채로 둔다.
-        */}
-        <div className="relative flex aspect-4/5 items-center justify-center rounded-md bg-ph-sand lg:aspect-auto lg:h-[700px]">
-          {product.images[0] ? (
-            <Image
-              src={product.images[0].url}
-              alt={product.images[0].alt}
-              fill
-              // 좁은 화면에서는 폭 전체, 넓은 화면에서는 오른쪽 452px 을 뺀 만큼
-              sizes="(min-width: 1024px) calc(100vw - 452px), 100vw"
-              // 이 화면의 가장 큰 그림이자 첫 화면에 있다. 늦게 받으면 그대로 체감된다.
-              priority
-              {...(isBlurDataUrl(product.images[0].blurDataUrl)
-                ? { placeholder: 'blur' as const, blurDataURL: product.images[0].blurDataUrl }
-                : {})}
-              className="rounded-md object-cover"
-            />
-          ) : (
-            <span aria-hidden="true" className="text-[11px] tracking-widest text-n-700">IMAGE</span>
-          )}
-
-          {/*
-            우리가 찍지 않은 사진에는 출처를 밝힌다.
-            라이선스가 강제하지 않더라도, 남의 결과물을 우리 매대에 쓰면서
-            누구 것인지 적지 않을 이유가 없다.
-          */}
-          {product.images[0]?.credit && (
-            <p className="absolute right-2 bottom-2 rounded-xs bg-n-900/55 px-2 py-1 text-[10px] text-n-0">
-              {t('product.photoCredit')}{' '}
-              {product.images[0].creditUrl ? (
-                <a
-                  href={product.images[0].creditUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-n-0 underline"
-                >
-                  {product.images[0].credit}
-                </a>
-              ) : (
-                product.images[0].credit
-              )}
-              {' · Unsplash'}
-            </p>
-          )}
-        </div>
+        <ProductGallery images={product.images} name={product.name} />
 
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2.5">

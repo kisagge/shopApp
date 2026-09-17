@@ -43,11 +43,15 @@ export default async function AdminUserPointsPage({ params }: { params: Promise<
         </nav>
       </header>
 
-      <div className="grid gap-6 p-4 sm:p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
+      {/*
+        좁은 화면의 한 줄짜리 격자도 칸 폭을 0 부터 잡는다 — 기본(auto)이면 줄바꿈 안 되는 글자(긴 이메일)가
+        칸을 밀어 화면 전체가 옆으로 밀렸다. 가입 검사가 만든 회원이 목록 맨 위에 오면 375px 검사가 졌다.
+      */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 p-4 sm:p-8 xl:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
         <section aria-labelledby="point-ledger" className="flex h-fit flex-col gap-4 rounded-md border border-[var(--border)] bg-[var(--bg)] p-5 sm:p-7">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 id="point-ledger" className="text-[15px] font-semibold tracking-tight">최근 내역</h2>
-            <p className="text-[13px] text-[var(--fg-secondary)]">
+            <p className="min-w-0 break-all text-[13px] text-[var(--fg-secondary)]">
               {account.email}
               {account.closedAt && <span className="ml-2 text-[var(--fg-muted)]">· 탈퇴한 계정</span>}
             </p>

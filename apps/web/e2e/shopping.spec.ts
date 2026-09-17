@@ -196,3 +196,27 @@ test('상품 문의는 사기 전에 물어볼 자리다', async ({ page }) => {
   // 로그인하지 않았으면 양식 대신 안내가 나와야 한다
   await expect(page.getByText(/로그인 후 남기실 수 있습니다/)).toBeVisible();
 });
+
+/**
+ * **상품 사진을 전부 본다.** 조회는 사진을 차례대로 실어 왔는데 화면은 첫 장만 그렸다 — 뒷모습·소재 사진을
+ * 올려도 손님은 볼 길이 없었다. 시드가 이 상품에만 사진을 두 장 넣는다(seed 의 GALLERY_SEED_SLUG) — 작은
+ * 사진을 눌러 큰 사진이 바뀌는지 본다. 읽기만 한다(사진을 고치는 명세는 이 상품을 쓰지 않는다).
+ */
+test('작은 사진을 누르면 큰 사진이 바뀐다', async ({ page }) => {
+  await page.goto('/product/wool-varsity-blouson');
+  await ready(page);
+
+  const thumbs = page.getByRole('list', { name: /상품 사진 \d+장/ });
+  await expect(thumbs.getByRole('button')).toHaveCount(2);
+
+  const current = thumbs.locator('button[aria-current="true"]');
+  await expect(current).toHaveAccessibleName(/^1번째 사진 보기/);
+  // 큰 사진 = 대체 텍스트가 있는 그림 중 첫 것(작은 사진은 alt 가 비어 있다)
+  const big = page.getByRole('main').getByRole('img').first();
+  const before = await big.getAttribute('src');
+
+  await thumbs.getByRole('button', { name: /^2번째 사진 보기/ }).click();
+
+  await expect(current).toHaveAccessibleName(/^2번째 사진 보기/);
+  await expect.poll(() => big.getAttribute('src')).not.toBe(before);
+});

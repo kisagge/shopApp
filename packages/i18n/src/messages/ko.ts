@@ -146,6 +146,8 @@ export const ko = {
   'product.inquiries': '상품 문의',
   'product.notFound': '상품을 찾을 수 없습니다',
   'product.photoCredit': '사진',
+  'product.gallery': '상품 사진 {count}장',
+  'product.galleryShow': '{index}번째 사진 보기',
   'product.allSoldOut': '전 옵션 품절',
   'product.rewardLabel': '적립',
   'product.rewardValue': '구매 시 {points}P 적립 ({percent}%)',

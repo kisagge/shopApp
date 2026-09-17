@@ -467,7 +467,8 @@ function Row({ label, value, small }: { label: string; value: string; small?: bo
   return (
     <div className={`flex gap-3.5 ${small ? '' : 'border-t border-[var(--surface-2)] py-2.5 first:border-0'}`}>
       <dt className="w-20 shrink-0 text-xs text-[var(--fg-muted)]">{label}</dt>
-      <dd className="text-[13px] leading-relaxed">{value}</dd>
+      {/* 긴 이메일·주소는 띄어쓰기가 없어도 줄을 바꾼다 — 안 그러면 좁은 화면이 옆으로 밀린다 */}
+      <dd className="min-w-0 break-words text-[13px] leading-relaxed">{value}</dd>
     </div>
   );
 }

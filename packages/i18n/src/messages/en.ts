@@ -140,6 +140,8 @@ export const en: Dictionary = {
   'product.inquiries': 'Questions',
   'product.notFound': 'Product not found',
   'product.photoCredit': 'Photo',
+  'product.gallery': '{count} product photos',
+  'product.galleryShow': 'Show photo {index}',
   'product.allSoldOut': 'All options sold out',
   'product.rewardLabel': 'Points',
   'product.rewardValue': 'Earns {points} points ({percent}%)',
