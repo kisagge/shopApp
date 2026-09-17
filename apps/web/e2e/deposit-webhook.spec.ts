@@ -122,6 +122,62 @@ test('같은 웹훅이 두 번 와도 한 번만 반영된다', async ({ page })
   await undo(page, orderNo);
 });
 
+test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 돌려줄 곳에 뜬다', async ({ page, browser }) => {
+  /*
+   * 취소와 입금이 엇갈린 경우다. 모의 결제사는 취소를 받아도 입금 기록을 지우지 않아, 취소 뒤에
+   * "입금됐다" 고 답한다 — 바로 그 엇갈림이다.
+   *
+   * 예전에는 입금 처리가 "취소 → 결제완료" 를 계산하다 던져서 **500** 을 줬다. 토스는 끝없이 다시
+   * 보내고, 받은 돈은 아무 데도 적히지 않았다. 입금 뒤의 환불은 손님 계좌가 있어야 해서 자동으로 못
+   * 돌려준다 — 사람이 볼 곳에 남아야 한다.
+   */
+  const orderNo = await placeVirtualAccountOrder(page);
+  await undo(page, orderNo);
+
+  const res = await page.request.post('/api/webhooks/toss', {
+    data: { eventType: 'PAYMENT_STATUS_CHANGED', data: { paymentKey: `mock_va_${orderNo}` } },
+  });
+  expect(res.status(), '재시도를 부르면 안 된다').toBe(200);
+  expect(await res.json()).toMatchObject({ received: true, applied: false });
+
+  // 주문은 취소된 그대로다
+  await page.goto(`/order/${orderNo}`);
+  await ready(page);
+  await expect(page.getByText('결제완료')).toHaveCount(0);
+
+  const admin = await browser.newContext({ storageState: STATE_FILE.admin });
+  try {
+    const ap = await admin.newPage();
+
+    // 대시보드가 먼저 알려 주고, 누르면 그 주문이 있는 목록이 열린다
+    await ap.goto('/admin');
+    await ready(ap);
+    await ap.getByRole('region', { name: '처리가 필요한 일' })
+      .getByRole('link', { name: /취소 뒤 들어온 입금/ }).click();
+    await ap.waitForURL(/\/admin\/orders\?lateDeposit=1/);
+    await ready(ap);
+    await ap.getByRole('link', { name: orderNo }).click();
+
+    // 맨 위에 무엇을 해야 하는지 선다
+    await ready(ap);
+    const alert = ap.getByRole('alert').filter({ hasText: '취소한 뒤 입금이 들어왔습니다' });
+    await expect(alert).toBeVisible();
+
+    // 돌려준 뒤 닫는다 — 한 번 더 묻는다
+    await alert.getByRole('button', { name: '환불 처리함' }).click();
+    await alert.getByRole('group', { name: '환불 처리 확인' }).getByRole('button', { name: '돌려주었음' }).click();
+    await expect(ap.getByRole('alert').filter({ hasText: '취소한 뒤 입금이 들어왔습니다' })).toHaveCount(0, { timeout: 15_000 });
+    await expect(ap.getByText(/환불 처리$/)).toBeVisible();
+
+    // 닫았으니 목록에서도 빠진다
+    await ap.goto('/admin/orders?lateDeposit=1');
+    await ready(ap);
+    await expect(ap.getByRole('link', { name: orderNo })).toHaveCount(0);
+  } finally {
+    await admin.close();
+  }
+});
+
 test('읽을 수 없는 본문에도 재시도를 부르지 않는다', async ({ page }) => {
   /*
    * 4xx·5xx 를 주면 토스가 계속 다시 보낸다. 본문이 깨졌다면 몇 번을 다시

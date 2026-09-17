@@ -3,6 +3,7 @@ import { won } from '../src/money';
 import {
   PAYMENT_STATUS_CODE, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_CODE,
   isPaidStatus, assertPaymentAmount, PaymentError, awaitingDeposit, depositExpired,
+  depositDecision, mustCloseVirtualAccount,
 } from '../src/payment';
 import { isRepayable } from '../src/order-state';
 
@@ -115,5 +116,28 @@ describe('입금 기한', () => {
 
   it('딱 그 시각이면 지난 것이다 — 경계에서 입금하면 받아 주지 않는다', () => {
     expect(depositExpired(NOW, NOW)).toBe(true);
+  });
+});
+
+describe('입금 신호를 어떻게 다룰까', () => {
+  it('결제 대기 주문이면 반영한다', () => {
+    expect(depositDecision('PENDING')).toBe('APPLY');
+  });
+
+  it.each(['CANCELLED', 'REFUNDED', 'PAID', 'DELIVERED'] as const)(
+    '%s 주문이면 반영하지 않고 사람에게 넘긴다 — 상태머신이 던지던 자리다',
+    (status) => {
+      expect(depositDecision(status)).toBe('LATE');
+    },
+  );
+});
+
+describe('취소할 때 가상계좌를 닫는가', () => {
+  it('입금 전이면 닫는다 — 안 닫으면 취소한 뒤에도 입금이 들어온다', () => {
+    expect(mustCloseVirtualAccount('WAITING_FOR_DEPOSIT')).toBe(true);
+  });
+
+  it.each(['DONE', 'READY', 'ABORTED', 'EXPIRED', null] as const)('%s 이면 닫지 않는다', (status) => {
+    expect(mustCloseVirtualAccount(status)).toBe(false);
   });
 });

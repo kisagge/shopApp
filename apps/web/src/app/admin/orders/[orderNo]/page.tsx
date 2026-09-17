@@ -8,6 +8,7 @@ import {
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
+import { LateDepositButton } from './late-deposit-button';
 import { ReturnActions, CompleteReturnButton, ReceiveReturnButton, ShipExchangeForm } from './return-actions';
 import { previewCompleteReturn } from '~/lib/orders/complete-return';
 import { requireAdmin } from '~/lib/admin/guard';
@@ -17,6 +18,7 @@ import { CancelItemsForm } from '~/components/cancel-items-form';
 import { OrderNotes } from '~/components/admin/order-notes';
 import { listOrderNotes } from '~/lib/orders/order-notes';
 import { getT } from '~/lib/i18n/server';
+import { adminTimestamp } from '~/lib/admin/date-format';
 import { GRADE_KEY, RETURN_TYPE_KEY, RETURN_REASON_KEY, RETURN_STATUS_KEY } from '~/lib/i18n/enum-labels';
 
 export const metadata: Metadata = { title: '주문 상세' };
@@ -120,6 +122,23 @@ export default async function AdminOrderDetail({
       </header>
 
       <div className="grid gap-5 p-8 xl:grid-cols-[minmax(0,1fr)_372px]">
+        {/*
+          **받은 돈을 돌려줘야 하는 주문.** 취소한 뒤에 가상계좌로 입금이 들어왔다. 입금 뒤 환불은 손님
+          계좌가 있어야 해서 자동으로 못 한다 — 맨 위에 세워 놓친 채 지나가지 않게 한다. 가맹점은
+          결제를 보지 않으므로(isScoped) 운영진에게만 뜬다.
+        */}
+        {!order.isScoped && order.payment?.lateDepositAt && !order.payment.lateDepositResolvedAt && (
+          <div role="alert" className="flex flex-col gap-3 rounded-sm bg-accent-soft px-4 py-3 text-[13px] text-accent-hover xl:col-span-2">
+            <p>
+              <strong>취소한 뒤 입금이 들어왔습니다</strong> —{' '}
+              <span className="tnum">{format(won(order.payment.lateDepositAmount ?? 0))}원</span>
+              {' · '}
+              <time dateTime={order.payment.lateDepositAt.toISOString()}>{adminTimestamp.format(order.payment.lateDepositAt)}</time>.
+              가상계좌 입금은 손님 환불 계좌가 있어야 돌려줄 수 있습니다. 손님에게 계좌를 받아 돌려준 뒤 처리해 주세요.
+            </p>
+            {hasPermission(actor, 'order:refund') && <LateDepositButton orderNo={order.orderNo} />}
+          </div>
+        )}
         <div className="flex flex-col gap-5">
           <section
             aria-labelledby="items-title"
@@ -397,6 +416,17 @@ export default async function AdminOrderDetail({
                     />
                     {order.payment.pgApprovalNo && (
                       <Row label="승인 번호" value={order.payment.pgApprovalNo} small />
+                    )}
+                    {order.payment.lateDepositAt && (
+                      <Row
+                        label="취소 뒤 입금"
+                        value={`${format(won(order.payment.lateDepositAmount ?? 0))}원 · ${
+                          order.payment.lateDepositResolvedAt
+                            ? `${adminTimestamp.format(order.payment.lateDepositResolvedAt)} 환불 처리`
+                            : '환불 필요'
+                        }`}
+                        small
+                      />
                     )}
                   </dl>
                 )}

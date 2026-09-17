@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { PaymentGateway } from '@shop/core';
 
 const db = vi.hoisted(() => ({
-  payment: { findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  payment: {
+    findUnique: vi.fn<(...a: any[]) => any>(),
+    update: vi.fn<(...a: any[]) => any>(),
+    updateMany: vi.fn<(...a: any[]) => any>(),
+  },
   order: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
@@ -45,6 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.payment.findUnique.mockResolvedValue(payment());
   db.order.updateMany.mockResolvedValue({ count: 1 });
+  db.payment.updateMany.mockResolvedValue({ count: 1 });
   db.eventLog.createMany.mockResolvedValue({ count: 1 });
   db.$transaction.mockImplementation(async (fn: any) => fn(db));
 });
@@ -162,5 +167,79 @@ describe('매출 기록', () => {
     await applyDeposit('pk_1', g);
 
     expect(db.eventLog.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **결제 대기가 아닌 주문에 들어온 입금.**
+ *
+ * 대개 손님이 취소한 뒤 입금한 것이다. 예전에는 "결제완료로 옮기기" 를 계산하다 상태머신이 던져서
+ * 웹훅이 500 을 받고 끝없이 재시도했고, 받은 돈은 아무 데도 적히지 않았다.
+ */
+describe('취소한 주문에 들어온 입금', () => {
+  const cancelled = () => {
+    const base = payment();
+    return { ...base, status: 'ABORTED', order: { ...base.order, status: 'CANCELLED' } };
+  };
+
+  it('던지지 않고, 받은 돈을 결제에 남기고, 반영하지 않았다고 답한다', async () => {
+    db.payment.findUnique.mockResolvedValue(cancelled());
+
+    const outcome = await applyDeposit('pk_1', gateway());
+
+    expect(outcome).toMatchObject({ applied: false });
+    expect(db.payment.updateMany).toHaveBeenCalledWith({
+      where: { id: 'pay-1', lateDepositAt: null },
+      data: { lateDepositAt: new Date('2026-09-03T02:00:00Z'), lateDepositAmount: 289000 },
+    });
+    // 주문은 취소된 그대로다
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('PG 가 알려 준 금액을 적는다 — 사람이 보내므로 주문 금액과 다를 수 있다', async () => {
+    db.payment.findUnique.mockResolvedValue(cancelled());
+    const g = gateway({
+      inquire: vi.fn<(...a: any[]) => any>(async () => ({
+        paymentKey: 'pk_1', approvalNo: null, method: 'VIRTUAL_ACCOUNT' as const,
+        status: 'DONE' as const, amount: 100000, approvedAt: null, virtualAccount: null, raw: {},
+      })),
+    });
+
+    await applyDeposit('pk_1', g);
+
+    expect(db.payment.updateMany.mock.calls[0]![0].data.lateDepositAmount).toBe(100000);
+  });
+
+  it('다시 와도 한 번만 적고 소리 내지 않는다 — 웹훅은 여러 번 온다', async () => {
+    db.payment.findUnique.mockResolvedValue(cancelled());
+    db.payment.updateMany.mockResolvedValue({ count: 0 });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(applyDeposit('pk_1', gateway())).resolves.toMatchObject({ applied: false });
+
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('처음 적을 때는 크게 남긴다 — 사람이 돌려줘야 하는 돈이다', async () => {
+    db.payment.findUnique.mockResolvedValue(cancelled());
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await applyDeposit('pk_1', gateway());
+
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('사람이 환불해야 한다'), expect.objectContaining({ orderNo: '20260903-0000001' }));
+  });
+
+  it('아직 입금 전이면 아무것도 적지 않는다', async () => {
+    db.payment.findUnique.mockResolvedValue(cancelled());
+    const g = gateway({
+      inquire: vi.fn<(...a: any[]) => any>(async () => ({
+        paymentKey: 'pk_1', approvalNo: null, method: 'VIRTUAL_ACCOUNT' as const,
+        status: 'CANCELED' as const, amount: 289000, approvedAt: null, virtualAccount: null, raw: {},
+      })),
+    });
+
+    await applyDeposit('pk_1', g);
+
+    expect(db.payment.updateMany).not.toHaveBeenCalled();
   });
 });

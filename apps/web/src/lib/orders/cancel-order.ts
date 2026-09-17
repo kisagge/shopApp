@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   isCancellableByCustomer, transition, canRefundOrder, remainingRefund, ORDER_STATUS_LABEL,
+  mustCloseVirtualAccount,
   type Actor, type PaymentGateway,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
@@ -114,6 +115,22 @@ export async function cancelOrder(
     void result;
   }
 
+  /*
+   * **입금 전 가상계좌는 닫는다.** 닫지 않으면 계좌가 살아 있어, 취소한 주문에 손님이 그대로 입금할 수
+   * 있었다 — 그 돈은 입금 처리에서 멈춰 아무 데도 적히지 않았다. 입금 전이라 돌려줄 돈이 없고 환불 계좌도
+   * 필요 없다(PG 문서). 닫기가 실패하면 **주문을 취소하지 않는다** — 그사이 입금됐을 수 있고, 그러면
+   * 입금 처리가 주문을 결제완료로 옮기는 것이 맞다.
+   */
+  const closingAccount = !captured && mustCloseVirtualAccount(order.payment?.status ?? null) && !!order.payment?.pgPaymentKey;
+  if (closingAccount) {
+    await (gateway ?? getPaymentGateway()).cancel({
+      paymentKey: order.payment!.pgPaymentKey!,
+      amount: null,
+      reason,
+      idempotencyKey: `cancel-${order.orderNo}`,
+    });
+  }
+
   await prisma.$transaction(async (tx) => {
     // 조건부 UPDATE — 그 사이 다른 요청이 먼저 취소했으면 0건이 나온다
     const { count } = await tx.order.updateMany({
@@ -165,7 +182,8 @@ export async function cancelOrder(
       await tx.payment.update({
         where: { id: order.payment.id },
         data: {
-          status: captured ? 'CANCELED' : 'ABORTED',
+          // 닫은 가상계좌는 PG 에서도 취소다 — 결제창에서 그만둔 것(ABORTED)과 다르다
+          status: captured || closingAccount ? 'CANCELED' : 'ABORTED',
           refundedAmount: order.payment.refundedAmount + refunded,
           canceledAt: now,
         },

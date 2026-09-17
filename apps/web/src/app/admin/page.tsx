@@ -140,6 +140,13 @@ export default async function AdminDashboard({
           >
             <h2 id="todo-title" className="mb-4 text-base font-semibold">처리가 필요한 일</h2>
             <ul className="flex flex-col">
+              {/*
+                **돌려줘야 할 돈이 있으면 맨 위에.** 취소한 뒤 들어온 가상계좌 입금은 자동으로 못
+                돌려준다. 없을 때는 줄을 세우지 않는다 — 늘 0 인 줄은 읽히지 않게 된다.
+              */}
+              {d.todo.lateDeposits > 0 && (
+                <Todo href="/admin/orders?lateDeposit=1" label="취소 뒤 들어온 입금 (환불 필요)" count={d.todo.lateDeposits} urgent />
+              )}
               <Todo href="/admin/orders?status=PREPARING" label="배송 준비 중" count={d.todo.preparing} />
               <Todo href="/admin/orders?status=PENDING" label="입금 대기" count={d.todo.pendingPayment} />
               <Todo
@@ -328,7 +335,7 @@ function Kpi({ label, value, note, compare }: { label: string; value: string; no
 function Todo({
   href, label, count, urgent, last,
 }: {
-  href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING'
+  href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING' | '/admin/orders?lateDeposit=1'
     | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low';
   label: string;
   count: number;

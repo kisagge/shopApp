@@ -28,6 +28,11 @@ export interface AdminOrderFilter {
   readonly q?: string | undefined;
   readonly from?: string | undefined;
   readonly to?: string | undefined;
+  /**
+   * 취소한 뒤 입금이 들어와 **아직 돌려주지 않은** 주문만. 대시보드의 "처리가 필요한 일" 이 여기로 보낸다.
+   * 운영진만 본다 — 가맹점은 결제를 보지 않고, 받은 돈은 플랫폼 계좌에 있다.
+   */
+  readonly lateDeposit?: boolean | undefined;
 }
 
 /**
@@ -37,6 +42,9 @@ export interface AdminOrderFilter {
  * 순간이 하필 가맹점 범위일 수 있다. 화면에는 자기 주문만 보이는데 내려받은
  * 파일에는 남의 가맹점 주문과 그 수령인·주소가 들어 있는 상태다.
  */
+/** 취소 뒤 들어왔고 아직 돌려주지 않은 입금. 목록 필터와 대시보드 숫자가 이것 하나를 쓴다 */
+export const LATE_DEPOSIT_OPEN = { lateDepositAt: { not: null }, lateDepositResolvedAt: null } as const;
+
 export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) {
   const term = readOrderSearch(filter.q);
   const range = readDateRange(filter.from, filter.to);
@@ -69,6 +77,7 @@ export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) 
   return {
     ...(filter.status ? { status: filter.status } : {}),
     ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    ...(filter.lateDeposit && scope === null ? { payment: { is: LATE_DEPOSIT_OPEN } } : {}),
     ...search,
     ...placedAt,
   };
@@ -140,7 +149,13 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       recipient: true, recipientPhone: true, postalCode: true,
       address1: true, address2: true, deliveryMemo: true,
       user: { select: { name: true, email: true, grade: true } },
-      payment: { select: { method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true } },
+      payment: {
+        select: {
+          method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true,
+          // 취소한 주문에 들어온 입금 — 사람이 돌려줘야 한다(lib/admin/late-deposit)
+          lateDepositAt: true, lateDepositAmount: true, lateDepositResolvedAt: true,
+        },
+      },
       shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
       deliveredAt: true,
       returnRequests: {

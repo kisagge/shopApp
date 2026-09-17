@@ -1,4 +1,6 @@
 import type { Won } from './money';
+// 타입만 서로 가져온다 — 실행 시점의 순환은 없다
+import type { OrderStatus } from './order-state';
 
 /**
  * 결제 게이트웨이 경계.
@@ -147,3 +149,27 @@ export const awaitingDeposit = (
 /** 입금 기한이 지났는가. 기한이 없으면 지나지 않은 것으로 본다 */
 export const depositExpired = (dueDate: Date | null, now: Date = new Date()): boolean =>
   dueDate !== null && dueDate.getTime() <= now.getTime();
+
+/**
+ * 가상계좌 입금 신호가 왔을 때 무엇을 할까.
+ *
+ * · `APPLY` — 결제 대기 주문이다. 결제완료로 옮긴다.
+ * · `LATE`  — 이미 결제 대기가 아니다(대개 손님이 취소했다). **받은 돈을 남기고 사람에게 넘긴다.**
+ *
+ * 한동안 LATE 를 가리지 않고 "결제완료로 옮기기" 를 계산하다 상태머신이 던졌다(취소 → 결제완료는
+ * 없는 길이다). 웹훅은 500 을 받고 끝없이 재시도했고, 받은 돈은 아무 데도 적히지 않았다. 입금 뒤의
+ * 환불은 손님의 환불 계좌가 있어야 해서(PG 규칙) 여기서 자동으로 돌려줄 수도 없다.
+ */
+export type DepositDecision = 'APPLY' | 'LATE';
+
+export const depositDecision = (orderStatus: OrderStatus): DepositDecision =>
+  orderStatus === 'PENDING' ? 'APPLY' : 'LATE';
+
+/**
+ * 주문을 취소할 때 PG 에서 가상계좌를 닫아야 하는가.
+ *
+ * **입금 전이면 닫는다.** 닫지 않으면 계좌가 살아 있어 취소한 뒤에도 입금이 들어온다. 입금 전 취소는
+ * 돌려줄 돈이 없어 환불 계좌가 필요 없고, 전액 취소만 된다(PG 문서).
+ */
+export const mustCloseVirtualAccount = (paymentStatus: PaymentStatusCode | null): boolean =>
+  paymentStatus === 'WAITING_FOR_DEPOSIT';

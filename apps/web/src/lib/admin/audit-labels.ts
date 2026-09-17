@@ -45,6 +45,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.export': '주문 내려받기',
   'order.note.add': '주문 메모 남김',
   'order.note.delete': '주문 메모 삭제',
+  'order.resolveLateDeposit': '취소 뒤 입금 환불 처리',
   'product.image.add': '이미지 추가',
   'product.image.delete': '이미지 삭제',
   'product.image.reorder': '이미지 순서 변경',

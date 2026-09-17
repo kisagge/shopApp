@@ -1045,7 +1045,19 @@ model Payment {
   approvedAt  DateTime?
   canceledAt  DateTime?
 
+  /// **취소한 주문에 들어온 입금.** 가상계좌는 취소할 때 닫지만, 취소와 입금이 엇갈리면
+  /// 돈이 먼저 들어올 수 있다. 입금 뒤의 환불은 손님 환불 계좌가 있어야 해서(PG 규칙)
+  /// 자동으로 못 한다 — 사람이 처리하도록 여기 남긴다. 한동안은 이 경우 입금 처리가
+  /// 예외로 멈춰 웹훅이 끝없이 재시도했고, 돈은 받은 채로 아무 데도 적히지 않았다.
+  lateDepositAt         DateTime?
+  /// PG 가 알려 준 입금액. 주문 금액과 다를 수 있다(사람이 직접 송금한다)
+  lateDepositAmount     Int?
+  /// 운영진이 손님에게 돌려준 뒤 처리 완료로 표시한 시각과 사람
+  lateDepositResolvedAt DateTime?
+  lateDepositResolvedBy String?
+
   @@index([status, requestedAt])
+  @@index([lateDepositAt])
   @@map("payments")
 }
 

@@ -279,3 +279,77 @@ describe('일부 취소한 뒤의 전액 취소', () => {
     });
   });
 });
+
+/**
+ * **입금 전 가상계좌는 취소할 때 닫는다.**
+ *
+ * 닫지 않으면 계좌가 살아 있어, 취소한 주문에 손님이 그대로 입금할 수 있었다. 입금 전이라 돌려줄 돈이
+ * 없고 환불 계좌도 필요 없다(PG 문서).
+ */
+describe('입금 전 가상계좌', () => {
+  const waiting = () => order({
+    status: 'PENDING',
+    payment: { id: 'p-1', status: 'WAITING_FOR_DEPOSIT', pgPaymentKey: 'pk_va', refundedAmount: 0 },
+  });
+
+  it('PG 에 전액 취소를 요청해 계좌를 닫는다', async () => {
+    db.order.findFirst.mockResolvedValue(waiting());
+    const g = gateway();
+
+    await cancelOrder('20260831-1234567', customer, '단순 변심', g);
+
+    expect(g.cancel).toHaveBeenCalledWith({
+      paymentKey: 'pk_va', amount: null, reason: '단순 변심', idempotencyKey: 'cancel-20260831-1234567',
+    });
+  });
+
+  it('닫은 계좌는 결제에서도 취소로 남긴다 — 결제창에서 그만둔 것과 다르다', async () => {
+    db.order.findFirst.mockResolvedValue(waiting());
+
+    await cancelOrder('20260831-1234567', customer, '단순 변심', gateway());
+
+    expect(tx.payment.update.mock.calls[0]![0].data).toMatchObject({ status: 'CANCELED', refundedAmount: 0 });
+  });
+
+  it('돌려준 돈은 없다 — 입금 전이다', async () => {
+    db.order.findFirst.mockResolvedValue(waiting());
+
+    const result = await cancelOrder('20260831-1234567', customer, '단순 변심', gateway());
+
+    expect(result.refunded).toBe(0);
+  });
+
+  it('닫기가 실패하면 주문을 취소하지 않는다 — 그사이 입금됐을 수 있다', async () => {
+    db.order.findFirst.mockResolvedValue(waiting());
+    const g = gateway();
+    vi.mocked(g.cancel).mockRejectedValue(new Error('이미 입금된 결제'));
+
+    await expect(cancelOrder('20260831-1234567', customer, '단순 변심', g)).rejects.toThrow('이미 입금된 결제');
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('결제 키가 없으면(계좌를 받기 전) PG 를 부르지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      status: 'PENDING',
+      payment: { id: 'p-1', status: 'WAITING_FOR_DEPOSIT', pgPaymentKey: null, refundedAmount: 0 },
+    }));
+    const g = gateway();
+
+    await cancelOrder('20260831-1234567', customer, '단순 변심', g);
+
+    expect(g.cancel).not.toHaveBeenCalled();
+  });
+
+  it('카드 결제창에서 그만둔 주문은 PG 를 부르지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      status: 'PENDING',
+      payment: { id: 'p-1', status: 'READY', pgPaymentKey: null, refundedAmount: 0 },
+    }));
+    const g = gateway();
+
+    await cancelOrder('20260831-1234567', customer, '단순 변심', g);
+
+    expect(g.cancel).not.toHaveBeenCalled();
+    expect(tx.payment.update.mock.calls[0]![0].data.status).toBe('ABORTED');
+  });
+});

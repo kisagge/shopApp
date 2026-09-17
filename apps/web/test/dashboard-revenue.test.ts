@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
   orderItem: { aggregate: vi.fn<(...a: any[]) => any>(), groupBy: vi.fn<(...a: any[]) => any>() },
   orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   product: { count: vi.fn<(...a: any[]) => any>() },
+  payment: { count: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
@@ -32,6 +33,7 @@ beforeEach(() => {
     .mockResolvedValue({ _sum: { subtotal: 0 } });
   db.order.count.mockResolvedValue(0);
   db.product.count.mockResolvedValue(0);
+  db.payment.count.mockResolvedValue(0);
   db.order.findMany.mockResolvedValue([]);
   db.orderItem.groupBy.mockResolvedValue([]);
   db.eventLog.groupBy.mockResolvedValue([]);

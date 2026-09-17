@@ -31,12 +31,14 @@ export default async function AdminOrdersPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    status?: string; page?: string; q?: string; from?: string; to?: string;
+    status?: string; page?: string; q?: string; from?: string; to?: string; lateDeposit?: string;
   }>;
 }) {
   const actor = await requireAdmin('order:read');
-  const { status, page: pageParam, q, from, to } = await searchParams;
+  const { status, page: pageParam, q, from, to, lateDeposit: lateParam } = await searchParams;
   const filter = status && isOrderStatus(status) ? status : undefined;
+  // 취소 뒤 입금은 운영진 일이다 — 가맹점에게는 이 조건을 걸지 않는다(조회도 무시한다)
+  const lateDeposit = lateParam === '1' && actor.merchantId === null;
 
   /**
    * 날짜가 잘못 들어오면 목록을 비우지 않고 조건 없이 보여 준다.
@@ -51,16 +53,17 @@ export default async function AdminOrdersPage({
   let result;
   let searchError: string | null = null;
   try {
-    result = await getAdminOrders(actor, { status: filter, page: asked, q, from, to });
+    result = await getAdminOrders(actor, { status: filter, page: asked, q, from, to, lateDeposit });
   } catch (error) {
     searchError = error instanceof OrderSearchError ? error.message : '검색 조건을 확인해 주세요.';
-    result = await getAdminOrders(actor, { status: filter, page: asked });
+    result = await getAdminOrders(actor, { status: filter, page: asked, lateDeposit });
   }
   const orders = result.rows;
 
   // 필터·검색을 유지한 채 다음 쪽으로 간다. 하나라도 빠뜨리면 넘기는 순간 조건이 풀린다.
   const kept = {
     ...(filter ? { status: filter } : {}),
+    ...(lateDeposit ? { lateDeposit: '1' } : {}),
     ...(q ? { q } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
@@ -182,6 +185,21 @@ export default async function AdminOrdersPage({
           filter={searchError ? { status: filter } : { status: filter, q, from, to }}
           canFulfill={hasPermission(actor, 'order:fulfill')}
         />
+
+        {lateDeposit && (
+          <p role="status" className="mb-5 flex flex-wrap items-center gap-x-3 rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
+            취소한 뒤 입금이 들어와 아직 돌려주지 않은 주문만 보는 중입니다.
+            <Link
+              href={{
+                pathname: '/admin/orders',
+                query: Object.fromEntries(Object.entries(kept).filter(([key]) => key !== 'lateDeposit')),
+              }}
+              className="underline underline-offset-2"
+            >
+              전체 주문 보기
+            </Link>
+          </p>
+        )}
 
         {searchError && (
           <p role="alert" className="mb-5 rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">

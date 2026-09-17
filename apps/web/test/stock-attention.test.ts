@@ -23,6 +23,7 @@ const db = vi.hoisted(() => ({
   orderItem: { aggregate: vi.fn<(...a: any[]) => any>(), groupBy: vi.fn<(...a: any[]) => any>() },
   orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   product: { count: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
+  payment: { count: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
@@ -48,6 +49,7 @@ beforeEach(() => {
   db.eventLog.groupBy.mockResolvedValue([]);
   db.$queryRaw.mockResolvedValue([]);
   db.product.count.mockResolvedValue(0);
+  db.payment.count.mockResolvedValue(0);
   db.product.findMany.mockResolvedValue([]);
 });
 
@@ -146,5 +148,24 @@ describe('눌러서 도착하는 목록', () => {
     await getAdminProducts(admin, {});
 
     expect(db.product.findMany.mock.calls[0]![0].where.variants).toBeUndefined();
+  });
+});
+
+describe('취소 뒤 들어온 입금', () => {
+  it('운영진 대시보드는 목록 필터와 같은 조건으로 센다', async () => {
+    const { LATE_DEPOSIT_OPEN } = await import('~/lib/queries/admin/orders');
+    db.payment.count.mockResolvedValue(2);
+
+    const d = await getDashboard(admin, '7d', new Date('2026-09-09T00:00:00Z'));
+
+    expect(d.todo.lateDeposits).toBe(2);
+    expect(db.payment.count).toHaveBeenCalledWith({ where: LATE_DEPOSIT_OPEN });
+  });
+
+  it('가맹점 대시보드는 세지 않는다 — 받은 돈은 플랫폼 계좌에 있다', async () => {
+    const d = await getDashboard(merchant, '7d', new Date('2026-09-09T00:00:00Z'));
+
+    expect(d.todo.lateDeposits).toBe(0);
+    expect(db.payment.count).not.toHaveBeenCalled();
   });
 });

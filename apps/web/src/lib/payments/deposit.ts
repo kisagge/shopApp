@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { isPaidStatus, transition, type PaymentGateway } from '@shop/core';
+import { depositDecision, isPaidStatus, transition, type PaymentGateway } from '@shop/core';
 import { deliverOrderNotice, orderLocale, shipToLine } from '~/lib/orders/notify';
 import { getPaymentGateway } from './index';
 import { recordServerEvent } from '~/lib/analytics/server';
@@ -61,6 +61,28 @@ export async function applyDeposit(
 
   if (!isPaidStatus(result.status)) {
     return { applied: false, reason: `아직 입금 전입니다 (${result.status})` };
+  }
+
+  /*
+   * **결제 대기가 아닌 주문에 들어온 입금은 남기고 멈춘다.**
+   *
+   * 대개 손님이 취소한 뒤 입금한 것이다(취소가 계좌를 닫기 전에 엇갈렸거나, 그 전의 주문). 예전에는 아래의
+   * "결제완료로 옮기기" 를 계산하다 상태머신이 던져서, 웹훅이 끝없이 재시도하고 받은 돈은 아무 데도 적히지
+   * 않았다. 입금 뒤의 환불은 손님 계좌가 있어야 해서(PG 규칙) 여기서 돌려줄 수 없다 — 사람이 처리하도록
+   * 남기고, 웹훅에는 처리했다고 답한다. 다시 와도 한 번만 적는다. 금액은 PG 가 알려 준 대로 적는다 —
+   * 사람이 직접 송금하므로 주문 금액과 다를 수 있다.
+   */
+  if (depositDecision(payment.order.status) === 'LATE') {
+    const { count } = await prisma.payment.updateMany({
+      where: { id: payment.id, lateDepositAt: null },
+      data: { lateDepositAt: result.approvedAt ?? new Date(), lateDepositAmount: result.amount },
+    });
+    if (count > 0) {
+      console.error('[deposit] 결제 대기가 아닌 주문에 입금이 들어왔다 — 사람이 환불해야 한다', {
+        orderNo: payment.order.orderNo, orderStatus: payment.order.status, amount: result.amount,
+      });
+    }
+    return { applied: false, reason: '결제 대기가 아닌 주문에 들어온 입금입니다 — 환불이 필요합니다' };
   }
 
   /**

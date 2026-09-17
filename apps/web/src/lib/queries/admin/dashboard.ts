@@ -8,6 +8,7 @@ import {
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 import { stockAttentionWhere } from './products';
+import { LATE_DEPOSIT_OPEN } from './orders';
 
 /**
  * 매출은 **돈이 오간 시각**으로 센다 — 자세한 까닭은 `@shop/core` 의 revenue.ts.
@@ -57,6 +58,11 @@ export interface DashboardTodo {
    */
   readonly outOfStock: number;
   readonly lowStock: number;
+  /**
+   * 취소한 뒤 입금이 들어와 아직 돌려주지 않은 주문 수. 운영진만 센다(가맹점은 0).
+   * 자동으로 돌려줄 수 없는 돈이라(가상계좌는 손님 계좌가 필요하다) 사람이 챙기지 않으면 영영 남는다.
+   */
+  readonly lateDeposits: number;
 }
 
 export interface TopProduct {
@@ -204,7 +210,7 @@ async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
 
 async function loadTodo(scope: string | null): Promise<DashboardTodo> {
   const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
-  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock] = await Promise.all([
+  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits] = await Promise.all([
     prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
     prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
     prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
@@ -215,8 +221,10 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
      */
     prisma.product.count({ where: stockAttentionWhere('OUT', scope) }),
     prisma.product.count({ where: stockAttentionWhere('LOW', scope) }),
+    // 목록 필터와 같은 조건이다 — 숫자를 누르면 그 주문들이 나온다
+    scope === null ? prisma.payment.count({ where: LATE_DEPOSIT_OPEN }) : Promise.resolve(0),
   ]);
-  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock };
+  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits };
 }
 
 async function loadTopProducts(scope: string | null, w: Window): Promise<TopProduct[]> {
