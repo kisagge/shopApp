@@ -226,6 +226,8 @@ enum SettlementStatus {
   CONFIRMED
   PAID
   HELD
+  /// 지급액이 음수였던 달 — 다음 확정에서 그 달 지급액에서 뺐다(carriedIntoId 가 그 달이다)
+  CARRIED
 }
 
 /// 가맹점별 정산. 기간 단위로 묶어 확정하고 지급한다.
@@ -246,8 +248,15 @@ model Settlement {
   commissionPercent Int @default(0)
   /// 환불·반품으로 차감된 금액
   refundAmount     Int @default(0)
-  /// 실제 지급액 = gross - commission - refund
+  /// 앞선 달에서 넘어온 음수 지급액의 합(0 이하). 지급액에 이미 들어 있다
+  carriedAmount    Int @default(0)
+  /// 실제 지급액 = gross - commission - refund + carried
   netAmount        Int
+
+  /// 이 달의 음수 지급액을 떠안은 정산. CARRIED 일 때만 있다
+  carriedIntoId String?
+  carriedInto   Settlement?  @relation("SettlementCarry", fields: [carriedIntoId], references: [id])
+  carriedFrom   Settlement[] @relation("SettlementCarry")
 
   status SettlementStatus @default(PENDING)
 

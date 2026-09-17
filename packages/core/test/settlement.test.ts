@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   settlementPeriod, isClosedPeriod, previousYearMonth, yearMonthOf, settlementWorthTelling,
-  calculateSettlement, isRecalculable, SettlementError,
+  calculateSettlement, isRecalculable, SettlementError, isCarryable, isPayable,
 } from '../src/settlement';
 import { won } from '../src/money';
 
@@ -153,5 +153,56 @@ describe('재집계 가능 여부', () => {
   it('집계 중이거나 보류인 것만 다시 계산한다', () => {
     expect(isRecalculable('PENDING')).toBe(true);
     expect(isRecalculable('HELD')).toBe(true);
+  });
+});
+
+/**
+ * **음수 지급액은 다음 달로 넘어간다.** 넘긴다는 말만 있고 넘기는 곳이 없어서, 음수로 확정된 달은 지급이 막힌 채
+ * 남았고 다음 달은 그 빚을 모른 채 제 금액을 보냈다.
+ */
+describe('앞선 달의 빚', () => {
+  it('넘어온 음수를 이 달 지급액에서 뺀다', () => {
+    const r = calculateSettlement({ gross: won(1_000_000), commissionPercent: 10, refund: won(0), carried: won(-210_000) });
+    expect(r.carriedAmount).toBe(-210_000);
+    expect(r.netAmount).toBe(900_000 - 210_000);
+  });
+
+  it('빼고도 음수면 그대로 음수다 — 또 다음 달로 넘어간다', () => {
+    const r = calculateSettlement({ gross: won(100_000), commissionPercent: 10, refund: won(0), carried: won(-500_000) });
+    expect(r.netAmount).toBe(-410_000);
+  });
+
+  it('넘어온 것이 없으면 예전과 같다', () => {
+    const r = calculateSettlement({ gross: won(100_000), commissionPercent: 10, refund: won(0) });
+    expect(r.carriedAmount).toBe(0);
+    expect(r.netAmount).toBe(90_000);
+  });
+
+  it('넘어오는 것은 빚뿐이다 — 양수면 어디선가 두 번 세고 있다', () => {
+    expect(() => calculateSettlement({ gross: won(0), commissionPercent: 10, refund: won(0), carried: won(1) }))
+      .toThrow(SettlementError);
+  });
+});
+
+describe('넘길 것과 보낼 것', () => {
+  it('확정된 음수만 넘긴다 — 지급·보류·이미 넘긴 것은 넘기지 않는다', () => {
+    expect(isCarryable({ status: 'CONFIRMED', netAmount: -1 })).toBe(true);
+    expect(isCarryable({ status: 'CONFIRMED', netAmount: 0 })).toBe(false);
+    for (const status of ['PENDING', 'PAID', 'HELD', 'CARRIED'] as const) {
+      expect(isCarryable({ status, netAmount: -1 }), status).toBe(false);
+    }
+  });
+
+  it('확정된 0 이상만 보낸다 — 음수는 다음 확정 때 넘어간다', () => {
+    expect(isPayable({ status: 'CONFIRMED', netAmount: 0 })).toBe(true);
+    expect(isPayable({ status: 'CONFIRMED', netAmount: 1 })).toBe(true);
+    expect(isPayable({ status: 'CONFIRMED', netAmount: -1 })).toBe(false);
+    for (const status of ['PENDING', 'PAID', 'HELD', 'CARRIED'] as const) {
+      expect(isPayable({ status, netAmount: 100 }), status).toBe(false);
+    }
+  });
+
+  it('넘긴 달은 다시 계산하지 않는다 — 이미 다른 달이 떠안았다', () => {
+    expect(isRecalculable('CARRIED')).toBe(false);
   });
 });

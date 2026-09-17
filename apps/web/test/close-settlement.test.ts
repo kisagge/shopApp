@@ -5,6 +5,7 @@ const db = vi.hoisted(() => ({
   merchant: { findMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { groupBy: vi.fn<(...a: any[]) => any>() },
   settlement: { findMany: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
+  $transaction: vi.fn<(...a: any[]) => any>(),
   // 알림을 진짜로 남기는 길을 함께 본다 — 모듈을 흉내 내면 "안 부른다" 를 못 잡는다
   user: { findMany: vi.fn<(...a: any[]) => any>() },
   notification: { createMany: vi.fn<(...a: any[]) => any>() },
@@ -26,6 +27,10 @@ const DURING = new Date('2026-08-15T00:00:00Z');
 
 /** 가맹점에 소속된 계정. 알림이 여기로 간다 */
 let staff: { id: string; merchantId: string }[];
+/** 이 기간에 이미 있는 정산 */
+let existingRows: { merchantId: string; status: string }[];
+/** 이 기간으로 넘어올 앞선 달의 음수 정산 */
+let carryRows: { id: string; merchantId: string; netAmount: number; status: string }[];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,8 +44,15 @@ beforeEach(() => {
       { merchantId: 'm-b', _sum: { subtotal: 500_000 }, _count: { _all: 2 } },
     ])
     .mockResolvedValueOnce([{ merchantId: 'm-a', _sum: { subtotal: 100_000 } }]);
-  db.settlement.findMany.mockResolvedValue([]);
+  /*
+   * 두 질의가 같은 표를 읽는다 — 이 기간에 이미 있는 행과, 이 기간으로 넘어올 앞선 달의 음수. 모양으로 가른다
+   * (넘어올 것을 묻는 쪽만 OR 를 쓴다). 넘어올 것은 기본으로 없다.
+   */
+  existingRows = [];
+  carryRows = [];
+  db.settlement.findMany.mockImplementation(async (args: any) => (args.where.OR ? carryRows : existingRows));
   db.settlement.upsert.mockResolvedValue({ id: 's-1' });
+  db.$transaction.mockImplementation(async (fn: any) => fn(db));
   // where 를 흉내 낸다 — 그냥 전부 돌려주면 "남의 가맹점에는 안 간다" 가 검사되지 않는다
   staff = [{ id: 'u-moore', merchantId: 'm-a' }, { id: 'u-noon', merchantId: 'm-b' }];
   db.user.findMany.mockImplementation(async (args: any) =>
@@ -124,7 +136,7 @@ describe('초안 계산', () => {
   });
 
   it('이미 확정된 기간이면 그 상태를 함께 준다', async () => {
-    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', status: 'PAID' }]);
+    existingRows = [{ merchantId: 'm-a', status: 'PAID' }];
     const drafts = await previewSettlements(admin, '2026-08');
     expect(drafts[0]?.existingStatus).toBe('PAID');
     expect(drafts[1]?.existingStatus).toBeNull();
@@ -159,23 +171,23 @@ describe('기간 확정', () => {
   });
 
   it('이미 확정된 것은 다시 계산하지 않는다', async () => {
-    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', status: 'CONFIRMED' }]);
+    existingRows = [{ merchantId: 'm-a', status: 'CONFIRMED' }];
     const result = await closeSettlements(admin, '2026-08', AFTER);
     expect(result.skipped).toEqual(['무어']);
     expect(db.settlement.upsert).toHaveBeenCalledTimes(1);
   });
 
   it('지급된 것은 절대 건드리지 않는다', async () => {
-    db.settlement.findMany.mockResolvedValue([
+    existingRows = [
       { merchantId: 'm-a', status: 'PAID' }, { merchantId: 'm-b', status: 'PAID' },
-    ]);
+    ];
     const result = await closeSettlements(admin, '2026-08', AFTER);
     expect(db.settlement.upsert).not.toHaveBeenCalled();
     expect(result.skipped).toHaveLength(2);
   });
 
   it('보류(HELD)는 다시 계산한다', async () => {
-    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', status: 'HELD' }]);
+    existingRows = [{ merchantId: 'm-a', status: 'HELD' }];
     const result = await closeSettlements(admin, '2026-08', AFTER);
     expect(result).toMatchObject({ created: 1, updated: 1, skipped: [] });
   });
@@ -244,7 +256,7 @@ describe('마감을 알린다', () => {
      * 다시 돌 때마다 알리면 같은 달 정산이 알림함에 여러 번 쌓여서, 두 번째부터는
      * 아무도 읽지 않는다. 보류(HELD)를 다시 계산해 덮어쓰는 경우가 그렇다.
      */
-    db.settlement.findMany.mockResolvedValue([{ merchantId: 'm-a', status: 'HELD' }]);
+    existingRows = [{ merchantId: 'm-a', status: 'HELD' }];
 
     await closeSettlements(admin, '2026-08', AFTER);
 
@@ -419,5 +431,82 @@ describe('지급 집행', () => {
   it('없는 정산은 404', async () => {
     db.settlement.findUnique.mockResolvedValue(null);
     await expect(paySettlement(superAdmin, 's-x')).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+/**
+ * **음수 지급액은 다음 달로 넘어간다.** 넘긴다는 말만 있고 넘기는 곳이 없어서, 음수로 확정된 달은 지급이 막힌 채
+ * 남았고 다음 달은 그 빚을 모른 채 제 금액을 보냈다.
+ */
+describe('앞선 달의 빚', () => {
+  const july = { id: 's-july', merchantId: 'm-a', netAmount: -200_000, status: 'CONFIRMED' };
+
+  it('초안이 앞선 달의 음수를 이 달 지급액에서 뺀다', async () => {
+    carryRows = [july];
+
+    const drafts = await previewSettlements(admin, '2026-08');
+
+    expect(drafts[0]).toMatchObject({ carriedAmount: -200_000, netAmount: 750_000 - 200_000, carriedFromIds: ['s-july'] });
+    // 다른 가맹점의 빚은 끌어오지 않는다
+    expect(drafts[1]).toMatchObject({ carriedAmount: 0, netAmount: 450_000, carriedFromIds: [] });
+  });
+
+  it('넘어올 것은 확정된 음수 중 넘기지 않은 앞선 달, 그리고 이 달이 이미 떠안은 것이다', async () => {
+    await previewSettlements(admin, '2026-08');
+    const where = db.settlement.findMany.mock.calls.find((c) => c[0].where.OR)![0].where;
+    expect(where.OR).toEqual([
+      { status: 'CONFIRMED', netAmount: { lt: 0 }, carriedIntoId: null, periodEnd: { lte: new Date('2026-07-31T15:00:00.000Z') } },
+      { status: 'CARRIED', carriedInto: { periodStart: new Date('2026-07-31T15:00:00.000Z'), periodEnd: new Date('2026-08-31T15:00:00.000Z') } },
+    ]);
+  });
+
+  it('확정하면 빚을 뺀 금액을 얼리고, 넘어온 달을 이 달이 떠안았다고 적는다 — 한 번에', async () => {
+    carryRows = [july];
+    db.settlement.upsert.mockResolvedValue({ id: 's-aug' });
+    db.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    await closeSettlements(superAdmin, '2026-08', AFTER);
+
+    const moore = db.settlement.upsert.mock.calls.find((c) => c[0].create.merchantId === 'm-a')![0];
+    expect(moore.create).toMatchObject({ carriedAmount: -200_000, netAmount: 550_000, status: 'CONFIRMED' });
+    expect(db.settlement.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: { in: ['s-july'] },
+        OR: [{ status: 'CONFIRMED', carriedIntoId: null }, { status: 'CARRIED', carriedIntoId: 's-aug' }],
+      },
+      data: { status: 'CARRIED', carriedIntoId: 's-aug' },
+    });
+    // 행 쓰기와 넘김 표시가 같은 트랜잭션이다
+    expect(db.$transaction).toHaveBeenCalled();
+  });
+
+  it('넘어온 달이 그사이 바뀌었으면 통째로 물린다 — 같은 빚을 두 번 빼지 않는다', async () => {
+    carryRows = [july];
+    db.settlement.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(closeSettlements(superAdmin, '2026-08', AFTER)).rejects.toMatchObject({ code: 'CARRY_CHANGED' });
+  });
+
+  it('넘어올 빚이 없으면 넘김 표시를 쓰지 않는다', async () => {
+    await closeSettlements(superAdmin, '2026-08', AFTER);
+    expect(db.settlement.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('이미 얼린 달의 초안은 그 달이 실제로 떠안은 빚만 보여 준다', async () => {
+    existingRows = [{ merchantId: 'm-a', status: 'CONFIRMED' }];
+    // 아직 넘기지 않은 빚(다음 확정에서 넘어간다)과 이 달이 이미 떠안은 빚
+    carryRows = [july, { id: 's-june', merchantId: 'm-a', netAmount: -30_000, status: 'CARRIED' }];
+
+    const drafts = await previewSettlements(admin, '2026-08');
+
+    expect(drafts[0]).toMatchObject({ carriedAmount: -30_000, carriedFromIds: ['s-june'] });
+  });
+
+  it('음수 정산은 지급하지 않는다고 말하고, 다음 달에서 뺀다고 알린다', async () => {
+    db.settlement.findUnique.mockResolvedValue({
+      id: 's-1', status: 'CONFIRMED', netAmount: -50_000,
+      merchant: { name: '무어', settlementBank: 'KB', settlementAccount: '12345678', settlementHolder: '무어' },
+    });
+    await expect(paySettlement(superAdmin, 's-1')).rejects.toThrow('다음 달 정산에서 뺍니다');
   });
 });

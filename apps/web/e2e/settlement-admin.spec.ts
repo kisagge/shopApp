@@ -50,15 +50,30 @@ function wonOf(text: string): number {
   return negative ? -Number(digits) : Number(digits);
 }
 
-/** 한 표의 줄들을 칸 글자로 읽는다 */
-async function rows(page: Page, label: string): Promise<string[][]> {
-  const table = page.getByRole('region', { name: label }).locator('tbody tr');
+/**
+ * 한 표의 줄들을 **머리칸 이름으로** 읽는다.
+ *
+ * 칸 순서로 읽었더니, 이월 칸이 하나 늘자 지급액을 환불 칸에서 읽어 멀쩡한 확정을 틀렸다고 했다. 이월 칸은 넘어온
+ * 빚이 있을 때만 생기므로 순서는 기간마다 달라진다 — 이름으로 찾는다.
+ */
+async function rows(page: Page, label: string): Promise<Record<string, string>[]> {
+  const region = page.getByRole('region', { name: label });
+  const headers = (await region.locator('thead th').allInnerTexts()).map((h) => h.trim());
+  const table = region.locator('tbody tr');
   const count = await table.count();
-  const out: string[][] = [];
+  const out: Record<string, string>[] = [];
   for (let i = 0; i < count; i += 1) {
-    out.push(await table.nth(i).locator('td').allInnerTexts());
+    const cells = await table.nth(i).locator('td').allInnerTexts();
+    out.push(Object.fromEntries(headers.map((h, j) => [h, cells[j] ?? ''])));
   }
   return out;
+}
+
+/** 한 줄의 칸. 없는 칸을 부르면 그 자리에서 말한다 — 조용히 빈 글자로 읽으면 0 원이 된다 */
+function cell(row: Record<string, string>, name: string): string {
+  const value = row[name];
+  expect(value, `"${name}" 칸이 없다 — 머리칸: ${Object.keys(row).join(', ')}`).toBeDefined();
+  return value!;
 }
 
 async function openPeriod(page: Page, yearMonth: string): Promise<void> {
@@ -98,13 +113,16 @@ test('초안의 줄이 서로 맞는다', async ({ page }) => {
    * 셈을 한다.
    */
   let sum = 0;
-  for (const [merchant, , gross, commission, refund, net] of draft) {
-    const expected = wonOf(gross!) + wonOf(commission!) + wonOf(refund!);
+  for (const row of draft) {
+    const [gross, commission, refund, net] = ['확정 매출', '수수료', '환불', '지급액'].map((n) => cell(row, n));
+    // 앞선 달에서 넘어온 빚도 이미 부호를 달고 나온다. 넘어온 것이 없는 기간에는 칸이 없다
+    const carried = row['이월 차감'] ?? '—';
+    const expected = wonOf(gross!) + wonOf(commission!) + wonOf(refund!) + wonOf(carried);
     expect(
-      wonOf(net!),
-      `${merchant} — 매출 ${gross} 수수료 ${commission} 환불 ${refund} 인데 지급액이 ${net} 이다`,
+      wonOf(net!.split('\n')[0]!),
+      `${cell(row, '가맹점')} — 매출 ${gross} 수수료 ${commission} 환불 ${refund} 이월 ${carried} 인데 지급액이 ${net} 이다`,
     ).toBe(expected);
-    sum += wonOf(net!);
+    sum += wonOf(net!.split('\n')[0]!);
   }
 
   // 합계가 줄과 따로 계산되면 사람은 어느 쪽을 믿어야 할지 모른다
@@ -128,17 +146,20 @@ test('내려받은 내역의 합이 초안과 같다', async ({ page }) => {
   const [header, ...lines] = parseCsv((await readFile(await file.path())).toString('utf8'));
   expect(header).toEqual(['구분', '가맹점', '주문번호', '기준일시', '상품', '옵션', '수량', '금액']);
 
-  for (const [merchantCell, count, gross, , , net] of draft) {
+  for (const row of draft) {
+    const count = cell(row, '건수');
+    const gross = cell(row, '확정 매출');
+    const net = cell(row, '지급액').split('\n')[0]!;
     // 첫 칸은 "무어수수료 12%" 처럼 수수료율이 붙어 나온다
-    const name = merchantCell!.split('수수료')[0]!.trim();
+    const name = cell(row, '가맹점').split('수수료')[0]!.trim();
     const mine = lines.filter((l) => l[1] === name);
     const sales = mine.filter((l) => l[0] === '판매');
     const payout = mine.find((l) => l[0] === '합계 · 지급액');
 
-    expect(sales.length, `${name} 판매 줄 수가 초안의 건수와 다르다`).toBe(Number(count!.replace(/[^\d]/g, '')));
+    expect(sales.length, `${name} 판매 줄 수가 초안의 건수와 다르다`).toBe(Number(count.replace(/[^\d]/g, '')));
     if (sales.length === 0 && !payout) continue;
-    expect(sales.reduce((sum, l) => sum + Number(l[7]), 0), `${name} 판매 합이 초안과 다르다`).toBe(wonOf(gross!));
-    expect(Number(payout?.[7]), `${name} 지급액이 초안과 다르다`).toBe(wonOf(net!));
+    expect(sales.reduce((sum, l) => sum + Number(l[7]), 0), `${name} 판매 합이 초안과 다르다`).toBe(wonOf(gross));
+    expect(Number(payout?.[7]), `${name} 지급액이 초안과 다르다`).toBe(wonOf(net));
   }
 });
 
@@ -169,12 +190,15 @@ test('확정하면 초안의 숫자가 그대로 얼어붙는다', async ({ page
   const ofPeriod = async (): Promise<Map<string, number>> =>
     new Map(
       (await rows(page, '확정된 정산 내역'))
-        .filter((r) => r[0]!.trim() === label)
-        .map((r) => [nameOf(r[1]!), wonOf(r[4]!)]),
+        .filter((r) => cell(r, '기간').trim() === label)
+        .map((r) => [nameOf(cell(r, '가맹점')), wonOf(cell(r, '지급액'))]),
     );
 
   const draft = await rows(page, '정산 미리보기');
-  const before = new Map(draft.map((r) => [nameOf(r[0]!), { net: wonOf(r[5]!), status: r[6]! }]));
+  const before = new Map(draft.map((r) => [
+    nameOf(cell(r, '가맹점')),
+    { net: wonOf(cell(r, '지급액').split('\n')[0]!), status: cell(r, '상태') },
+  ]));
   const frozenBefore = await ofPeriod();
 
   await page.getByRole('button', { name: `${PERIOD} 정산 확정` }).click();
@@ -189,7 +213,7 @@ test('확정하면 초안의 숫자가 그대로 얼어붙는다', async ({ page
 
   // 초안 표의 상태 칸이 "미확정" 에서 벗어난다
   await expect
-    .poll(async () => (await rows(page, '정산 미리보기')).every((r) => !r[6]!.includes('미확정')))
+    .poll(async () => (await rows(page, '정산 미리보기')).every((r) => !cell(r, '상태').includes('미확정')))
     .toBe(true);
 
   const frozen = await ofPeriod();
@@ -257,7 +281,7 @@ test('지급은 슈퍼관리자가 하고, 두 번 나가지 않는다', async (
        * 조용히 통과하지 않고 건너뛴다고 말한다.
        */
       const history = await rows(page, '확정된 정산 내역');
-      expect(history.some((r) => r[5]!.includes(PAID)), `단추도 없고 ${PAID} 도 없다`).toBe(true);
+      expect(history.some((r) => cell(r, '상태').includes(PAID)), `단추도 없고 ${PAID} 도 없다`).toBe(true);
       test.skip(true, '이 기간은 앞선 실행이 이미 지급했다');
       return;
     }
@@ -270,7 +294,7 @@ test('지급은 슈퍼관리자가 하고, 두 번 나가지 않는다', async (
     expect(response.status(), '지급 요청이 거절됐다').toBe(200);
 
     await expect
-      .poll(async () => (await rows(page, '확정된 정산 내역')).some((r) => r[5]!.includes(PAID)))
+      .poll(async () => (await rows(page, '확정된 정산 내역')).some((r) => cell(r, '상태').includes(PAID)))
       .toBe(true);
 
     /*

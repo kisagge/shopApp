@@ -7,7 +7,7 @@ import { won, type Won } from './money';
  * 반품 가능 기간이 지난 돈만 가맹점에 넘어간다.
  */
 
-export const SETTLEMENT_STATUS = ['PENDING', 'CONFIRMED', 'PAID', 'HELD'] as const;
+export const SETTLEMENT_STATUS = ['PENDING', 'CONFIRMED', 'PAID', 'HELD', 'CARRIED'] as const;
 export type SettlementStatus = (typeof SETTLEMENT_STATUS)[number];
 
 export const SETTLEMENT_STATUS_LABEL: Readonly<Record<SettlementStatus, string>> = {
@@ -15,6 +15,7 @@ export const SETTLEMENT_STATUS_LABEL: Readonly<Record<SettlementStatus, string>>
   CONFIRMED: '확정',
   PAID: '지급 완료',
   HELD: '보류',
+  CARRIED: '다음 달로 이월',
 };
 
 /** 확정된 정산은 다시 집계하지 않는다. 지급된 것은 더더욱. */
@@ -105,6 +106,8 @@ export interface SettlementAmounts {
   readonly grossAmount: Won;
   readonly commissionAmount: Won;
   readonly refundAmount: Won;
+  /** 앞선 달에서 넘어온 음수 지급액의 합(0 이하) */
+  readonly carriedAmount: Won;
   readonly netAmount: Won;
 }
 
@@ -118,15 +121,26 @@ export interface SettlementAmounts {
  *
  * 환불이 매출을 넘으면 지급액은 음수가 된다. 0 으로 막지 않는 이유는
  * **다음 달로 넘길 채무가 사라지기 때문**이다. 숫자가 음수인 편이 정확하다.
+ *
+ * **넘긴다는 말만 있고 넘기는 곳이 없었다.** 음수로 확정된 달은 지급이 막힌 채 남았고, 다음 달은 그 빚을 모른 채
+ * 제 금액을 보냈다. 이제 앞선 달의 음수(`carried`, 0 이하)를 이 달 지급액에 더한다 — 그래도 음수면 또 넘어간다.
  */
 export function calculateSettlement(input: {
   gross: Won;
   commissionPercent: number;
   refund: Won;
+  /** 앞선 달에서 넘어온 음수 지급액의 합. 0 이하만 받는다 */
+  carried?: Won;
 }): SettlementAmounts {
   if (!Number.isInteger(input.commissionPercent) ||
       input.commissionPercent < 0 || input.commissionPercent > 100) {
     throw new SettlementError(`수수료율은 0~100 사이 정수여야 합니다: ${input.commissionPercent}`);
+  }
+
+  const carried = input.carried ?? won(0);
+  if (carried > 0) {
+    // 넘어오는 것은 빚뿐이다. 양수가 오면 어디선가 지급할 돈을 두 번 세고 있다
+    throw new SettlementError(`넘어온 금액은 0 이하여야 합니다: ${carried}`);
   }
 
   const commission = won(Math.floor((input.gross * input.commissionPercent) / 100));
@@ -135,6 +149,19 @@ export function calculateSettlement(input: {
     grossAmount: input.gross,
     commissionAmount: commission,
     refundAmount: input.refund,
-    netAmount: won(input.gross - commission - input.refund),
+    carriedAmount: carried,
+    netAmount: won(input.gross - commission - input.refund + carried),
   };
 }
+
+/**
+ * 다음 달로 넘길 정산인가 — 확정됐고 지급액이 음수다.
+ *
+ * 지급·보류된 것은 넘기지 않는다. 이미 넘겨진 것(CARRIED)도 다시 넘기지 않는다 — 두 번 빼면 가맹점이 손해를 본다.
+ */
+export const isCarryable = (settlement: { readonly status: SettlementStatus; readonly netAmount: number }): boolean =>
+  settlement.status === 'CONFIRMED' && settlement.netAmount < 0;
+
+/** 지급할 수 있는가 — 확정됐고 지급액이 0 이상이다. 음수는 다음 확정 때 넘어간다 */
+export const isPayable = (settlement: { readonly status: SettlementStatus; readonly netAmount: number }): boolean =>
+  settlement.status === 'CONFIRMED' && settlement.netAmount >= 0;

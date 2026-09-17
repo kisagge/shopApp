@@ -4,7 +4,7 @@ import {
   assertPermission, calculateSettlement, settlementPeriod, won,
   type Actor,
 } from '@shop/core';
-import { settlementDeductionWhere, settlementSaleWhere } from '~/lib/admin/close-settlement';
+import { previewSettlements, settlementDeductionWhere, settlementSaleWhere } from '~/lib/admin/close-settlement';
 
 /**
  * 정산 내역 내려받기.
@@ -116,14 +116,29 @@ export async function exportSettlementLines(
    * 가맹점마다 합계. 계산은 화면의 정산과 같은 함수(calculateSettlement)로 한다 — 수수료 반올림 하나만
    * 달라도 파일과 지급액이 1원씩 어긋난다.
    */
+  /*
+   * **앞선 달에서 넘어온 빚도 적는다.** 화면의 지급액은 그것을 뺀 금액이라, 파일에 없으면 합계가 화면과 어긋난다.
+   * 무엇이 넘어오는지는 화면의 초안과 같은 계산(previewSettlements)에서 가져온다 — 따로 세면 둘이 갈린다.
+   */
+  const carried = new Map(
+    (await previewSettlements(scope ? { ...actor, merchantId: scope } : actor, yearMonth))
+      .map((d) => [d.merchantId, d.carriedAmount] as const),
+  );
+
   for (const m of merchants) {
-    const t = totals.get(m.id);
+    const carry = carried.get(m.id) ?? 0;
+    const t = totals.get(m.id) ?? (carry !== 0 ? { gross: 0, refund: 0 } : undefined);
     if (!t) continue;
     const percent = frozen.get(m.id) ?? m.commissionPercent;
-    const amounts = calculateSettlement({ gross: won(t.gross), commissionPercent: percent, refund: won(t.refund) });
+    const amounts = calculateSettlement({
+      gross: won(t.gross), commissionPercent: percent, refund: won(t.refund), carried: won(carry),
+    });
     rows.push(['합계 · 판매', m.name, '', '', '', '', '', amounts.grossAmount]);
     rows.push([`합계 · 수수료 ${percent}%`, m.name, '', '', '', '', '', 0 - amounts.commissionAmount]);
     rows.push(['합계 · 차감', m.name, '', '', '', '', '', 0 - amounts.refundAmount]);
+    if (amounts.carriedAmount !== 0) {
+      rows.push(['합계 · 앞선 달 이월', m.name, '', '', '', '', '', amounts.carriedAmount]);
+    }
     rows.push(['합계 · 지급액', m.name, '', '', '', '', '', amounts.netAmount]);
   }
 

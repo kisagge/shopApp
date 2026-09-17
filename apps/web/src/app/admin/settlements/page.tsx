@@ -5,7 +5,8 @@ import {
   isSettlementBank, SETTLEMENT_BANK_LABEL, SETTLEMENT_STATUS_LABEL, SettlementError, type SettlementStatus,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getSettlements } from '~/lib/queries/admin/settlements';
+import { getSettlements, SETTLEMENT_PAGE_SIZE } from '~/lib/queries/admin/settlements';
+import { PageNav } from '~/components/page-nav';
 import { previewSettlements } from '~/lib/admin/close-settlement';
 import { CloseButton, PayButton } from './settlement-actions';
 import { adminDate } from '~/lib/admin/date-format';
@@ -29,7 +30,7 @@ function endLabel(end: Date): string {
 export default async function SettlementsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ period?: string }>;
+  searchParams: Promise<{ period?: string; page?: string }>;
 }) {
   const actor = await requireAdmin('settlement:read');
   const params = await searchParams;
@@ -49,10 +50,13 @@ export default async function SettlementsPage({
   const period = settlementPeriod(yearMonth);
   const closed = isClosedPeriod(period, now);
 
-  const [drafts, settlements] = await Promise.all([
+  const pageNo = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
+  const [drafts, history] = await Promise.all([
     previewSettlements(actor, yearMonth),
-    getSettlements(actor),
+    getSettlements(actor, pageNo),
   ]);
+  const settlements = history.rows;
+  const anyCarry = drafts.some((d) => d.carriedAmount !== 0);
 
   const canConfirm = hasPermission(actor, 'settlement:confirm');
   const canPay = hasPermission(actor, 'settlement:pay');
@@ -139,6 +143,9 @@ export default async function SettlementsPage({
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">확정 매출</th>
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">환불</th>
+                    {anyCarry && (
+                      <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">이월 차감</th>
+                    )}
                     <th scope="col" className="w-32 pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
                     <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                     {!actor.merchantId && (
@@ -163,8 +170,20 @@ export default async function SettlementsPage({
                       <td className="tnum py-3 text-right text-[13px] text-accent">
                         {d.refundAmount > 0 ? `−${format(d.refundAmount)}` : '—'}
                       </td>
+                      {/*
+                        **앞선 달에서 넘어온 빚.** 환불이 매출을 넘은 달은 지급할 것이 없어 이 달에서 뺀다 — 칸이
+                        없으면 지급액이 왜 매출·수수료·환불로 계산한 것보다 적은지 알 길이 없다.
+                      */}
+                      {anyCarry && (
+                        <td className="tnum py-3 text-right text-[13px] text-accent">
+                          {d.carriedAmount < 0 ? `−${format(won(Math.abs(d.carriedAmount)))}` : '—'}
+                        </td>
+                      )}
                       <td className="tnum py-3 text-right text-[13px] font-semibold">
                         {format(d.netAmount)}
+                        {d.netAmount < 0 && (
+                          <span className="block text-[11px] font-normal text-[var(--fg-muted)]">다음 달에서 뺍니다</span>
+                        )}
                       </td>
                       <td className="py-3 text-center">
                         {d.existingStatus ? (
@@ -200,7 +219,7 @@ export default async function SettlementsPage({
                 </tbody>
                 <tfoot>
                   <tr>
-                    <th scope="row" colSpan={5} className="pt-3 text-right text-xs text-[var(--fg-secondary)]">
+                    <th scope="row" colSpan={anyCarry ? 6 : 5} className="pt-3 text-right text-xs text-[var(--fg-secondary)]">
                       지급액 합계
                     </th>
                     <td className="tnum pt-3 text-right text-[15px] font-semibold">{format(total)}</td>
@@ -234,6 +253,7 @@ export default async function SettlementsPage({
                     )}
                     <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">매출</th>
                     <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">수수료</th>
+                    <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">환불·이월</th>
                     <th scope="col" className="pb-2.5 text-right text-xs text-[var(--fg-secondary)]">지급액</th>
                     <th scope="col" className="w-24 pb-2.5 text-center text-xs text-[var(--fg-secondary)]">상태</th>
                     {canPay && (
@@ -269,11 +289,23 @@ export default async function SettlementsPage({
                           {s.commissionPercent}%
                         </span>
                       </td>
+                      <td className="tnum py-3 text-right text-[13px] text-accent">
+                        {s.refundAmount > 0 ? `−${format(s.refundAmount)}` : '—'}
+                        {s.carriedAmount < 0 && (
+                          <span className="block text-[11px]">이월 −{format(won(Math.abs(s.carriedAmount)))}</span>
+                        )}
+                      </td>
                       <td className="tnum py-3 text-right text-[13px] font-semibold">{format(s.netAmount)}</td>
                       <td className="py-3 text-center">
                         <Badge tone={s.status === 'PAID' ? 'success' : 'neutral'}>
                           {SETTLEMENT_STATUS_LABEL[s.status as SettlementStatus] ?? s.status}
                         </Badge>
+                        {/* 어느 달이 떠안았는지 — 넘긴 빚이 어디서 빠졌는지 맞춰 볼 수 있게 */}
+                        {s.carriedIntoStart && (
+                          <span className="tnum mt-1 block text-[11px] text-[var(--fg-muted)]">
+                            {s.carriedIntoStart.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric' })} 정산에서 차감
+                          </span>
+                        )}
                       </td>
                       {canPay && (
                         <td className="py-3 text-center">
@@ -286,7 +318,7 @@ export default async function SettlementsPage({
                                 눌러 보고 나서 거절당하는 화면은 사람을 두 번 헛되게 한다.
                               */
                               disabledReason={
-                                s.netAmount < 0 ? '수동 처리' : s.account === null ? '계좌 없음' : undefined
+                                s.netAmount < 0 ? '다음 달 차감' : s.account === null ? '계좌 없음' : undefined
                               }
                             />
                           ) : (
@@ -300,6 +332,17 @@ export default async function SettlementsPage({
               </table>
             </div>
           )}
+          <div className="mt-5">
+            <PageNav
+              page={pageNo}
+              total={history.total}
+              pageSize={SETTLEMENT_PAGE_SIZE}
+              hrefOf={(n) => ({
+                pathname: '/admin/settlements',
+                query: { ...(params.period ? { period: yearMonth } : {}), ...(n === 1 ? {} : { page: String(n) }) },
+              })}
+            />
+          </div>
         </section>
       </div>
     </>

@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  hasSettlementAccount, settlementWorthTelling, won,
+  hasSettlementAccount, settlementWorthTelling, won, isPayable,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 import { notifySettlementClosed, notifySettlementPaid } from '~/lib/notifications/settlement';
@@ -30,10 +30,29 @@ export interface SettlementDraft {
   readonly grossAmount: Won;
   readonly commissionAmount: Won;
   readonly refundAmount: Won;
+  /** 앞선 달에서 넘어온 음수 지급액의 합(0 이하) */
+  readonly carriedAmount: Won;
   readonly netAmount: Won;
   readonly orderCount: number;
   /** 이미 확정된 기간이면 그 상태 */
   readonly existingStatus: SettlementStatus | null;
+  /** 이 달로 넘어오는 앞선 달 정산들. 확정할 때 이것들을 CARRIED 로 돌린다 */
+  readonly carriedFromIds: readonly string[];
+}
+
+/**
+ * 이 기간으로 넘어올 앞선 달의 음수 정산.
+ *
+ * - 아직 넘기지 않은 확정 음수(core isCarryable) — 이 기간보다 앞선 달만
+ * - **이 기간이 이미 떠안은 것** — 이 기간을 다시 계산할 때 빼먹으면 넘어온 빚이 사라진다
+ */
+function carryWhere(period: { start: Date; end: Date }) {
+  return {
+    OR: [
+      { status: 'CONFIRMED' as const, netAmount: { lt: 0 }, carriedIntoId: null, periodEnd: { lte: period.start } },
+      { status: 'CARRIED' as const, carriedInto: { periodStart: period.start, periodEnd: period.end } },
+    ],
+  };
 }
 
 /**
@@ -88,7 +107,7 @@ export async function previewSettlements(
     select: { id: true, name: true, commissionPercent: true },
   });
 
-  const [sales, refunds, existing] = await Promise.all([
+  const [sales, refunds, existing, carries] = await Promise.all([
     prisma.orderItem.groupBy({
       by: ['merchantId'],
       where: settlementSaleWhere(period),
@@ -104,18 +123,37 @@ export async function previewSettlements(
       where: { periodStart: period.start, periodEnd: period.end },
       select: { merchantId: true, status: true },
     }),
+    prisma.settlement.findMany({
+      where: carryWhere(period),
+      select: { id: true, merchantId: true, netAmount: true, status: true },
+    }),
   ]);
 
   const salesBy = new Map(sales.map((s) => [s.merchantId, s]));
   const refundBy = new Map(refunds.map((r) => [r.merchantId, r._sum.subtotal ?? 0]));
   const statusBy = new Map(existing.map((e) => [e.merchantId, e.status]));
+  const carriesBy = new Map<string, { ids: string[]; amount: number }>();
+  for (const c of carries) {
+    /*
+     * 이미 얼린 달(확정·지급)은 다시 계산하지 않는다 — 그 달이 **실제로 떠안은 것**만 보여 준다. 아직 넘기지 않은
+     * 빚까지 더해 보이면, 얼린 숫자와 다른 초안이 뜬다.
+     */
+    const frozen = statusBy.get(c.merchantId);
+    if (frozen !== undefined && !isRecalculable(frozen) && c.status !== 'CARRIED') continue;
+    const entry = carriesBy.get(c.merchantId) ?? { ids: [], amount: 0 };
+    entry.ids.push(c.id);
+    entry.amount += c.netAmount;
+    carriesBy.set(c.merchantId, entry);
+  }
 
   return merchants.map((m) => {
     const sale = salesBy.get(m.id);
+    const carried = carriesBy.get(m.id);
     const amounts = calculateSettlement({
       gross: won(sale?._sum.subtotal ?? 0),
       commissionPercent: m.commissionPercent,
       refund: won(refundBy.get(m.id) ?? 0),
+      carried: won(carried?.amount ?? 0),
     });
     return {
       merchantId: m.id,
@@ -124,6 +162,7 @@ export async function previewSettlements(
       ...amounts,
       orderCount: sale?._count._all ?? 0,
       existingStatus: statusBy.get(m.id) ?? null,
+      carriedFromIds: carried?.ids ?? [],
     };
   });
 }
@@ -186,29 +225,55 @@ export async function closeSettlements(
       // 금액과 함께 **그때의 요율**도 얼린다 — 나중에 요율이 바뀌어도 이 행이 무엇으로 계산됐는지 남는다
       commissionPercent: d.commissionPercent,
       refundAmount: d.refundAmount,
+      carriedAmount: d.carriedAmount,
       netAmount: d.netAmount,
       status: 'CONFIRMED' as const,
       confirmedAt: now,
     };
 
-    await prisma.settlement.upsert({
-      // 같은 가맹점의 같은 기간은 유니크 제약이 하나만 허용한다.
-      // 배치가 두 번 돌아도 행이 늘지 않는다.
-      where: {
-        merchantId_periodStart_periodEnd: {
+    /*
+     * **이 달 행과 넘어온 달의 표시를 한 번에 바꾼다.** 따로 쓰면 이 달은 빚을 뺀 채 확정됐는데 앞선 달은 아직
+     * "넘기지 않음" 으로 남아, 다음 확정이 같은 빚을 또 뺀다. 넘어온 달이 그사이 바뀌었으면(누가 먼저 확정했다)
+     * 통째로 물린다.
+     */
+    await prisma.$transaction(async (tx) => {
+      const row = await tx.settlement.upsert({
+        // 같은 가맹점의 같은 기간은 유니크 제약이 하나만 허용한다.
+        // 배치가 두 번 돌아도 행이 늘지 않는다.
+        where: {
+          merchantId_periodStart_periodEnd: {
+            merchantId: d.merchantId,
+            periodStart: period.start,
+            periodEnd: period.end,
+          },
+        },
+        create: {
           merchantId: d.merchantId,
           periodStart: period.start,
           periodEnd: period.end,
+          ...data,
         },
-      },
-      create: {
-        merchantId: d.merchantId,
-        periodStart: period.start,
-        periodEnd: period.end,
-        ...data,
-      },
-      update: data,
-      select: { id: true },
+        update: data,
+        select: { id: true },
+      });
+
+      if (d.carriedFromIds.length === 0) return;
+      const { count } = await tx.settlement.updateMany({
+        where: {
+          id: { in: [...d.carriedFromIds] },
+          OR: [
+            { status: 'CONFIRMED', carriedIntoId: null },
+            { status: 'CARRIED', carriedIntoId: row.id },
+          ],
+        },
+        data: { status: 'CARRIED', carriedIntoId: row.id },
+      });
+      if (count !== d.carriedFromIds.length) {
+        throw new SettlementCloseError(
+          'CARRY_CHANGED', 409,
+          `${d.merchantName} 의 앞선 달 정산이 그사이 바뀌었습니다. 다시 확정해 주세요.`,
+        );
+      }
     });
 
     if (d.existingStatus === null) {
@@ -264,10 +329,9 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
       `${before.merchant.name} 의 정산 계좌가 없습니다. 가맹점 정보에서 먼저 등록해야 지급할 수 있습니다.`,
     );
   }
-  if (before.netAmount < 0) {
-    // 환불이 매출을 넘은 달이다. 돈을 보내는 게 아니라 받아야 하므로
-    // 자동 집행 대상이 아니다.
-    throw new SettlementCloseError('NEGATIVE_AMOUNT', 409, '지급액이 음수인 정산은 수동으로 처리해야 합니다.');
+  if (!isPayable(before)) {
+    // 환불이 매출을 넘은 달이다. 보낼 돈이 아니라 받을 돈이라, 다음 달을 확정할 때 그 달 지급액에서 뺀다
+    throw new SettlementCloseError('NEGATIVE_AMOUNT', 409, '지급액이 음수인 정산은 다음 달 정산에서 뺍니다. 지급할 것이 없습니다.');
   }
 
   // 상태가 CONFIRMED 일 때만 바꾼다. 두 사람이 동시에 눌러도 한 번만 나간다.

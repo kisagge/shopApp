@@ -16,6 +16,13 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/** 넘어올 빚은 초안이 센다 — 여기서는 그 결과만 흉내 낸다(줄 조건은 진짜를 쓴다) */
+const previewSettlements = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/admin/close-settlement', async (orig) => ({
+  ...(await orig<typeof import('~/lib/admin/close-settlement')>()),
+  previewSettlements,
+}));
+
 const { exportSettlementLines, SettlementExportTooLargeError, SETTLEMENT_EXPORT_MAX_ROWS } =
   await import('~/lib/admin/settlement-export');
 const { settlementSaleWhere, settlementDeductionWhere } = await import('~/lib/admin/close-settlement');
@@ -34,6 +41,7 @@ beforeEach(() => {
   db.merchant.findMany.mockResolvedValue([{ id: 'm-a', name: '무어', commissionPercent: 15 }]);
   // 아직 확정하지 않은 기간 — 그때는 가맹점의 지금 요율이 곧 확정될 요율이다
   db.settlement.findMany.mockResolvedValue([]);
+  previewSettlements.mockResolvedValue([]);
   db.orderItem.count.mockResolvedValue(3);
   db.orderItem.findMany
     .mockResolvedValueOnce([line('20260810-0000001', 100_000), line('20260811-0000002', 33_333)])
@@ -124,5 +132,40 @@ describe('확정된 기간의 요율', () => {
   it('확정 전이면 지금 요율로 적는다 — 확정될 때의 요율이 그것이다', async () => {
     const rows = await exportSettlementLines(admin, '2026-08');
     expect(rows.find((r) => String(r[0]).startsWith('합계 · 수수료'))?.[0]).toBe('합계 · 수수료 15%');
+  });
+});
+
+/**
+ * **앞선 달에서 넘어온 빚도 파일에 적는다.** 화면의 지급액은 그것을 뺀 금액이라, 파일에 없으면 합이 어긋난다.
+ */
+describe('앞선 달 이월', () => {
+  it('넘어온 빚을 한 줄로 적고 지급액에서 뺀다 — 초안과 같은 숫자다', async () => {
+    previewSettlements.mockResolvedValue([{ merchantId: 'm-a', carriedAmount: -40_000 }]);
+
+    const rows = await exportSettlementLines(admin, '2026-08');
+
+    const byLabel = new Map(rows.filter((r) => String(r[0]).startsWith('합계')).map((r) => [r[0], r[7]]));
+    expect(byLabel.get('합계 · 앞선 달 이월')).toBe(-40_000);
+    // 133,333 판매, 수수료 15% 19,999, 차감 20,000, 이월 40,000
+    expect(byLabel.get('합계 · 지급액')).toBe(133_333 - 19_999 - 20_000 - 40_000);
+  });
+
+  it('넘어온 빚이 없으면 그 줄을 두지 않는다', async () => {
+    const rows = await exportSettlementLines(admin, '2026-08');
+    expect(rows.some((r) => r[0] === '합계 · 앞선 달 이월')).toBe(false);
+  });
+
+  it('판매가 없어도 넘어온 빚이 있으면 합계를 적는다 — 화면에는 그 가맹점의 음수가 뜬다', async () => {
+    db.orderItem.findMany.mockReset().mockResolvedValue([]);
+    previewSettlements.mockResolvedValue([{ merchantId: 'm-a', carriedAmount: -5_000 }]);
+
+    const rows = await exportSettlementLines(admin, '2026-08');
+
+    expect(rows.find((r) => r[0] === '합계 · 지급액')?.[7]).toBe(-5_000);
+  });
+
+  it('가맹점 계정은 자기 범위로 초안을 센다', async () => {
+    await exportSettlementLines(merchant, '2026-08', 'm-other');
+    expect(previewSettlements.mock.calls[0]![0]).toMatchObject({ merchantId: 'm-a' });
   });
 });
