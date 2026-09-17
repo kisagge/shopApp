@@ -145,3 +145,64 @@ test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금
   await ready(page);
   await expect(page.getByText(`주문 ${orderNo} 의 상품이 취소되었습니다.`)).toHaveCount(0);
 });
+
+/**
+ * **일부 취소와 전액 취소가 동시에 들어와도 한 번씩만 돌려준다.**
+ *
+ * 일부 취소는 주문 상태를 바꾸지 않는다. 예전 전액 취소는 남은 줄을 잠그기 전에 읽고 "상태가 그대로면"
+ * 만 보았으므로, 그사이 한 줄이 취소되면 그 줄의 재고와 포인트가 한 번 더 돌아갔다. 두 창구가 같은 주문
+ * 잠금을 잡는지 본다. 어느 쪽이 먼저 끝나든 끝난 모습은 같아야 한다 — 재고는 처음대로, 돌려준 돈은
+ * 결제 금액과 같다.
+ */
+test('일부 취소와 전액 취소가 동시에 들어와도 재고와 돈이 한 번씩만 돌아온다', async ({ page }) => {
+  test.setTimeout(120_000);
+
+  const first = await addProductToCart(page, RACE_PRODUCT.partialCancel);
+  expect(first, '담을 수 있는 옵션이 없다').not.toBeNull();
+  await addSecondLine(page);
+
+  const cart = (await (await page.request.get('/api/cart')).json()) as { items: { variantId: string }[] };
+  const variants = cart.items.map((i) => i.variantId);
+  const stockSum = async () => (await stockOf(page, variants[0]!)) + (await stockOf(page, variants[1]!));
+  const stockBefore = await stockSum();
+
+  await page.goto('/checkout');
+  await ready(page);
+  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
+  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  await expect(page.getByText('결제완료').first()).toBeVisible();
+  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const payable = (await page.getByRole('term').filter({ hasText: '결제 금액' })
+    .locator('xpath=following-sibling::dd').textContent())!;
+
+  // 줄 번호는 화면에 없다 — 줄을 고르면 나가는 금액 미리보기 요청에서 읽는다
+  await page.getByRole('button', { name: '일부 상품만 취소' }).click();
+  const form = page.getByRole('form', { name: '취소할 상품' });
+  const [previewRequest] = await Promise.all([
+    page.waitForRequest((r) => r.url().endsWith(`/cancel-items`) && r.method() === 'POST'),
+    form.getByRole('checkbox').first().check(),
+  ]);
+  const { itemIds } = previewRequest.postDataJSON() as { itemIds: string[] };
+  expect(itemIds).toHaveLength(1);
+
+  const base = `/api/orders/${encodeURIComponent(orderNo)}`;
+  const [partial, full] = await Promise.all([
+    page.request.post(`${base}/cancel-items`, { data: { itemIds, reason: '동시 취소' }, failOnStatusCode: false }),
+    page.request.post(`${base}/cancel`, { data: { reason: '동시 취소' }, failOnStatusCode: false }),
+  ]);
+  // 전액 취소는 언제나 된다. 일부 취소는 먼저 끝났으면 되고, 늦었으면 "이미 취소된 주문" 으로 거절된다
+  expect(full.status(), await full.text()).toBe(200);
+  expect([200, 409], await partial.text()).toContain(partial.status());
+
+  expect(await stockSum(), '재고가 처음과 다르다 — 취소된 줄이 두 번 돌아왔거나 안 돌아왔다').toBe(stockBefore);
+
+  await page.reload();
+  await ready(page);
+  await expect(page.getByText('환불완료').first()).toBeVisible();
+  const refundedRow = page.getByRole('term').filter({ hasText: '돌려받은 금액' });
+  await expect(refundedRow.locator('xpath=following-sibling::dd'), '돌려준 돈이 결제 금액과 다르다')
+    .toHaveText(`-${payable}`);
+});

@@ -4,22 +4,29 @@ import { won, type Actor, type PaymentGateway } from '@shop/core';
 const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
+/** 잠근 뒤 다시 읽는 것도 같은 값을 보게 한다 — 달리 보이게 할 때만 트랜잭션 쪽을 바꾼다 */
+const read = vi.hoisted(() => ({
+  findOrder: vi.fn<(...a: any[]) => any>(),
+  aggregate: vi.fn<(...a: any[]) => any>(),
+  legacy: vi.fn<(...a: any[]) => any>(),
+}));
 const tx = vi.hoisted(() => ({
-  order: { updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
+  $queryRaw: vi.fn<(...a: any[]) => any>(),
+  order: { findFirst: read.findOrder, updateMany: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
   orderItem: { updateMany: vi.fn<(...a: any[]) => any>() },
   productVariant: { updateMany: vi.fn<(...a: any[]) => any>() },
   user: { update: vi.fn<(...a: any[]) => any>() },
-  pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
-  orderRefund: { create: vi.fn<(...a: any[]) => any>() },
+  pointTransaction: { create: vi.fn<(...a: any[]) => any>(), findFirst: read.legacy },
+  orderRefund: { create: vi.fn<(...a: any[]) => any>(), aggregate: read.aggregate },
   userCoupon: { update: vi.fn<(...a: any[]) => any>() },
   payment: { update: vi.fn<(...a: any[]) => any>() },
   orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
 }));
 const db = vi.hoisted(() => ({
-  order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  order: { findFirst: read.findOrder },
   // 앞서 돌려준 것 — 기본은 없다(부분 취소가 없던 주문)
-  orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
-  pointTransaction: { findFirst: vi.fn<(...a: any[]) => any>() },
+  orderRefund: { aggregate: read.aggregate },
+  pointTransaction: { findFirst: read.legacy },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -277,6 +284,82 @@ describe('일부 취소한 뒤의 전액 취소', () => {
     expect(tx.orderRefund.create.mock.calls[0]![0].data).toMatchObject({
       amount: 246_000, points: 2_000, shippingDeducted: -3_000, kind: 'CANCEL', itemIds: ['i-1'],
     });
+  });
+});
+
+/**
+ * **일부 취소와 동시에 들어온 전액 취소.**
+ *
+ * 일부 취소는 주문 상태를 바꾸지 않는다. 예전 전액 취소는 남은 줄과 돌려준 몫을 잠그기 전에 읽고
+ * "상태가 그대로면" 만 보았으므로, 그사이 한 줄이 취소되면 그 줄의 재고와 포인트가 한 번 더 돌아갔다.
+ * 잠근 뒤 다시 읽은 값으로 계산하는지 본다 — 처음 읽기는 두 줄이 살아 있고, 잠근 뒤에는 한 줄이 취소돼 있다.
+ */
+describe('그사이 들어온 일부 취소', () => {
+  const before = order({
+    items: [
+      { id: 'i-1', variantId: 'v-coat-m', quantity: 2, canceledAt: null },
+      { id: 'i-2', variantId: 'v-knit-l', quantity: 1, canceledAt: null },
+    ],
+  });
+  const after = order({
+    items: [
+      { id: 'i-1', variantId: 'v-coat-m', quantity: 2, canceledAt: null },
+      { id: 'i-2', variantId: 'v-knit-l', quantity: 1, canceledAt: new Date('2026-09-17') },
+    ],
+    payment: { id: 'p-1', status: 'PARTIAL_CANCELED', pgPaymentKey: 'pk_1', refundedAmount: 40_000 },
+  });
+
+  beforeEach(() => {
+    const order = [before, after];
+    read.findOrder.mockImplementation(async () => order.shift() ?? after);
+    // 잠그기 전에는 부른 적이 없다 — 돌려준 몫은 잠근 뒤에만 읽는다
+    read.aggregate.mockResolvedValue({
+      _sum: { amount: 40_000, points: 1_000, shippingDeducted: 3_000 }, _count: { _all: 1 },
+    });
+  });
+
+  it('잠근 뒤에 주문을 다시 읽는다', async () => {
+    await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(tx.$queryRaw).toHaveBeenCalledOnce();
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]!).toBeLessThan(read.findOrder.mock.invocationCallOrder[1]!);
+    expect(tx.$queryRaw.mock.invocationCallOrder[0]!).toBeLessThan(read.aggregate.mock.invocationCallOrder[0]!);
+  });
+
+  it('그사이 취소된 줄의 재고를 다시 올리지 않는다', async () => {
+    await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(tx.productVariant.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-coat-m' }, data: { stock: { increment: 2 } },
+    });
+  });
+
+  it('그사이 돌려준 돈과 포인트를 빼고 돌려준다', async () => {
+    const result = await cancelOrder('20260831-1234567', customer, '변심', gateway());
+    expect(result).toMatchObject({ refunded: 246_000, pointsReturned: 2_000 });
+    expect(tx.payment.update.mock.calls[0]![0].data.refundedAmount).toBe(286_000);
+    expect(tx.orderRefund.create.mock.calls[0]![0].data).toMatchObject({ itemIds: ['i-1'] });
+  });
+
+  it('잠근 뒤 보니 이미 취소됐으면 결제 취소를 부르지 않는다', async () => {
+    read.findOrder.mockReset();
+    read.findOrder
+      .mockResolvedValueOnce(before)
+      .mockResolvedValueOnce(order({ status: 'CANCELLED' }));
+    const g = gateway();
+
+    await expect(cancelOrder('20260831-1234567', customer, '변심', g))
+      .rejects.toMatchObject({ code: 'ALREADY_CANCELLED' });
+    expect(g.cancel).not.toHaveBeenCalled();
+    expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('돈이 나간 뒤 장부에 못 적으면 크게 남기고 오류를 그대로 올린다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    tx.orderStatusLog.create.mockRejectedValueOnce(new Error('connection lost'));
+
+    await expect(cancelOrder('20260831-1234567', customer, '변심', gateway())).rejects.toThrow('connection lost');
+    expect(error).toHaveBeenCalledWith(expect.stringContaining('수동 대사'), { orderNo: '20260831-1234567' }, expect.any(Error));
+    error.mockRestore();
   });
 });
 

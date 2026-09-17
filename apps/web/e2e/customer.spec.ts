@@ -238,9 +238,15 @@ test('운영진이 답하면 운영 화면에 누가 답했는지 남고, 손님
     await ready(ap);
     const row = ap.getByRole('listitem').filter({ hasText: asked });
     await row.getByLabel('고객센터 문의 답변').fill('내일 출고됩니다.');
-    await row.getByRole('button', { name: '답변 등록' }).click();
-    // 저장이 끝나 답이 뜰 때까지 기다린다 — 곧바로 떠나면 요청이 끊긴다
-    await expect(row.getByText('내일 출고됩니다.')).toBeVisible({ timeout: 20_000 });
+    /*
+     * 저장 응답까지 기다린다 — 곧바로 떠나면 요청이 끊긴다. 화면의 글자로 기다리면 안 된다: 입력칸
+     * (제어되는 textarea)도 적은 글자를 제 글자로 들고 있어서, 보내기도 전에 "답이 떴다" 로 보였다.
+     */
+    const [saved] = await Promise.all([
+      ap.waitForResponse((r) => r.url().endsWith('/answer') && r.request().method() === 'POST', { timeout: 20_000 }),
+      row.getByRole('button', { name: '답변 등록' }).click(),
+    ]);
+    expect(saved.status(), await saved.text()).toBe(200);
 
     await ap.goto('/admin/inquiries?tab=all');
     await ready(ap);

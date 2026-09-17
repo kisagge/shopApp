@@ -27,29 +27,11 @@ export interface RefundResult {
   readonly rewardReclaimed: number;
 }
 
-/**
- * 환불.
- *
- * **이 파일이 생기기 전까지 환불은 상태만 바꿨다.** 어드민이 주문을
- * 환불완료로 옮겨도 PG 취소가 나가지 않아, 화면에는 환불됐다고 적히고
- * 돈은 그대로 있었다. 반품을 승인해도 마찬가지였다.
- *
- * 그래서 상태 전이(transitionOrder)와 갈라 두었다. 환불은 외부로 돈을
- * 내보내는 동작이라 상태머신을 옮기는 범용 함수 안에 섞을 것이 아니다.
- * 대신 transitionOrder 는 REFUNDED 로 가는 길을 **막는다** — 그러지 않으면
- * 아무나 이 경로를 우회해 돈 없이 환불완료를 만들 수 있다.
- */
-export async function refundOrder(
-  orderNo: string,
-  actor: Actor,
-  reason: string,
-  gateway: PaymentGateway = getPaymentGateway(),
-): Promise<RefundResult> {
-  if (!canRefundOrder(actor)) {
-    throw new RefundError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
-  }
+/** 결제 환불이 오래 걸려도 잠금을 무한히 쥐지 않는다 */
+const LOCK_TIMEOUT_MS = 20_000;
 
-  const order = await prisma.order.findFirst({
+function loadOrder(db: Pick<typeof prisma, 'order'>, orderNo: string) {
+  return db.order.findFirst({
     where: { orderNo },
     select: {
       id: true, orderNo: true, status: true, userId: true, browserSessionId: true,
@@ -58,8 +40,12 @@ export async function refundOrder(
       payment: { select: { id: true, status: true, pgPaymentKey: true, refundedAmount: true } },
     },
   });
-  if (!order) throw new RefundError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+}
 
+type LoadedOrder = NonNullable<Awaited<ReturnType<typeof loadOrder>>>;
+
+/** 환불할 수 있는 주문인지 보고, 환불할 결제를 돌려준다 */
+function assertRefundable(order: LoadedOrder): { id: string; pgPaymentKey: string; refundedAmount: number } {
   if (order.status === 'REFUNDED') {
     throw new RefundError('ALREADY_REFUNDED', '이미 환불된 주문입니다.');
   }
@@ -83,20 +69,9 @@ export async function refundOrder(
     );
   }
 
-  /**
-   * 재고를 되돌릴지는 **어디서 왔는지**가 정한다.
-   *
-   * 취소(cancelOrder)는 그 자리에서 이미 재고를 풀었다. 반품 경로는 아무도
-   * 풀지 않아 지금까지 재고가 영영 잠겨 있었다.
-   *
-   * REFUNDED 로 들어오는 길이 이 둘뿐이라 이 판단이 성립한다. 길이 하나
-   * 더 생기면 이 가정이 깨지므로, 상태머신을 지키는 테스트를 함께 두었다.
-   */
-  const fromReturn = order.status === 'RETURNED';
-
-  const captured =
-    order.payment?.status === 'DONE' || order.payment?.status === 'PARTIAL_CANCELED';
-  if (!captured || !order.payment?.pgPaymentKey) {
+  const payment = order.payment;
+  const captured = payment?.status === 'DONE' || payment?.status === 'PARTIAL_CANCELED';
+  if (!payment || !captured || !payment.pgPaymentKey) {
     /**
      * 돈이 나간 적 없으면 환불도 없다.
      *
@@ -108,141 +83,205 @@ export async function refundOrder(
       `${ORDER_STATUS_LABEL[order.status]} 주문에 환불할 결제가 없습니다.`,
     );
   }
+  return { id: payment.id, pgPaymentKey: payment.pgPaymentKey, refundedAmount: payment.refundedAmount };
+}
 
-  /**
-   * PG 취소는 트랜잭션 밖에서 먼저 부른다.
-   *
-   * 외부 호출은 롤백할 수 없다. 실패하면 아무것도 바꾸지 않은 채로 끝나는
-   * 것이 맞고, 성공한 뒤 DB 가 실패하면 같은 키로 다시 시도하면 된다.
-   */
-  /*
-   * **돌려줄 것은 받은 것 − 이미 돌려준 것이다.** 예전에는 포인트 원장에 돌려준 흔적이
-   * 하나라도 있으면 건너뛰었다. 부분 취소가 생기자 그 흔적은 "일부만 돌려줬다" 일 수 있게
-   * 됐고, 그대로 두면 **남은 포인트를 영영 안 돌려준다.** 환불 기록의 합으로 센다(옛 주문은
-   * refundedSoFar 가 원장으로 판단한다).
-   */
-  const soFar = await refundedSoFar(prisma, order);
-  const rest = remainingRefund({
-    payable: order.payable, cashRefunded: soFar.cash,
-    pointsUsed: order.pointsUsed, pointsReturned: soFar.points,
-  });
-  // 출고 전에 일부 취소된 줄은 재고가 이미 돌아와 있다
-  const live = order.items.filter((i) => !i.canceledAt);
+/**
+ * 환불.
+ *
+ * **이 파일이 생기기 전까지 환불은 상태만 바꿨다.** 어드민이 주문을
+ * 환불완료로 옮겨도 PG 취소가 나가지 않아, 화면에는 환불됐다고 적히고
+ * 돈은 그대로 있었다. 반품을 승인해도 마찬가지였다.
+ *
+ * 그래서 상태 전이(transitionOrder)와 갈라 두었다. 환불은 외부로 돈을
+ * 내보내는 동작이라 상태머신을 옮기는 범용 함수 안에 섞을 것이 아니다.
+ * 대신 transitionOrder 는 REFUNDED 로 가는 길을 **막는다** — 그러지 않으면
+ * 아무나 이 경로를 우회해 돈 없이 환불완료를 만들 수 있다.
+ */
+export async function refundOrder(
+  orderNo: string,
+  actor: Actor,
+  reason: string,
+  gateway: PaymentGateway = getPaymentGateway(),
+): Promise<RefundResult> {
+  if (!canRefundOrder(actor)) {
+    throw new RefundError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
+  }
 
-  await gateway.cancel({
-    paymentKey: order.payment.pgPaymentKey,
-    amount: null, // 남은 금액 전부. 앞선 부분 취소 몫은 PG 가 이미 빼고 있다
-    reason,
-    // 같은 환불을 두 번 보내도 한 번만 처리되게 한다. 재시도로 두 번 돈이
-    // 나가는 사고를 막는 유일한 장치다.
-    idempotencyKey: `refund-${order.orderNo}`,
-  });
+  const first = await loadOrder(prisma, orderNo);
+  if (!first) throw new RefundError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  // 잠그기 전에 한 번 본다 — 환불할 수 없는 주문으로 잠금을 쥐지 않는다
+  assertRefundable(first);
 
-  const now = new Date();
-  const refunded = rest.cash;
+  let refunded = 0;
   let stockRestored = 0;
   let pointsReturned = 0;
   let rewardReclaimed = 0;
+  let quantity = 0;
+  let fromReturn = false;
+  let pgDone = false;
 
-  await prisma.$transaction(async (tx) => {
-    // 조건부 UPDATE — 그 사이 다른 요청이 먼저 환불했으면 0건이 나온다
-    const { count } = await tx.order.updateMany({
-      where: { id: order.id, status: order.status },
+  try {
+    await prisma.$transaction(async (tx) => {
       /*
-       * `canceledAt` 은 **돈이 나간 시각**이다. 결제 취소에서만 찍고 있었는데,
-       * 반품으로 들어온 환불(RETURNED → REFUNDED)은 취소를 거치지 않아 이 칸이
-       * 비어 있었다. 정산도 대시보드도 이 시각으로 환불을 세므로, 비어 있으면
-       * 반품 환불이 어디에서도 빠지지 않는다 — 돌려준 돈이 장부에는 남는다.
-       *
-       * 취소 뒤 환불(CANCELLED → REFUNDED)이면 취소 시각을 덮어쓰지 않는다.
-       * 그 주문의 돈은 취소 때 이미 멈췄고, 두 번 빼면 안 된다.
+       * **이 주문에 대한 다른 취소·환불은 여기서 기다린다.** 예전에는 남은 줄과 돌려준 몫을 잠그기 전에
+       * 읽고 "상태가 그대로면" 만 보았다. 상태를 바꾸지 않는 일부 취소·일부 반품이 그사이 끝나면 그 몫이
+       * 한 번 더 돌아갔다. 그 둘과 같은 잠금을 잡고, 그 안에서 다시 읽어 계산한다.
        */
-      data: { status: 'REFUNDED', ...(order.canceledAt === null ? { canceledAt: now } : {}) },
-    });
-    if (count === 0) throw new RefundError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+      await tx.$queryRaw`SELECT id FROM orders WHERE id = ${first.id} FOR UPDATE`;
 
-    await tx.orderItem.updateMany({
-      where: { orderId: order.id, canceledAt: null },
-      // 확정 뒤 반품이면 정산이 돌아간 달에 뺀다(close-settlement)
-      data: { status: 'REFUNDED', canceledAt: now, refundedAfterConfirm: order.confirmedAt !== null },
-    });
+      const order = await loadOrder(tx, orderNo);
+      if (!order) throw new RefundError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+      const payment = assertRefundable(order);
 
-    if (fromReturn) {
-      for (const item of live) {
-        await tx.productVariant.updateMany({
-          where: { id: item.variantId },
-          data: { stock: { increment: item.quantity } },
-        });
-        stockRestored += item.quantity;
-      }
-    }
+      /**
+       * 재고를 되돌릴지는 **어디서 왔는지**가 정한다.
+       *
+       * 취소(cancelOrder)는 그 자리에서 이미 재고를 풀었다. 반품 경로는 아무도
+       * 풀지 않아 지금까지 재고가 영영 잠겨 있었다.
+       *
+       * REFUNDED 로 들어오는 길이 이 둘뿐이라 이 판단이 성립한다. 길이 하나
+       * 더 생기면 이 가정이 깨지므로, 상태머신을 지키는 테스트를 함께 두었다.
+       */
+      fromReturn = order.status === 'RETURNED';
 
-    /**
-     * 쓴 포인트를 돌려준다. 원장에 이미 있으면 건너뛴다.
-     *
-     * 취소 경로가 먼저 돌려줬을 수 있다. 상태로 판단하지 않고 원장을 보는
-     * 이유는, 잔액만 두 번 올라가면 아무도 알아채지 못하기 때문이다 —
-     * 적립 지급이 같은 이유로 같은 방식을 쓴다.
-     */
-    if (rest.points > 0) {
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { pointBalance: { increment: rest.points } },
+      /*
+       * **돌려줄 것은 받은 것 − 이미 돌려준 것이다.** 예전에는 포인트 원장에 돌려준 흔적이
+       * 하나라도 있으면 건너뛰었다. 부분 취소가 생기자 그 흔적은 "일부만 돌려줬다" 일 수 있게
+       * 됐고, 그대로 두면 **남은 포인트를 영영 안 돌려준다.** 환불 기록의 합으로 센다(옛 주문은
+       * refundedSoFar 가 원장으로 판단한다).
+       */
+      const soFar = await refundedSoFar(tx, order);
+      const rest = remainingRefund({
+        payable: order.payable, cashRefunded: soFar.cash,
+        pointsUsed: order.pointsUsed, pointsReturned: soFar.points,
       });
-      await tx.pointTransaction.create({
+      // 출고 전에 일부 취소된 줄은 재고가 이미 돌아와 있다
+      const live = order.items.filter((i) => !i.canceledAt);
+
+      /*
+       * 외부 호출은 롤백할 수 없다. 실패하면 아무것도 바꾸지 않은 채로 끝나고, 성공한 뒤 장부가
+       * 실패하면 같은 키로 다시 시도하면 된다.
+       */
+      await gateway.cancel({
+        paymentKey: payment.pgPaymentKey,
+        amount: null, // 남은 금액 전부. 앞선 부분 취소 몫은 PG 가 이미 빼고 있다
+        reason,
+        // 같은 환불을 두 번 보내도 한 번만 처리되게 한다. 재시도로 두 번 돈이
+        // 나가는 사고를 막는 유일한 장치다.
+        idempotencyKey: `refund-${order.orderNo}`,
+      });
+      pgDone = true;
+
+      const now = new Date();
+      refunded = rest.cash;
+      quantity = live.reduce((sum, i) => sum + i.quantity, 0);
+
+      // 조건부 UPDATE — 그 사이 다른 요청이 먼저 환불했으면 0건이 나온다
+      const { count } = await tx.order.updateMany({
+        where: { id: order.id, status: order.status },
+        /*
+         * `canceledAt` 은 **돈이 나간 시각**이다. 결제 취소에서만 찍고 있었는데,
+         * 반품으로 들어온 환불(RETURNED → REFUNDED)은 취소를 거치지 않아 이 칸이
+         * 비어 있었다. 정산도 대시보드도 이 시각으로 환불을 세므로, 비어 있으면
+         * 반품 환불이 어디에서도 빠지지 않는다 — 돌려준 돈이 장부에는 남는다.
+         *
+         * 취소 뒤 환불(CANCELLED → REFUNDED)이면 취소 시각을 덮어쓰지 않는다.
+         * 그 주문의 돈은 취소 때 이미 멈췄고, 두 번 빼면 안 된다.
+         */
+        data: { status: 'REFUNDED', ...(order.canceledAt === null ? { canceledAt: now } : {}) },
+      });
+      if (count === 0) throw new RefundError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+
+      await tx.orderItem.updateMany({
+        where: { orderId: order.id, canceledAt: null },
+        // 확정 뒤 반품이면 정산이 돌아간 달에 뺀다(close-settlement)
+        data: { status: 'REFUNDED', canceledAt: now, refundedAfterConfirm: order.confirmedAt !== null },
+      });
+
+      if (fromReturn) {
+        for (const item of live) {
+          await tx.productVariant.updateMany({
+            where: { id: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+          stockRestored += item.quantity;
+        }
+      }
+
+      /**
+       * 쓴 포인트를 돌려준다. 원장에 이미 있으면 건너뛴다.
+       *
+       * 취소 경로가 먼저 돌려줬을 수 있다. 상태로 판단하지 않고 원장을 보는
+       * 이유는, 잔액만 두 번 올라가면 아무도 알아채지 못하기 때문이다 —
+       * 적립 지급이 같은 이유로 같은 방식을 쓴다.
+       */
+      if (rest.points > 0) {
+        await tx.user.update({
+          where: { id: order.userId },
+          data: { pointBalance: { increment: rest.points } },
+        });
+        await tx.pointTransaction.create({
+          data: {
+            userId: order.userId,
+            amount: rest.points,
+            reason: 'CANCEL_REFUND',
+            orderId: order.id,
+            note: `주문 ${order.orderNo} 환불`,
+          },
+        });
+        pointsReturned = rest.points;
+      }
+
+      /*
+       * 구매확정으로 준 적립은 되가져온다. 물건도 돌아오고 돈도 돌아가는데
+       * 적립만 남으면, 확정 → 적립 → 하자 반품을 되풀이하는 만큼 쌓인다.
+       * 확정에 이른 적 없는 주문이면 줄 적립도 없어서 아무 일도 하지 않는다.
+       */
+      rewardReclaimed = (await reclaimPurchaseReward(tx, order)).reclaimed;
+
+      // 쿠폰 되살리기. 이미 풀려 있어도 같은 결과라 그대로 둔다.
+      if (order.usedCouponId) {
+        await tx.userCoupon.update({ where: { id: order.usedCouponId }, data: { usedAt: null } });
+      }
+
+      await tx.payment.update({
+        where: { id: payment.id },
         data: {
-          userId: order.userId,
-          amount: rest.points,
-          reason: 'CANCEL_REFUND',
-          orderId: order.id,
-          note: `주문 ${order.orderNo} 환불`,
+          status: 'CANCELED',
+          refundedAmount: payment.refundedAmount + refunded,
+          canceledAt: now,
         },
       });
-      pointsReturned = rest.points;
+
+      await tx.orderRefund.create({
+        data: {
+          orderId: order.id,
+          amount: refunded,
+          points: rest.points,
+          shippingDeducted: 0,
+          itemIds: live.map((i) => i.id),
+          kind: 'REFUND',
+          reason,
+          actorId: actor.id,
+          idempotencyKey: `refund-${order.orderNo}`,
+        },
+      });
+
+      await tx.orderStatusLog.create({
+        data: {
+          orderId: order.id, from: order.status, to: 'REFUNDED',
+          actor: actor.id, note: reason,
+        },
+      });
+    }, { timeout: LOCK_TIMEOUT_MS, maxWait: LOCK_TIMEOUT_MS });
+  } catch (error) {
+    if (pgDone) {
+      // 돈은 나갔는데 장부가 없다. 다시 누르면 같은 멱등 키가 나가 돈은 두 번 나가지 않고 장부만 채워진다
+      console.error('[refund-order] 결제 환불 후 장부 반영 실패 — 다시 시도하거나 수동 대사 필요', { orderNo }, error);
     }
-
-    /*
-     * 구매확정으로 준 적립은 되가져온다. 물건도 돌아오고 돈도 돌아가는데
-     * 적립만 남으면, 확정 → 적립 → 하자 반품을 되풀이하는 만큼 쌓인다.
-     * 확정에 이른 적 없는 주문이면 줄 적립도 없어서 아무 일도 하지 않는다.
-     */
-    rewardReclaimed = (await reclaimPurchaseReward(tx, order)).reclaimed;
-
-    // 쿠폰 되살리기. 이미 풀려 있어도 같은 결과라 그대로 둔다.
-    if (order.usedCouponId) {
-      await tx.userCoupon.update({ where: { id: order.usedCouponId }, data: { usedAt: null } });
-    }
-
-    await tx.payment.update({
-      where: { id: order.payment!.id },
-      data: {
-        status: 'CANCELED',
-        refundedAmount: order.payment!.refundedAmount + refunded,
-        canceledAt: now,
-      },
-    });
-
-    await tx.orderRefund.create({
-      data: {
-        orderId: order.id,
-        amount: refunded,
-        points: rest.points,
-        shippingDeducted: 0,
-        itemIds: live.map((i) => i.id),
-        kind: 'REFUND',
-        reason,
-        actorId: actor.id,
-        idempotencyKey: `refund-${order.orderNo}`,
-      },
-    });
-
-    await tx.orderStatusLog.create({
-      data: {
-        orderId: order.id, from: order.status, to: 'REFUNDED',
-        actor: actor.id, note: reason,
-      },
-    });
-  });
+    throw error;
+  }
 
   /**
    * 매출 이벤트는 트랜잭션 밖에서.
@@ -252,20 +291,20 @@ export async function refundOrder(
   await recordServerEvent({
     name: 'refund',
     occurredAt: new Date(),
-    sessionId: order.browserSessionId ?? `order-${order.orderNo}`,
-    anonymousId: order.browserSessionId ?? `order-${order.orderNo}`,
-    userId: order.userId,
+    sessionId: first.browserSessionId ?? `order-${first.orderNo}`,
+    anonymousId: first.browserSessionId ?? `order-${first.orderNo}`,
+    userId: first.userId,
     path: '/admin',
     productId: null, variantId: null,
-    orderId: order.orderNo,
+    orderId: first.orderNo,
     merchantId: null,
     value: refunded,
-    quantity: live.reduce((sum, i) => sum + i.quantity, 0),
+    quantity,
     props: { reason, fromReturn },
   });
 
   return {
-    orderNo: order.orderNo,
+    orderNo: first.orderNo,
     orderStatus: 'REFUNDED',
     refunded,
     stockRestored,
