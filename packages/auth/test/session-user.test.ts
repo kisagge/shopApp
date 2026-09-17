@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const getSession = vi.hoisted(() => vi.fn());
 vi.mock('../src/index', () => ({ auth: { api: { getSession } } }));
+const findMerchant = vi.hoisted(() => vi.fn());
+vi.mock('@shop/db', () => ({ prisma: { merchant: { findUnique: findMerchant } } }));
 
 const { getSessionUser, getActor, normalizeRole } = await import('../src/session-user');
 
-beforeEach(() => getSession.mockReset());
+beforeEach(() => {
+  getSession.mockReset();
+  findMerchant.mockReset();
+});
 
 describe('역할 정규화', () => {
   it('알려진 역할은 그대로 둔다', () => {
@@ -73,5 +78,42 @@ describe('getActor', () => {
   it('역할이 손상돼 있어도 CUSTOMER 로 내려간다', async () => {
     getSession.mockResolvedValue({ user: { id: 'u', email: 'a@b', name: 'n', role: 'ROOT' } });
     expect((await getActor(new Headers()))?.role).toBe('CUSTOMER');
+  });
+});
+
+/**
+ * **정지된 가맹점도 콘솔을 그대로 썼다.** 역할이 세션에 실린 채 그대로였다. 지금 상태를 DB 에서 읽는다.
+ */
+describe('getActor — 가맹점 상태', () => {
+  const merchantSession = {
+    user: { id: 'u-m', email: 'm@b.test', name: '가맹점', role: 'MERCHANT', merchantId: 'm-1' },
+  };
+
+  it('승인된 가맹점의 계정은 가맹점이다', async () => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue({ status: 'APPROVED' });
+
+    expect(await getActor(new Headers())).toEqual({ id: 'u-m', role: 'MERCHANT', merchantId: 'm-1' });
+    expect(findMerchant).toHaveBeenCalledWith({ where: { id: 'm-1' }, select: { status: true } });
+  });
+
+  it('정지된 가맹점의 계정은 손님이다 — 세션 캐시를 기다리지 않는다', async () => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue({ status: 'SUSPENDED' });
+
+    expect(await getActor(new Headers())).toEqual({ id: 'u-m', role: 'CUSTOMER', merchantId: null });
+  });
+
+  it('가맹점 행이 없으면 손님이다', async () => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue(null);
+
+    expect((await getActor(new Headers()))?.role).toBe('CUSTOMER');
+  });
+
+  it('운영진·손님에게는 가맹점을 묻지 않는다 — 왕복을 하나 더 얹지 않는다', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u-a', email: 'a@b', name: 'n', role: 'ADMIN', merchantId: null } });
+    await getActor(new Headers());
+    expect(findMerchant).not.toHaveBeenCalled();
   });
 });

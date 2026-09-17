@@ -302,3 +302,20 @@ export function canSuspendUser(
   if ((target.role === 'ADMIN' || target.role === 'SUPER_ADMIN') && actor.role !== 'SUPER_ADMIN') return 'STAFF';
   return 'OK';
 }
+
+/**
+ * 가맹점 상태로 권한을 다시 정한다.
+ *
+ * **정지된 가맹점도 콘솔을 그대로 썼다.** 가맹점을 정지하면 그 상품은 매대에서 내려가는데(sellableBrand), 가맹점
+ * 계정의 역할은 그대로 MERCHANT 라 상품을 고치고 주문·반품을 처리하고 정산 계좌를 바꿀 수 있었다. 처분이 매대에만
+ * 걸리고 사람에게는 걸리지 않은 것이다.
+ *
+ * 승인(APPROVED)이 아닌 가맹점의 계정은 **손님으로 본다** — 콘솔 권한(admin:access)도, 가맹점 범위(merchantId)도
+ * 없다. 상태를 모르면(가맹점 행이 없으면) 역시 손님이다. 권한은 모를 때 낮은 쪽으로 닫는다(normalizeRole 과 같다).
+ * 운영진·손님 계정은 가맹점 상태와 상관없다.
+ */
+export function actorForMerchantStatus(actor: Actor, merchantStatus: string | null): Actor {
+  if (actor.role !== 'MERCHANT') return actor;
+  if (actor.merchantId !== null && merchantStatus === 'APPROVED') return actor;
+  return { id: actor.id, role: 'CUSTOMER', merchantId: null };
+}

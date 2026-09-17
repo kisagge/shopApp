@@ -3,6 +3,7 @@ import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
   hasPermission, assertPermission, ForbiddenError, canManageProduct,
   canRefundOrder, canAssignRole, canEditUser, merchantScope, canResolveReturnOf, canSuspendUser,
+  actorForMerchantStatus,
   type Actor,
 } from '../src/authz';
 
@@ -182,5 +183,38 @@ describe('이용 정지', () => {
 
   it('회원 관리 권한이 없으면 못 한다', () => {
     expect(canSuspendUser(merchant, { id: 'u-c', role: 'CUSTOMER' })).toBe('FORBIDDEN');
+  });
+});
+
+/**
+ * **정지된 가맹점도 콘솔을 그대로 썼다.** 처분이 매대에만 걸리고 사람에게는 걸리지 않았다.
+ */
+describe('가맹점 상태로 다시 정한 권한', () => {
+  const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-1' };
+
+  it('승인된 가맹점은 그대로다', () => {
+    expect(actorForMerchantStatus(merchant, 'APPROVED')).toEqual(merchant);
+  });
+
+  it.each(['PENDING', 'REJECTED', 'SUSPENDED', 'TERMINATED'])('%s 가맹점의 계정은 손님이다 — 콘솔에 못 들어온다', (status) => {
+    const actor = actorForMerchantStatus(merchant, status);
+    expect(actor).toEqual({ id: 'u-m', role: 'CUSTOMER', merchantId: null });
+    expect(hasPermission(actor, 'admin:access')).toBe(false);
+    expect(hasPermission(actor, 'product:write')).toBe(false);
+  });
+
+  it('상태를 모르면 손님이다 — 권한은 모를 때 낮은 쪽으로 닫는다', () => {
+    expect(actorForMerchantStatus(merchant, null).role).toBe('CUSTOMER');
+  });
+
+  it('가맹점 id 가 없는 가맹점 계정도 손님이다', () => {
+    expect(actorForMerchantStatus({ ...merchant, merchantId: null }, 'APPROVED').role).toBe('CUSTOMER');
+  });
+
+  it('운영진·손님은 가맹점 상태와 상관없다', () => {
+    const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
+    const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
+    expect(actorForMerchantStatus(admin, null)).toBe(admin);
+    expect(actorForMerchantStatus(customer, 'SUSPENDED')).toBe(customer);
   });
 });
