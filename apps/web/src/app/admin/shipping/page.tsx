@@ -5,13 +5,17 @@ import { getShippingPolicy } from '~/lib/shipping-policy';
 import { ShippingPolicyForm } from './shipping-form';
 import { getReturnAddress } from '~/lib/orders/return-address';
 import { ReturnAddressForm } from '~/components/admin/return-address-form';
+import { LastEdited } from '~/components/admin/last-edited';
+import { getReturnAddressEdit, getShippingPolicyEdit } from '~/lib/queries/admin/last-edit';
 
 export const metadata: Metadata = { title: '배송비' };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminShippingPage() {
-  await requireAdmin('shipping:write');
-  const [policy, returnAddress] = await Promise.all([getShippingPolicy(), getReturnAddress(null)]);
+  const actor = await requireAdmin('shipping:write');
+  const [policy, returnAddress, policyEdit, returnEdit] = await Promise.all([
+    getShippingPolicy(), getReturnAddress(null), getShippingPolicyEdit(actor), getReturnAddressEdit(actor, null),
+  ]);
 
   return (
     <>
@@ -46,6 +50,7 @@ export default async function AdminShippingPage() {
               받습니다. <b>저장하면 곧바로 모든 주문에 적용됩니다</b> — 상품 화면의 안내와
               결제 금액이 함께 바뀝니다.
             </p>
+            {policyEdit && <LastEdited at={policyEdit.at.toISOString()} by={policyEdit.by} />}
           </div>
 
           <ShippingPolicyForm
@@ -69,6 +74,7 @@ export default async function AdminShippingPage() {
               가맹점이 없는 자사 브랜드 상품의 반품·교환을 승인하면 손님에게 이 주소를 안내합니다. 가맹점 상품은 가맹점
               화면에서 가맹점마다 등록합니다.
             </p>
+            {returnEdit && <LastEdited at={returnEdit.at.toISOString()} by={returnEdit.by} />}
             {!returnAddress && (
               <p className="mt-1 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
                 아직 등록하지 않았습니다. 등록하기 전에는 자사 상품의 반품·교환을 승인할 수 없습니다.

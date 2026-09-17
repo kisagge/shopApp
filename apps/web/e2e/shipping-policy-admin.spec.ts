@@ -62,6 +62,8 @@ test('운영 화면에서 바꾸면 값이 남는다', async ({ page }) => {
   await page.goto('/admin/shipping');
   await ready(page);
   await expect(page.getByLabel('무료배송 기준')).toHaveValue(String(CHANGED.freeThreshold));
+  // 누가 바꿨는지도 이 자리에서 읽힌다 — 적어 두기만 하고 어디에도 뜨지 않았다(이름 · 역할)
+  await expect(page.getByRole('region', { name: '현재 정책' })).toContainText(/마지막 수정 .+ · .+ · \S+/);
 });
 
 test('바꾼 값이 손님 화면의 안내까지 간다', async ({ browser }) => {

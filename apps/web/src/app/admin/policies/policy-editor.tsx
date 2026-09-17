@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { POLICY_KIND_LABEL, POLICY_PATH, type PolicyKind, type RichTextDoc } from '@shop/core';
 import { failureMessage } from '~/lib/client/failure-message';
+import { LastEdited } from '~/components/admin/last-edited';
 
 const RichEditor = dynamic(() => import('../support/rich-editor').then((m) => m.RichEditor), {
   ssr: false,
@@ -21,6 +22,8 @@ export interface PolicyItem {
   /** 'YYYY-MM-DD' (KST 기준). 폼이 날짜 칸으로 다룬다 */
   readonly effectiveOn: string;
   readonly updatedAt: string | null;
+  /** 마지막으로 고친 때와 사람. 아직 쓰지 않은 문서면 null */
+  readonly lastEdit: { readonly at: string; readonly by: string } | null;
   readonly revisionCount: number;
 }
 
@@ -85,6 +88,7 @@ export function PolicyEditor({ item }: { item: PolicyItem }) {
           {item.revisionCount > 0 && <span className="ml-2 tnum">지난 방침 {item.revisionCount}개</span>}
         </p>
       </div>
+      {item.lastEdit && <LastEdited at={item.lastEdit.at} by={item.lastEdit.by} />}
 
       <form onSubmit={submit} className="flex flex-col gap-4">
         <Field

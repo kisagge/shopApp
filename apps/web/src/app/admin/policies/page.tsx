@@ -3,6 +3,7 @@ import { POLICY_KIND, POLICY_KIND_LABEL, type PolicyKind } from '@shop/core';
 import { prisma } from '@shop/db';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getPolicies } from '~/lib/policies/policy';
+import { getPolicyEdits } from '~/lib/queries/admin/last-edit';
 import { PolicyEditor, type PolicyItem } from './policy-editor';
 
 export const metadata: Metadata = { title: '약관·방침' };
@@ -19,11 +20,12 @@ const kstDay = (value: Date): string =>
  * 고칠 때마다 판이 남으며 시행일이 따로 있다.
  */
 export default async function AdminPoliciesPage() {
-  await requireAdmin('support:write');
+  const actor = await requireAdmin('support:write');
 
-  const [docs, counts] = await Promise.all([
+  const [docs, counts, edits] = await Promise.all([
     getPolicies(),
     prisma.policyRevision.groupBy({ by: ['kind'], _count: { _all: true } }),
+    getPolicyEdits(actor),
   ]);
 
   const today = kstDay(new Date());
@@ -31,12 +33,14 @@ export default async function AdminPoliciesPage() {
 
   const items: PolicyItem[] = POLICY_KIND.map((kind) => {
     const doc = docs.find((d) => d.kind === kind) ?? null;
+    const edit = edits.get(kind);
     return {
       kind,
       title: doc?.title ?? POLICY_KIND_LABEL[kind],
       bodyRich: doc?.bodyRich ?? null,
       effectiveOn: doc ? kstDay(doc.effectiveAt) : today,
       updatedAt: doc?.updatedAt.toISOString() ?? null,
+      lastEdit: edit ? { at: edit.at.toISOString(), by: edit.by } : null,
       revisionCount: countOf(kind),
     };
   });

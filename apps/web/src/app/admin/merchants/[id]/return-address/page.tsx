@@ -5,6 +5,8 @@ import { canEditReturnAddress } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchantReturnAddress } from '~/lib/orders/return-address';
 import { ReturnAddressForm } from '~/components/admin/return-address-form';
+import { LastEdited } from '~/components/admin/last-edited';
+import { getReturnAddressEdit } from '~/lib/queries/admin/last-edit';
 
 export const metadata: Metadata = { title: '반품지' };
 export const dynamic = 'force-dynamic';
@@ -20,7 +22,7 @@ export default async function MerchantReturnAddressPage({ params }: { params: Pr
   const { id } = await params;
   if (!canEditReturnAddress(actor, id)) notFound();
 
-  const merchant = await getMerchantReturnAddress(id);
+  const [merchant, edit] = await Promise.all([getMerchantReturnAddress(id), getReturnAddressEdit(actor, id)]);
   if (!merchant) notFound();
   const { address } = merchant;
 
@@ -50,6 +52,7 @@ export default async function MerchantReturnAddressPage({ params }: { params: Pr
             <p className="text-xs leading-relaxed text-[var(--fg-muted)]">
               반품·교환을 승인하면 손님의 주문 화면과 승인 메일에 이 주소가 보내실 곳으로 적힙니다.
             </p>
+            {edit && <LastEdited at={edit.at.toISOString()} by={edit.by} />}
             {!address && (
               <p className="mt-1 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
                 아직 등록하지 않았습니다. 등록하기 전에는 이 가맹점 상품의 반품·교환을 승인할 수 없습니다.

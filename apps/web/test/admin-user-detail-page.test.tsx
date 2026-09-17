@@ -22,7 +22,7 @@ const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const detail = (over: Partial<AdminUserDetail> = {}): AdminUserDetail => ({
   id: 'u-1', name: '김손님', email: 'kim@plain.test', emailVerified: false, phone: null, role: 'CUSTOMER',
   merchantName: null, signInMethods: ['credential', 'google'], grade: 'SILVER', totalSpent: 320_000,
-  createdAt: new Date('2026-01-01T00:00:00Z'), closedAt: null, suspendedAt: null, suspendedReason: null, suspendedBy: null,
+  createdAt: new Date('2026-01-01T00:00:00Z'), termsAgreedAt: new Date('2026-01-01T00:05:00Z'), closedAt: null, suspendedAt: null, suspendedReason: null, suspendedBy: null,
   pointBalance: 1_200,
   counts: { orders: 12, reviews: 3, inquiries: 4, inquiriesWaiting: 1, coupons: 2, wishlist: 5 },
   recentOrders: [{ orderNo: 'PL-20260901-0001', status: 'CONFIRMED', payable: 50_000, placedAt: new Date('2026-09-01T00:00:00Z'), itemCount: 2 }],
@@ -55,6 +55,19 @@ describe('회원 상세 화면', () => {
     const profile = screen.getByRole('region', { name: '기본 정보' });
     expect(within(profile).getByText('미인증')).toBeInTheDocument();
     expect(within(profile).getByText('이메일·비밀번호, 구글')).toBeInTheDocument();
+  });
+
+  it('약관에 동의한 시각을 적는다', async () => {
+    await renderPage();
+    const profile = screen.getByRole('region', { name: '기본 정보' });
+    expect(within(profile).getByText('약관 동의')).toBeInTheDocument();
+    expect(within(profile).getByText('약관 동의').nextElementSibling?.querySelector('time')).toHaveAttribute('dateTime', '2026-01-01T00:05:00.000Z');
+  });
+
+  it('약관 동의 기록이 없으면 비워 두지 않고 없다고 적는다', async () => {
+    getAdminUserDetail.mockResolvedValue(detail({ termsAgreedAt: null }));
+    await renderPage();
+    expect(within(screen.getByRole('region', { name: '기본 정보' })).getByText('기록 없음')).toBeInTheDocument();
   });
 
   it('최근 주문은 주문 상세로 가고, 누적액·등급을 함께 말한다', async () => {

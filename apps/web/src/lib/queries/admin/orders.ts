@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  won, readOrderSearch, readDateRange,
+  won, readOrderSearch, readDateRange, actorLabel,
   type Actor, type Won, type OrderStatus,
   offsetOf,
 } from '@shop/core';
@@ -9,6 +9,7 @@ import {
   assertAdminQuery, scopeOf, maskName, PAGE_SIZE, MAX_PAGE_SIZE, type Paged,
 } from './scope';
 import { clampToLastPage } from '../paged';
+import { loadActors } from './actors';
 
 // ── 주문 ──────────────────────────────────────────────────────
 
@@ -165,6 +166,8 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
           receivedAt: true,
+          // 누가 승인·반려했고 누가 도착을 확인했는가 — 적어 두기만 하고 보여 주지 않았다
+          receivedBy: true, resolvedBy: true, resolvedAt: true,
           exchangeLines: { select: { orderItemId: true, fromOptionLabel: true, toOptionLabel: true, quantity: true } },
           reshipCarrier: true, reshipTrackingNumber: true, reshippedAt: true,
         },
@@ -207,9 +210,23 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       })).map((i) => i.merchantId)
     : [];
 
+  /*
+   * **처리한 사람.** 신청을 누가 승인·반려했고 누가 물건 도착을 확인했는지 적혀 있는데 어느 화면에도 뜨지 않아,
+   * 가맹점과 운영진이 함께 다루는 반품에서 "누가 눌렀나" 를 감사 로그에서 찾아야 했다. 가맹점에게는 같은 가맹점
+   * 사람만 이름으로, 운영진은 "운영진" 으로 보인다(core actorLabel).
+   */
+  const people = active ? await loadActors([active.resolvedBy, active.receivedBy]) : new Map();
+  const labelOf = (id: string | null) =>
+    id === null ? null : actorLabel(actor, { id, identity: people.get(id) ?? null }, '기록 없음');
+  const returnPeople = {
+    resolved: active ? labelOf(active.resolvedBy) : null,
+    received: active ? labelOf(active.receivedBy) : null,
+  };
+
   return {
     ...order,
     returnMerchantIds,
+    returnPeople,
     /*
      * 주문자 개인정보는 가맹점에게 최소한만 준다.
      *

@@ -275,12 +275,20 @@ export default async function AdminOrderDetail({
                 {activeReturn.rejectReason && (
                   <Row label="반려 사유" value={activeReturn.rejectReason} />
                 )}
+                {activeReturn.resolvedAt && order.returnPeople.resolved && (
+                  <Row
+                    // 마무리(회수·교환 발송)하면 그 사람으로 덮인다 — 상태에 맞춰 무엇을 한 사람인지 적는다
+                    label={activeReturn.status === 'REJECTED' ? '반려한 사람'
+                      : activeReturn.status === 'COMPLETED' ? '처리를 마친 사람' : '승인한 사람'}
+                    value={`${order.returnPeople.resolved} · ${activeReturn.resolvedAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}`}
+                  />
+                )}
                 {activeReturn.status === 'APPROVED' || activeReturn.status === 'COMPLETED' ? (
                   <Row
                     label="회수 확인"
                     value={
                       activeReturn.receivedAt
-                        ? activeReturn.receivedAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })
+                        ? `${activeReturn.receivedAt.toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}${order.returnPeople.received ? ` · ${order.returnPeople.received}` : ''}`
                         : '아직 — 물건이 도착하면 확인합니다'
                     }
                   />

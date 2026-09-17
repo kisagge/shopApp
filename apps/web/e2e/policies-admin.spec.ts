@@ -59,6 +59,8 @@ test('고친 약관이 손님 화면에 뜨고, 바뀌기 전 내용은 지난 �
   await page.goto('/admin/policies');
   await ready(page);
   const again = page.getByRole('region', { name: '이용약관' });
+  // 방금 고친 사람이 문서 머리에 적힌다(이름 · 역할)
+  await expect(again).toContainText(/마지막 수정 .+ · .+ · \S+/);
   await again.getByLabel(/^제목/).fill(SEEDED_TITLE);
   await again.getByRole('button', { name: '새 판으로 저장' }).click();
   await expect(again.getByRole('status')).toContainText('저장했습니다', { timeout: 20_000 });

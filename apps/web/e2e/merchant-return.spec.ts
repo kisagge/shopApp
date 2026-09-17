@@ -130,6 +130,10 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     await ap.waitForURL(new RegExp(`/admin/orders/${orderNo}$`));
     await ready(ap);
     await expect(ap.getByText('가맹점이 물건 도착을 확인했습니다')).toBeVisible();
+    // 누가 승인하고 누가 받았는지가 기록 그대로 뜬다 — 운영진에게는 이름과 역할로
+    const valueOf = (term: string) => ap.locator('dt', { hasText: new RegExp(`^${term}$`) }).locator('xpath=following-sibling::dd');
+    await expect(valueOf('승인한 사람')).toContainText('· 가맹점 ·');
+    await expect(valueOf('회수 확인')).toContainText(/· 가맹점$/);
     await ap.getByRole('button', { name: '환불', exact: true }).click();
     await expect(ap.getByRole('button', { name: '환불', exact: true })).toHaveCount(0, { timeout: 20_000 });
 

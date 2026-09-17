@@ -20,6 +20,11 @@ export interface AdminUserDetail {
   readonly grade: MemberGrade;
   readonly totalSpent: number;
   readonly createdAt: Date;
+  /**
+   * 약관에 동의한 시각. 가입 전 계정이나 소셜 가입 직후라 아직 동의하지 않았으면 null.
+   * **적어 두기만 했다** — "그날 무엇에 동의했는가" 는 이 시각과 약관 이력으로 답하는데, 시각이 어디에도 뜨지 않았다.
+   */
+  readonly termsAgreedAt: Date | null;
   readonly closedAt: Date | null;
   readonly suspendedAt: Date | null;
   readonly suspendedReason: string | null;
@@ -71,7 +76,7 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
     where: { id: userId },
     select: {
       id: true, name: true, email: true, emailVerified: true, phone: true, role: true, grade: true,
-      createdAt: true, deletedAt: true, suspendedAt: true, suspendedReason: true, suspendedBy: true, pointBalance: true,
+      createdAt: true, termsAgreedAt: true, deletedAt: true, suspendedAt: true, suspendedReason: true, suspendedBy: true, pointBalance: true,
       merchant: { select: { name: true } },
       accounts: { select: { providerId: true } },
       _count: { select: { orders: true, reviews: true, wishlist: true } },
@@ -111,6 +116,7 @@ export async function getAdminUserDetail(actor: Actor, userId: string, now = new
     grade: effective.grade,
     totalSpent: effective.totalSpent,
     createdAt: user.createdAt,
+    termsAgreedAt: user.termsAgreedAt,
     closedAt: user.deletedAt,
     suspendedAt: user.suspendedAt,
     suspendedReason: user.suspendedReason,

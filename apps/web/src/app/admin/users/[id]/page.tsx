@@ -42,6 +42,9 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     ['소속 가맹점', user.merchantName ?? '—'],
     ['로그인 방식', user.signInMethods.length ? user.signInMethods.map((m) => SIGN_IN_LABEL[m] ?? m).join(', ') : '—'],
     ['가입', <time key="joined" dateTime={user.createdAt.toISOString()}>{adminDate.format(user.createdAt)}</time>],
+    ['약관 동의', user.termsAgreedAt
+      ? <time key="terms" dateTime={user.termsAgreedAt.toISOString()}>{adminTimestamp.format(user.termsAgreedAt)}</time>
+      : '기록 없음'],
   ];
 
   const activity: [string, number, string | undefined][] = [

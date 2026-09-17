@@ -24,7 +24,7 @@ const NOW = new Date('2026-09-15T00:00:00Z');
 
 const USER = {
   id: 'u-1', name: '김손님', email: 'kim@plain.test', emailVerified: true, phone: '010-1234-5678', role: 'CUSTOMER',
-  grade: 'BASIC', createdAt: new Date('2026-01-01'), deletedAt: null, suspendedAt: null, suspendedReason: null,
+  grade: 'BASIC', createdAt: new Date('2026-01-01'), termsAgreedAt: new Date('2026-01-01T00:05:00Z'), deletedAt: null, suspendedAt: null, suspendedReason: null,
   pointBalance: 1_200, merchant: null,
   accounts: [{ providerId: 'google' }, { providerId: 'credential' }, { providerId: 'google' }],
   _count: { orders: 12, reviews: 3, wishlist: 5 },
@@ -62,6 +62,11 @@ describe('getAdminUserDetail', () => {
     const d = (await getAdminUserDetail(admin, 'u-1', NOW))!;
     expect(getEffectiveGrade).toHaveBeenCalledWith('u-1', 'BASIC');
     expect(d).toMatchObject({ grade: 'SILVER', totalSpent: 320_000 });
+  });
+
+  it('약관에 동의한 시각을 넘긴다 — 적어 두기만 하고 어디에도 뜨지 않았다', async () => {
+    expect((await getAdminUserDetail(admin, 'u-1', NOW))!.termsAgreedAt).toEqual(new Date('2026-01-01T00:05:00Z'));
+    expect(db.user.findUnique.mock.calls[0]?.[0].select).toMatchObject({ termsAgreedAt: true });
   });
 
   it('가입 방식은 겹치지 않게, 늘 같은 순서로', async () => {

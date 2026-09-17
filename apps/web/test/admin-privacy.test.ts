@@ -29,6 +29,8 @@ const db = vi.hoisted(() => {
   return {
     order: { findMany: fn(), findFirst: fn(), count: fn(), aggregate: fn(), groupBy: fn() },
     merchant: { findMany: fn() },
+    orderItem: { findMany: fn() },
+    user: { findMany: fn() },
     $queryRaw: fn(),
   };
 });
@@ -107,5 +109,57 @@ describe('가맹점이 보는 주문 — 손님의 값이 새지 않는다', () 
     const order = await getAdminOrder(admin, '20260907-1234567');
     expect(leaks(order, CUSTOMER.name)).toBe(true);
     expect(leaks(order, CUSTOMER.email)).toBe(true);
+  });
+});
+
+/**
+ * **반품을 누가 처리했는가.** 승인·반려한 사람과 도착을 확인한 사람이 적혀 있었는데 어느 화면에도 뜨지 않았다.
+ * 가맹점에게는 같은 가맹점 사람만 이름으로, 운영진은 "운영진" 으로 — 운영진 개인의 이름은 새지 않는다.
+ */
+describe('반품을 처리한 사람', () => {
+  const withReturn = {
+    ...ORDER,
+    returnRequests: [{
+      type: 'RETURN', reason: 'DEFECT', detail: null, status: 'COMPLETED', shippingBorneBy: 'SELLER',
+      rejectReason: null, requestedAt: new Date('2026-09-10'), itemIds: [],
+      receivedAt: new Date('2026-09-12'), receivedBy: 'u-colleague',
+      resolvedBy: 'u-staff', resolvedAt: new Date('2026-09-13'),
+      exchangeLines: [], reshipCarrier: null, reshipTrackingNumber: null, reshippedAt: null,
+    }],
+  };
+
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(withReturn);
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: 'm-a' }]);
+    db.user.findMany.mockResolvedValue([
+      { id: 'u-colleague', name: '무어 담당자', role: 'MERCHANT', merchantId: 'm-a' },
+      { id: 'u-staff', name: '김운영', role: 'ADMIN', merchantId: null },
+    ]);
+  });
+
+  it('운영진에게는 둘 다 이름과 역할로 보인다', async () => {
+    const order = await getAdminOrder(admin, withReturn.orderNo);
+    expect(order?.returnPeople).toEqual({ resolved: '김운영 · 관리자', received: '무어 담당자 · 가맹점' });
+    // 한 번에 묻는다 — 줄마다 따로 묻지 않는다
+    expect(db.user.findMany).toHaveBeenCalledOnce();
+  });
+
+  it('가맹점에게는 같은 가맹점 사람만 이름으로, 운영진은 운영진으로 보인다', async () => {
+    const order = await getAdminOrder(merchant, withReturn.orderNo);
+    expect(order?.returnPeople).toEqual({ resolved: '운영진', received: '무어 담당자' });
+    expect(leaks(order, '김운영')).toBe(false);
+  });
+
+  it('처리한 사람이 지워졌으면 탈퇴한 계정이라고 적는다', async () => {
+    db.user.findMany.mockResolvedValue([]);
+    const order = await getAdminOrder(admin, withReturn.orderNo);
+    expect(order?.returnPeople).toEqual({ resolved: '탈퇴한 계정', received: '탈퇴한 계정' });
+  });
+
+  it('반품 신청이 없으면 사람을 묻지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(ORDER);
+    const order = await getAdminOrder(admin, ORDER.orderNo);
+    expect(order?.returnPeople).toEqual({ resolved: null, received: null });
+    expect(db.user.findMany).not.toHaveBeenCalled();
   });
 });
