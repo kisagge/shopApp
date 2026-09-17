@@ -1,14 +1,16 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { authClient } from '@shop/auth/client';
 import { track } from '~/lib/analytics/client';
 import { useT } from '~/lib/i18n/client';
 
-export function LoginForm() {
-  const router = useRouter();
+/**
+ * @param next 로그인 뒤에 갈 곳. 로그인 화면이 이미 거른 값이다(safeNextPath) — 늘 우리 사이트 안의 경로.
+ *   한동안 이 폼은 next 를 받지 않아 결제하러 왔다가 로그인한 사람도 홈으로 갔다.
+ */
+export function LoginForm({ next = '/' }: { next?: string }) {
   const t = useT();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,8 +50,11 @@ export function LoginForm() {
       return;
     }
     track('login', { method: 'email' });
-    router.push('/');
-    router.refresh();
+    /*
+     * 통째로 새로 연다 — 구글 로그인과 같다. next 는 거른 경로라도 typedRoutes 가 임의 문자열을
+     * 받지 않고, 세션이 바뀌었으니 서버 렌더도 새로 받는 편이 맞다.
+     */
+    window.location.assign(next);
   }
 
   return (

@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { SEED_PASSWORD, SEED_ACCOUNT } from '@shop/auth/seed-fixtures';
 import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
 
 /**
@@ -97,4 +98,72 @@ test('지난 주문 화면에서 다시 담기를 누르면 그 옵션이 장바
   await page.waitForURL(/\/cart$/);
   await ready(page);
   await expect(page.getByRole('button', { name: /옵션 변경$/ })).toHaveCount(1);
+});
+
+/** 상품 화면에서 그룹마다 재고 있는 첫 옵션을 고른다 */
+async function pickFirstInStock(page: Page): Promise<void> {
+  const groups = page.locator('[role="radiogroup"]');
+  for (let i = 0; i < (await groups.count()); i += 1) {
+    const pick = groups.nth(i).locator('[role="radio"]:not([data-sold-out])').first();
+    if ((await pick.count()) > 0) await pick.click();
+  }
+  await expect(page.getByRole('button', { name: '바로 구매' })).not.toHaveAttribute('aria-disabled', 'true');
+}
+
+/**
+ * **바로 구매.** 상품 화면의 주 단추인데 한동안 눌러도 아무 일도 없었다. 장바구니를 건드리지 않고
+ * 그 하나를 곧장 사게 한다 — 담아 둔 것은 산 뒤에도 그대로여야 한다.
+ */
+test('바로 구매하면 그 하나만 결제 화면에 오고, 사고 나도 장바구니는 그대로다', async ({ page }) => {
+  test.setTimeout(90_000);
+
+  // 장바구니에 하나를 담아 둔다
+  const kept = await addProductToCart(page, RACE_PRODUCT.reorder);
+  expect(kept, '담을 수 있는 옵션이 없다').not.toBeNull();
+
+  await page.goto(`/product/${RACE_PRODUCT.reorder}`);
+  await ready(page);
+  await pickFirstInStock(page);
+  await page.getByRole('button', { name: '바로 구매' }).click();
+
+  await page.waitForURL(/\/checkout\?now=1$/);
+  await ready(page);
+  await expect(page.getByText('바로 구매하는 상품입니다. 장바구니에 담아 둔 것은 그대로 남습니다.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
+
+  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  await ready(page);
+
+  // 담아 둔 것은 그대로다 — 바로 산 옵션이 같더라도 지우지 않는다
+  expect(await cartVariantIds(page)).toEqual([kept]);
+});
+
+test('로그인하지 않고 바로 구매하면, 로그인한 뒤 그 상품을 사러 결제 화면으로 돌아온다', async ({ browser }) => {
+  /*
+   * 이메일 로그인은 한동안 돌아갈 곳(next)을 보지 않고 늘 홈으로 갔다. 바로 구매를 붙이면서 그 길이
+   * 막다른 곳이 됐다 — 로그인하고 나면 무엇을 사려 했는지 사라진다.
+   */
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  try {
+    const page = await context.newPage();
+    await page.goto(`/product/${RACE_PRODUCT.reorder}`);
+    await ready(page);
+    await pickFirstInStock(page);
+    await page.getByRole('button', { name: '바로 구매' }).click();
+
+    await page.waitForURL(/\/login\?next=/);
+    expect(new URL(page.url()).searchParams.get('next')).toBe('/checkout?now=1');
+
+    await page.getByLabel('이메일').fill(SEED_ACCOUNT.reorderer);
+    await page.getByLabel('비밀번호').fill(SEED_PASSWORD);
+    await page.getByRole('button', { name: '로그인', exact: true }).click();
+
+    await page.waitForURL(/\/checkout\?now=1$/, { timeout: 20_000 });
+    await expect(page.getByText('바로 구매하는 상품입니다. 장바구니에 담아 둔 것은 그대로 남습니다.')).toBeVisible();
+  } finally {
+    await context.close();
+  }
 });

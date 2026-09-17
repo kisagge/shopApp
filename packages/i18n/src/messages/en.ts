@@ -886,6 +886,7 @@ export const en: Dictionary = {
 
   'checkout.heading': 'Checkout',
   'checkout.nothing': 'Nothing to order. Please choose items in your cart.',
+  'checkout.buyNowNote': 'You are buying this item now. Items in your cart stay as they are.',
   'checkout.address': 'Delivery address',
   'checkout.addressRemote': 'This is a remote area, so an extra shipping fee applies.',
   'checkout.addressChange': 'Change',

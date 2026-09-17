@@ -882,6 +882,7 @@ export const ja: Dictionary = {
 
   'checkout.heading': 'ご注文 / お支払い',
   'checkout.nothing': '注文する商品がありません。カートで商品を選んでください。',
+  'checkout.buyNowNote': '今すぐ購入する商品です。カートに入れた商品はそのまま残ります。',
   'checkout.address': 'お届け先',
   'checkout.addressRemote': '離島・山間部のため追加送料がかかります。',
   'checkout.addressChange': '変更',

@@ -5,7 +5,8 @@ import { stockLevel } from '@shop/core';
 import { Button, Price } from '@shop/ui';
 import { RestockButton } from '~/components/restock-button';
 import { track } from '~/lib/analytics/client';
-import { useCartStore } from '~/stores/cart';
+import { useCartStore, type CartItem } from '~/stores/cart';
+import { useBuyNowStore } from '~/stores/buy-now';
 import { useRadioGroup } from '~/lib/a11y/use-radio-group';
 import type { ProductDetail } from '~/lib/queries/catalog/products';
 import { useT } from '~/lib/i18n/client';
@@ -32,6 +33,7 @@ export function ProductOptions({
   const [quantity, setQuantity] = useState(1);
   const [added, setAdded] = useState(false);
   const add = useCartStore((s) => s.add);
+  const setBuyNow = useBuyNowStore((s) => s.set);
 
   useEffect(() => {
     track('view_item', { productId: product.id });
@@ -65,6 +67,21 @@ export function ProductOptions({
   }, [picked, product]);
 
   const canAdd = selected !== null && selected.stock > 0;
+
+  /** 담기와 바로 구매가 같은 줄을 만든다 — 한쪽만 고치면 결제 화면에 다른 이름·사진이 뜬다 */
+  const lineOf = (variant: NonNullable<typeof selected>): Omit<CartItem, 'quantity' | 'selected'> => ({
+    variantId: variant.id,
+    productId: product.id,
+    productName: product.name,
+    brand: product.brand,
+    optionLabel: variant.label,
+    listPrice: product.listPrice,
+    // 금액은 서버(/api/cart/quote)가 다시 계산한다. 여기 값은 화면 표시용이다.
+    salePrice: variant.price,
+    // 장바구니·결제 화면을 열자마자 흐린 사진부터 보이게. 견적이 오면 그 값으로 바뀐다
+    imageUrl: product.images[0]?.url ?? null,
+    blurDataUrl: product.images[0]?.blurDataUrl ?? null,
+  });
 
   /*
    * **수량은 고른 옵션의 재고를 넘지 않는다.** 화살표로 옵션을 옮기면 옮기는 순간 골라진다(라디오 규칙) — M 에서 4 개로
@@ -170,22 +187,7 @@ export function ProductOptions({
           aria-describedby={canAdd ? undefined : 'add-blocked'}
           onClick={() => {
             if (!canAdd || !selected) return;
-            add(
-              {
-                variantId: selected.id,
-                productId: product.id,
-                productName: product.name,
-                brand: product.brand,
-                optionLabel: selected.label,
-                listPrice: product.listPrice,
-                // 금액은 서버(/api/cart/quote)가 다시 계산한다. 여기 값은 화면 표시용이다.
-                salePrice: selected.price,
-                // 장바구니를 열자마자 흐린 사진부터 보이게. 견적이 오면 그 값으로 바뀐다
-                imageUrl: product.images[0]?.url ?? null,
-                blurDataUrl: product.images[0]?.blurDataUrl ?? null,
-              },
-              shownQuantity,
-            );
+            add(lineOf(selected), shownQuantity);
             track('add_to_cart', {
               productId: product.id,
               variantId: selected.id,
@@ -201,7 +203,21 @@ export function ProductOptions({
           */}
           {t('product.addToCart')}
         </Button>
-        <Button aria-disabled={!canAdd} className="flex-[1.3]">
+        {/*
+          **한동안 눌러도 아무 일도 없었다** — 단추만 있고 동작이 없었다. 상품 화면의 주 단추인데.
+          장바구니는 건드리지 않고 이것 하나를 곧장 결제 화면으로 가져간다(stores/buy-now).
+        */}
+        <Button
+          aria-disabled={!canAdd}
+          className="flex-[1.3]"
+          onClick={() => {
+            if (!canAdd || !selected) return;
+            setBuyNow(lineOf(selected), shownQuantity);
+            track('begin_checkout', { itemCount: 1 });
+            // 대입이 아니라 호출로 옮긴다 — 장바구니의 결제 단추와 같다
+            window.location.assign('/checkout?now=1');
+          }}
+        >
           {canAdd ? t('product.buyNow') : t('opt.selectFirst')}
         </Button>
       </div>

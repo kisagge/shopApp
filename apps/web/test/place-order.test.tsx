@@ -20,6 +20,7 @@ vi.mock('~/lib/payments/client', () => ({ openPaymentWindow }));
 
 const { usePlaceOrder } = await import('~/lib/checkout/place-order');
 const { useCartStore } = await import('~/stores/cart');
+const { useBuyNowStore } = await import('~/stores/buy-now');
 
 /**
  * 주문 만들기부터 결제 승인까지.
@@ -109,6 +110,49 @@ describe('같은 시도는 한 번만', () => {
     await act(async () => { await b.result.current.place(input([item('v1')])); });
 
     expect(bodyOf(0)['idempotencyKey']).not.toBe(first);
+  });
+});
+
+describe('바로 구매', () => {
+  /*
+   * 바로 구매는 장바구니를 건드리지 않는다. 주문 뒤에 장바구니에서 산 옵션을 지우면, 담아 두었던
+   * 같은 옵션이 함께 사라진다 — 바로 산 것은 그것이 아니었는데.
+   */
+  it('주문이 만들어지면 바로 구매 칸만 비우고 장바구니는 그대로 둔다', async () => {
+    useCartStore.setState({ items: [item('v1'), item('v2')] });
+    useBuyNowStore.setState({ item: item('v1') });
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+
+    happyPath();
+    await act(async () => { await result.current.place({ ...input([item('v1')]), source: 'buyNow' }); });
+
+    expect(useBuyNowStore.getState().item).toBeNull();
+    expect(useCartStore.getState().items.map((i) => i.variantId)).toEqual(['v1', 'v2']);
+  });
+
+  it('주문이 실패하면 바로 구매 칸도 남긴다 — 다시 누를 수 있어야 한다', async () => {
+    useBuyNowStore.setState({ item: item('v1') });
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+
+    vi.mocked(fetch).mockResolvedValueOnce(fail({ code: 'OUT_OF_STOCK', message: '품절' }, 409));
+    await act(async () => { await result.current.place({ ...input([item('v1')]), source: 'buyNow' }); });
+
+    expect(useBuyNowStore.getState().item?.variantId).toBe('v1');
+  });
+
+  it('결제창을 열 때도 바로 구매 칸만 비운다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', 'test_ck_abcdefghijklmnopqrstuvwx');
+    useCartStore.setState({ items: [item('v1')] });
+    useBuyNowStore.setState({ item: item('v1') });
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+    openPaymentWindow.mockResolvedValueOnce(undefined);
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    await act(async () => { await result.current.place({ ...input([item('v1')]), source: 'buyNow' }); });
+
+    expect(useBuyNowStore.getState().item).toBeNull();
+    expect(useCartStore.getState().items.map((i) => i.variantId)).toEqual(['v1']);
+    vi.unstubAllEnvs();
   });
 });
 

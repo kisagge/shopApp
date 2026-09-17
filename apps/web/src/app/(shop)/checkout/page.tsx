@@ -14,10 +14,20 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export const dynamic = 'force-dynamic';
 
-export default async function CheckoutPage() {
+export default async function CheckoutPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ now?: string }>;
+}) {
+  // 바로 구매로 왔는가 — 장바구니 대신 그 하나를 산다(stores/buy-now)
+  const buyNow = (await searchParams).now === '1';
   const user = await getViewer();
-  // 주문 조회·취소·환불이 전부 계정에 묶여 있어 비회원 주문은 지원하지 않는다
-  if (!user) redirect('/login?next=/checkout');
+  /*
+   * 주문 조회·취소·환불이 전부 계정에 묶여 있어 비회원 주문은 지원하지 않는다.
+   * 돌아올 주소에 바로 구매를 남긴다 — 빠뜨리면 로그인하고 돌아와 장바구니를 산다.
+   */
+  // 고정된 경로라 인코딩하지 않는다(마이페이지들과 같은 모양) — 쿼리 값 안의 `?` 는 그대로 읽힌다
+  if (!user) redirect(buyNow ? '/login?next=/checkout?now=1' : '/login?next=/checkout');
 
   const [address, t] = await Promise.all([getDefaultAddress(user.id), getT()]);
 
@@ -40,6 +50,7 @@ export default async function CheckoutPage() {
         <CheckoutUnavailable />
       ) : (
         <CheckoutForm
+          buyNow={buyNow}
           defaultAddress={address}
           paymentMode={payment.mode}
           remoteSurcharge={(await getShippingPolicy()).remoteSurcharge}

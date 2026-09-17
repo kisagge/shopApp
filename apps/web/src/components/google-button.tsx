@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { authClient } from '@shop/auth/client';
+import { safeNextPath } from '@shop/core';
 import { isNativeShell, nativeGoogleIdToken, type GoogleClientIds } from '@shop/native';
 import { useT } from '~/lib/i18n/client';
 
@@ -22,6 +23,8 @@ export function GoogleButton({
   const t = useT();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState(false);
+  // 주소에 실린 값이 여기까지 온다 — 남의 사이트로 보내지 않게 한 번 더 거른다(safeNextPath)
+  const destination = safeNextPath(next);
 
   async function start() {
     setError(false);
@@ -47,13 +50,13 @@ export function GoogleButton({
 
         // typedRoutes 는 임의 문자열을 경로로 받지 않는다. 통째로 새로
         // 여는 편이 안전하기도 하다 — 세션이 바뀌었으니 서버 렌더도 새로 받는다.
-        window.location.assign(next ?? '/');
+        window.location.assign(destination);
         return;
       }
 
       await authClient.signIn.social({
         provider: 'google',
-        callbackURL: next ?? '/',
+        callbackURL: destination,
         // 실패하면 우리 로그인 화면으로 돌아온다. 인증 서버의 기본 오류
         // 화면은 우리 것이 아니고 다음 행동도 알려 주지 못한다.
         errorCallbackURL: '/login',

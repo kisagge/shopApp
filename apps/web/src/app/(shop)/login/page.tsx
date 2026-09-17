@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { googleEnabled, googleNativeClientIds } from '@shop/auth';
+import { safeNextPath } from '@shop/core';
 import { LoginForm } from '~/components/login-form';
 import { GoogleButton, OrDivider } from '~/components/google-button';
 import type { MessageKey } from '@shop/i18n';
@@ -27,7 +28,9 @@ export default async function LoginPage({
 }: {
   searchParams: Promise<{ reset?: string; next?: string; error?: string }>;
 }) {
-  const { reset, next, error } = await searchParams;
+  const { reset, next: rawNext, error } = await searchParams;
+  // 주소에 실린 값이다 — 우리 사이트 안의 경로만 받는다(core 의 safeNextPath)
+  const next = safeNextPath(rawNext);
   const t = await getT();
   const socialError = error
     ? t(SOCIAL_ERROR_KEY[error] ?? 'auth.googleFailedShort')
@@ -83,7 +86,7 @@ export default async function LoginPage({
         </>
       )}
 
-      <LoginForm />
+      <LoginForm next={next} />
 
       <p className="text-center text-[13px]">
         <Link href="/forgot-password" className="text-[var(--fg-muted)] underline underline-offset-2">

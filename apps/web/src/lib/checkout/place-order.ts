@@ -7,6 +7,7 @@ import type { PaymentMode } from '@shop/core';
 import { payOrder, orderNameOf } from './pay-order';
 import type { CartItem } from '~/stores/cart';
 import { useCartStore } from '~/stores/cart';
+import { useBuyNowStore } from '~/stores/buy-now';
 import { track } from '~/lib/analytics/client';
 import { getSessionId } from '~/lib/analytics/session';
 import { useT } from '~/lib/i18n/client';
@@ -29,6 +30,11 @@ function newOrderKey(): string {
 
 export interface PlaceOrderInput {
   readonly items: readonly CartItem[];
+  /**
+   * 어디서 온 줄인가. 주문 뒤에 **그 자리만** 비운다 — 바로 구매한 것을 장바구니에서 지우면
+   * 담아 둔 같은 옵션이 함께 사라진다.
+   */
+  readonly source?: 'cart' | 'buyNow';
   readonly addressId: string;
   /** 고른 쿠폰 코드. 안 쓰면 넣지 않는다. */
   readonly couponCode?: string | undefined;
@@ -57,8 +63,12 @@ export function usePlaceOrder(mode: PaymentMode) {
   const [pending, setPending] = useState(false);
   const [orderKey] = useState(newOrderKey);
 
-  /** 만든 주문에 들어간 것만 장바구니에서 뺀다 */
-  const clear = (items: readonly CartItem[]) => {
+  /** 만든 주문에 들어간 것만 온 자리에서 뺀다 */
+  const clear = (items: readonly CartItem[], source: 'cart' | 'buyNow' = 'cart') => {
+    if (source === 'buyNow') {
+      useBuyNowStore.getState().clear();
+      return;
+    }
     for (const i of items) useCartStore.getState().remove(i.variantId);
   };
 
@@ -131,7 +141,7 @@ export function usePlaceOrder(mode: PaymentMode) {
       method: input.method,
       orderName: orderNameOf(input.items, t),
       // 창이 뜨면 이 페이지를 떠나므로 그때는 먼저 비워야 한다
-      beforeWindow: () => clear(input.items),
+      beforeWindow: () => clear(input.items, input.source),
     });
 
     if (paid.kind === 'window') return { refetchQuote: false };
@@ -145,7 +155,7 @@ export function usePlaceOrder(mode: PaymentMode) {
      * 이 화면이 "주문할 상품이 없습니다" 로 바뀐다 — 기기에서 그렇게 보였다.
      * 창을 여는 길만 예외다(`beforeWindow`). 그때는 페이지를 떠나 버린다.
      */
-    clear(input.items);
+    clear(input.items, input.source);
 
     if (paid.kind === 'windowFailed') {
       // 창을 닫거나 SDK 를 못 불러왔다. 주문은 이미 만들어져 있다.

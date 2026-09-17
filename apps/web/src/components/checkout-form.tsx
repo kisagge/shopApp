@@ -13,6 +13,7 @@ import { OrderTotal } from '~/components/checkout/order-total';
 import { usePlaceOrder } from '~/lib/checkout/place-order';
 import { useCartQuote } from '~/lib/use-cart-quote';
 import { useCartStore } from '~/stores/cart';
+import { useBuyNowStore } from '~/stores/buy-now';
 import { track } from '~/lib/analytics/client';
 import { formatMoney, formatNumber } from '@shop/i18n';
 import { useLocale, useT } from '~/lib/i18n/client';
@@ -36,10 +37,13 @@ interface SavedAddress {
  * 들어가야 했다.
  */
 export function CheckoutForm({
+  buyNow = false,
   defaultAddress: initialAddress,
   paymentMode,
   remoteSurcharge,
 }: {
+  /** 바로 구매로 왔다 — 장바구니가 아니라 그 하나를 산다(stores/buy-now) */
+  buyNow?: boolean;
   defaultAddress: SavedAddress | null;
   /** 서버가 정한 결제 방식. 브라우저는 다시 정하지 않는다 — place-order.ts 주석 참고 */
   paymentMode: PaymentMode;
@@ -65,7 +69,17 @@ export function CheckoutForm({
   const [defaultAddress, setDefaultAddress] = useState<SavedAddress | null>(initialAddress);
   const [editingAddress, setEditingAddress] = useState(initialAddress === null);
   const items = useCartStore((s) => s.items);
-  const selected = useMemo(() => items.filter((i) => i.selected), [items]);
+  const buyNowItem = useBuyNowStore((s) => s.item);
+  /**
+   * 사는 것. 바로 구매면 그 하나, 아니면 장바구니에서 고른 줄.
+   *
+   * 바로 구매는 장바구니를 건드리지 않는다 — 담아 둔 다른 줄의 선택을 바꾸지도, 주문 뒤에
+   * 담아 둔 같은 옵션을 지우지도 않는다.
+   */
+  const selected = useMemo(
+    () => (buyNow ? (buyNowItem ? [buyNowItem] : []) : items.filter((i) => i.selected)),
+    [buyNow, buyNowItem, items],
+  );
 
   const [method, setMethod] = useState<PaymentMethodInput>('CARD');
 
@@ -158,6 +172,7 @@ export function CheckoutForm({
 
     const { refetchQuote } = await place({
       items: selected,
+      source: buyNow ? 'buyNow' : 'cart',
       addressId: defaultAddress.id,
       memo,
       pointsToUse,
@@ -275,6 +290,9 @@ export function CheckoutForm({
         </section>
 
       <OrderItems items={selected} quote={q} money={money} />
+      {buyNow && selected.length > 0 && (
+        <p className="-mt-6 text-[12px] text-[var(--fg-muted)]">{t('checkout.buyNowNote')}</p>
+      )}
 
       {q && q.pointsAvailable > 0 && (
         <section aria-labelledby="point-title">

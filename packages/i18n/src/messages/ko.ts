@@ -914,6 +914,7 @@ export const ko = {
 
   'checkout.heading': '주문 / 결제',
   'checkout.nothing': '주문할 상품이 없습니다. 장바구니에서 상품을 선택해 주세요.',
+  'checkout.buyNowNote': '바로 구매하는 상품입니다. 장바구니에 담아 둔 것은 그대로 남습니다.',
   'checkout.address': '배송지',
   'checkout.addressRemote': '도서산간 지역이라 추가 배송비가 붙습니다.',
   'checkout.addressChange': '변경',

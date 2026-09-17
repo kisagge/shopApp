@@ -22,6 +22,40 @@ beforeEach(() => {
   vi.stubGlobal('location', { assign: vi.fn() });
 });
 
+describe('돌아갈 곳', () => {
+  /*
+   * next 는 주소에 실린 값이다. 한동안 그대로 location.assign 과 callbackURL 에 넘겨서,
+   * `?next=https://다른곳` 링크로 우리 로그인 화면을 거쳐 남의 사이트로 보낼 수 있었다.
+   */
+  it('우리 사이트 안의 경로면 로그인 뒤 거기로 간다', async () => {
+    const user = userEvent.setup();
+    render(<GoogleButton next="/checkout?now=1" />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    expect(social.mock.calls[0]![0].callbackURL).toBe('/checkout?now=1');
+  });
+
+  it.each(['https://evil.test', '//evil.test'])('%s 는 받지 않고 홈으로 보낸다', async (next) => {
+    const user = userEvent.setup();
+    render(<GoogleButton next={next} />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    expect(social.mock.calls[0]![0].callbackURL).toBe('/');
+  });
+
+  it('앱에서도 걸러서 연다', async () => {
+    const user = userEvent.setup();
+    isNativeShell.mockReturnValue(true);
+    render(<GoogleButton next="https://evil.test" nativeIds={NATIVE_IDS} />);
+
+    await user.click(screen.getByRole('button', { name: '구글로 계속하기' }));
+
+    await vi.waitFor(() => expect(location.assign).toHaveBeenCalledWith('/'));
+  });
+});
+
 describe('구글 버튼', () => {
   it('이름은 글자가 준다 — 로고만으로는 읽히지 않는다', () => {
     render(<GoogleButton />);
