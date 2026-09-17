@@ -207,3 +207,32 @@ export const REVIEW_ERROR_MESSAGE: Readonly<Record<ReviewErrorCode, string>> = {
   NOT_OWN_REVIEW: '자기 리뷰만 고칠 수 있습니다',
   SELLER_CANNOT_REVIEW: '판매자 계정으로는 리뷰를 쓸 수 없습니다. 손님으로 사신 것이라면 개인 계정으로 써 주세요.',
 };
+
+/**
+ * 주문 상세의 줄마다 후기로 가는 길.
+ *
+ * **주문을 보다가 후기를 쓰러 갈 길이 없었다.** 받은 물건을 확인하는 자리가 곧 후기를 떠올리는 자리인데, 마이페이지의
+ * 다른 메뉴로 가서 그 줄을 다시 찾아야 했다. 쓴 것이 있으면 고치러, 없으면 쓰러 보낸다.
+ *
+ * · `WRITE` — 받았고(isReviewableStatus) 줄이 살아 있고 아직 안 썼다
+ * · `EDIT`  — 이미 썼고 운영진이 내리지 않았다(내린 글은 고치는 화면이 없는 글로 답한다)
+ * · null    — 받기 전이거나 돌려보낸 줄이거나, 운영진이 내린 후기다(다시 쓸 수도 없다 — assertCanReview)
+ */
+export type OrderLineReviewLink =
+  | { readonly kind: 'WRITE' }
+  | { readonly kind: 'EDIT'; readonly reviewId: string }
+  | null;
+
+export function orderLineReviewLink(input: {
+  readonly orderStatus: OrderStatus;
+  /** 취소·환불로 돈이 돌아간 줄 */
+  readonly lineCanceled: boolean;
+  /** 이 줄로 쓴 후기. 행이 없으면 null(본인이 지운 것도 행이 없다) */
+  readonly review: { readonly id: string; readonly deletedAt: Date | null } | null;
+}): OrderLineReviewLink {
+  if (input.review) {
+    return input.review.deletedAt === null ? { kind: 'EDIT', reviewId: input.review.id } : null;
+  }
+  if (input.lineCanceled || !isReviewableStatus(input.orderStatus)) return null;
+  return { kind: 'WRITE' };
+}

@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { checkExchangeOption } from '@shop/core';
+import { onDisplay, sellableBrand } from './catalog/shelf';
 
 /** 체크아웃에서 쓸 기본 배송지 */
 export async function getDefaultAddress(userId: string) {
@@ -74,7 +75,11 @@ export async function getOrderForUser(orderNo: string, userId: string) {
           imageUrl: true,
           listPrice: true, unitPrice: true, quantity: true, subtotal: true,
           // 교환 옵션을 고르려면 같은 상품·같은 추가금인지 알아야 한다
-          variant: { select: { id: true, productId: true, priceOverride: true } },
+          variant: {
+            select: { id: true, productId: true, priceOverride: true },
+          },
+          // 이 줄로 쓴 후기 — 쓰러 갈지 고치러 갈지(core orderLineReviewLink)
+          review: { select: { id: true, deletedAt: true } },
         },
       },
     },
@@ -116,4 +121,19 @@ export async function getExchangeOptions(
         .map((c) => ({ variantId: c.id, label: c.label })),
     ]),
   );
+}
+
+/**
+ * 매대에 나와 있는 상품의 주소 — 상품 id → slug.
+ *
+ * 주문 상세가 줄마다 상품 화면으로 링크를 걸 때 쓴다. **매대와 같은 조건(onDisplay·sellableBrand)으로 거른다** —
+ * 내린 상품이나 정지된 가맹점의 상품으로 가는 링크는 404 로 끝나는 막다른 길이다. 조건을 여기서 따로 적지 않는다.
+ */
+export async function getDisplayedProductSlugs(productIds: readonly string[]): Promise<ReadonlyMap<string, string>> {
+  if (productIds.length === 0) return new Map();
+  const rows = await prisma.product.findMany({
+    where: { id: { in: [...new Set(productIds)] }, ...onDisplay(), brand: sellableBrand() },
+    select: { id: true, slug: true },
+  });
+  return new Map(rows.map((r) => [r.id, r.slug]));
 }

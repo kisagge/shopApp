@@ -449,6 +449,8 @@ export const en: Dictionary = {
   'order.returnShipping': 'Return shipping',
   'order.exchangeLines': 'Exchange',
   'order.exchangeReship': 'Exchange shipment',
+  'order.lineWriteReview': 'Write a review',
+  'order.lineEditReview': 'Edit my review',
   'order.returnTo': 'Where to send it',
   'order.returnToNote': 'Please send the items to the address below. We continue once they arrive.',
   'order.returnToSplit': 'These items ship back to different sellers, so please send separate boxes — put only the items listed under each address.',

@@ -6,7 +6,7 @@ import type { Metadata } from 'next';
 import {
   isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
   isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber, canConfirmPurchase, isOpenReturn,
-  returnAddressLine, awaitingDeposit, depositExpired,
+  returnAddressLine, awaitingDeposit, depositExpired, trackingUrlFor, orderLineReviewLink,
   type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
@@ -19,7 +19,7 @@ import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { approvedReturnDestinations } from '~/lib/orders/return-address';
-import { getOrderForUser, getExchangeOptions } from '~/lib/queries/orders';
+import { getOrderForUser, getExchangeOptions, getDisplayedProductSlugs } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
 import { formatMoney, formatNumber, formatDateTime, type MessageKey } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -161,6 +161,8 @@ export default async function OrderPage({
 
   // 폼을 띄울 때만 읽는다 — 교환으로 바꿀 수 있는 옵션(같은 상품·같은 가격·재고)
   const exchangeOptions = showReturnForm ? await getExchangeOptions(returnableItems) : {};
+  // 줄마다 상품 화면으로 가는 링크 — 매대에 나와 있는 상품만
+  const productSlugs = await getDisplayedProductSlugs(order.items.map((i) => i.variant.productId));
 
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
@@ -309,7 +311,17 @@ export default async function OrderPage({
               <span className="flex flex-1 flex-col gap-0.5">
                 <span className="text-[10px] tracking-[0.08em] text-[var(--fg-muted)]">{i.brandName}</span>
                 <span className="text-[13px]">
-                  {i.productName}
+                  {/*
+                    **산 물건의 화면으로 간다.** 다시 사거나 설명을 다시 보려면 검색부터 해야 했다. 내린 상품은
+                    링크를 걸지 않는다 — 404 로 끝나는 막다른 길이다. 이름은 주문에 박힌 그때의 이름이다.
+                  */}
+                  {productSlugs.has(i.variant.productId) ? (
+                    <Link href={`/product/${productSlugs.get(i.variant.productId)!}`} className="text-[var(--fg)] underline-offset-2 hover:underline">
+                      {i.productName}
+                    </Link>
+                  ) : (
+                    i.productName
+                  )}
                   {/* 흐리게만 하면 색을 못 보는 사람에게는 취소됐는지 알 길이 없다 */}
                   {(i.canceledAt || i.status === 'RETURN_REQUESTED') && (
                     <span className="ml-1.5 rounded-full border border-[var(--border-strong)] px-1.5 py-px text-[10px] text-[var(--fg-secondary)]">
@@ -326,6 +338,27 @@ export default async function OrderPage({
                 <span className="text-[11px] text-[var(--fg-muted)]">
                   {i.optionLabel} · <span className="tnum">{i.quantity}</span>
                 </span>
+                {(() => {
+                  const review = orderLineReviewLink({
+                    orderStatus: order.status, lineCanceled: i.canceledAt !== null, review: i.review,
+                  });
+                  if (!review) return null;
+                  /*
+                   * **주문을 보다가 후기로 간다.** 받은 물건을 확인하는 자리가 후기를 떠올리는 자리인데, 다른 메뉴에서
+                   * 그 줄을 다시 찾아야 했다. 링크 이름에 상품명을 붙인다 — "후기 쓰기" 가 여럿이면 어느 것인지 모른다.
+                   */
+                  return (
+                    <Link
+                      href={review.kind === 'EDIT'
+                        ? `/mypage/reviews/${review.reviewId}/edit`
+                        : `/mypage/reviews#review-item-${i.id}`}
+                      className="mt-1 w-fit text-[11px] text-[var(--fg-secondary)] underline underline-offset-2"
+                    >
+                      {t(review.kind === 'EDIT' ? 'order.lineEditReview' : 'order.lineWriteReview')}
+                      <span className="sr-only"> — {i.productName}</span>
+                    </Link>
+                  );
+                })()}
               </span>
               <span className="tnum text-sm font-semibold">{money(i.subtotal)}</span>
             </li>
@@ -442,6 +475,27 @@ export default async function OrderPage({
                 <dd className="tnum">
                   {carrierOf(activeReturn.reshipCarrier ?? '')?.name ?? activeReturn.reshipCarrier}{' '}
                   {formatTrackingNumber(activeReturn.reshipTrackingNumber)}
+                  {/*
+                    **새로 보낸 물건도 조회할 수 있어야 한다.** 첫 배송에는 조회 링크가 있는데 교환 송장은 번호만
+                    적혀 있어, 손님이 택배사 누리집에 번호를 옮겨 적어야 했다. 같은 규칙(trackingUrlFor)으로 건다.
+                  */}
+                  {(() => {
+                    const url = trackingUrlFor(activeReturn.reshipCarrier ?? '', activeReturn.reshipTrackingNumber);
+                    if (!url) return null;
+                    const carrierName = carrierOf(activeReturn.reshipCarrier ?? '')?.name ?? activeReturn.reshipCarrier ?? '';
+                    return (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-2 font-sans text-[12px] text-[var(--fg-secondary)] underline underline-offset-2"
+                      >
+                        {t('track.openAt', { carrier: carrierName })}
+                        <span className="sr-only"> {t('track.newWindow')}</span>
+                        <span aria-hidden="true"> ↗</span>
+                      </a>
+                    );
+                  })()}
                 </dd>
               </div>
             )}

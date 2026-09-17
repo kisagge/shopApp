@@ -445,6 +445,8 @@ export const ja: Dictionary = {
   'order.returnShipping': '返送料',
   'order.exchangeLines': '交換内容',
   'order.exchangeReship': '交換商品の伝票',
+  'order.lineWriteReview': 'レビューを書く',
+  'order.lineEditReview': 'レビューを編集',
   'order.returnTo': '送り先',
   'order.returnToNote': '下記の住所へお送りください。到着を確認しだい次の手続きに進みます。',
   'order.returnToSplit': '販売元が異なるため、箱を分けてお送りください。各住所に記載の商品だけを入れてください。',

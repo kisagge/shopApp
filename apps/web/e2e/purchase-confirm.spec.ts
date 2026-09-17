@@ -82,6 +82,22 @@ test('받은 주문을 구매확정하면 적립금이 바로 들어오고 단�
   await expect(page.getByRole('button', { name: '구매확정' })).toHaveCount(0);
   await expect(page.getByText('현재 상태는 구매확정입니다.')).toBeVisible();
 
+  /*
+   * ── 줄에서 산 물건의 화면과 후기로 간다. 다시 사거나 후기를 쓰려면 다른 메뉴에서 그 줄을 다시 찾아야 했다.
+   */
+  const items = page.getByRole('region', { name: /주문 상품/ });
+  await expect(items.locator(`a[href="/product/${RACE_PRODUCT.purchaseConfirm}"]`)).toBeVisible();
+  const write = items.getByRole('link', { name: /^후기 쓰기/ });
+  await expect(write).toHaveCount(1);
+  await write.click();
+  await page.waitForURL(/\/mypage\/reviews#review-item-/);
+  await ready(page);
+  const target = decodeURIComponent(new URL(page.url()).hash.slice(1));
+  // 데려간 자리에 그 줄의 후기 양식이 있다
+  await expect(page.locator(`[id="${target}"]`).getByRole('button', { name: /등록/ })).toBeVisible();
+  await page.goto(`/order/${orderNo}`);
+  await ready(page);
+
   // 확정하면 단순 변심 반품이 닫힌다 — 판매자 귀책은 남는다
   await page.getByRole('button', { name: '반품 · 교환 신청' }).click();
   await expect(page.getByRole('radio', { name: /단순 변심/ })).toHaveCount(0);

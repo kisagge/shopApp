@@ -101,7 +101,12 @@ export default async function MyReviewsPage({
         ) : (
           <ul className="flex flex-col gap-8">
             {items.map((item) => (
-              <li key={item.orderItemId} className="rounded-md border border-[var(--border)] p-6">
+              // 주문 상세의 "후기 쓰기" 가 이 줄로 곧장 데려온다(#review-item-…)
+              <li
+                key={item.orderItemId}
+                id={`review-item-${item.orderItemId}`}
+                className="scroll-mt-24 rounded-md border border-[var(--border)] p-6"
+              >
                 <article>
                   <div className="flex gap-4 border-b border-[var(--surface-2)] pb-5">
                     {item.imageUrl ? (

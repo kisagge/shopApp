@@ -462,6 +462,8 @@ export const ko = {
   'order.returnShipping': '반송비',
   'order.exchangeLines': '교환 내용',
   'order.exchangeReship': '교환 상품 송장',
+  'order.lineWriteReview': '후기 쓰기',
+  'order.lineEditReview': '내 후기 고치기',
   'order.borneByCustomer': '고객 부담',
   'order.borneBySeller': '판매자 부담',
   'order.returnDetail': '설명',

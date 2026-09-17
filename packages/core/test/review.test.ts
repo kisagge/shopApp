@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   averageRating, ratingScore, ratingBreakdown, sizeFitSummary,
-  isReviewableStatus, isSizeFit, planReviewImages, reviewChanged, canWriteReview,
+  isReviewableStatus, isSizeFit, planReviewImages, reviewChanged, canWriteReview, orderLineReviewLink,
   RATING_MAX, RATING_MIN,
 } from '../src/review';
 import type { Actor } from '../src/authz';
@@ -188,5 +188,37 @@ describe('고쳐졌는가', () => {
 
   it('글자 하나 안 바뀌어도 사진이 바뀌었으면 고쳐진 것이다', () => {
     expect(reviewChanged(before, {}, true)).toBe(true);
+  });
+});
+
+/**
+ * 주문 상세에서 후기로 가는 길. 주문을 보다가 후기를 쓰러 갈 길이 없었다.
+ */
+describe('주문 줄의 후기 길', () => {
+  const at = new Date('2026-09-10');
+
+  it('받은 줄이고 아직 안 썼으면 쓰러 보낸다', () => {
+    expect(orderLineReviewLink({ orderStatus: 'DELIVERED', lineCanceled: false, review: null })).toEqual({ kind: 'WRITE' });
+    expect(orderLineReviewLink({ orderStatus: 'CONFIRMED', lineCanceled: false, review: null })).toEqual({ kind: 'WRITE' });
+  });
+
+  it('받기 전이면 길을 두지 않는다 — 누르면 막힌다', () => {
+    for (const orderStatus of ['PENDING', 'PAID', 'PREPARING', 'SHIPPED'] as const) {
+      expect(orderLineReviewLink({ orderStatus, lineCanceled: false, review: null })).toBeNull();
+    }
+  });
+
+  it('돌려보낸 줄에는 쓰러 보내지 않는다 — 산 사람의 후기가 아니다', () => {
+    expect(orderLineReviewLink({ orderStatus: 'DELIVERED', lineCanceled: true, review: null })).toBeNull();
+  });
+
+  it('이미 썼으면 고치러 보낸다', () => {
+    expect(orderLineReviewLink({ orderStatus: 'CONFIRMED', lineCanceled: false, review: { id: 'r-1', deletedAt: null } }))
+      .toEqual({ kind: 'EDIT', reviewId: 'r-1' });
+  });
+
+  it('운영진이 내린 후기는 고칠 수도 다시 쓸 수도 없다 — 길을 두지 않는다', () => {
+    expect(orderLineReviewLink({ orderStatus: 'CONFIRMED', lineCanceled: false, review: { id: 'r-1', deletedAt: at } }))
+      .toBeNull();
   });
 });
