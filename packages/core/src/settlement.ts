@@ -165,3 +165,18 @@ export const isCarryable = (settlement: { readonly status: SettlementStatus; rea
 /** 지급할 수 있는가 — 확정됐고 지급액이 0 이상이다. 음수는 다음 확정 때 넘어간다 */
 export const isPayable = (settlement: { readonly status: SettlementStatus; readonly netAmount: number }): boolean =>
   settlement.status === 'CONFIRMED' && settlement.netAmount >= 0;
+
+/**
+ * 지급 보류·해제로 옮길 상태.
+ *
+ * **보류 상태는 있었는데 보류할 길이 없었다.** 확정된 정산에 문제가 보여도(가맹점 분쟁, 계좌 확인 중) 지급 단추는
+ * 그대로 살아 있었다. 확정된 것만 보류하고, 보류된 것만 푼다 — 지급·이월된 것을 보류하면 이미 끝난 일을 멈춘 척한다.
+ * 보류된 달은 지급할 수 없고(isPayable), 다시 확정하면 금액을 새로 센다(isRecalculable).
+ */
+export function settlementHoldTarget(current: SettlementStatus, hold: boolean): SettlementStatus {
+  if (hold && current === 'CONFIRMED') return 'HELD';
+  if (!hold && current === 'HELD') return 'CONFIRMED';
+  throw new SettlementError(
+    hold ? `확정된 정산만 보류할 수 있습니다(지금: ${current})` : `보류된 정산만 풀 수 있습니다(지금: ${current})`,
+  );
+}

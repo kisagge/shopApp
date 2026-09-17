@@ -84,3 +84,15 @@ export const merchantCommissionSchema = z.object({
   reason: trimmed(200),
 });
 export type MerchantCommissionInput = z.infer<typeof merchantCommissionSchema>;
+
+/**
+ * 정산 지급 보류·해제.
+ *
+ * 보류는 **까닭을 적어야 한다** — 가맹점도 그 까닭을 본다. 들어올 돈이 왜 안 들어오는지 모르면 문의가 먼저 온다.
+ * 풀 때는 까닭이 없어도 된다.
+ */
+export const settlementHoldSchema = z.discriminatedUnion('hold', [
+  z.object({ hold: z.literal(true), reason: trimmed(200) }),
+  z.object({ hold: z.literal(false) }),
+]);
+export type SettlementHoldInput = z.infer<typeof settlementHoldSchema>;

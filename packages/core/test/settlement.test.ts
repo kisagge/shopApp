@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   settlementPeriod, isClosedPeriod, previousYearMonth, yearMonthOf, settlementWorthTelling,
-  calculateSettlement, isRecalculable, SettlementError, isCarryable, isPayable,
+  calculateSettlement, isRecalculable, SettlementError, isCarryable, isPayable, settlementHoldTarget,
 } from '../src/settlement';
 import { won } from '../src/money';
 
@@ -204,5 +204,27 @@ describe('넘길 것과 보낼 것', () => {
 
   it('넘긴 달은 다시 계산하지 않는다 — 이미 다른 달이 떠안았다', () => {
     expect(isRecalculable('CARRIED')).toBe(false);
+  });
+});
+
+/**
+ * **보류 상태는 있었는데 보류할 길이 없었다.** 확정된 것만 보류하고, 보류된 것만 푼다.
+ */
+describe('지급 보류', () => {
+  it('확정된 것을 보류하고, 보류된 것을 푼다', () => {
+    expect(settlementHoldTarget('CONFIRMED', true)).toBe('HELD');
+    expect(settlementHoldTarget('HELD', false)).toBe('CONFIRMED');
+  });
+
+  it.each(['PENDING', 'PAID', 'HELD', 'CARRIED'] as const)('%s 는 보류하지 않는다 — 끝난 일을 멈춘 척하지 않는다', (status) => {
+    expect(() => settlementHoldTarget(status, true)).toThrow(SettlementError);
+  });
+
+  it.each(['PENDING', 'CONFIRMED', 'PAID', 'CARRIED'] as const)('%s 는 풀 것이 없다', (status) => {
+    expect(() => settlementHoldTarget(status, false)).toThrow(SettlementError);
+  });
+
+  it('보류된 것은 지급하지 않는다', () => {
+    expect(isPayable({ status: 'HELD', netAmount: 100 })).toBe(false);
   });
 });

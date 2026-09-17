@@ -63,6 +63,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'user.restore': '정지 해제',
   'settlement.close': '정산 확정',
   'settlement.pay': '정산 지급',
+  'settlement.hold': '정산 지급 보류',
+  'settlement.release': '정산 지급 보류 해제',
   'points.reconcile': '포인트 대사',
   'points.expire': '포인트 소멸',
   'notices.expiry': '소멸 임박 알림',

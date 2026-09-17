@@ -259,6 +259,8 @@ model Settlement {
   carriedFrom   Settlement[] @relation("SettlementCarry")
 
   status SettlementStatus @default(PENDING)
+  /// 지급을 보류한 까닭. 보류(HELD)일 때만 있다 — 가맹점도 본다(왜 안 들어오는지 알아야 한다)
+  heldReason String?
 
   confirmedAt DateTime?
   paidAt      DateTime?

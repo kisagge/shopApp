@@ -8,7 +8,7 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getSettlements, SETTLEMENT_PAGE_SIZE } from '~/lib/queries/admin/settlements';
 import { PageNav } from '~/components/page-nav';
 import { previewSettlements } from '~/lib/admin/close-settlement';
-import { CloseButton, PayButton } from './settlement-actions';
+import { CloseButton, HoldButton, PayButton } from './settlement-actions';
 import { adminDate } from '~/lib/admin/date-format';
 
 export const metadata: Metadata = { title: '정산' };
@@ -301,6 +301,10 @@ export default async function SettlementsPage({
                           {SETTLEMENT_STATUS_LABEL[s.status as SettlementStatus] ?? s.status}
                         </Badge>
                         {/* 어느 달이 떠안았는지 — 넘긴 빚이 어디서 빠졌는지 맞춰 볼 수 있게 */}
+                        {/* 왜 멈췄는지 — 가맹점도 이 화면에서 본다 */}
+                        {s.heldReason && (
+                          <span className="mt-1 block max-w-48 text-[11px] text-warning">{s.heldReason}</span>
+                        )}
                         {s.carriedIntoStart && (
                           <span className="tnum mt-1 block text-[11px] text-[var(--fg-muted)]">
                             {s.carriedIntoStart.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric' })} 정산에서 차감
@@ -309,7 +313,9 @@ export default async function SettlementsPage({
                       </td>
                       {canPay && (
                         <td className="py-3 text-center">
-                          {s.status === 'CONFIRMED' ? (
+                          {s.status === 'CONFIRMED' || s.status === 'HELD' ? (
+                            <>
+                            {s.status === 'CONFIRMED' && (
                             <PayButton
                               settlementId={s.id}
                               merchantName={s.merchantName}
@@ -321,6 +327,12 @@ export default async function SettlementsPage({
                                 s.netAmount < 0 ? '다음 달 차감' : s.account === null ? '계좌 없음' : undefined
                               }
                             />
+                            )}
+                            {/* 음수 달은 지급할 것이 없어 보류할 것도 없다 — 다음 확정에서 넘어간다 */}
+                            {s.netAmount >= 0 && (
+                              <HoldButton settlementId={s.id} merchantName={s.merchantName} held={s.status === 'HELD'} />
+                            )}
+                            </>
                           ) : (
                             <span className="text-[11px] text-[var(--fg-muted)]">—</span>
                           )}

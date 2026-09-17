@@ -262,6 +262,45 @@ test('관리자는 지급을 집행하지 못한다', async ({ page }) => {
   ).toHaveCount(0);
 });
 
+/**
+ * **지급을 멈출 길이 없었다.** 보류 상태는 처음부터 있었는데 보류할 단추가 없어, 확정된 정산에 문제가 보여도 지급
+ * 단추가 그대로 살아 있었다. 보류하면 까닭이 적히고 지급 단추가 사라지며, 풀면 돌아온다. 뒤 검사가 지급할 수 있게
+ * 끝에 풀어 둔다.
+ */
+test('슈퍼관리자는 지급을 까닭과 함께 보류하고 푼다', async ({ browser }) => {
+  const context = await browser.newContext({ storageState: STATE_FILE.superAdmin });
+  try {
+    const page = await context.newPage();
+    await openPeriod(page, PERIOD);
+    const history = page.getByRole('region', { name: '확정된 정산 내역' });
+
+    const pay = history.getByRole('button', { name: /지급$/ }).first();
+    test.skip((await pay.count()) === 0, '지급할 정산이 없다 — 앞선 실행이 이미 지급했다');
+    // 단추 이름에 가맹점 이름이 붙어 있다("무어 지급") — 그 이름으로 줄을 붙잡는다
+    const payName = (await pay.textContent())!.trim();
+    const row = history.getByRole('row').filter({ has: page.getByRole('button', { name: payName, exact: true }) });
+
+    await row.getByRole('button', { name: /보류$/ }).click();
+    const form = row.getByRole('form', { name: /정산 지급 보류$/ });
+    // 까닭 없이는 보류하지 않는다 — 가맹점도 이 까닭을 본다
+    await form.getByRole('button', { name: '보류하기' }).click();
+    await expect(form.getByRole('alert')).toContainText('까닭');
+    const reason = `계좌 확인 중 ${Date.now()}`;
+    await form.getByLabel('보류 까닭').fill(reason);
+    await form.getByRole('button', { name: '보류하기' }).click();
+
+    const heldRow = history.getByRole('row').filter({ hasText: reason });
+    await expect(heldRow).toContainText('보류');
+    await expect(heldRow.getByRole('button', { name: /지급$/ })).toHaveCount(0);
+
+    await heldRow.getByRole('button', { name: /보류 해제$/ }).click();
+    await expect(history.getByRole('row').filter({ hasText: reason })).toHaveCount(0);
+    await expect(history.getByRole('button', { name: payName, exact: true })).toBeVisible();
+  } finally {
+    await context.close();
+  }
+});
+
 test('지급은 슈퍼관리자가 하고, 두 번 나가지 않는다', async ({ browser }) => {
   const context = await browser.newContext({ storageState: STATE_FILE.superAdmin });
   try {

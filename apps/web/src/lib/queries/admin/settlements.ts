@@ -20,6 +20,8 @@ export interface SettlementRow {
   readonly status: string;
   /** 이 달의 음수 지급액을 떠안은 달의 시작. 넘기지 않았으면 null */
   readonly carriedIntoStart: Date | null;
+  /** 지급을 보류한 까닭. 보류가 아니면 null */
+  readonly heldReason: string | null;
   /** 그때의 수수료율. 지금 요율이 아니다 — 확정은 숫자와 함께 요율도 얼린다 */
   readonly commissionPercent: number;
   /**
@@ -53,7 +55,7 @@ export async function getSettlements(actor: Actor, page = 1): Promise<{ rows: Se
       select: {
         id: true, periodStart: true, periodEnd: true,
         grossAmount: true, commissionAmount: true, refundAmount: true, carriedAmount: true, netAmount: true,
-        status: true, commissionPercent: true,
+        status: true, commissionPercent: true, heldReason: true,
         carriedInto: { select: { periodStart: true } },
         merchant: {
           select: {
@@ -87,5 +89,6 @@ export async function getSettlements(actor: Actor, page = 1): Promise<{ rows: Se
     netAmount: won(s.netAmount),
     status: s.status,
     carriedIntoStart: s.carriedInto?.periodStart ?? null,
+    heldReason: s.status === 'HELD' ? s.heldReason : null,
   })) };
 }

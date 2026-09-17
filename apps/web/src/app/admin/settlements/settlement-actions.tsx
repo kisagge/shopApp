@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 
@@ -116,10 +116,121 @@ export function PayButton({
   return (
     <>
       <Button type="button" size="sm" variant="secondary" disabled={pending} onClick={() => pay()}>
-        <span className="sr-only">{merchantName} </span>
+        <span className="sr-only">{`${merchantName} `}</span>
         {pending ? '처리 중…' : '지급'}
       </Button>
       {error && <p role="alert" className="mt-1 text-[11px] text-accent">{error}</p>}
     </>
+  );
+}
+
+/**
+ * 지급 보류·해제.
+ *
+ * **보류 상태는 있었는데 보류할 길이 없었다.** 확정된 정산에 문제가 보여도 지급 단추는 그대로 살아 있었다.
+ * 보류는 까닭을 적어야 누를 수 있다 — 가맹점도 그 까닭을 본다. 푸는 것은 한 번에 된다(지급 단추가 다시 생길 뿐이다).
+ */
+export function HoldButton({
+  settlementId,
+  merchantName,
+  held,
+}: {
+  settlementId: string;
+  merchantName: string;
+  /** 지금 보류 중인가 */
+  held: boolean;
+}) {
+  const router = useRouter();
+  const ids = { reason: useId(), note: useId() };
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState('');
+  const reasonRef = useRef<HTMLInputElement>(null);
+  // 누른 단추가 사라지므로 초점을 까닭 칸으로 옮긴다 — 키보드 사용자가 제자리를 잃지 않게
+  useEffect(() => {
+    if (open) reasonRef.current?.focus();
+  }, [open]);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function send(body: { hold: true; reason: string } | { hold: false }) {
+    setPending(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/settlements/${settlementId}/hold`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
+      if (!response.ok) {
+        setError(data.message ?? '처리하지 못했습니다.');
+        return;
+      }
+      setOpen(false);
+      setReason('');
+      router.refresh();
+    } catch {
+      setError('네트워크 오류로 처리하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (held) {
+    return (
+      <div className="mt-1.5 flex flex-col items-center gap-1">
+        <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => void send({ hold: false })}>
+          <span className="sr-only">{`${merchantName} `}</span>
+          {pending ? '푸는 중…' : '보류 해제'}
+        </Button>
+        {error && <p role="alert" className="text-[11px] text-accent">{error}</p>}
+      </div>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Button type="button" size="sm" variant="ghost" className="mt-1.5" onClick={() => setOpen(true)}>
+        <span className="sr-only">{`${merchantName} `}</span>
+        보류
+      </Button>
+    );
+  }
+
+  return (
+    <form
+      aria-label={`${merchantName} 정산 지급 보류`}
+      className="mt-1.5 flex w-56 flex-col gap-1.5 text-left"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (reason.trim().length === 0) {
+          setError('보류 까닭을 적어 주세요. 가맹점도 이 까닭을 봅니다.');
+          return;
+        }
+        void send({ hold: true, reason: reason.trim() });
+      }}
+    >
+      <label htmlFor={ids.reason} className="text-[11px] text-[var(--fg-secondary)]">
+        보류 까닭
+      </label>
+      <input
+        id={ids.reason}
+        value={reason}
+        maxLength={200}
+        onChange={(e) => setReason(e.target.value)}
+        aria-describedby={ids.note}
+        aria-invalid={error !== null && reason.trim().length === 0 ? true : undefined}
+        ref={reasonRef}
+        className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
+      />
+      <p id={ids.note} className="text-[11px] text-[var(--fg-muted)]">가맹점 정산 화면에도 보입니다.</p>
+      <div className="flex gap-1.5">
+        <Button type="submit" size="sm" disabled={pending}>{pending ? '보류 중…' : '보류하기'}</Button>
+        <Button type="button" size="sm" variant="ghost" onClick={() => { setOpen(false); setError(null); }}>
+          취소
+        </Button>
+      </div>
+      {error && <p role="alert" className="text-[11px] text-accent">{error}</p>}
+    </form>
   );
 }

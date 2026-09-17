@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, calculateSettlement, settlementPeriod, isClosedPeriod, isRecalculable,
-  hasSettlementAccount, settlementWorthTelling, won, isPayable,
+  hasSettlementAccount, settlementWorthTelling, won, isPayable, settlementHoldTarget, SettlementError,
   type Actor, type Won, type SettlementStatus,
 } from '@shop/core';
 import { notifySettlementClosed, notifySettlementPaid } from '~/lib/notifications/settlement';
@@ -359,4 +359,42 @@ export async function paySettlement(actor: Actor, settlementId: string, now = ne
     netAmount: won(before.netAmount),
     status: 'PAID' as const,
   };
+}
+
+/**
+ * 지급 보류·해제. 지급할 수 있는 사람(settlement:pay)만 — 지급을 멈추는 것도 지급의 일이다.
+ *
+ * 상태를 **읽은 그대로일 때만** 바꾼다. 누가 그사이 지급했으면 보류는 아무것도 바꾸지 않는다 — 나간 돈을 멈춘 척하지 않는다.
+ */
+export async function holdSettlement(
+  actor: Actor,
+  settlementId: string,
+  input: { hold: true; reason: string } | { hold: false },
+): Promise<{ id: string; merchantName: string; before: SettlementStatus; status: SettlementStatus; reason: string | null }> {
+  assertPermission(actor, 'settlement:pay');
+
+  const current = await prisma.settlement.findUnique({
+    where: { id: settlementId },
+    select: { id: true, status: true, merchant: { select: { name: true } } },
+  });
+  if (!current) throw new SettlementCloseError('NOT_FOUND', 404, '정산 내역을 찾을 수 없습니다.');
+
+  let next: SettlementStatus;
+  try {
+    next = settlementHoldTarget(current.status, input.hold);
+  } catch (error) {
+    if (error instanceof SettlementError) throw new SettlementCloseError('HOLD_NOT_ALLOWED', 409, error.message);
+    throw error;
+  }
+
+  const reason = input.hold ? input.reason : null;
+  const { count } = await prisma.settlement.updateMany({
+    where: { id: settlementId, status: current.status },
+    data: { status: next, heldReason: reason },
+  });
+  if (count === 0) {
+    throw new SettlementCloseError('HOLD_CHANGED', 409, '그사이 정산 상태가 바뀌었습니다. 새로 불러와 주세요.');
+  }
+
+  return { id: current.id, merchantName: current.merchant.name, before: current.status, status: next, reason };
 }

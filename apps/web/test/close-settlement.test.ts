@@ -12,7 +12,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { previewSettlements, closeSettlements, paySettlement } =
+const { previewSettlements, closeSettlements, paySettlement, holdSettlement } =
   await import('~/lib/admin/close-settlement');
 
 const superAdmin: Actor = { id: 'u-s', role: 'SUPER_ADMIN', merchantId: null };
@@ -508,5 +508,60 @@ describe('앞선 달의 빚', () => {
       merchant: { name: '무어', settlementBank: 'KB', settlementAccount: '12345678', settlementHolder: '무어' },
     });
     await expect(paySettlement(superAdmin, 's-1')).rejects.toThrow('다음 달 정산에서 뺍니다');
+  });
+});
+
+/**
+ * **지급을 멈출 길이 없었다.** 보류 상태는 있었는데 보류할 단추가 없었다.
+ */
+describe('지급 보류', () => {
+  const row = (status: string) => ({ id: 's-1', status, merchant: { name: '무어' } });
+
+  it('확정된 정산을 까닭과 함께 보류한다 — 읽은 상태 그대로일 때만', async () => {
+    db.settlement.findUnique.mockResolvedValue(row('CONFIRMED'));
+    db.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await holdSettlement(superAdmin, 's-1', { hold: true, reason: '계좌 확인 중' });
+
+    expect(db.settlement.updateMany).toHaveBeenCalledWith({
+      where: { id: 's-1', status: 'CONFIRMED' },
+      data: { status: 'HELD', heldReason: '계좌 확인 중' },
+    });
+    expect(result).toMatchObject({ before: 'CONFIRMED', status: 'HELD', reason: '계좌 확인 중', merchantName: '무어' });
+  });
+
+  it('풀면 확정으로 돌리고 까닭을 지운다', async () => {
+    db.settlement.findUnique.mockResolvedValue(row('HELD'));
+    db.settlement.updateMany.mockResolvedValue({ count: 1 });
+
+    await holdSettlement(superAdmin, 's-1', { hold: false });
+
+    expect(db.settlement.updateMany.mock.calls[0]![0].data).toEqual({ status: 'CONFIRMED', heldReason: null });
+  });
+
+  it('지급된 정산은 보류하지 않는다 — 나간 돈을 멈춘 척하지 않는다', async () => {
+    db.settlement.findUnique.mockResolvedValue(row('PAID'));
+
+    await expect(holdSettlement(superAdmin, 's-1', { hold: true, reason: 'x' }))
+      .rejects.toMatchObject({ code: 'HOLD_NOT_ALLOWED', status: 409 });
+    expect(db.settlement.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('그사이 상태가 바뀌었으면 아무것도 바꾸지 않았다고 말한다', async () => {
+    db.settlement.findUnique.mockResolvedValue(row('CONFIRMED'));
+    db.settlement.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(holdSettlement(superAdmin, 's-1', { hold: true, reason: 'x' }))
+      .rejects.toMatchObject({ code: 'HOLD_CHANGED' });
+  });
+
+  it('지급할 수 없는 사람은 보류도 못 한다 — 관리자는 안 된다', async () => {
+    await expect(holdSettlement(admin, 's-1', { hold: true, reason: 'x' })).rejects.toThrow();
+    expect(db.settlement.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('없는 정산은 404', async () => {
+    db.settlement.findUnique.mockResolvedValue(null);
+    await expect(holdSettlement(superAdmin, 's-x', { hold: false })).rejects.toMatchObject({ status: 404 });
   });
 });

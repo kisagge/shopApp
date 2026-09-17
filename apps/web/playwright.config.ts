@@ -107,7 +107,13 @@ export default defineConfig({
    * 3100 을 쓰는 이유는 작업 중인 3000 을 건드리지 않기 위해서다.
    */
   webServer: {
-    command: `pnpm build && pnpm start --port ${PORT}`,
+    /*
+     * **연결을 오래 살려 둔다(--keepAliveTimeout).** 서버의 기본은 5초라, 검사의 요청 도구(page.request)가 쉬던
+     * 연결을 다시 쓰려는 순간 서버가 그 연결을 닫으면 요청이 ECONNRESET 으로 끊겼다 — 응답 없이 끊겨 검사가
+     * 무엇을 보려 했는지와 상관없이 졌고, 하루에 세 번 서로 다른 명세(장바구니·정산 지급·쿠폰)에서 났다.
+     * 쉬는 연결을 서버가 먼저 닫지 않게 한다. 운영(Vercel)은 이 명령을 쓰지 않는다.
+     */
+    command: `pnpm build && pnpm start --port ${PORT} --keepAliveTimeout 70000`,
     url: BASE_URL,
     reuseExistingServer: !process.env['CI'],
     timeout: 300_000,
