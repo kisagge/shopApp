@@ -19,10 +19,10 @@ export default async function AdminPointsPage() {
         <div className="flex items-baseline gap-3">
           <h1 className="text-[19px] font-semibold tracking-tight">포인트 대사</h1>
           <p className="text-[13px] text-[var(--fg-muted)]">
-            최근 <span className="tnum">{result.checked}</span>명 · 원장 합계와 잔액 비교
+            회원 전체 <span className="tnum">{result.checked.toLocaleString('ko-KR')}</span>명 · 원장 합계와 잔액 비교
           </p>
         </div>
-        {canFix && <ReconcileButton mismatchCount={result.mismatches.length} />}
+        {canFix && <ReconcileButton mismatchCount={result.mismatchTotal} />}
       </header>
 
       <div className="flex flex-col gap-5 p-8">
@@ -34,16 +34,16 @@ export default async function AdminPointsPage() {
           <dl className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div className="rounded-sm bg-[var(--surface)] p-4">
               <dt className="text-xs text-[var(--fg-muted)]">검사한 회원</dt>
-              <dd className="tnum mt-1.5 text-xl font-semibold">{result.checked}명</dd>
+              <dd className="tnum mt-1.5 text-xl font-semibold">{result.checked.toLocaleString('ko-KR')}명</dd>
             </div>
             <div className="rounded-sm bg-[var(--surface)] p-4">
               <dt className="text-xs text-[var(--fg-muted)]">불일치</dt>
               <dd
                 className={`tnum mt-1.5 text-xl font-semibold ${
-                  result.mismatches.length > 0 ? 'text-accent' : ''
+                  result.mismatchTotal > 0 ? 'text-accent' : ''
                 }`}
               >
-                {result.mismatches.length}건
+                {result.mismatchTotal.toLocaleString('ko-KR')}건
               </dd>
             </div>
             <div className="rounded-sm bg-[var(--surface)] p-4">
@@ -72,6 +72,13 @@ export default async function AdminPointsPage() {
               모든 회원의 잔액이 원장과 일치합니다.
             </p>
           ) : (
+            <>
+            {result.mismatchTotal > result.mismatches.length && (
+              <p className="mb-3 text-[12px] text-[var(--fg-secondary)]">
+                차이가 큰 <span className="tnum">{result.mismatches.length.toLocaleString('ko-KR')}</span>건만 보여 줍니다.
+                맞추면 이 건들부터 고치고, 나머지는 다음 대사에서 이어서 고칩니다.
+              </p>
+            )}
             <div className="table-scroll" tabIndex={0} role="region" aria-label="잔액과 원장이 어긋난 회원">
               <table className="data-table">
                 <caption className="sr-only">잔액과 원장이 어긋난 회원</caption>
@@ -110,6 +117,7 @@ export default async function AdminPointsPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </section>
       </div>

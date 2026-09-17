@@ -26,11 +26,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         after: {
           fixed: result.fixed,
           overCredited: result.overCredited,
-          users: result.mismatches.map((m) => ({
-            userId: m.userId,
-            from: m.storedBalance,
-            to: m.ledgerBalance,
-          })),
+          users: result.fixes,
         },
         request,
       });

@@ -29,9 +29,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       after: {
         fixed: result.fixed,
         overCredited: result.overCredited,
-        users: result.mismatches.map((m) => ({
-          userId: m.userId, from: m.storedBalance, to: m.ledgerBalance,
-        })),
+        users: result.fixes,
       },
       request,
     });
@@ -39,7 +37,7 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   return NextResponse.json({
     checked: result.checked,
-    mismatches: result.mismatches.length,
+    mismatches: result.mismatchTotal,
     fixed: result.fixed,
     overCredited: result.overCredited,
   });

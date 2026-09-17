@@ -94,3 +94,24 @@ test('잔액을 눌러 들어가 지급·차감하면 잔액과 손님 내역이
     await customer.close();
   }
 });
+
+/**
+ * **포인트 대사가 진짜 DB 에서 돌고, 멀쩡한 회원을 어긋났다고 하지 않는다.**
+ *
+ * 대사는 잔액과 원장 합계를 한 SQL 문에서 읽는다(단위 검사는 SQL 을 흉내 낼 수 없다). 다른 명세가 지금도
+ * 포인트를 쓰고 주는 중이지만, 모든 길이 원장과 잔액을 한 트랜잭션에서 바꾸므로 한 시점을 보는 대사에는
+ * 어긋남이 없어야 한다. 예전에는 둘을 따로 읽어 그사이 끝난 주문이 어긋남으로 보였고, 가입 순으로 500명만 봤다.
+ */
+test('포인트 대사는 회원 전체를 보고, 동시에 오가는 포인트를 어긋남으로 세지 않는다', async ({ page }) => {
+  await page.goto('/admin/points');
+  await ready(page);
+  await expect(page.getByText(/^회원 전체 [\d,]+명/)).toBeVisible();
+  await expect(page.getByText('모든 회원의 잔액이 원장과 일치합니다.')).toBeVisible();
+
+  // 고치기도 진짜 DB 에서 돈다 — 고칠 것이 없으니 0 건
+  const res = await page.request.post('/api/admin/points/reconcile');
+  expect(res.status(), await res.text()).toBe(200);
+  const body = (await res.json()) as { checked: number; mismatchTotal: number; fixed: number };
+  expect(body.checked).toBeGreaterThan(0);
+  expect(body).toMatchObject({ mismatchTotal: 0, fixed: 0 });
+});
