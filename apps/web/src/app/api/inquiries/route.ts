@@ -4,6 +4,7 @@ import { ImageError, MAX_IMAGES_PER_INQUIRY } from '@shop/core';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { createInquiry, InquiryError } from '~/lib/inquiry/write';
+import { notifyInquiryReceived } from '~/lib/notifications/console-work';
 import { discardInquiryImages, uploadInquiryImages } from '~/lib/inquiry/images';
 import { readJsonWithImages } from '~/lib/images/read-body';
 import type { UploadedImage } from '~/lib/images/upload-files';
@@ -53,7 +54,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   let uploaded: UploadedImage[] = [];
   try {
     uploaded = await uploadInquiryImages(user.id, files);
-    return NextResponse.json(await createInquiry(user.id, parsed.data, uploaded), { status: 201 });
+    const created = await createInquiry(user.id, parsed.data, uploaded);
+    // 답할 사람에게 알린다 — 목록을 열어 보기 전까지 아무도 몰랐다
+    await notifyInquiryReceived(created.id);
+    return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (uploaded.length > 0) await discardInquiryImages(uploaded.map((u) => u.key));
     if (error instanceof ImageError) {

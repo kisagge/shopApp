@@ -1829,6 +1829,11 @@ enum NotificationKind {
   /// 지난달 정산이 확정됐다 / 지급이 나갔다 — 둘 다 운영 알림함에만 뜬다
   SETTLEMENT_CLOSED
   SETTLEMENT_PAID
+  /// 처리할 일이 들어왔다 — 처리할 수 있는 사람의 운영 알림함에 뜬다(core console-audience)
+  RETURN_REQUESTED
+  INQUIRY_RECEIVED
+  SUPPORT_INQUIRY_RECEIVED
+  MERCHANT_APPLIED
 }
 
 model Notification {

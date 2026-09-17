@@ -40,6 +40,10 @@ export const NOTIFICATION_PARAMS = {
   /** 금액까지 싣는다 — 기간만 알리면 얼마인지 보러 결국 화면을 열게 된다 */
   SETTLEMENT_CLOSED: ['period', 'amount'],
   SETTLEMENT_PAID: ['period', 'amount'],
+  RETURN_REQUESTED: ['orderNo'],
+  INQUIRY_RECEIVED: ['productName'],
+  SUPPORT_INQUIRY_RECEIVED: [],
+  MERCHANT_APPLIED: ['merchantName'],
 } as const satisfies Record<NotificationKind, readonly string[]>;
 
 /** 미리보기에 끼울 값. 운영자가 고친 문구가 실제로 어떻게 읽히는지 보려고 쓴다 */

@@ -1197,4 +1197,8 @@ export const en: Dictionary = {
   'notif.REVIEW_REPLIED': 'The seller replied to your review of {productName}.',
   'notif.SETTLEMENT_CLOSED': 'Settlement for {period} is confirmed — {amount} KRW due',
   'notif.SETTLEMENT_PAID': 'Settlement for {period} was paid — {amount} KRW',
+  'notif.RETURN_REQUESTED': 'A return or exchange was requested for order {orderNo}',
+  'notif.INQUIRY_RECEIVED': 'New question about {productName}',
+  'notif.SUPPORT_INQUIRY_RECEIVED': 'New customer support inquiry',
+  'notif.MERCHANT_APPLIED': 'New seller application from {merchantName}',
 };

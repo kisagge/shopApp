@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { applyMerchantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { applyForMerchant, MerchantApplicationError } from '~/lib/merchant/apply';
+import { notifyMerchantApplied } from '~/lib/notifications/console-work';
 import { validationFailed } from '~/lib/i18n/validation';
 import { unauthorized } from '~/lib/api/respond';
 
@@ -23,7 +24,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   try {
-    return NextResponse.json({ application: await applyForMerchant(actor, parsed.data) }, { status: 201 });
+    const application = await applyForMerchant(actor, parsed.data);
+    // 승인할 사람에게 알린다 — 심사 대기 목록을 열어 보기 전까지 아무도 몰랐다
+    await notifyMerchantApplied({ merchantName: application.name });
+    return NextResponse.json({ application }, { status: 201 });
   } catch (error) {
     if (error instanceof MerchantApplicationError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });

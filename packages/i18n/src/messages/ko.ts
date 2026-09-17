@@ -1227,6 +1227,10 @@ export const ko = {
   'notif.REVIEW_REPLIED': '{productName} 리뷰에 판매자가 답글을 남겼습니다.',
   'notif.SETTLEMENT_CLOSED': '{period} 정산이 확정되었습니다 — 지급 예정액 {amount}원',
   'notif.SETTLEMENT_PAID': '{period} 정산금 {amount}원이 지급되었습니다',
+  'notif.RETURN_REQUESTED': '주문 {orderNo} 에 반품·교환 신청이 들어왔습니다',
+  'notif.INQUIRY_RECEIVED': '{productName} 에 새 문의가 들어왔습니다',
+  'notif.SUPPORT_INQUIRY_RECEIVED': '고객센터에 새 문의가 들어왔습니다',
+  'notif.MERCHANT_APPLIED': '{merchantName} 입점 신청이 들어왔습니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

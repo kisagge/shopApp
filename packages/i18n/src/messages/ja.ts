@@ -1193,4 +1193,8 @@ export const ja: Dictionary = {
   'notif.REVIEW_REPLIED': '{productName} のレビューに販売者が返信しました。',
   'notif.SETTLEMENT_CLOSED': '{period} の精算が確定しました — 支払予定額 {amount}ウォン',
   'notif.SETTLEMENT_PAID': '{period} の精算金 {amount}ウォンが支払われました',
+  'notif.RETURN_REQUESTED': '注文 {orderNo} に返品・交換の申請がありました',
+  'notif.INQUIRY_RECEIVED': '{productName} に新しいお問い合わせがありました',
+  'notif.SUPPORT_INQUIRY_RECEIVED': 'カスタマーサポートに新しいお問い合わせがありました',
+  'notif.MERCHANT_APPLIED': '{merchantName} から出店申請がありました',
 };

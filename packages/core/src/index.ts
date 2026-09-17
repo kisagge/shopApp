@@ -81,3 +81,4 @@ export * from './receipt';
 export * from './notification-template';
 export * from './exchange';
 export * from './stock-upload';
+export * from './console-audience';

@@ -319,3 +319,13 @@ export function actorForMerchantStatus(actor: Actor, merchantStatus: string | nu
   if (actor.merchantId !== null && merchantStatus === 'APPROVED') return actor;
   return { id: actor.id, role: 'CUSTOMER', merchantId: null };
 }
+
+/**
+ * 이 권한을 가진 **운영 역할**(가맹점·손님 제외).
+ *
+ * 처리할 일을 알릴 때 "누구에게" 를 역할 목록으로 적어 두면, 역할의 권한을 바꿀 때 알림만 옛 목록을 따른다.
+ * 권한표(ROLE_PERMISSIONS)에서 뽑는다 — 입점 승인은 슈퍼관리자에게만, 반품 처리는 관리자에게도 간다.
+ */
+export function operatorRolesWith(permission: Permission): UserRole[] {
+  return USER_ROLE.filter((role) => role !== 'CUSTOMER' && role !== 'MERCHANT' && permissionsOf(role).includes(permission));
+}

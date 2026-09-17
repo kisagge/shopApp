@@ -94,6 +94,17 @@ export const NOTIFICATION_KIND = [
    */
   'SETTLEMENT_CLOSED',
   'SETTLEMENT_PAID',
+  /*
+   * 처리할 일이 들어왔다 — 반품·교환 신청, 상품 문의, 고객센터 문의, 입점 신청.
+   *
+   * **운영 알림함에 처리할 일이 오지 않았다.** 알림은 가맹점에게 가는 소식(재고·검수·정산)뿐이라, 손님이 반품을
+   * 신청하거나 문의를 남기거나 새 가맹점이 신청해도 누군가 목록을 열어 보기 전까지 아무도 몰랐다. 대기가 길어지는
+   * 것은 대개 이 때문이다. 받는 사람은 그 일을 **처리할 수 있는 사람**이다(console-audience).
+   */
+  'RETURN_REQUESTED',
+  'INQUIRY_RECEIVED',
+  'SUPPORT_INQUIRY_RECEIVED',
+  'MERCHANT_APPLIED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
@@ -115,6 +126,11 @@ export const CONSOLE_NOTIFICATION_KIND = [
   // 정산은 장사의 일이다. 누르면 정산 화면으로 가니 운영 알림함이 아니면 갈 곳이 없다
   'SETTLEMENT_CLOSED',
   'SETTLEMENT_PAID',
+  // 처리할 일 — 처리하는 자리가 운영 화면이다
+  'RETURN_REQUESTED',
+  'INQUIRY_RECEIVED',
+  'SUPPORT_INQUIRY_RECEIVED',
+  'MERCHANT_APPLIED',
 ] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>

@@ -41,6 +41,10 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   POINTS_EXPIRING: '적립금 소멸 임박',
   SETTLEMENT_CLOSED: '정산 확정',
   SETTLEMENT_PAID: '정산 지급',
+  RETURN_REQUESTED: '반품·교환 신청 접수',
+  INQUIRY_RECEIVED: '상품 문의 접수',
+  SUPPORT_INQUIRY_RECEIVED: '고객센터 문의 접수',
+  MERCHANT_APPLIED: '입점 신청 접수',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */

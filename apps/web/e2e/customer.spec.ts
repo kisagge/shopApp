@@ -234,6 +234,14 @@ test('운영진이 답하면 운영 화면에 누가 답했는지 남고, 손님
      * "전체" 탭에서 찾는다. 기본 탭은 답변 대기(오래된 것부터)라 새 문의가 다른 쪽으로 밀릴 수 있고,
      * 답하고 나면 그 탭에서 빠져 누가 답했는지를 볼 수 없다.
      */
+    /*
+     * 운영 알림함에 처리할 일이 온다 — 예전에는 문의 목록을 열어 보기 전까지 아무도 몰랐다. 다른 검사도 문의를
+     * 남기므로 같은 문구가 여럿일 수 있다(이 검사가 보는 것은 "온다" 는 것이다).
+     */
+    await ap.goto('/admin/notifications');
+    await ready(ap);
+    await expect(ap.getByText('고객센터에 새 문의가 들어왔습니다').first()).toBeVisible();
+
     await ap.goto('/admin/inquiries?tab=all');
     await ready(ap);
     const row = ap.getByRole('listitem').filter({ hasText: asked });

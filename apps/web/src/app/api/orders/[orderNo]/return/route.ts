@@ -4,6 +4,7 @@ import { returnRequestSchema } from '@shop/contract';
 import { requestReturn, ReturnError } from '~/lib/orders/return-request';
 import { unauthorized } from '~/lib/api/respond';
 import { revalidateCatalog } from '~/lib/cache';
+import { notifyReturnRequested } from '~/lib/notifications/console-work';
 import { validationFailed } from '~/lib/i18n/validation';
 
 /** 고객의 반품·교환 신청 */
@@ -28,6 +29,8 @@ export async function POST(
     const result = await requestReturn(orderNo, parsed.data, user);
     // 교환 신청은 바꿀 옵션의 재고를 잡는다 — 안 털면 마지막 한 장이 캐시 수명만큼 남아 있는 것으로 보인다
     revalidateCatalog();
+    // 처리할 사람에게 알린다 — 목록을 열어 보기 전까지 아무도 몰랐다
+    await notifyReturnRequested({ orderNo: result.orderNo, itemIds: result.itemIds });
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ReturnError) {
