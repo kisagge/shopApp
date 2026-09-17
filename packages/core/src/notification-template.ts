@@ -44,6 +44,9 @@ export const NOTIFICATION_PARAMS = {
   INQUIRY_RECEIVED: ['productName'],
   SUPPORT_INQUIRY_RECEIVED: [],
   MERCHANT_APPLIED: ['merchantName'],
+  LATE_DEPOSIT_RECEIVED: ['orderNo', 'amount'],
+  LATE_DEPOSIT_REFUNDED: ['orderNo', 'amount'],
+  LATE_DEPOSIT_FOUND: ['orderNo', 'amount'],
 } as const satisfies Record<NotificationKind, readonly string[]>;
 
 /** 미리보기에 끼울 값. 운영자가 고친 문구가 실제로 어떻게 읽히는지 보려고 쓴다 */

@@ -3,7 +3,7 @@ import { won } from '../src/money';
 import {
   PAYMENT_STATUS_CODE, PAYMENT_STATUS_LABEL, PAYMENT_METHOD_CODE,
   isPaidStatus, assertPaymentAmount, PaymentError, awaitingDeposit, depositExpired,
-  depositDecision, mustCloseVirtualAccount,
+  depositDecision, mustCloseVirtualAccount, lateDepositStage,
 } from '../src/payment';
 import { isRepayable } from '../src/order-state';
 
@@ -139,5 +139,26 @@ describe('취소할 때 가상계좌를 닫는가', () => {
 
   it.each(['DONE', 'READY', 'ABORTED', 'EXPIRED', null] as const)('%s 이면 닫지 않는다', (status) => {
     expect(mustCloseVirtualAccount(status)).toBe(false);
+  });
+});
+
+describe('취소 뒤 들어온 입금이 손님에게 어디까지 왔나', () => {
+  const at = new Date('2026-09-17T01:00:00Z');
+
+  it('결제가 없거나 그런 입금이 없으면 아무 말도 하지 않는다', () => {
+    expect(lateDepositStage(null)).toBe('NONE');
+    expect(lateDepositStage({ lateDepositAt: null, lateDepositResolvedAt: null })).toBe('NONE');
+  });
+
+  it('받고 아직 돌려주지 않았으면 손님이 계좌를 알려 줄 차례다', () => {
+    expect(lateDepositStage({ lateDepositAt: at, lateDepositResolvedAt: null })).toBe('AWAITING_REFUND');
+  });
+
+  it('돌려주었으면 끝났다고 말한다', () => {
+    expect(lateDepositStage({ lateDepositAt: at, lateDepositResolvedAt: new Date('2026-09-18T01:00:00Z') })).toBe('REFUNDED');
+  });
+
+  it('처리 시각만 남은 줄은 입금이 없던 것으로 본다 — 받은 적 없는 돈을 돌려줬다고 하지 않는다', () => {
+    expect(lateDepositStage({ lateDepositAt: null, lateDepositResolvedAt: at })).toBe('NONE');
   });
 });

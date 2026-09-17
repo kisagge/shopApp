@@ -105,6 +105,16 @@ export const NOTIFICATION_KIND = [
   'INQUIRY_RECEIVED',
   'SUPPORT_INQUIRY_RECEIVED',
   'MERCHANT_APPLIED',
+  /*
+   * 취소한 주문에 입금이 들어왔다 / 그 돈을 돌려주었다 — 손님에게.
+   *
+   * **돈을 보낸 사람이 아무 말도 듣지 못했다.** 주문은 취소된 채이고 돈은 빠져나갔는데, 돌려받으려면 계좌를
+   * 알려야 한다는 것(가상계좌 환불의 PG 규칙)을 알 길이 없었다. 금액을 싣는다 — 얼마가 묶였는지가 첫 질문이다.
+   */
+  'LATE_DEPOSIT_RECEIVED',
+  'LATE_DEPOSIT_REFUNDED',
+  /** 돌려줄 입금이 생겼다 — 환불할 수 있는 운영진에게. 대시보드를 열어야만 보였다 */
+  'LATE_DEPOSIT_FOUND',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
@@ -131,6 +141,7 @@ export const CONSOLE_NOTIFICATION_KIND = [
   'INQUIRY_RECEIVED',
   'SUPPORT_INQUIRY_RECEIVED',
   'MERCHANT_APPLIED',
+  'LATE_DEPOSIT_FOUND',
 ] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>

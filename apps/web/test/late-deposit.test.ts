@@ -21,6 +21,9 @@ vi.mock('~/lib/audit', () => ({ recordAudit }));
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 
+const notifyLateDepositRefunded = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/late-deposit', () => ({ notifyLateDepositRefunded }));
+
 const { resolveLateDeposit } = await import('~/lib/admin/late-deposit');
 const { POST } = await import('~/app/api/admin/orders/[orderNo]/late-deposit/route');
 const { adminOrderWhere, LATE_DEPOSIT_OPEN } = await import('~/lib/queries/admin/orders');
@@ -29,7 +32,7 @@ const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
 const NOW = new Date('2026-09-17T03:00:00Z');
 
-const withPayment = (payment: Record<string, unknown> | null) => ({ payment });
+const withPayment = (payment: Record<string, unknown> | null) => ({ userId: 'u-buyer', payment });
 const open = { id: 'pay-1', lateDepositAt: new Date('2026-09-16T00:00:00Z'), lateDepositAmount: 289_000, lateDepositResolvedAt: null };
 
 beforeEach(() => {
@@ -49,6 +52,8 @@ describe('돌려준 뒤 닫기', () => {
       data: { lateDepositResolvedAt: NOW, lateDepositResolvedBy: 'u-a' },
     });
     expect(result).toEqual({ orderNo: 'O-1', amount: 289_000, resolvedAt: NOW });
+    // 계좌를 알려 주고 기다리던 손님이 끝났다는 것을 듣는다
+    expect(notifyLateDepositRefunded).toHaveBeenCalledWith({ orderNo: 'O-1', userId: 'u-buyer', amount: 289_000 });
   });
 
   it('가맹점은 못 닫는다 — 받은 돈은 플랫폼 계좌에 있다', async () => {
@@ -75,6 +80,8 @@ describe('돌려준 뒤 닫기', () => {
   it('두 사람이 동시에 눌러도 한 번만 닫힌다', async () => {
     db.payment.updateMany.mockResolvedValue({ count: 0 });
     await expect(resolveLateDeposit(admin, 'O-1', NOW)).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+    // 진 쪽은 손님에게 또 알리지 않는다
+    expect(notifyLateDepositRefunded).not.toHaveBeenCalled();
   });
 });
 

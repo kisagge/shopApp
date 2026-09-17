@@ -15,6 +15,9 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: {} }));
 
+const notifyLateDepositFound = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/late-deposit', () => ({ notifyLateDepositFound }));
+
 const { applyDeposit } = await import('~/lib/payments/deposit');
 
 const gateway = (over: Partial<PaymentGateway> = {}): PaymentGateway => ({
@@ -194,6 +197,8 @@ describe('취소한 주문에 들어온 입금', () => {
     });
     // 주문은 취소된 그대로다
     expect(db.order.updateMany).not.toHaveBeenCalled();
+    // 돈을 보낸 손님과 돌려줄 운영진이 듣는다 — PG 가 알려 준 금액으로
+    expect(notifyLateDepositFound).toHaveBeenCalledWith({ orderNo: '20260903-0000001', userId: 'u-1', amount: 289000 });
   });
 
   it('PG 가 알려 준 금액을 적는다 — 사람이 보내므로 주문 금액과 다를 수 있다', async () => {
@@ -218,6 +223,8 @@ describe('취소한 주문에 들어온 입금', () => {
     await expect(applyDeposit('pk_1', gateway())).resolves.toMatchObject({ applied: false });
 
     expect(error).not.toHaveBeenCalled();
+    // 두 번째 신호에 같은 알림을 또 보내지 않는다
+    expect(notifyLateDepositFound).not.toHaveBeenCalled();
   });
 
   it('처음 적을 때는 크게 남긴다 — 사람이 돌려줘야 하는 돈이다', async () => {

@@ -41,6 +41,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         select: {
           method: true, status: true,
           virtualAccount: true, virtualBank: true, virtualDueDate: true,
+          // 취소한 뒤 들어온 입금 — 돌려받으려면 손님이 계좌를 알려야 한다(core lateDepositStage)
+          lateDepositAt: true, lateDepositAmount: true, lateDepositResolvedAt: true,
         },
       },
       // 돌려준 돈. 일부 취소한 주문은 결제완료인 채로 남으므로 상태만으로는 안 보인다

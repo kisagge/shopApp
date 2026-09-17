@@ -145,6 +145,14 @@ test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 
   await ready(page);
   await expect(page.getByText('결제완료')).toHaveCount(0);
 
+  // 돈을 보낸 손님이 듣는다 — 무슨 일인지, 돌려받으려면 무엇을 해야 하는지
+  const late = page.getByRole('region', { name: '취소한 주문에 입금이 확인되었습니다' });
+  await expect(late).toBeVisible();
+  await expect(late.getByRole('link', { name: '1:1 문의로 계좌 알려 주기' })).toHaveAttribute('href', '/support/ask');
+  await page.goto('/mypage/notifications');
+  await ready(page);
+  await expect(page.getByText(`취소한 주문 ${orderNo} 에`)).toBeVisible();
+
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {
     const ap = await admin.newPage();
@@ -176,6 +184,12 @@ test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 
   } finally {
     await admin.close();
   }
+
+  // 손님의 주문 화면이 끝났다고 말한다 — 더 할 일을 내밀지 않는다
+  await page.goto(`/order/${orderNo}`);
+  await ready(page);
+  await expect(page.getByRole('region', { name: '취소 뒤 입금한 돈을 돌려드렸습니다' })).toBeVisible();
+  await expect(page.getByRole('region', { name: '취소한 주문에 입금이 확인되었습니다' })).toHaveCount(0);
 });
 
 test('읽을 수 없는 본문에도 재시도를 부르지 않는다', async ({ page }) => {

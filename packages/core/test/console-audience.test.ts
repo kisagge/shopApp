@@ -53,8 +53,13 @@ describe('권한을 가진 운영 역할', () => {
 
 describe('알림함', () => {
   it('처리할 일은 운영 알림함에 뜬다', () => {
-    for (const kind of ['RETURN_REQUESTED', 'INQUIRY_RECEIVED', 'SUPPORT_INQUIRY_RECEIVED', 'MERCHANT_APPLIED'] as const) {
+    for (const kind of ['RETURN_REQUESTED', 'INQUIRY_RECEIVED', 'SUPPORT_INQUIRY_RECEIVED', 'MERCHANT_APPLIED', 'LATE_DEPOSIT_FOUND'] as const) {
       expect(CONSOLE_NOTIFICATION_KIND).toContain(kind);
     }
+  });
+
+  it('취소 뒤 입금의 두 소식은 돈을 보낸 손님의 알림함에 뜬다', () => {
+    expect(CONSOLE_NOTIFICATION_KIND).not.toContain('LATE_DEPOSIT_RECEIVED');
+    expect(CONSOLE_NOTIFICATION_KIND).not.toContain('LATE_DEPOSIT_REFUNDED');
   });
 });

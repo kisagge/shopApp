@@ -1845,6 +1845,10 @@ enum NotificationKind {
   INQUIRY_RECEIVED
   SUPPORT_INQUIRY_RECEIVED
   MERCHANT_APPLIED
+  /// 취소한 주문에 입금이 들어왔다(손님) / 그 돈을 돌려주었다(손님) / 돌려줄 입금이 생겼다(운영 알림함)
+  LATE_DEPOSIT_RECEIVED
+  LATE_DEPOSIT_REFUNDED
+  LATE_DEPOSIT_FOUND
 }
 
 model Notification {

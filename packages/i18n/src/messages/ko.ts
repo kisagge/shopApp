@@ -985,6 +985,11 @@ export const ko = {
   'deposit.account': '계좌번호',
   'deposit.due': '입금 기한',
   'deposit.amount': '입금 금액',
+  'lateDeposit.heading': '취소한 주문에 입금이 확인되었습니다',
+  'lateDeposit.notice': '{amount}원이 들어왔지만 주문은 취소된 상태라 돌려드려야 합니다. 가상계좌 입금은 받으실 계좌를 알아야 돌려드릴 수 있습니다 — 1:1 문의로 주문번호와 은행·계좌번호·예금주를 알려 주세요.',
+  'lateDeposit.ask': '1:1 문의로 계좌 알려 주기',
+  'lateDeposit.refundedHeading': '취소 뒤 입금한 돈을 돌려드렸습니다',
+  'lateDeposit.refundedNotice': '{amount}원을 {date}에 돌려드렸습니다. 계좌에 들어오기까지 하루 이틀 걸릴 수 있습니다.',
   'checkout.orderFallbackName': '주문',
   'payMethod.CARD': '신용·체크카드',
   'payMethod.TRANSFER': '계좌이체',
@@ -1231,6 +1236,9 @@ export const ko = {
   'notif.INQUIRY_RECEIVED': '{productName} 에 새 문의가 들어왔습니다',
   'notif.SUPPORT_INQUIRY_RECEIVED': '고객센터에 새 문의가 들어왔습니다',
   'notif.MERCHANT_APPLIED': '{merchantName} 입점 신청이 들어왔습니다',
+  'notif.LATE_DEPOSIT_RECEIVED': '취소한 주문 {orderNo} 에 {amount}원이 입금되었습니다. 돌려받으실 계좌를 알려 주세요',
+  'notif.LATE_DEPOSIT_REFUNDED': '주문 {orderNo} 에 입금하신 {amount}원을 돌려드렸습니다',
+  'notif.LATE_DEPOSIT_FOUND': '취소한 주문 {orderNo} 에 {amount}원이 입금되었습니다 — 환불이 필요합니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

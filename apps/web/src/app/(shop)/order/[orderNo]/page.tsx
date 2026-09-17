@@ -13,6 +13,7 @@ import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
 import { CancelItemsForm } from '~/components/cancel-items-form';
 import { RepayButton } from '~/components/repay-button';
+import { LateDepositNotice } from '~/components/late-deposit-notice';
 import { ReorderButton } from '~/components/reorder-button';
 import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
@@ -217,6 +218,8 @@ export default async function OrderPage({
             {paymentFailed ? t('repay.failedNotice') : t('repay.pendingNotice')}
           </p>
         )}
+
+        <LateDepositNotice payment={order.payment} locale={locale} t={t} />
 
         {/*
           **입금할 곳.**

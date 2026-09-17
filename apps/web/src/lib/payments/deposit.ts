@@ -4,6 +4,7 @@ import { depositDecision, isPaidStatus, transition, type PaymentGateway } from '
 import { deliverOrderNotice, orderLocale, shipToLine } from '~/lib/orders/notify';
 import { getPaymentGateway } from './index';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { notifyLateDepositFound } from '~/lib/notifications/late-deposit';
 
 /**
  * 가상계좌 입금 반영.
@@ -81,6 +82,8 @@ export async function applyDeposit(
       console.error('[deposit] 결제 대기가 아닌 주문에 입금이 들어왔다 — 사람이 환불해야 한다', {
         orderNo: payment.order.orderNo, orderStatus: payment.order.status, amount: result.amount,
       });
+      // 처음 적은 때만 알린다 — 웹훅은 여러 번 온다
+      await notifyLateDepositFound({ orderNo: payment.order.orderNo, userId: payment.order.userId, amount: result.amount });
     }
     return { applied: false, reason: '결제 대기가 아닌 주문에 들어온 입금입니다 — 환불이 필요합니다' };
   }

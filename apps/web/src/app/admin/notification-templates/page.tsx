@@ -45,6 +45,9 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   INQUIRY_RECEIVED: '상품 문의 접수',
   SUPPORT_INQUIRY_RECEIVED: '고객센터 문의 접수',
   MERCHANT_APPLIED: '입점 신청 접수',
+  LATE_DEPOSIT_RECEIVED: '취소 뒤 입금 확인(손님)',
+  LATE_DEPOSIT_REFUNDED: '취소 뒤 입금 반환(손님)',
+  LATE_DEPOSIT_FOUND: '취소 뒤 입금 — 환불 필요',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */

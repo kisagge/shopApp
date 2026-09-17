@@ -166,6 +166,24 @@ export const depositDecision = (orderStatus: OrderStatus): DepositDecision =>
   orderStatus === 'PENDING' ? 'APPLY' : 'LATE';
 
 /**
+ * 취소한 주문에 들어온 입금이 손님에게 어디까지 왔는가.
+ *
+ * · `NONE` — 그런 입금이 없다.
+ * · `AWAITING_REFUND` — 받았고 아직 돌려주지 않았다. 손님이 할 일이 있다: 돌려받을 계좌를 알려 주는 것.
+ * · `REFUNDED` — 돌려주었다.
+ *
+ * 손님 화면과 알림이 같은 판단을 쓴다 — 알림은 "계좌를 알려 주세요" 라고 하는데 화면은 아무 말이 없으면 안 된다.
+ */
+export type LateDepositStage = 'NONE' | 'AWAITING_REFUND' | 'REFUNDED';
+
+export function lateDepositStage(
+  payment: { readonly lateDepositAt: Date | null; readonly lateDepositResolvedAt: Date | null } | null,
+): LateDepositStage {
+  if (!payment?.lateDepositAt) return 'NONE';
+  return payment.lateDepositResolvedAt ? 'REFUNDED' : 'AWAITING_REFUND';
+}
+
+/**
  * 주문을 취소할 때 PG 에서 가상계좌를 닫아야 하는가.
  *
  * **입금 전이면 닫는다.** 닫지 않으면 계좌가 살아 있어 취소한 뒤에도 입금이 들어온다. 입금 전 취소는
