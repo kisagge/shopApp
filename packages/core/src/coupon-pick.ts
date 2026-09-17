@@ -89,3 +89,30 @@ export function couponOffers<T>(
     discount: discountFor(c.coupon, lines),
   }));
 }
+
+/**
+ * 견적에 쿠폰을 **어떻게** 붙일지.
+ *
+ * · `NONE`  — 붙이지 않는다. 사람이 "쓰지 않기" 를 골랐다(코드를 함께 보냈더라도 — 마지막으로 누른 것이 그것이다).
+ * · `ASKED` — 보낸 코드를 붙인다.
+ * · `AUTO`  — 가장 많이 깎이는 것을 서버가 고른다.
+ *
+ * **자동 고르기는 명시적으로 부탁할 때만이다.** 한동안 "아무 말도 없으면 고른다" 였는데, 견적을 부르는 곳이
+ * 화면만이 아니었다 — 주문 생성도 같은 견적을 부르면서 쿠폰에 대해 아무 말도 하지 않았다. 그러면 견적은 쿠폰을
+ * 골라 결제 금액을 깎는데, 주문 생성은 "보낸 코드가 없다" 며 그 쿠폰을 **쓴 것으로 처리하지 않았다.**
+ * "쓰지 않기" 를 고른 손님도 할인을 받았고, 같은 쿠폰이 끝없이 다시 깎였다.
+ *
+ * 화면 창구는 계약의 기본값(`useCoupon: true`)으로 늘 부탁하므로 화면에서 달라지는 것은 없다. 서버 안에서
+ * 부르는 자리는 이제 **보낸 코드만** 붙인다 — 주문은 이름 붙은 쿠폰만 쓰고, 쓴 것은 소진한다.
+ */
+export type CouponChoice = 'NONE' | 'ASKED' | 'AUTO';
+
+export function couponChoice(input: {
+  /** true 여야 서버가 고른다. 비워 두면 고르지 않는다 */
+  readonly useCoupon: boolean | undefined;
+  readonly hasCode: boolean;
+}): CouponChoice {
+  if (input.useCoupon === false) return 'NONE';
+  if (input.hasCode) return 'ASKED';
+  return input.useCoupon === true ? 'AUTO' : 'NONE';
+}

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { cartQuoteRequestSchema } from '@shop/contract';
 
 const findManyVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const findFirstUserCoupon = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
@@ -395,16 +396,51 @@ describe('쿠폰 자동 적용', () => {
     findManyVariants.mockResolvedValue([variant()]);
   });
 
-  it('아무것도 안 고르면 가장 많이 깎이는 것이 붙는다', async () => {
+  it('화면이 아무것도 안 고르면 가장 많이 깎이는 것이 붙는다', async () => {
     findManyUserCoupons.mockResolvedValue([
       userCoupon('SMALL', { value: 1_000 }),
       userCoupon('BIG', { value: 9_000 }),
     ]);
 
-    const q = await quoteCart(cart, viewer);
+    // 화면 창구는 계약의 기본값으로 늘 "골라 달라" 고 부탁한다(아래 계약 검사)
+    const q = await quoteCart({ ...cart, useCoupon: true }, viewer);
 
     expect(q.couponCode).toBe('BIG');
     expect(q.couponDiscount).toBe(9_000);
+  });
+
+  it('화면 창구의 요청은 기본으로 골라 달라고 부탁한다', () => {
+    const parsed = cartQuoteRequestSchema.parse({
+      lines: [{ variantId: 'clvariant0000000000000001', quantity: 1 }],
+    });
+    expect(parsed.useCoupon).toBe(true);
+  });
+
+  it('서버 안에서 쿠폰에 대해 아무 말 없이 부르면 고르지 않는다 — 주문 생성이 그렇게 부른다', async () => {
+    /*
+     * 예전에는 여기서도 골랐다. 주문 생성은 코드를 보내지 않은 주문에 대해 쿠폰을 쓴 것으로
+     * 처리하지 않으므로, 견적이 고른 쿠폰의 할인만 받고 쿠폰은 그대로 남았다 — "쓰지 않기" 를
+     * 고른 손님도 할인을 받았고, 같은 쿠폰이 끝없이 다시 깎였다.
+     */
+    findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
+
+    const q = await quoteCart(cart, viewer);
+
+    expect(q.couponCode).toBeNull();
+    expect(q.couponDiscount).toBe(0);
+  });
+
+  it('서버 안에서 코드를 보내면 그 코드만 붙인다', async () => {
+    findManyUserCoupons.mockResolvedValue([
+      userCoupon('SMALL', { value: 1_000 }),
+      userCoupon('BIG', { value: 9_000 }),
+    ]);
+    findFirstUserCoupon.mockResolvedValue(userCoupon('SMALL', { value: 1_000 }));
+
+    const q = await quoteCart({ ...cart, couponCode: 'SMALL' }, viewer);
+
+    expect(q.couponCode).toBe('SMALL');
+    expect(q.couponDiscount).toBe(1_000);
   });
 
   /** 코드를 비워 보내는 것만으로는 "아직 안 골랐다" 와 구분되지 않는다 */
@@ -454,7 +490,7 @@ describe('쿠폰 자동 적용', () => {
   it('붙은 쿠폰의 코드와 이름을 함께 알려 준다', async () => {
     findManyUserCoupons.mockResolvedValue([userCoupon('BIG', { value: 9_000 })]);
 
-    const q = await quoteCart(cart, viewer);
+    const q = await quoteCart({ ...cart, useCoupon: true }, viewer);
 
     expect(q.couponCode).toBe('BIG');
     expect(q.couponName).toBe('BIG 쿠폰');

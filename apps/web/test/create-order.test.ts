@@ -303,6 +303,27 @@ describe('포인트', () => {
 });
 
 describe('쿠폰', () => {
+  /*
+   * **코드를 보내지 않은 주문은 쿠폰을 쓰지 않는다.** 한동안 견적이 "아무 말 없으면 고른다" 였고,
+   * 주문 생성은 아무 말 없이 견적을 불렀다 — 할인은 받고 쿠폰은 소진하지 않았다.
+   */
+  it('코드 없이 주문하면 견적에 쿠폰을 골라 달라고 하지 않는다', async () => {
+    quoteCart.mockResolvedValue(quote());
+    await createOrder(request(), user);
+
+    const asked = quoteCart.mock.calls[0]![0];
+    expect(asked.couponCode).toBeUndefined();
+    expect(asked.useCoupon).not.toBe(true);
+    expect(tx.userCoupon.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('코드 없는 주문에 쿠폰 할인이 붙어 오면 만들지 않는다 — 소진하지 않은 할인이다', async () => {
+    quoteCart.mockResolvedValue(quote({ couponDiscount: 9_000, couponCode: 'BIG', payable: 280_000 }));
+
+    await expect(createOrder(request(), user)).rejects.toThrow(/견적과 주문이 어긋났다/);
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
   it('사용 처리는 아직 안 쓴 것만 잡히도록 조건을 건다', async () => {
     quoteCart.mockResolvedValue(quote({ couponDiscount: 10_000, payable: 279_000 }));
     db.userCoupon.findFirst.mockResolvedValue({ id: 'uc-1' });

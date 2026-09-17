@@ -135,6 +135,17 @@ export async function createOrder(
   if (input.couponCode !== undefined && quote.couponDiscount === 0) {
     throw new OrderError('COUPON_INVALID');
   }
+  /*
+   * **코드 없이 온 주문에 쿠폰 할인이 붙으면 만들지 않는다.**
+   *
+   * 쿠폰을 쓴 것으로 처리하는 일은 보낸 코드로만 한다. 그러니 코드 없는 주문의 할인은 누구의
+   * 쿠폰도 소진하지 않은 할인이다 — 한동안 실제로 그랬다(견적이 아무 말 없으면 쿠폰을 골랐다).
+   * 견적은 이제 부탁받지 않으면 고르지 않지만(core 의 couponChoice), 돈이 새는 자리라 여기서도
+   * 막는다. 사람이 고칠 수 있는 오류가 아니라 우리 쪽이 어긋난 것이므로 조용히 넘기지 않는다.
+   */
+  if (input.couponCode === undefined && quote.couponDiscount > 0) {
+    throw new Error(`[order] 코드 없는 주문에 쿠폰 할인 ${quote.couponDiscount}원이 붙었다 — 견적과 주문이 어긋났다`);
+  }
 
   // 스냅샷에 필요한 값(가맹점·대표 이미지)은 견적에 없어 따로 읽는다 — 위에서 함께 읽었다
   if (detailsRead.status === 'rejected') throw detailsRead.reason;

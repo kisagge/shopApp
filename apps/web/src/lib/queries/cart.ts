@@ -3,7 +3,7 @@ import { prisma } from '@shop/db';
 import {
   calculateCart, discountRateOf, won, ZERO, variantUnavailable, type VariantState, type ProductStatus,
   type CartLine, type Coupon, type LineShare, type ShippingPolicy,
-  couponOffers, bestCoupon,
+  couponOffers, bestCoupon, couponChoice,
 } from '@shop/core';
 import {
   type CartQuoteRequest, type CartQuoteResponse, type CartQuoteLine, type LineIssue,
@@ -20,8 +20,10 @@ import { getShippingPolicy } from '~/lib/shipping-policy';
 /**
  * 계약의 요청 모양에서 `useCoupon` 만 선택으로 둔다.
  *
- * 계약에는 기본값이 있어서(`.default(true)`) 바깥에서 오는 값은 늘 채워져
- * 있지만, 서버 안에서 부르는 자리(주문 생성·검사)는 그것까지 적을 이유가 없다.
+ * 계약에는 기본값이 있어서(`.default(true)`) 화면 창구에서 오는 값은 늘 채워져 있다.
+ * 서버 안에서 부르는 자리(주문 생성)는 비워 두는데, **비워 두면 쿠폰을 고르지 않는다**
+ * (core 의 couponChoice). 예전에는 비워 두면 골랐고, 주문 생성이 그 쿠폰을 모른 채
+ * 할인만 받아 가서 같은 쿠폰이 끝없이 다시 깎였다.
  */
 type QuoteInput = Omit<CartQuoteRequest, 'useCoupon'> & { readonly useCoupon?: boolean };
 
@@ -190,8 +192,9 @@ export async function quoteCartDetailed(
    * 사람이 "쓰지 않기" 를 고르면 `useCoupon: false` 로 온다 — 코드를 비워
    * 보내는 것만으로는 "아직 안 골랐다" 와 구분되지 않는다.
    */
+  const choice = couponChoice({ useCoupon: input.useCoupon, hasCode: input.couponCode !== undefined });
   const auto =
-    input.useCoupon !== false && asked === null
+    choice === 'AUTO'
       ? bestCoupon(
           mine.map((m) => ({ coupon: m.coupon, expiresAt: m.expiresAt, ref: m })),
           payableLines,
@@ -203,9 +206,11 @@ export async function quoteCartDetailed(
    * 것을 따르는 편이 맞고, 그것이 "쓰지 않기" 다.
    */
   const resolved =
-    input.useCoupon === false
+    choice === 'NONE'
       ? null
-      : (asked ?? (auto === null ? null : { coupon: auto.coupon, name: auto.ref.name }));
+      : choice === 'ASKED'
+        ? asked
+        : (auto === null ? null : { coupon: auto.coupon, name: auto.ref.name });
 
   const totals = calculateCart({
     lines: payableLines,

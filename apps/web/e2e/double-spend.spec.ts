@@ -139,3 +139,53 @@ test('한 장짜리 쿠폰이 두 주문에 붙지 않는다', async ({ page, br
     }
   }
 });
+
+/**
+ * **코드를 보내지 않은 주문은 쿠폰 할인을 받지 않고, 쿠폰도 그대로 남는다.**
+ *
+ * 한동안 견적이 "쿠폰에 대해 아무 말 없으면 가장 좋은 것을 고른다" 였는데, 주문 생성도 아무 말 없이
+ * 견적을 불렀다. 그러면 할인은 붙고 쿠폰은 소진되지 않아 — "쓰지 않기" 를 고른 손님도 할인을 받았고,
+ * 코드 없이 주문을 몇 번이든 보내면 같은 쿠폰이 매번 깎였다. 위 검사는 코드를 보내는 길만 밟아서
+ * 이것을 못 봤다.
+ */
+test('코드 없이 주문하면 쿠폰 할인이 붙지 않고, 쿠폰은 쓰지 않은 채 남는다', async ({ page }) => {
+  const claim = await page.request.post('/api/coupons/claim', { data: { code: COUPON.code }, failOnStatusCode: false });
+  expect([200, 409]).toContain(claim.status());
+
+  const variantId = await addProductToCart(page, RACE_PRODUCT.coupon);
+  expect(variantId, '담을 수 있는 상품이 없다').not.toBeNull();
+  const addressId = await defaultAddressId(page);
+
+  const quoteOf = async (extra: Record<string, unknown>, quantity: number) =>
+    (await (await page.request.post('/api/cart/quote', {
+      data: { lines: [{ variantId: variantId!, quantity }], ...extra },
+    })).json()) as { lines: { unitPrice: number }[]; couponDiscount: number; payable: number };
+
+  const unit = (await quoteOf({ useCoupon: false }, 1)).lines[0]!.unitPrice;
+  const quantity = Math.ceil(COUPON.minimum / unit);
+  const withoutCoupon = await quoteOf({ useCoupon: false }, quantity);
+  // 쿠폰이 붙을 수 있는 주문이어야 겨룬 것이 있다
+  expect((await quoteOf({ couponCode: COUPON.code }, quantity)).couponDiscount, '쿠폰이 이 주문에 붙지 않는다').toBe(COUPON.amount);
+
+  const res = await page.request.post('/api/orders', {
+    data: { lines: [{ variantId: variantId!, quantity }], addressId, paymentMethod: 'CARD', agreedToTerms: true },
+    failOnStatusCode: false,
+  });
+  const body = (await res.json()) as { orderNo?: string; payable?: number };
+  try {
+    expect(res.status(), JSON.stringify(body)).toBeLessThan(400);
+    // 쿠폰을 고르지 않은 값 그대로다
+    expect(body.payable).toBe(withoutCoupon.payable);
+    // 쿠폰은 여전히 쓸 수 있다 — 소진되지 않은 할인이 없었다는 뜻이다
+    expect((await quoteOf({ couponCode: COUPON.code }, quantity)).couponDiscount).toBe(COUPON.amount);
+  } finally {
+    if (body.orderNo) {
+      await page.request
+        .post(`/api/orders/${body.orderNo}/cancel`, {
+          data: { reason: '검사가 만든 주문을 되돌립니다' },
+          failOnStatusCode: false,
+        })
+        .catch(() => null);
+    }
+  }
+});

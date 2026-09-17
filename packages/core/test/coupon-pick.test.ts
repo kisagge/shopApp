@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { bestCoupon, couponOffers, discountFor, calculateCart, won, type CartLine, type Coupon } from '../src';
+import { bestCoupon, couponChoice, couponOffers, discountFor, calculateCart, won, type CartLine, type Coupon } from '../src';
 
 /**
  * 어느 쿠폰이 이 장바구니에 가장 유리한가.
@@ -132,5 +132,29 @@ describe('쿠폰마다 얼마가 깎이는지', () => {
 
     expect(offers.find((o) => o.ref === best.ref)?.discount).toBe(best.discount);
     expect(Math.max(...offers.map((o) => o.discount))).toBe(best.discount);
+  });
+});
+
+describe('쿠폰을 어떻게 붙일지', () => {
+  it('쓰지 않기를 골랐으면 붙이지 않는다 — 코드를 함께 보냈어도', () => {
+    expect(couponChoice({ useCoupon: false, hasCode: false })).toBe('NONE');
+    expect(couponChoice({ useCoupon: false, hasCode: true })).toBe('NONE');
+  });
+
+  it('코드를 보냈으면 그 코드', () => {
+    expect(couponChoice({ useCoupon: true, hasCode: true })).toBe('ASKED');
+    expect(couponChoice({ useCoupon: undefined, hasCode: true })).toBe('ASKED');
+  });
+
+  it('골라 달라고 부탁했을 때만 서버가 고른다', () => {
+    expect(couponChoice({ useCoupon: true, hasCode: false })).toBe('AUTO');
+  });
+
+  it('아무 말이 없으면 고르지 않는다 — 주문 생성이 그렇게 부르고, 고른 쿠폰을 소진하지 않는다', () => {
+    /*
+     * 예전에는 여기서 골랐다. 주문 생성은 보낸 코드로만 쿠폰을 소진하므로, 견적이 골라 준 할인은
+     * 누구의 쿠폰도 쓰지 않은 할인이 됐다 — "쓰지 않기" 를 고른 손님도 받았고, 끝없이 반복됐다.
+     */
+    expect(couponChoice({ useCoupon: undefined, hasCode: false })).toBe('NONE');
   });
 });
