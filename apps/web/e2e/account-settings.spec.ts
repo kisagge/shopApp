@@ -49,10 +49,21 @@ test('이름·연락처를 고치고 비밀번호를 바꾸면, 머리 이름이
 
   // ── 이름·연락처
   const profile = page.getByRole('region', { name: '기본 정보' });
+
+  /*
+   * ── 이메일 인증: 막 가입한 주소는 인증 전이고, 인증 메일을 다시 받을 수 있다. 예전에는 가입할 때 한 번 나가고
+   * 끝이라 지운 사람은 받을 길이 없었고, 인증했는지조차 손님 화면에 보이지 않았다.
+   */
+  await expect(profile.getByText('인증 전', { exact: true })).toBeVisible();
+  await profile.getByRole('button', { name: '인증 메일 다시 보내기' }).click();
+  await expect(profile.getByRole('status').filter({ hasText: '인증 메일' }))
+    .toHaveText('인증 메일을 보냈습니다. 메일함을 확인해 주세요.', { timeout: 15_000 });
+
   await profile.getByLabel(/^이름/).fill('바뀐 이름');
   await profile.getByLabel(/^연락처/).fill('01098765432');
   await profile.getByRole('button', { name: '저장' }).click();
-  await expect(profile.getByRole('status')).toHaveText('회원정보를 저장했습니다.');
+  // 인증 안내도 같은 칸에서 결과를 말한다 — 저장 결과만 골라 본다
+  await expect(profile.getByRole('status').filter({ hasText: '회원정보' })).toHaveText('회원정보를 저장했습니다.');
   await expect(page.getByRole('banner').getByText('바뀐 이름', { exact: true }).locator('visible=true')).toHaveCount(1);
 
   await page.reload();

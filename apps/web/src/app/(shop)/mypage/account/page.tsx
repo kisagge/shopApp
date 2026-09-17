@@ -4,6 +4,7 @@ import { prisma } from '@shop/db';
 import { getViewer } from '~/lib/viewer';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { ProfileForm, PasswordForm } from '~/components/account-forms';
+import { EmailVerification } from '~/components/email-verification';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
 
@@ -21,15 +22,20 @@ export const dynamic = 'force-dynamic';
  * 비밀번호 칸은 **비밀번호로 가입한 계정에만** 둔다. 구글로 가입한 계정에는 비밀번호가 없어서, 칸을 두면 무엇을
  * "지금 비밀번호" 에 적어야 할지 모른다.
  */
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ verified?: string }>;
+}) {
   const viewer = await getViewer();
   if (!viewer) redirect('/login?next=/mypage/account');
+  const { verified: justVerified } = await searchParams;
 
   const [user, t] = await Promise.all([
     prisma.user.findUnique({
       where: { id: viewer.id },
       select: {
-        name: true, email: true, phone: true,
+        name: true, email: true, phone: true, emailVerified: true,
         accounts: { where: { providerId: 'credential' }, select: { id: true }, take: 1 },
       },
     }),
@@ -47,6 +53,15 @@ export default async function AccountPage() {
       </nav>
       <h1 className="pb-6 text-xl font-semibold tracking-tight md:text-2xl">{t('acct.heading')}</h1>
 
+      {/*
+        인증 메일의 링크를 누르고 돌아온 자리. **주소만 믿지 않는다** — 실제로 인증된 계정일 때만 말한다.
+      */}
+      {justVerified === '1' && user.emailVerified && (
+        <p role="status" className="mb-6 rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+          {t('acct.verifiedNotice')}
+        </p>
+      )}
+
       <section aria-labelledby="profile-title" className="flex flex-col gap-4 border-t border-[var(--border)] pt-6">
         <h2 id="profile-title" className="text-[15px] font-semibold">{t('acct.profile')}</h2>
         <dl className="flex flex-col gap-1">
@@ -54,6 +69,7 @@ export default async function AccountPage() {
           <dd className="text-sm">
             {user.email}
             <span className="mt-0.5 block text-[12px] text-[var(--fg-muted)]">{t('acct.emailNote')}</span>
+            <EmailVerification email={user.email} verified={user.emailVerified} />
           </dd>
         </dl>
         <ProfileForm name={user.name} phone={user.phone} />
