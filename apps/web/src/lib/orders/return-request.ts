@@ -344,8 +344,13 @@ export async function resolveReturn(
     : transition(order.status, statusBeforeReturn(order));
 
   await prisma.$transaction(async (tx) => {
-    await tx.returnRequest.update({
-      where: { id: request.id },
+    /*
+     * **아직 대기 중일 때만 처리한다.** 예전에는 위에서 읽은 상태만 보고 무조건 썼다. 두 사람이 동시에
+     * 반려하면 둘 다 통과해 교환으로 잡아 둔 재고가 두 번 풀렸고(없는 물건), 한 사람은 승인·한 사람은
+     * 반려하면 둘 다 "처리했다" 를 받고 나중 것이 남았다.
+     */
+    const { count } = await tx.returnRequest.updateMany({
+      where: { id: request.id, status: 'REQUESTED' },
       data: {
         status: approve ? 'APPROVED' : 'REJECTED',
         ...(approve ? {} : { rejectReason: input.rejectReason ?? null }),
@@ -353,6 +358,7 @@ export async function resolveReturn(
         resolvedBy: actor.id,
       },
     });
+    if (count === 0) throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
 
     if (approve) return;
 
@@ -364,10 +370,12 @@ export async function resolveReturn(
       });
     }
 
-    await tx.order.updateMany({
+    // 읽은 뒤 주문이 옮겨 갔으면(다른 처리가 먼저 끝났다) 줄만 되돌리지 않는다 — 통째로 물린다
+    const moved = await tx.order.updateMany({
       where: { id: order.id, status: order.status },
       data: { status: nextOrderStatus },
     });
+    if (moved.count === 0) throw new ReturnError('ALREADY_RESOLVED', '그사이 주문 상태가 바뀌었습니다. 새로 불러와 주세요.');
     await tx.orderItem.updateMany({
       /*
        * 신청한 줄만 되돌린다. 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다 — 줄을 고르게

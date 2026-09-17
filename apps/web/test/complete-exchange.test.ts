@@ -130,8 +130,6 @@ describe('교환 상품 발송', () => {
 describe('교환 반려', () => {
   it('잡아 둔 바꿀 옵션의 재고를 풀어 준다', async () => {
     db.order.findFirst.mockResolvedValue(order({ status: 'REQUESTED' }));
-    const txAll = { ...tx, returnRequest: { update: vi.fn() } };
-    db.$transaction.mockImplementation(async (fn: any) => fn(txAll));
 
     await resolveReturn('20260915-0000001', { action: 'REJECT', rejectReason: '사진상 사용 흔적' }, admin);
     expect(tx.productVariant.updateMany).toHaveBeenCalledWith({ where: { id: 'v-knit-m' }, data: { stock: { increment: 2 } } });
@@ -140,7 +138,6 @@ describe('교환 반려', () => {
 
   it('반품 반려는 재고를 건드리지 않는다', async () => {
     db.order.findFirst.mockResolvedValue(order({ type: 'RETURN', status: 'REQUESTED', exchangeLines: [] }));
-    db.$transaction.mockImplementation(async (fn: any) => fn({ ...tx, returnRequest: { update: vi.fn() } }));
     await resolveReturn('20260915-0000001', { action: 'REJECT', rejectReason: '기한 지남' }, admin);
     expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
   });

@@ -42,6 +42,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.order.findFirst.mockResolvedValue(order());
   db.order.updateMany.mockResolvedValue({ count: 1 });
+  db.returnRequest.updateMany.mockResolvedValue({ count: 1 });
   db.$transaction.mockImplementation(async (fn: any) => fn(db));
   db.productVariant.updateMany.mockResolvedValue({ count: 1 });
   db.productVariant.findMany.mockResolvedValue([
@@ -239,7 +240,7 @@ describe('운영진 처리', () => {
     await expect(
       resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin),
     ).rejects.toMatchObject({ code: 'RETURN_ADDRESS_MISSING', status: 409 });
-    expect(db.returnRequest.update).not.toHaveBeenCalled();
+    expect(db.returnRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it('반품지가 없어도 반려는 한다 — 보낼 물건이 없다', async () => {
@@ -260,7 +261,7 @@ describe('운영진 처리', () => {
     expect(db.returnAddress.findMany.mock.calls[0]![0].where).toEqual({
       OR: [{ merchantId: { in: ['m-a'] } }, { id: 'platform' }],
     });
-    expect(db.returnRequest.update).toHaveBeenCalled();
+    expect(db.returnRequest.updateMany).toHaveBeenCalled();
   });
 
   it('가맹점은 신청한 줄이 전부 자기 상품이면 승인한다 — 물건을 받는 곳이 가맹점 창고다', async () => {
@@ -277,7 +278,7 @@ describe('운영진 처리', () => {
     await expect(
       resolveReturn('20260901-0000001', { action: 'APPROVE' }, merchant),
     ).rejects.toMatchObject({ status: 403, code: 'MIXED_MERCHANTS' });
-    expect(db.returnRequest.update).not.toHaveBeenCalled();
+    expect(db.returnRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it('자기 상품이 하나도 없는 주문은 없는 주문으로 답한다 — 남의 주문인지 새지 않게', async () => {
@@ -321,7 +322,8 @@ describe('운영진 처리', () => {
       admin,
     );
 
-    expect(db.returnRequest.update.mock.calls[0]?.[0].data).toMatchObject({
+    expect(db.returnRequest.updateMany.mock.calls[0]?.[0]).toMatchObject({ where: { id: 'r-1', status: 'REQUESTED' } });
+    expect(db.returnRequest.updateMany.mock.calls[0]?.[0].data).toMatchObject({
       status: 'REJECTED',
       rejectReason: '사용 흔적이 있습니다',
       resolvedBy: 'u-admin',
@@ -337,6 +339,37 @@ describe('운영진 처리', () => {
     await expect(
       resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin),
     ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+  });
+
+  /*
+   * 두 사람이 동시에 누르면 둘 다 위의 "대기 중" 검사를 통과한다. 쓰는 순간 다시 보아 늦은 쪽은 아무것도
+   * 바꾸지 않는다 — 교환이면 잡아 둔 재고가 두 번 풀렸다.
+   */
+  it('그사이 다른 사람이 처리했으면 늦은 쪽은 아무것도 바꾸지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...requested,
+      returnRequests: [{
+        id: 'r-1', type: 'EXCHANGE', status: 'REQUESTED', itemIds: [],
+        exchangeLines: [{ orderItemId: 'i-coat', fromVariantId: 'v-m', fromOptionLabel: 'M', toVariantId: 'v-l', toOptionLabel: 'L', quantity: 1 }],
+      }],
+    });
+    db.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '늦음' }, admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+    expect(db.productVariant.updateMany).not.toHaveBeenCalled();
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+    expect(db.orderStatusLog.create).not.toHaveBeenCalled();
+  });
+
+  it('반려하는 사이 주문이 옮겨 갔으면 줄만 되돌리지 않고 통째로 물린다', async () => {
+    db.order.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적' }, admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+    expect(db.orderItem.updateMany).not.toHaveBeenCalled();
   });
 
   it('신청이 없으면 404', async () => {
