@@ -13,6 +13,7 @@ const { grantReviewReward } = await import('~/lib/reviews/reward');
 const tx = {
   pointTransaction: {
     aggregate: vi.fn<(...a: any[]) => any>(),
+    count: vi.fn<(...a: any[]) => any>(),
     create: vi.fn<(...a: any[]) => any>(),
   },
   user: { update: vi.fn<(...a: any[]) => any>() },
@@ -27,6 +28,7 @@ const granted = (amount: number | null) => {
 beforeEach(() => {
   vi.clearAllMocks();
   granted(null);
+  tx.pointTransaction.count.mockResolvedValue(0);
 });
 
 describe('리뷰 적립', () => {
@@ -62,6 +64,14 @@ describe('리뷰 적립', () => {
     const diff = REVIEW_REWARD.photo - REVIEW_REWARD.text;
     expect(await grantReviewReward(tx, { ...input, hasPhoto: true, topUpOnly: true })).toBe(diff);
     expect(tx.pointTransaction.create.mock.calls[0]![0].data.amount).toBe(diff);
+  });
+
+  it('반품으로 적립을 되가져간 줄이면 사진을 붙여도 다시 주지 않는다', async () => {
+    granted(REVIEW_REWARD.text);
+    tx.pointTransaction.count.mockResolvedValue(1);
+    expect(await grantReviewReward(tx, { ...input, hasPhoto: true, topUpOnly: true })).toBe(0);
+    expect(tx.pointTransaction.count.mock.calls[0]![0].where).toMatchObject({ orderItemId: 'oi-1', reason: 'ADMIN_ADJUST', orderId: null });
+    expect(tx.pointTransaction.create).not.toHaveBeenCalled();
   });
 
   it('적립을 받은 적 없는 글은 고쳐도 주지 않는다', async () => {

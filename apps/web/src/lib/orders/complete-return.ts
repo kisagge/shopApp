@@ -10,7 +10,7 @@ import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
 import { refundOrder } from '~/lib/admin/refund-order';
 import { policyOf } from './cancel-items';
-import { reclaimPurchaseReward } from './reclaim-reward';
+import { reclaimPurchaseReward, reclaimReviewReward } from './reclaim-reward';
 import { refundedSoFar } from './refund-ledger';
 import { ReturnError } from './return-request';
 
@@ -255,6 +255,8 @@ export async function completeReturn(
       } else {
         await tx.order.update({ where: { id: order.id }, data: { rewardPoints: { decrement: plan.rewardReduced } } });
       }
+      // 후기 적립은 확정과 상관없이 줄마다 나갔다 — 돌려받은 줄 몫을 되가져온다
+      await reclaimReviewReward(tx, order, plan.itemIds);
 
       if (payment && plan.cash > 0) {
         await tx.payment.update({

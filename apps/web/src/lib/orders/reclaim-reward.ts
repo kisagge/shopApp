@@ -92,3 +92,79 @@ export async function reclaimPurchaseReward(
 
   return { reclaimed: take, shortfall };
 }
+
+interface ReviewReclaimTx {
+  pointTransaction: {
+    groupBy(args: unknown): Promise<{ orderItemId: string | null; reason: string; _sum: { amount: number | null } }[]>;
+    create(args: unknown): Promise<unknown>;
+  };
+  user: {
+    findUnique(args: unknown): Promise<{ pointBalance: number } | null>;
+    update(args: unknown): Promise<unknown>;
+  };
+}
+
+/**
+ * 돌려받은 줄에 준 **후기 적립**을 되가져온다.
+ *
+ * 후기 적립은 줄(주문 항목)마다 나간다. 구매확정 적립만 되가져오고 이것은 두었더니, 받고 → 사진 후기를
+ * 쓰고 → 반품하면 물건도 돈도 돌아가는데 후기 적립만 남았다. 되풀이하면 그만큼 쌓인다.
+ *
+ * 회수 원장은 **그 줄을 가리키는 음수 조정**으로 남긴다(주문은 가리키지 않는다 — 주문을 가리키는 음수
+ * 조정은 구매확정 적립 회수의 몫이라 섞이면 그쪽이 덜 가져간다). 이미 가져간 만큼은 빼고 세므로 두 번
+ * 부르거나 줄을 나눠 반품해도 두 번 빼지 않는다. 잔액이 모자라면 있는 만큼만 — 구매확정 적립과 같은 판단이다.
+ */
+export async function reclaimReviewReward(
+  tx: ReviewReclaimTx,
+  order: { orderNo: string; userId: string },
+  itemIds: readonly string[],
+): Promise<RewardReclaim> {
+  if (itemIds.length === 0) return { reclaimed: 0, shortfall: 0 };
+
+  const rows = await tx.pointTransaction.groupBy({
+    by: ['orderItemId', 'reason'],
+    where: {
+      orderItemId: { in: [...itemIds] },
+      OR: [{ reason: 'EARN_REVIEW' }, { reason: 'ADMIN_ADJUST', amount: { lt: 0 }, orderId: null }],
+    },
+    _sum: { amount: true },
+  });
+  const owed = new Map<string, number>();
+  for (const row of rows) {
+    if (row.orderItemId === null) continue;
+    // 준 것은 양수, 가져간 것은 음수로 쌓인다 — 더하면 남은 몫이다
+    owed.set(row.orderItemId, (owed.get(row.orderItemId) ?? 0) + (row._sum.amount ?? 0));
+  }
+  const targets = [...itemIds].map((id) => ({ id, amount: Math.max(0, owed.get(id) ?? 0) })).filter((t) => t.amount > 0);
+  if (targets.length === 0) return { reclaimed: 0, shortfall: 0 };
+
+  const user = await tx.user.findUnique({ where: { id: order.userId }, select: { pointBalance: true } });
+  let balance = Math.max(user?.pointBalance ?? 0, 0);
+  let reclaimed = 0;
+  let shortfall = 0;
+
+  for (const target of targets) {
+    const take = Math.min(target.amount, balance);
+    shortfall += target.amount - take;
+    if (take === 0) continue;
+    balance -= take;
+    reclaimed += take;
+    await tx.pointTransaction.create({
+      data: {
+        userId: order.userId,
+        amount: -take,
+        reason: 'ADMIN_ADJUST',
+        orderItemId: target.id,
+        note:
+          take === target.amount
+            ? `주문 ${order.orderNo} 반품 — 후기 적립 회수`
+            : `주문 ${order.orderNo} 반품 — 후기 적립 회수 (잔액 부족 ${target.amount - take}P 미회수)`,
+      },
+    });
+  }
+
+  if (reclaimed > 0) {
+    await tx.user.update({ where: { id: order.userId }, data: { pointBalance: { decrement: reclaimed } } });
+  }
+  return { reclaimed, shortfall };
+}

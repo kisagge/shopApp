@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { reclaimPurchaseReward } from '~/lib/orders/reclaim-reward';
+import { reclaimPurchaseReward, reclaimReviewReward } from '~/lib/orders/reclaim-reward';
 
 /**
  * 구매확정으로 준 적립을 되가져온다.
@@ -147,5 +147,82 @@ describe('적립 회수', () => {
 
     const out = await reclaimPurchaseReward(t, order, 500);
     expect(out.reclaimed).toBe(200);
+  });
+});
+
+/**
+ * **후기 적립 회수.** 후기 적립은 줄마다 나가서, 확정 적립만 되가져오면 받고 → 사진 후기 → 반품을 되풀이하는 만큼
+ * 쌓였다. 회수 원장은 줄을 가리키는 음수 조정이고 주문은 가리키지 않는다(주문 쪽은 확정 적립 회수의 셈이다).
+ */
+describe('후기 적립 회수', () => {
+  const reviewTx = () => ({
+    pointTransaction: {
+      groupBy: vi.fn<(...a: any[]) => any>(async () => []),
+      create: vi.fn<(...a: any[]) => any>(),
+    },
+    user: {
+      findUnique: vi.fn<(...a: any[]) => any>(async () => ({ pointBalance: 10_000 })),
+      update: vi.fn<(...a: any[]) => any>(),
+    },
+  });
+  const row = (orderItemId: string, reason: string, amount: number) => ({ orderItemId, reason, _sum: { amount } });
+
+  it('돌려받은 줄에 준 만큼 줄마다 되가져오고 잔액은 한 번에 뺀다', async () => {
+    const r = reviewTx();
+    r.pointTransaction.groupBy.mockResolvedValue([row('i-1', 'EARN_REVIEW', 500), row('i-2', 'EARN_REVIEW', 100)]);
+
+    const out = await reclaimReviewReward(r, order, ['i-1', 'i-2']);
+
+    expect(out).toEqual({ reclaimed: 600, shortfall: 0 });
+    expect(r.pointTransaction.create.mock.calls.map((c) => c[0].data)).toEqual([
+      expect.objectContaining({ userId: 'u-1', amount: -500, reason: 'ADMIN_ADJUST', orderItemId: 'i-1' }),
+      expect.objectContaining({ amount: -100, orderItemId: 'i-2' }),
+    ]);
+    // 주문을 가리키지 않는다 — 확정 적립 회수의 셈에 섞이지 않게
+    expect(r.pointTransaction.create.mock.calls[0]![0].data).not.toHaveProperty('orderId');
+    expect(r.user.update).toHaveBeenCalledOnce();
+    expect(r.user.update.mock.calls[0]![0].data).toEqual({ pointBalance: { decrement: 600 } });
+  });
+
+  it('돌려받은 줄만 본다', async () => {
+    const r = reviewTx();
+    await reclaimReviewReward(r, order, ['i-1']);
+    expect(r.pointTransaction.groupBy.mock.calls[0]![0].where).toMatchObject({ orderItemId: { in: ['i-1'] } });
+    expect(r.pointTransaction.groupBy.mock.calls[0]![0].where.OR).toContainEqual({ reason: 'ADMIN_ADJUST', amount: { lt: 0 }, orderId: null });
+  });
+
+  it('이미 가져간 만큼은 빼고 센다 — 두 번 불러도 두 번 빼지 않는다', async () => {
+    const r = reviewTx();
+    r.pointTransaction.groupBy.mockResolvedValue([row('i-1', 'EARN_REVIEW', 500), row('i-1', 'ADMIN_ADJUST', -500)]);
+
+    const out = await reclaimReviewReward(r, order, ['i-1']);
+
+    expect(out).toEqual({ reclaimed: 0, shortfall: 0 });
+    expect(r.pointTransaction.create).not.toHaveBeenCalled();
+    expect(r.user.update).not.toHaveBeenCalled();
+  });
+
+  it('후기를 안 쓴 줄이면 아무것도 하지 않는다', async () => {
+    const r = reviewTx();
+    expect(await reclaimReviewReward(r, order, ['i-1'])).toEqual({ reclaimed: 0, shortfall: 0 });
+    expect(r.user.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('잔액이 모자라면 있는 만큼만 가져오고 못 가져온 몫을 적는다 — 빚지게 하지 않는다', async () => {
+    const r = reviewTx();
+    r.user.findUnique.mockResolvedValue({ pointBalance: 300 });
+    r.pointTransaction.groupBy.mockResolvedValue([row('i-1', 'EARN_REVIEW', 500)]);
+
+    const out = await reclaimReviewReward(r, order, ['i-1']);
+
+    expect(out).toEqual({ reclaimed: 300, shortfall: 200 });
+    expect(r.pointTransaction.create.mock.calls[0]![0].data).toMatchObject({ amount: -300 });
+    expect(r.pointTransaction.create.mock.calls[0]![0].data.note).toContain('200P 미회수');
+  });
+
+  it('줄이 없으면 읽지도 않는다', async () => {
+    const r = reviewTx();
+    expect(await reclaimReviewReward(r, order, [])).toEqual({ reclaimed: 0, shortfall: 0 });
+    expect(r.pointTransaction.groupBy).not.toHaveBeenCalled();
   });
 });

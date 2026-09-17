@@ -4,7 +4,10 @@ import type { Actor } from '@shop/core';
 const reclaimPurchaseReward = vi.hoisted(() =>
   vi.fn<(...a: any[]) => any>(() => Promise.resolve({ reclaimed: 0, shortfall: 0 })),
 );
-vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward }));
+const reclaimReviewReward = vi.hoisted(() =>
+  vi.fn<(...a: any[]) => any>(() => Promise.resolve({ reclaimed: 0, shortfall: 0 })),
+);
+vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward, reclaimReviewReward }));
 
 /** 잠근 뒤 다시 읽는 것도 같은 값을 보게 한다 — 달리 보이게 할 때만 순서대로 돌려준다 */
 const read = vi.hoisted(() => ({
@@ -279,6 +282,15 @@ describe('구매확정 적립', () => {
     const out = await refundOrder('20260904-1234567', admin, '하자 반품', gateway);
 
     expect(out.rewardReclaimed).toBe(2_890);
+  });
+
+  it('돌려받은 줄의 후기 적립도 되가져오고 결과에 따로 싣는다', async () => {
+    reclaimReviewReward.mockResolvedValueOnce({ reclaimed: 500, shortfall: 0 });
+
+    const out = await refundOrder('20260904-1234567', admin, '하자 반품', gateway);
+
+    expect(reclaimReviewReward).toHaveBeenCalledWith(tx, expect.objectContaining({ orderNo: '20260904-1234567' }), ['i-1', 'i-2']);
+    expect(out.reviewRewardReclaimed).toBe(500);
   });
 
   it('확정에 이른 적 없는 주문이면 0 이다', async () => {

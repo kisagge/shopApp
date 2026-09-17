@@ -16,7 +16,8 @@ const refundOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/refund-order', () => ({ refundOrder }));
 
 const reclaimPurchaseReward = vi.hoisted(() => vi.fn<(...a: any[]) => any>(async () => ({ reclaimed: 0, shortfall: 0 })));
-vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward }));
+const reclaimReviewReward = vi.hoisted(() => vi.fn<(...a: any[]) => any>(async () => ({ reclaimed: 0, shortfall: 0 })));
+vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward, reclaimReviewReward }));
 
 vi.mock('~/lib/shipping-policy', () => ({ getShippingPolicy: vi.fn() }));
 vi.mock('~/lib/payments', () => ({ getPaymentGateway: vi.fn() }));
@@ -133,6 +134,9 @@ describe('한 줄만 돌려받기', () => {
     await completeReturn('20260914-0000002', admin, gateway());
     expect(tx.order.update).toHaveBeenCalledWith({ where: { id: 'o-1' }, data: { rewardPoints: { decrement: 270 } } });
     expect(reclaimPurchaseReward).not.toHaveBeenCalled();
+    // 후기 적립은 확정과 상관없이 돌려받은 줄 몫을 가져온다
+    expect(reclaimReviewReward).toHaveBeenCalledWith(tx, expect.objectContaining({ id: 'o-1' }), expect.any(Array));
+    expect(reclaimReviewReward.mock.calls[0]![2]).toHaveLength(1);
 
     vi.clearAllMocks();
     tx.orderItem.updateMany.mockImplementation(async (a: { where: { id: { in: string[] } } }) => ({ count: a.where.id.in.length }));

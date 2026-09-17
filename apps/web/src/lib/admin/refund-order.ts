@@ -1,5 +1,5 @@
 import 'server-only';
-import { reclaimPurchaseReward } from '~/lib/orders/reclaim-reward';
+import { reclaimPurchaseReward, reclaimReviewReward } from '~/lib/orders/reclaim-reward';
 import { prisma } from '@shop/db';
 import {
   transition, canRefundOrder, remainingRefund, ORDER_STATUS_LABEL,
@@ -25,6 +25,8 @@ export interface RefundResult {
   readonly pointsReturned: number;
   /** 구매확정으로 줬다가 되가져온 적립. 확정에 이른 적 없는 주문이면 0 이다. */
   readonly rewardReclaimed: number;
+  /** 돌려받은 줄의 후기로 줬다가 되가져온 적립 */
+  readonly reviewRewardReclaimed: number;
 }
 
 /** 결제 환불이 오래 걸려도 잠금을 무한히 쥐지 않는다 */
@@ -117,6 +119,7 @@ export async function refundOrder(
   let stockRestored = 0;
   let pointsReturned = 0;
   let rewardReclaimed = 0;
+  let reviewRewardReclaimed = 0;
   let quantity = 0;
   let fromReturn = false;
   let pgDone = false;
@@ -239,6 +242,8 @@ export async function refundOrder(
        * 확정에 이른 적 없는 주문이면 줄 적립도 없어서 아무 일도 하지 않는다.
        */
       rewardReclaimed = (await reclaimPurchaseReward(tx, order)).reclaimed;
+      // 돌려받은 줄에 쓴 후기의 적립도 — 물건이 돌아왔으니 산 사람의 후기가 아니다
+      reviewRewardReclaimed = (await reclaimReviewReward(tx, order, live.map((i) => i.id))).reclaimed;
 
       // 쿠폰 되살리기. 이미 풀려 있어도 같은 결과라 그대로 둔다.
       if (order.usedCouponId) {
@@ -310,5 +315,6 @@ export async function refundOrder(
     stockRestored,
     pointsReturned,
     rewardReclaimed,
+    reviewRewardReclaimed,
   };
 }

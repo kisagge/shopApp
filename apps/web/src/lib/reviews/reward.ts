@@ -15,6 +15,7 @@ import { rewardExpiresAt, reviewRewardToGrant } from '@shop/core';
 interface RewardTx {
   pointTransaction: {
     aggregate(args: unknown): Promise<{ _sum: { amount: number | null } }>;
+    count(args: unknown): Promise<number>;
     create(args: unknown): Promise<unknown>;
   };
   user: { update(args: unknown): Promise<unknown> };
@@ -43,6 +44,17 @@ export async function grantReviewReward(
 
   const alreadyGranted = already._sum.amount ?? 0;
   if (input.topUpOnly && alreadyGranted === 0) return 0;
+
+  /*
+   * **돌려받은 줄이면 더 주지 않는다.** 반품하면 이 줄의 후기 적립을 되가져가는데(reclaimReviewReward), 그 뒤에 후기를
+   * 고쳐 사진을 붙이면 "받은 것" 은 여전히 원래 합으로 세어져 차액이 다시 나갔다.
+   */
+  if (alreadyGranted > 0) {
+    const reclaimed = await tx.pointTransaction.count({
+      where: { orderItemId: input.orderItemId, reason: 'ADMIN_ADJUST', amount: { lt: 0 }, orderId: null },
+    });
+    if (reclaimed > 0) return 0;
+  }
 
   const amount = reviewRewardToGrant({ hasPhoto: input.hasPhoto, alreadyGranted });
   if (amount === 0) return 0;

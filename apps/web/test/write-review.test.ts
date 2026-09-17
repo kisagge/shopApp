@@ -17,6 +17,7 @@ const tx = vi.hoisted(() => ({
   // 리뷰 적립도 같은 트랜잭션 안에서 나간다
   pointTransaction: {
     aggregate: vi.fn<(...a: any[]) => any>(),
+    count: vi.fn<(...a: any[]) => any>(async () => 0),
     create: vi.fn<(...a: any[]) => any>(),
   },
   user: { update: vi.fn<(...a: any[]) => any>() },
