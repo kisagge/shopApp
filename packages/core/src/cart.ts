@@ -205,6 +205,24 @@ function couponEligibility(
   );
 }
 
+/**
+ * 이 장바구니에서 쿠폰이 걸리는 **대상 줄의 수와 그 판매가 합계**.
+ *
+ * 쿠폰을 왜 못 쓰는지 말하는 자리(coupon-pick 의 couponBlocker)가 쓴다. 할인을 셈하는 것과 **같은 판정**으로
+ * 세야 "3,000원 더 담으면 됩니다" 가 실제로 맞는다 — 따로 세면 더 담았는데도 못 쓰는 날이 온다.
+ */
+export function couponCoverage(
+  coupon: Coupon,
+  inputLines: readonly CartLine[],
+): { readonly eligibleLines: number; readonly base: Won } {
+  const totals = calculateCart({ lines: inputLines }).lines;
+  const eligible = couponEligibility(coupon, inputLines);
+  return {
+    eligibleLines: eligible.filter(Boolean).length,
+    base: couponBaseOf(coupon, inputLines, totals),
+  };
+}
+
 /** 쿠폰 대상 줄들의 판매가 합계. 대상이 없으면 전체 합계. */
 function couponBaseOf(
   coupon: Coupon | undefined,

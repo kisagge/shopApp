@@ -251,6 +251,7 @@ export async function quoteCartDetailed(
         name: o.ref.name,
         discount: o.discount,
         expiresAt: o.ref.expiresAt.toISOString(),
+        unusable: o.blocker,
       }))
       .sort((a, b) => b.discount - a.discount || a.expiresAt.localeCompare(b.expiresAt)),
     pointsUsed: totals.pointsUsed,

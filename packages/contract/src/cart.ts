@@ -92,6 +92,19 @@ export const cartCouponOfferSchema = z.object({
   name: z.string(),
   discount: wonSchema,
   expiresAt: z.string(),
+  /**
+   * 못 쓰는 까닭(core 의 couponBlocker). 쓸 수 있으면 null.
+   *
+   * "사용 불가" 한 마디로는 대상 상품이 없어서인지, 조금 모자라서인지 알 수 없었다. 모자라면 얼마를 더 담으면
+   * 되는지(`shortfall`)까지 싣는다.
+   */
+  unusable: z
+    .discriminatedUnion('reason', [
+      z.object({ reason: z.literal('NO_ELIGIBLE_ITEMS') }),
+      z.object({ reason: z.literal('BELOW_MINIMUM'), minimum: wonSchema, shortfall: wonSchema }),
+      z.object({ reason: z.literal('NO_DISCOUNT') }),
+    ])
+    .nullable(),
 });
 export type CartCouponOffer = z.infer<typeof cartCouponOfferSchema>;
 

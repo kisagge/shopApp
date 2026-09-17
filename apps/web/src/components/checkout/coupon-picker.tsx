@@ -2,6 +2,7 @@
 
 import { useId } from 'react';
 import type { CartCouponOffer } from '@shop/contract';
+import type { MessageKey } from '@shop/i18n';
 import { useT } from '~/lib/i18n/client';
 
 /**
@@ -21,6 +22,13 @@ import { useT } from '~/lib/i18n/client';
  * 라디오다. 하나만 쓸 수 있고, 지금 무엇이 붙어 있는지 눌러 보지 않아도
  * 보여야 한다 — 그건 버튼이 아니라 라디오가 하는 일이다.
  */
+/** 못 쓰는 까닭마다의 문구. 까닭을 하나 더하면 여기서 컴파일이 멈춘다 */
+const UNUSABLE_KEY = {
+  NO_ELIGIBLE_ITEMS: 'coupon.unusable.NO_ELIGIBLE_ITEMS',
+  BELOW_MINIMUM: 'coupon.unusable.BELOW_MINIMUM',
+  NO_DISCOUNT: 'coupon.unusable.NO_DISCOUNT',
+} as const satisfies Record<NonNullable<CartCouponOffer['unusable']>['reason'], MessageKey>;
+
 export function CouponPicker({
   offers,
   selected,
@@ -71,27 +79,46 @@ export function CouponPicker({
 
       {offers.map((offer) => {
         const disabled = offer.discount === 0;
+        const whyId = `${name}-${offer.code}-why`;
+        /*
+         * **왜 못 쓰는지 말한다.** "사용 불가" 한 마디로는 대상 상품이 없어서인지 조금 모자라서인지 알 수 없어,
+         * 사람은 쿠폰이 고장 난 줄 알았다. 모자라면 얼마를 더 담으면 되는지까지 적는다.
+         */
+        const why = offer.unusable
+          ? offer.unusable.reason === 'BELOW_MINIMUM'
+            ? t(UNUSABLE_KEY.BELOW_MINIMUM, {
+                minimum: money(offer.unusable.minimum),
+                shortfall: money(offer.unusable.shortfall),
+              })
+            : t(UNUSABLE_KEY[offer.unusable.reason])
+          : null;
         return (
-          <label
-            key={offer.code}
-            className={`flex items-center gap-2 text-[13px] ${
-              disabled ? 'cursor-not-allowed text-[var(--fg-muted)]' : 'text-[var(--fg)]'
-            }`}
-          >
-            <input
-              type="radio"
-              name={name}
-              className="size-4 accent-[var(--brand)]"
-              checked={selected === offer.code}
-              disabled={disabled}
-              onChange={() => onSelect(offer.code)}
-            />
-            <span className="flex-1">{offer.name}</span>
-            {/* 얼마가 깎이는지가 고르는 이유다. 이름만으로는 알 수 없다. */}
-            <span className="tnum shrink-0 font-medium">
-              {disabled ? t('coupon.pickUnusable') : `-${money(offer.discount)}`}
-            </span>
-          </label>
+          <div key={offer.code} className="flex flex-col gap-0.5">
+            <label
+              className={`flex items-center gap-2 text-[13px] ${
+                disabled ? 'cursor-not-allowed text-[var(--fg-muted)]' : 'text-[var(--fg)]'
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                className="size-4 accent-[var(--brand)]"
+                checked={selected === offer.code}
+                disabled={disabled}
+                onChange={() => onSelect(offer.code)}
+                // 잠긴 까닭을 낭독기도 듣는다 — 옆 글자만으로는 이 단추와 이어지지 않는다
+                {...(disabled && why ? { 'aria-describedby': whyId } : {})}
+              />
+              <span className="flex-1">{offer.name}</span>
+              {/* 얼마가 깎이는지가 고르는 이유다. 이름만으로는 알 수 없다. */}
+              <span className="tnum shrink-0 font-medium">
+                {disabled ? t('coupon.pickUnusable') : `-${money(offer.discount)}`}
+              </span>
+            </label>
+            {disabled && why && (
+              <p id={whyId} className="pl-6 text-[12px] text-[var(--fg-muted)]">{why}</p>
+            )}
+          </div>
         );
       })}
     </fieldset>

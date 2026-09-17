@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { bestCoupon, couponChoice, couponOffers, discountFor, calculateCart, won, type CartLine, type Coupon } from '../src';
+import {
+  bestCoupon, couponBlocker, couponChoice, couponOffers, discountFor, calculateCart, won,
+  type CartLine, type Coupon,
+} from '../src';
 
 /**
  * 어느 쿠폰이 이 장바구니에 가장 유리한가.
@@ -156,5 +159,63 @@ describe('쿠폰을 어떻게 붙일지', () => {
      * 누구의 쿠폰도 쓰지 않은 할인이 됐다 — "쓰지 않기" 를 고른 손님도 받았고, 끝없이 반복됐다.
      */
     expect(couponChoice({ useCoupon: undefined, hasCode: false })).toBe('NONE');
+  });
+});
+
+/**
+ * **왜 못 쓰는지 말한다.** "사용 불가" 한 마디로는 대상 상품이 없어서인지 조금 모자라서인지 알 수 없었다.
+ * 모자라면 얼마를 더 담으면 되는지까지 — 할인을 셈하는 것과 같은 판정으로 센다.
+ */
+describe('못 쓰는 까닭', () => {
+  it('쓸 수 있으면 까닭이 없다', () => {
+    expect(couponBlocker(amount('OK', 5_000), cart)).toBeNull();
+  });
+
+  it('최소 주문 금액에 모자라면 얼마가 모자란지 말한다', () => {
+    // 20만원 담았고 25만원부터 — 5만원 더
+    expect(couponBlocker(amount('MIN', 10_000, 250_000), cart)).toEqual({
+      reason: 'BELOW_MINIMUM', minimum: 250_000, shortfall: 50_000,
+    });
+  });
+
+  it('모자란 금액은 대상 상품의 합계로 센다 — 전체 합계로 세면 더 담아도 못 쓴다', () => {
+    const noonOnly: Coupon = {
+      kind: 'amount', code: 'NOON', value: won(10_000), minimumOrder: won(150_000),
+      scope: { brandIds: ['b-noon'] },
+    };
+    // 대상 10만원 + 대상 아닌 10만원 → 대상만 세면 5만원 모자란다(전체로 세면 모자라지 않다)
+    const mixed = [line({ variantId: 'v1' }), line({ variantId: 'v2', brandId: 'b-other' })];
+    expect(couponBlocker(noonOnly, mixed)).toEqual({ reason: 'BELOW_MINIMUM', minimum: 150_000, shortfall: 50_000 });
+    // 말한 만큼 대상 상품을 더 담으면 실제로 깎인다
+    expect(discountFor(noonOnly, [...mixed, line({ variantId: 'v3', salePrice: won(50_000), listPrice: won(50_000) })]))
+      .toBeGreaterThan(0);
+  });
+
+  it('담은 상품 중 걸리는 것이 없으면 그렇게 말한다', () => {
+    const onlyV1: Coupon = {
+      kind: 'amount', code: 'ONLY', value: won(5_000), minimumOrder: won(0),
+      scope: { productIds: ['p-v1'] },
+    };
+    expect(couponBlocker(onlyV1, [line({ variantId: 'v2' })])).toEqual({ reason: 'NO_ELIGIBLE_ITEMS' });
+  });
+
+  it('걸리는 것도 없고 금액도 모자라면 걸리는 것이 없다는 쪽을 말한다 — 더 담아도 소용없다', () => {
+    const onlyV1: Coupon = {
+      kind: 'amount', code: 'ONLY', value: won(5_000), minimumOrder: won(999_999),
+      scope: { productIds: ['p-v1'] },
+    };
+    expect(couponBlocker(onlyV1, [line({ variantId: 'v2' })])).toEqual({ reason: 'NO_ELIGIBLE_ITEMS' });
+  });
+
+  it('조건은 맞는데 깎일 것이 0 원이면 그렇게 말한다', () => {
+    // 1% 가 1원 아래로 떨어진다
+    const tiny = [line({ variantId: 'v1', listPrice: won(50), salePrice: won(50) })];
+    expect(couponBlocker(percent('P1', 1), tiny)).toEqual({ reason: 'NO_DISCOUNT' });
+  });
+
+  it('쿠폰마다 까닭을 함께 싣는다', () => {
+    const offers = couponOffers([cand(amount('OK', 5_000)), cand(amount('NO', 10_000, 250_000))], cart);
+    expect(offers.find((o) => o.ref === 'OK')?.blocker).toBeNull();
+    expect(offers.find((o) => o.ref === 'NO')?.blocker).toMatchObject({ reason: 'BELOW_MINIMUM', shortfall: 50_000 });
   });
 });

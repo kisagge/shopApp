@@ -1,5 +1,5 @@
-import { calculateCart, type CartLine, type Coupon } from './cart';
-import { ZERO, type Won } from './money';
+import { calculateCart, couponCoverage, type CartLine, type Coupon } from './cart';
+import { subtractToZero, ZERO, type Won } from './money';
 
 /**
  * 장바구니 하나에 쿠폰 여럿을 대 보고 **가장 많이 깎이는 것**을 고른다.
@@ -32,6 +32,33 @@ export interface CouponPick<T> {
   readonly ref: T;
   readonly coupon: Coupon;
   readonly discount: Won;
+}
+
+/**
+ * 이 장바구니에서 쿠폰을 **왜** 못 쓰는가.
+ *
+ * 예전 화면은 "사용 불가" 한 마디뿐이었다. 대상 상품이 없어서인지, 조금 모자라서인지 알 수 없으니 사람은 쿠폰이
+ * 고장 난 줄 알았다. 모자란 것이라면 얼마를 더 담으면 되는지까지 말한다 — 그게 이 쿠폰을 쓰게 하는 한마디다.
+ *
+ * · `NO_ELIGIBLE_ITEMS` — 담은 상품 중 이 쿠폰이 걸리는 것이 없다(브랜드·카테고리·상품 지정 쿠폰)
+ * · `BELOW_MINIMUM`     — 걸리는 상품의 합계가 최소 주문 금액에 모자란다. 모자란 금액을 함께 준다
+ * · `NO_DISCOUNT`       — 조건은 맞는데 깎일 것이 0 원이다(정률이 1원 아래로 떨어지는 경우 등)
+ */
+export type CouponBlocker =
+  | { readonly reason: 'NO_ELIGIBLE_ITEMS' }
+  | { readonly reason: 'BELOW_MINIMUM'; readonly minimum: Won; readonly shortfall: Won }
+  | { readonly reason: 'NO_DISCOUNT' };
+
+/** 쓸 수 있으면 null */
+export function couponBlocker(coupon: Coupon, lines: readonly CartLine[]): CouponBlocker | null {
+  if (discountFor(coupon, lines) > ZERO) return null;
+
+  const { eligibleLines, base } = couponCoverage(coupon, lines);
+  if (lines.length === 0 || eligibleLines === 0) return { reason: 'NO_ELIGIBLE_ITEMS' };
+  if (base < coupon.minimumOrder) {
+    return { reason: 'BELOW_MINIMUM', minimum: coupon.minimumOrder, shortfall: subtractToZero(coupon.minimumOrder, base) };
+  }
+  return { reason: 'NO_DISCOUNT' };
 }
 
 /** 이 장바구니에서 이 쿠폰이 깎아 주는 금액. 0 이면 쓸 수 없다는 뜻이다. */
@@ -82,11 +109,12 @@ export function bestCoupon<T>(
 export function couponOffers<T>(
   candidates: readonly CouponCandidate<T>[],
   lines: readonly CartLine[],
-): readonly CouponPick<T>[] {
+): readonly (CouponPick<T> & { readonly blocker: CouponBlocker | null })[] {
   return candidates.map((c) => ({
     ref: c.ref,
     coupon: c.coupon,
     discount: discountFor(c.coupon, lines),
+    blocker: couponBlocker(c.coupon, lines),
   }));
 }
 

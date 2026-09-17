@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { STATE_FILE, ready } from './state';
+import { STATE_FILE, addProductToCart, ready } from './state';
 
 /**
  * 쿠폰 받기 — 운영이 공개한 쿠폰을 코드 없이 받는다.
@@ -13,6 +13,8 @@ import { STATE_FILE, ready } from './state';
  */
 
 test.use({ storageState: STATE_FILE.couponCollector });
+// 결제 화면을 보려고 서버 장바구니를 채우고 비운다 — 같은 파일의 검사끼리도 부딪히지 않게(cart-isolation)
+test.describe.configure({ mode: 'serial' });
 
 const makeCoupon = async (admin: APIRequestContext, prefix: string, downloadable: boolean) => {
   const stamp = Date.now().toString(36).toUpperCase();
@@ -64,6 +66,21 @@ test('공개한 쿠폰을 받기 화면에서 받으면 "받음" 으로 남고 �
     await page.goto('/mypage/coupons');
     await ready(page);
     await expect(page.getByText(open.name)).toBeVisible();
+
+    /*
+     * ── 결제 화면에서 **왜 못 쓰는지** 말한다. 이 쿠폰은 최소 주문 금액이 터무니없어(1,000만 원) 늘 모자란다 —
+     * "사용 불가" 한 마디 대신 얼마를 더 담으면 되는지가 잠긴 단추의 설명으로 붙는다. 담기만 하고 주문하지 않는다.
+     */
+    expect(await addProductToCart(page, 'nylon-coach-blouson'), '담을 수 있는 옵션이 없다').not.toBeNull();
+    try {
+      await page.goto('/checkout');
+      await ready(page);
+      const locked = page.getByRole('radio', { name: new RegExp(open.name) });
+      await expect(locked).toBeDisabled({ timeout: 15_000 });
+      await expect(locked).toHaveAccessibleDescription(/10,000,000원 이상부터 — [\d,]+원 더 담으면 쓸 수 있어요/);
+    } finally {
+      await page.request.put('/api/cart', { data: { lines: [] } });
+    }
 
     // ── 공개하지 않은 쿠폰은 id 를 알아도 없는 쿠폰이다
     const sneak = await page.request.post(`/api/coupons/${secret.id}/download`);

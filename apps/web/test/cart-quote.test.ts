@@ -350,6 +350,11 @@ describe('쓸 수 있는 쿠폰 제안', () => {
 
     expect(q.coupons).toHaveLength(2);
     expect(q.coupons.find((c) => c.code === 'HIGH')?.discount).toBe(0);
+    // 왜 못 쓰는지와 얼마가 모자란지를 함께 준다 — "사용 불가" 한 마디로는 알 수 없었다
+    const high = q.coupons.find((c) => c.code === 'HIGH')!;
+    expect(high.unusable).toMatchObject({ reason: 'BELOW_MINIMUM', minimum: 9_999_999 });
+    expect(high.unusable?.reason === 'BELOW_MINIMUM' && high.unusable.shortfall).toBe(9_999_999 - q.merchandiseTotal);
+    expect(q.coupons.find((c) => c.code === 'OK')?.unusable).toBeNull();
   });
 
   it('담긴 것이 없으면 제안하지 않는다 — 0 원짜리 목록은 보여 줄 값어치가 없다', async () => {
