@@ -88,6 +88,11 @@ export const updateStockSchema = z.object({
         variantId: cuidSchema,
         stock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig'),
         isActive: z.boolean().optional(),
+        /**
+         * 읽었을 때의 재고. 주면 **지금도 이 값일 때만** 쓴다 — 읽은 뒤 팔린 수량을 덮어써서 없는
+         * 물건을 만들지 않게. 안 주면 덮어쓴다(실사 결과를 그대로 넣는 경우).
+         */
+        expectedStock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig').optional(),
       }),
     )
     .min(1, 'valid.tooFewItems')
@@ -119,6 +124,7 @@ export const PRODUCT_ERROR = [
   'SLUG_TAKEN', 'BRAND_NOT_ALLOWED', 'PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'SKU_TAKEN',
   'PUBLISH_NOT_ALLOWED', 'NOT_AWAITING_REVIEW', 'REJECT_REASON_REQUIRED',
   'ALREADY_ARCHIVED', 'NOT_ARCHIVED', 'RESTORE_NOT_ALLOWED',
+  'STOCK_CHANGED',
 ] as const;
 export type ProductErrorCode = (typeof PRODUCT_ERROR)[number];
 
@@ -134,6 +140,7 @@ export const PRODUCT_ERROR_MESSAGE: Readonly<Record<ProductErrorCode, string>> =
   ALREADY_ARCHIVED: '이미 보관한 상품입니다',
   NOT_ARCHIVED: '보관함에 없는 상품입니다',
   RESTORE_NOT_ALLOWED: '운영진이 보관한 상품은 운영진만 되돌릴 수 있습니다',
+  STOCK_CHANGED: '읽은 뒤 재고가 바뀌었습니다(그사이 팔렸거나 누가 고쳤습니다). 새로 불러와 다시 고쳐 주세요',
 };
 
 /** 상품 보관·되돌리기. 무엇을 하는지만 받는다 — 누가 했는지는 세션이 말한다 */

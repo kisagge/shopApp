@@ -90,13 +90,13 @@ describe('일괄 수정', () => {
 
 describe('내려받기', () => {
   it('BOM 붙은 CSV 를 캐시 없이 준다 — 옛 재고 파일을 고쳐 올리면 팔린 만큼이 되살아난다', async () => {
-    lib.exportStock.mockResolvedValue([['COAT-M', 'MOOR', '코트', 'M', '판매중', '3']]);
+    lib.exportStock.mockResolvedValue([['COAT-M', 'MOOR', '코트', 'M', '판매중', '3', '3']]);
     const response = await GET(new Request('http://localhost/api/admin/products/stock/export'));
     expect(response.status).toBe(200);
     expect(response.headers.get('cache-control')).toBe('no-store');
     const bytes = new Uint8Array(await response.arrayBuffer());
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
-    expect(new TextDecoder().decode(bytes)).toContain('SKU,브랜드,상품,옵션,판매,재고');
+    expect(new TextDecoder().decode(bytes)).toContain('SKU,브랜드,상품,옵션,판매,내려받은 재고,재고');
   });
 
   it('로그인하지 않으면 401', async () => {

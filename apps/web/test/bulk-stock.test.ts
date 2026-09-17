@@ -29,7 +29,11 @@ const request = new Request('http://localhost/api/admin/products/stock/bulk', { 
 const variant = (sku: string, productId: string, stock: number, merchantId = 'm-a', isActive = true) => ({
   id: `v-${sku}`, sku, stock, isActive, productId, product: { brand: { merchantId } },
 });
-const entry = (sku: string, stock: number, line: number, isActive: boolean | null = null): StockEntry => ({ sku, stock, isActive, line });
+/** 내려받은 재고가 없는 줄 — 사람이 만든 실사 파일이다(덮어쓴다) */
+const entry = (sku: string, stock: number, line: number, isActive: boolean | null = null): StockEntry => ({ sku, stock, isActive, line, base: null });
+/** 내려받은 파일의 줄 — 내려받을 때의 재고가 적혀 있다 */
+const downloaded = (sku: string, base: number, stock: number, line: number, isActive: boolean | null = null): StockEntry =>
+  ({ sku, stock, isActive, line, base });
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -84,6 +88,71 @@ describe('적용', () => {
   });
 });
 
+/**
+ * **내려받은 뒤 팔린 수량을 되살리지 않는다.**
+ *
+ * 10시에 받은 파일(재고 10)을 11시에 올리면, 그사이 3개가 팔려 지금은 7이다. 예전에는 "파일의 10 과
+ * 지금의 7 이 다르다" 며 손대지도 않은 줄을 10 으로 되돌려 없는 물건 3개를 만들었다.
+ */
+describe('내려받은 파일', () => {
+  it('손대지 않은 줄은 그사이 팔렸어도 건드리지 않는다', async () => {
+    db.productVariant.findMany.mockResolvedValue([variant('COAT-M', 'p-coat', 7)]);
+
+    const result = await bulkUpdateStock(admin, [downloaded('COAT-M', 10, 10, 2)], request);
+
+    expect(updateStockAudited).not.toHaveBeenCalled();
+    expect(result).toEqual({ updated: 0, unchanged: 1, failures: [] });
+  });
+
+  it('고친 줄은 내려받은 값일 때만 쓰라고 넘긴다', async () => {
+    db.productVariant.findMany.mockResolvedValue([variant('COAT-M', 'p-coat', 10)]);
+
+    await bulkUpdateStock(admin, [downloaded('COAT-M', 10, 25, 2)], request);
+
+    expect(updateStockAudited).toHaveBeenCalledWith(admin, 'p-coat', {
+      variants: [{ variantId: 'v-COAT-M', stock: 25, expectedStock: 10 }],
+    }, request);
+  });
+
+  it('고쳤는데 그사이 재고가 움직였으면 쓰지 않고 다시 내려받으라고 말한다', async () => {
+    db.productVariant.findMany.mockResolvedValue([variant('COAT-M', 'p-coat', 7)]);
+
+    const result = await bulkUpdateStock(admin, [downloaded('COAT-M', 10, 25, 2)], request);
+
+    expect(updateStockAudited).not.toHaveBeenCalled();
+    expect(result.failures).toEqual([expect.objectContaining({
+      sku: 'COAT-M', lines: [2], code: 'STOCK_MOVED',
+      message: expect.stringContaining('내려받을 때 10개, 지금 7개'),
+    })]);
+  });
+
+  it('판매 여부만 바꿨으면 재고는 지금 값 그대로 둔다 — 파일의 옛 숫자로 되돌리지 않는다', async () => {
+    db.productVariant.findMany.mockResolvedValue([variant('COAT-M', 'p-coat', 7, 'm-a', true)]);
+
+    await bulkUpdateStock(admin, [downloaded('COAT-M', 10, 10, 2, false)], request);
+
+    expect(updateStockAudited).toHaveBeenCalledWith(admin, 'p-coat', {
+      variants: [{ variantId: 'v-COAT-M', stock: 7, expectedStock: 7, isActive: false }],
+    }, request);
+  });
+
+  it('쓰는 순간 어긋나면(그사이 또 팔렸다) 그 상품 줄을 실패로 돌려준다', async () => {
+    db.productVariant.findMany.mockResolvedValue([variant('COAT-M', 'p-coat', 10)]);
+    updateStockAudited.mockRejectedValue(new ProductError('STOCK_CHANGED', 409));
+
+    const result = await bulkUpdateStock(admin, [downloaded('COAT-M', 10, 25, 2)], request);
+
+    expect(result.failures).toEqual([expect.objectContaining({ sku: 'COAT-M', code: 'STOCK_CHANGED' })]);
+  });
+});
+
+describe('내려받기', () => {
+  it('내려받은 재고를 고치는 칸과 따로 적는다 — 올릴 때 견줄 기준이다', async () => {
+    const { STOCK_CSV_HEADER } = await import('~/lib/admin/bulk-stock');
+    expect(STOCK_CSV_HEADER).toEqual(['SKU', '브랜드', '상품', '옵션', '판매', '내려받은 재고', '재고']);
+  });
+});
+
 describe('범위', () => {
   it('가맹점은 자기 브랜드 옵션만 찾는다', async () => {
     db.productVariant.findMany.mockResolvedValue([]);
@@ -110,12 +179,13 @@ describe('범위', () => {
 });
 
 describe('내려받기', () => {
-  it('SKU·브랜드·상품·옵션·판매·재고를 한 줄씩 준다', async () => {
+  it('SKU·브랜드·상품·옵션·판매·내려받은 재고·재고를 한 줄씩 준다', async () => {
     db.productVariant.count.mockResolvedValue(1);
     db.productVariant.findMany.mockResolvedValue([
       { sku: 'COAT-M', label: '오트 / M', stock: 3, isActive: false, product: { name: '울 코트', brand: { name: 'MOOR' } } },
     ]);
-    expect(await exportStock(merchant)).toEqual([['COAT-M', 'MOOR', '울 코트', '오트 / M', '판매중지', '3']]);
+    // 내려받을 때는 두 칸이 같다 — 고치는 것은 뒤 칸이다
+    expect(await exportStock(merchant)).toEqual([['COAT-M', 'MOOR', '울 코트', '오트 / M', '판매중지', '3', '3']]);
     expect(db.productVariant.findMany.mock.calls[0]![0].where.product).toEqual({ deletedAt: null, brand: { merchantId: 'm-a' } });
   });
 

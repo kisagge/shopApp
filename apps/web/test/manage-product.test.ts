@@ -10,7 +10,7 @@ const db = vi.hoisted(() => ({
   },
   category: { findUnique: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   product: { findUnique: vi.fn<(...a: any[]) => any>(), findFirst: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>() },
-  productVariant: { findMany: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
+  productVariant: { findMany: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>(), update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>(), create: vi.fn<(...a: any[]) => any>() },
   productSlug: {
     findUnique: vi.fn<(...a: any[]) => any>(),
     upsert: vi.fn<(...a: any[]) => any>(),
@@ -80,6 +80,7 @@ beforeEach(() => {
   db.productSlug.findUnique.mockResolvedValue(null);
   db.productSlug.upsert.mockResolvedValue({});
   db.productSlug.deleteMany.mockResolvedValue({ count: 0 });
+  db.productVariant.updateMany.mockResolvedValue({ count: 1 });
   /*
    * 인자로 함수가 오면 트랜잭션 안에서 실제로 돌린다. 배열이면 예전처럼
    * 목록으로 받는다 — 두 형태를 다 쓰고 있고, 흉내가 한쪽만 알면 검사가
@@ -210,6 +211,25 @@ describe('재고 조정', () => {
       { sku: 'A-2', stock: 0 },
     ]);
     expect(db.$transaction).toHaveBeenCalledOnce();
+    // 읽은 값을 주지 않았으면 덮어쓴다 — 실사 결과를 그대로 넣는 경우다
+    expect(db.productVariant.updateMany).toHaveBeenCalledWith({ where: { id: 'v-1' }, data: { stock: 12 } });
+  });
+
+  it('읽은 값을 주면 지금도 그 값일 때만 쓴다', async () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 3 }]);
+
+    await updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 12, expectedStock: 3 }] });
+
+    expect(db.productVariant.updateMany).toHaveBeenCalledWith({ where: { id: 'v-1', stock: 3 }, data: { stock: 12 } });
+  });
+
+  it('그사이 재고가 바뀌었으면 쓰지 않고 알린다 — 읽은 뒤 팔린 수량을 지우지 않는다', async () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 3 }]);
+    db.productVariant.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(
+      updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 12, expectedStock: 5 }] }),
+    ).rejects.toMatchObject({ code: 'STOCK_CHANGED', status: 409 });
   });
 
   it('남의 상품 옵션 id 를 끼워 넣으면 통째로 거절한다', async () => {

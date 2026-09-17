@@ -24,6 +24,17 @@ export interface StockRow {
 export function StockForm({ productId, variants }: { productId: string; variants: readonly StockRow[] }) {
   const router = useRouter();
   const [rows, setRows] = useState(() => variants.map((v) => ({ ...v })));
+  /*
+   * **다시 읽어 온 재고로 입력칸을 맞춘다.** 입력칸은 처음 받은 값을 들고 있어서, 저장 뒤나 "그사이
+   * 바뀌었다" 로 다시 읽어 와도 옛 숫자가 남았다 — 그 숫자로 또 저장하면 방금 막은 덮어쓰기가 된다.
+   * 표를 통째로 새로 그리면 저장 결과 문구까지 사라지므로, 받은 값이 바뀐 때만 칸을 맞춘다.
+   */
+  const signature = variants.map((v) => `${v.id}:${v.stock}:${v.isActive}`).join('|');
+  const [seen, setSeen] = useState(signature);
+  if (seen !== signature) {
+    setSeen(signature);
+    setRows(variants.map((v) => ({ ...v })));
+  }
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -40,13 +51,25 @@ export function StockForm({ productId, variants }: { productId: string; variants
       const response = await fetch(`/api/admin/products/${productId}/stock`, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
+        /*
+         * **고친 줄만, 읽었던 재고와 함께 보낸다.** 예전에는 모든 줄을 보내서, 한 줄을 고쳐 저장하면
+         * 나머지 줄도 화면을 연 뒤 팔린 수량을 무시하고 옛 숫자로 덮였다. 읽은 값을 주면 서버는 지금도
+         * 그 값일 때만 쓴다 — 그사이 팔렸으면 저장하지 않고 알린다.
+         */
         body: JSON.stringify({
-          variants: rows.map((r) => ({ variantId: r.id, stock: r.stock, isActive: r.isActive })),
+          variants: rows
+            .map((r, i) => ({ r, o: variants[i] }))
+            .filter(({ r, o }) => o !== undefined && (o.stock !== r.stock || o.isActive !== r.isActive))
+            .map(({ r, o }) => ({
+              variantId: r.id, stock: r.stock, isActive: r.isActive, expectedStock: o!.stock,
+            })),
         }),
       });
       const data = (await response.json()) as { message?: string; updated?: number };
       if (!response.ok) {
         setMessage({ tone: 'error', text: data.message ?? '재고를 저장하지 못했습니다.' });
+        // 그사이 바뀐 재고를 다시 읽어 온다 — 고친 값은 표가 새 숫자로 다시 그려지며 사라진다
+        if (response.status === 409) router.refresh();
         return;
       }
       setMessage({ tone: 'ok', text: `${data.updated ?? rows.length}개 옵션의 재고를 반영했습니다.` });

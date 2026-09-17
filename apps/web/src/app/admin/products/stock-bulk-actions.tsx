@@ -25,8 +25,9 @@ const n = (value: number) => value.toLocaleString('ko-KR');
  * 재고 내려받기 · 일괄 수정.
  *
  * **내려받은 파일이 곧 올리는 양식이다.** 창고 실사를 엑셀에 맞춰 적는 것이 보통이라, 재고 칸의
- * 숫자만 고쳐 그대로 올리면 된다. 받은 뒤 오래 들고 있으면 그 사이 팔린 만큼이 되살아나므로,
- * 실사 직전에 받으라고 적어 둔다.
+ * 숫자만 고쳐 그대로 올리면 된다. 파일에는 내려받을 때의 재고가 따로 적혀 있어서, 손대지 않은 줄은
+ * 그사이 팔렸어도 건드리지 않고, 고친 줄은 그사이 움직였으면 쓰지 않고 돌려준다.
+ * (예전 안내는 "실사 직전에 받아 주세요" 뿐이었고, 오래된 파일은 팔린 수량을 되살렸다.)
  */
 export function StockBulkActions({ canWrite }: { canWrite: boolean }) {
   const router = useRouter();
@@ -95,8 +96,8 @@ export function StockBulkActions({ canWrite }: { canWrite: boolean }) {
       <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:gap-10">
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <p className="text-[12px] text-[var(--fg-muted)]">
-            옵션마다 SKU·판매 여부·지금 재고가 한 줄씩 들어 있습니다. 실사 직전에 받아 주세요 — 받은 뒤 팔린
-            수량은 파일에 없어서, 오래된 파일을 올리면 그만큼이 되살아납니다.
+            옵션마다 SKU·판매 여부·재고가 한 줄씩 들어 있습니다. 고치지 않은 줄은 받은 뒤 팔렸어도 그대로 두고,
+            고친 줄의 재고가 받은 뒤 움직였으면 반영하지 않고 알려 드립니다.
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -115,7 +116,8 @@ export function StockBulkActions({ canWrite }: { canWrite: boolean }) {
         {canWrite && (
           <form ref={formRef} onSubmit={(e) => void upload(e)} className="flex min-w-0 flex-1 flex-col gap-2">
             <p id={ids.hint} className="text-[12px] text-[var(--fg-muted)]">
-              내려받은 파일의 재고(와 판매) 칸을 고쳐 올리세요. 재고 칸이 빈 줄과 값이 그대로인 줄은 건너뜁니다.
+              내려받은 파일의 재고(와 판매) 칸을 고쳐 올리세요. ‘내려받은 재고’ 칸은 고치지 마세요 — 받은 뒤
+              바뀌었는지 견주는 기준입니다. 그 칸이 없는 파일(직접 만든 실사표)은 적힌 숫자로 덮어씁니다.
             </p>
             <div className="flex flex-wrap items-end gap-3">
               <div className="flex flex-col gap-1.5">

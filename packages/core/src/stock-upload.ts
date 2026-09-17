@@ -14,6 +14,14 @@ export interface StockEntry {
   readonly sku: string;
   /** 새 재고. 실사 결과를 **덮어쓴다** — 증감이 아니다 */
   readonly stock: number;
+  /**
+   * 내려받을 때의 재고. 내려받은 파일에만 있다 — 없으면 null(사람이 직접 만든 실사 파일).
+   *
+   * **이것이 있어야 그사이 팔린 수량을 되살리지 않는다.** 10시에 받은 파일(재고 10)을 11시에 올리면
+   * 그사이 3개가 팔려 지금은 7인데, 이 칸이 없을 때는 "파일의 10 과 지금의 7 이 다르다" 며 10 으로
+   * 되돌렸다. 고치지도 않은 줄이 없는 물건 3개를 만들었다. 판단은 stockUploadDecision 이 한다.
+   */
+  readonly base: number | null;
   /** 판매 여부를 적었으면 그 값, 비웠으면 건드리지 않는다 */
   readonly isActive: boolean | null;
   /** 파일에서 이 SKU 가 처음 나온 줄(머리칸 다음이 2) */
@@ -42,6 +50,7 @@ export const STOCK_MAX = 999_999;
 const HEADER = {
   sku: ['SKU', 'sku'],
   stock: ['재고', 'stock'],
+  base: ['내려받은 재고', 'base', 'baseStock'],
   isActive: ['판매', '판매 여부', 'isActive', 'active'],
 } as const;
 
@@ -85,6 +94,7 @@ export function readStockUpload(rows: readonly (readonly string[])[]): StockUplo
   const col = {
     sku: header ? findColumn(header, HEADER.sku) : -1,
     stock: header ? findColumn(header, HEADER.stock) : -1,
+    base: header ? findColumn(header, HEADER.base) : -1,
     isActive: header ? findColumn(header, HEADER.isActive) : -1,
   };
 
@@ -95,7 +105,7 @@ export function readStockUpload(rows: readonly (readonly string[])[]): StockUplo
 
   const problems: StockUploadProblem[] = [];
   /** SKU 별로 모은 값. 같은 SKU 가 두 번 나오면 값이 같을 때만 받는다 */
-  const bySku = new Map<string, { stock: number; isActive: boolean | null; lines: number[] }[]>();
+  const bySku = new Map<string, { stock: number; isActive: boolean | null; base: number | null; lines: number[] }[]>();
   const firstLine = new Map<string, number>();
   let skipped = 0;
 
@@ -122,11 +132,14 @@ export function readStockUpload(rows: readonly (readonly string[])[]): StockUplo
       return;
     }
 
+    // 내려받은 재고는 우리가 적은 값이다. 읽을 수 없으면 없는 것으로 본다 — 그 줄은 덮어쓰기가 된다
+    const base = col.base >= 0 ? parseStock(cells[col.base] ?? '') : null;
+
     if (!firstLine.has(sku)) firstLine.set(sku, line);
     const seen = bySku.get(sku) ?? [];
-    const same = seen.find((s) => s.stock === stock && s.isActive === isActive);
+    const same = seen.find((s) => s.stock === stock && s.isActive === isActive && s.base === base);
     if (same) same.lines.push(line);
-    else seen.push({ stock, isActive, lines: [line] });
+    else seen.push({ stock, isActive, base, lines: [line] });
     bySku.set(sku, seen);
   });
 
@@ -141,8 +154,51 @@ export function readStockUpload(rows: readonly (readonly string[])[]): StockUplo
       continue;
     }
     const only = values[0]!;
-    entries.push({ sku, stock: only.stock, isActive: only.isActive, line: firstLine.get(sku) ?? 0 });
+    entries.push({ sku, stock: only.stock, isActive: only.isActive, base: only.base, line: firstLine.get(sku) ?? 0 });
   }
 
   return { entries, problems, skipped };
+}
+
+/**
+ * 올린 한 줄을 어떻게 할까.
+ *
+ * · `UNCHANGED` — 손대지 않은 줄이다. **지금 재고가 달라졌어도** 그대로 둔다(그사이 팔렸을 뿐이다).
+ * · `APPLY` — 고친 줄이다. 쓸 때 "지금도 내려받은 값인가" 를 조건으로 건다(expected).
+ * · `MOVED` — 고쳤는데 그사이 재고가 움직였다. 파일의 숫자는 옛 재고를 보고 적은 것이라 그대로 쓰면
+ *   그사이 팔린 것이 사라지거나 들어온 것이 지워진다. 다시 내려받아 고치게 한다.
+ *
+ * 내려받은 값이 없는 파일(사람이 만든 실사 파일)은 예전처럼 **덮어쓴다** — 실사 결과가 곧 재고라는
+ * 뜻으로 올린 것이고, 비교할 기준이 없다. 값이 지금과 같으면 건드리지 않는다.
+ */
+export type StockUploadDecision =
+  | { readonly kind: 'UNCHANGED' }
+  /** stock 은 쓸 재고, expected 는 "지금도 이 값일 때만" 의 조건(없으면 덮어쓴다) */
+  | { readonly kind: 'APPLY'; readonly stock: number; readonly expected: number | null }
+  | { readonly kind: 'MOVED'; readonly base: number; readonly current: number };
+
+export function stockUploadDecision(input: {
+  readonly entry: Pick<StockEntry, 'stock' | 'base' | 'isActive'>;
+  readonly current: { readonly stock: number; readonly isActive: boolean };
+}): StockUploadDecision {
+  const { entry, current } = input;
+  const activeChanged = entry.isActive !== null && entry.isActive !== current.isActive;
+
+  if (entry.base === null) {
+    return entry.stock === current.stock && !activeChanged
+      ? { kind: 'UNCHANGED' }
+      : { kind: 'APPLY', stock: entry.stock, expected: null };
+  }
+
+  const stockEdited = entry.stock !== entry.base;
+  if (!stockEdited) {
+    // 재고는 손대지 않았다. 판매 여부만 바꿨으면 그것만 쓴다 — 재고는 지금 값을 그대로 둔다
+    return activeChanged
+      ? { kind: 'APPLY', stock: current.stock, expected: current.stock }
+      : { kind: 'UNCHANGED' };
+  }
+  if (current.stock !== entry.base) {
+    return { kind: 'MOVED', base: entry.base, current: current.stock };
+  }
+  return { kind: 'APPLY', stock: entry.stock, expected: entry.base };
 }

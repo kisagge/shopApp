@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, canManageProduct, merchantScope, activeLabel,
+  assertPermission, canManageProduct, merchantScope, activeLabel, stockUploadDecision,
   type Actor, type StockEntry,
 } from '@shop/core';
 import { ProductError, updateStockAudited } from '~/lib/admin/manage-product';
@@ -23,7 +23,11 @@ export class StockExportTooLargeError extends Error {
   }
 }
 
-export const STOCK_CSV_HEADER = ['SKU', '브랜드', '상품', '옵션', '판매', '재고'] as const;
+/**
+ * **"내려받은 재고" 는 고치는 칸이 아니다.** 내려받을 때의 숫자를 남겨 두는 칸이다 — 올릴 때 이것과
+ * 지금 재고를 견줘, 그사이 팔린 수량을 되살리지 않는다(core 의 stockUploadDecision). 고치는 칸은 "재고" 다.
+ */
+export const STOCK_CSV_HEADER = ['SKU', '브랜드', '상품', '옵션', '판매', '내려받은 재고', '재고'] as const;
 
 /** 가맹점에게는 자기 브랜드만. 지운 상품은 뺀다 — 고칠 수 없는 줄을 내주면 올릴 때 실패로 돌아온다 */
 function scopedVariants(actor: Actor) {
@@ -49,7 +53,7 @@ export async function exportStock(actor: Actor): Promise<string[][]> {
   });
 
   return rows.map((v) => [
-    v.sku, v.product.brand.name, v.product.name, v.label, activeLabel(v.isActive), String(v.stock),
+    v.sku, v.product.brand.name, v.product.name, v.label, activeLabel(v.isActive), String(v.stock), String(v.stock),
   ]);
 }
 
@@ -86,7 +90,7 @@ export async function bulkUpdateStock(
 
   const failures: BulkStockFailure[] = [];
   let unchanged = 0;
-  const byProduct = new Map<string, { entry: StockEntry; variantId: string }[]>();
+  const byProduct = new Map<string, { entry: StockEntry; variantId: string; stock: number; expected: number | null }[]>();
 
   for (const entry of entries) {
     const variant = bySku.get(entry.sku);
@@ -100,18 +104,26 @@ export async function bulkUpdateStock(
     }
 
     /*
-     * **값이 같으면 건드리지 않는다.** 내려받은 파일에서 몇 줄만 고쳐 통째로 올리는 것이 보통이다.
-     * 전부 적용하면 수백 줄의 감사 로그가 "재고 조정" 으로 쌓이고 "300개 수정" 이라고 말한다 —
-     * 이번에 무엇을 바꿨는지 알 수 없다. 송장 일괄 등록에서 같은 것을 겪었다.
+     * **고치지 않은 줄은 건드리지 않는다.** 내려받은 파일에서 몇 줄만 고쳐 통째로 올리는 것이 보통이다.
+     * 전부 적용하면 수백 줄의 감사 로그가 "재고 조정" 으로 쌓이고, 무엇보다 **그사이 팔린 수량이
+     * 되살아났다** — 예전에는 "파일 값이 지금과 다른가" 로 고친 줄을 가렸는데, 그사이 팔리면 손대지
+     * 않은 줄도 다르게 보여 옛 재고로 덮였다. 이제 내려받은 값과 견준다.
      */
-    const sameActive = entry.isActive === null || entry.isActive === variant.isActive;
-    if (variant.stock === entry.stock && sameActive) {
+    const decision = stockUploadDecision({ entry, current: variant });
+    if (decision.kind === 'UNCHANGED') {
       unchanged += 1;
+      continue;
+    }
+    if (decision.kind === 'MOVED') {
+      failures.push({
+        sku: entry.sku, lines: [entry.line], code: 'STOCK_MOVED',
+        message: `내려받은 뒤 재고가 바뀌었습니다(내려받을 때 ${decision.base.toLocaleString('ko-KR')}개, 지금 ${decision.current.toLocaleString('ko-KR')}개). 다시 내려받아 고쳐 주세요.`,
+      });
       continue;
     }
 
     const list = byProduct.get(variant.productId) ?? [];
-    list.push({ entry, variantId: variant.id });
+    list.push({ entry, variantId: variant.id, stock: decision.stock, expected: decision.expected });
     byProduct.set(variant.productId, list);
   }
 
@@ -123,9 +135,10 @@ export async function bulkUpdateStock(
         actor,
         productId,
         {
-          variants: list.map(({ entry, variantId }) => ({
+          variants: list.map(({ entry, variantId, stock, expected }) => ({
             variantId,
-            stock: entry.stock,
+            stock,
+            ...(expected === null ? {} : { expectedStock: expected }),
             ...(entry.isActive === null ? {} : { isActive: entry.isActive }),
           })),
         },

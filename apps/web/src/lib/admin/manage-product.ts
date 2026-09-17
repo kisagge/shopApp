@@ -268,8 +268,8 @@ export async function updateProduct(
  * 재고 조정.
  *
  * 주문의 재고 차감과 달리 여기서는 **덮어쓴다** — 실사 결과를 반영하는
- * 동작이라 증감이 아니라 절대값이 맞다. 다만 그 사이 팔린 수량은 반영되지
- * 않으므로, 어드민 화면은 저장 직후 값을 다시 읽어 보여 준다.
+ * 동작이라 증감이 아니라 절대값이 맞다. 읽은 뒤 팔린 수량을 지우지 않도록,
+ * 읽은 값(expectedStock)을 주면 그 값일 때만 쓴다.
  */
 export async function updateStock(actor: Actor, productId: string, input: UpdateStockInput) {
   const before = await loadProductForAudit(actor, productId);
@@ -285,14 +285,20 @@ export async function updateStock(actor: Actor, productId: string, input: Update
   // 남의 상품 변형 id 를 끼워 넣어 재고를 조작할 수 없게 한다
   if (owned.length !== ids.length) throw new ProductError('PRODUCT_NOT_FOUND', 404);
 
-  await prisma.$transaction(
-    input.variants.map((v) =>
-      prisma.productVariant.update({
-        where: { id: v.variantId },
+  /*
+   * **읽은 값을 주면 그 값일 때만 쓴다.** 덮어쓰기라 읽은 뒤 팔린 수량이 사라질 수 있다 — 재고 표를
+   * 열어 두고 한참 뒤 저장하거나, 내려받은 파일을 나중에 올리면 그렇다. 한 줄이라도 어긋나면 이
+   * 상품의 변경을 통째로 되돌린다 — 반만 들어가면 무엇이 적용됐는지 알 수 없다.
+   */
+  await prisma.$transaction(async (tx) => {
+    for (const v of input.variants) {
+      const { count } = await tx.productVariant.updateMany({
+        where: { id: v.variantId, ...(v.expectedStock === undefined ? {} : { stock: v.expectedStock }) },
         data: { stock: v.stock, ...(v.isActive === undefined ? {} : { isActive: v.isActive }) },
-      }),
-    ),
-  );
+      });
+      if (count === 0) throw new ProductError('STOCK_CHANGED', 409);
+    }
+  });
 
   /**
    * 재입고 알림.
