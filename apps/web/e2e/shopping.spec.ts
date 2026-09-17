@@ -172,11 +172,37 @@ test('"더 보기" 가 다음 쪽을 가져오고, 조건을 그대로 들고 �
   }
 });
 
-test('결과가 없으면 무엇을 풀어야 하는지 알려 준다', async ({ page }) => {
+test('결과가 없으면 무엇을 풀어야 하는지 알려 주고, 갈 곳을 준다', async ({ page }) => {
   await page.goto('/search?q=존재하지않는상품명입니다');
+  await ready(page);
 
   // 검색어만 되뇌지 않고 다음 행동을 알려 준다
-  await expect(page.locator('#main')).toContainText(/조건|다시|검색어/);
+  const empty = page.getByRole('region', { name: '검색 결과가 없습니다' });
+  await expect(empty).toContainText('다른 검색어');
+  // 고른 조건이 없으니 지울 것도 없다
+  await expect(empty.getByRole('link', { name: '조건 지우고 다시 보기' })).toHaveCount(0);
+
+  // 막다른 길이 아니다 — 카테고리로 곧장 간다
+  const browse = empty.getByRole('navigation', { name: '카테고리 둘러보기' });
+  await browse.getByRole('link').first().click();
+  await page.waitForURL(/\/category\//);
+});
+
+/**
+ * **고른 조건 때문에 비었으면 검색어를 탓하지 않는다.** 예전에는 브랜드·색상으로 비어도 "다른 검색어를 써 보라" 고 했다.
+ * 조건만 지우면 검색어는 그대로 남아 결과가 돌아온다.
+ */
+test('고른 조건으로 비었으면 그 조건을 풀라고 하고, 지우면 검색어는 남는다', async ({ page }) => {
+  await page.goto('/search?q=코트&size=없는사이즈');
+  await ready(page);
+
+  const empty = page.getByRole('region', { name: '검색 결과가 없습니다' });
+  await expect(empty).toContainText('색상·사이즈·브랜드');
+  await empty.getByRole('link', { name: '조건 지우고 다시 보기' }).click();
+
+  await page.waitForURL((url) => url.searchParams.get('q') === '코트' && !url.searchParams.has('size'));
+  await ready(page);
+  await expect(page.getByRole('region', { name: '검색 결과가 없습니다' })).toHaveCount(0);
 });
 
 test('비로그인은 어드민에 들어갈 수 없다', async ({ page }) => {

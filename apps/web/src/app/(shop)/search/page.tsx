@@ -12,6 +12,8 @@ import { CatalogPager } from '~/components/catalog-pager';
 import { NO_INDEX } from '~/lib/no-index';
 import { getT } from '~/lib/i18n/server';
 import { EMPTY_RESULT_KEY } from '~/lib/i18n/empty-result';
+import { EmptyResults } from '~/components/empty-results';
+import { getTopCategories } from '~/lib/queries/catalog/products';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +59,17 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
 
   // 검색어 안에 실제로 있는 값만 고르게 한다
   const facets = term ? await getFacets({ q: term }) : undefined;
+
+  const hasPrice = price.min !== null || price.max !== null;
+  const hasFilters = parsed.color.length + parsed.size.length + parsed.brand.length > 0;
+  /*
+   * 결과가 없을 때만 갈 곳을 더 읽는다 — 인기 검색어와 카테고리. 결과가 있으면 보여 줄 자리가 없다.
+   * 카테고리는 머리 메뉴와 같은 캐시를 쓴다.
+   */
+  const empty = page !== null && page.items.length === 0;
+  const [emptyPopular, categories] = empty
+    ? await Promise.all([getPopularSearches(), getTopCategories()])
+    : [[], []];
   const brands = term ? await getBrandOptions({ q: term }) : [];
 
   return (
@@ -117,21 +130,21 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             selectedBrands={parsed.brand}
           />
 
-          {page && page.items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-24">
-              <p className="text-[15px] font-medium">{t('empty.searchTitle')}</p>
-              <p className="text-[13px] text-[var(--fg-muted)]">
-                {t(
-                  EMPTY_RESULT_KEY[
-                    emptyResultReason({
-                      hasQuery: true,
-                      hasPriceRange: price.min !== null || price.max !== null,
-                      hasCategory: false,
-                    })
-                  ],
-                )}
-              </p>
-            </div>
+          {empty ? (
+            <EmptyResults
+              t={t}
+              title={t('empty.searchTitle')}
+              reason={t(
+                EMPTY_RESULT_KEY[
+                  emptyResultReason({ hasQuery: true, hasPriceRange: hasPrice, hasCategory: false, hasFilters })
+                ],
+              )}
+              // 조건만 지운다 — 검색어는 그대로 들고 간다
+              clearHref={hasPrice || hasFilters ? { pathname: '/search', query: { q: term } } : null}
+              // 방금 찾은 말은 빼고 권한다
+              popular={emptyPopular.filter((w) => w !== term)}
+              categories={categories}
+            />
           ) : (
             page && (
               <>

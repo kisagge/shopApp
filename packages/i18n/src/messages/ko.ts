@@ -114,6 +114,10 @@ export const ko = {
   'empty.widen_price': '가격 범위를 넓혀 보세요.',
   'empty.widen_category': '카테고리를 넓혀 보세요.',
   'empty.widen_both': '가격 범위와 카테고리를 넓혀 보세요.',
+  'empty.widen_filters': '고른 색상·사이즈·브랜드를 줄여 보세요.',
+  'empty.widen_price_filters': '가격 범위와 고른 색상·사이즈·브랜드를 넓혀 보세요.',
+  'empty.clearFilters': '조건 지우고 다시 보기',
+  'empty.browseCategories': '카테고리 둘러보기',
   'empty.other_term': '다른 검색어를 써 보시거나 철자를 확인해 주세요.',
   'empty.no_products': '아직 등록된 상품이 없습니다.',
 

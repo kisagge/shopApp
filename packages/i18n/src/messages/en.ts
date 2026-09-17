@@ -109,6 +109,10 @@ export const en: Dictionary = {
   'empty.widen_price': 'Try widening the price range.',
   'empty.widen_category': 'Try looking in a broader category.',
   'empty.widen_both': 'Try widening the price range or the category.',
+  'empty.widen_filters': 'Try removing some of the colors, sizes, or brands you picked.',
+  'empty.widen_price_filters': 'Try widening the price range and removing some of the colors, sizes, or brands you picked.',
+  'empty.clearFilters': 'Clear filters and try again',
+  'empty.browseCategories': 'Browse categories',
   'empty.other_term': 'Try a different word, or check the spelling.',
   'empty.no_products': 'No products have been listed yet.',
 

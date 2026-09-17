@@ -11,6 +11,8 @@ export const EMPTY_RESULT_KEY: Record<EmptyResultReason, MessageKey> = {
   widen_price: 'empty.widen_price',
   widen_category: 'empty.widen_category',
   widen_both: 'empty.widen_both',
+  widen_filters: 'empty.widen_filters',
+  widen_price_filters: 'empty.widen_price_filters',
   other_term: 'empty.other_term',
   no_products: 'empty.no_products',
 };

@@ -16,6 +16,8 @@ import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
 import { getT } from '~/lib/i18n/server';
 import { EMPTY_RESULT_KEY } from '~/lib/i18n/empty-result';
+import { EmptyResults } from '~/components/empty-results';
+import { getTopCategories } from '~/lib/queries/catalog/products';
 
 export const dynamic = 'force-dynamic';
 
@@ -197,20 +199,27 @@ export default async function CategoryPage({ params, searchParams }: Params) {
       <section aria-labelledby="product-list-title" className="pt-8">
         <h2 id="product-list-title" className="sr-only">{t('catalog.productList')}</h2>
         {products.length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-24">
-            <p className="text-[15px] font-medium">{t('empty.title')}</p>
-            <p className="text-[13px] text-[var(--fg-muted)]">
-              {t(
-                EMPTY_RESULT_KEY[
-                  emptyResultReason({
-                    hasQuery: false,
-                    hasPriceRange: price.min !== null || price.max !== null,
-                    hasCategory: true,
-                  })
-                ],
-              )}
-            </p>
-          </div>
+          <EmptyResults
+            t={t}
+            level={3}
+            title={t('empty.title')}
+            reason={t(
+              EMPTY_RESULT_KEY[
+                emptyResultReason({
+                  hasQuery: false,
+                  hasPriceRange: price.min !== null || price.max !== null,
+                  hasCategory: true,
+                  hasFilters: query.color.length + query.size.length + query.brand.length > 0,
+                })
+              ],
+            )}
+            // 고른 조건만 지운 이 화면의 주소
+            clearHref={price.min !== null || price.max !== null || query.color.length + query.size.length + query.brand.length > 0
+              ? { pathname: `/category/${slug}` }
+              : null}
+            // 이 화면이 아닌 다른 카테고리로 간다
+            categories={(await getTopCategories()).filter((c) => c.slug !== slug)}
+          />
         ) : (
           <TrackedProductList listId={`category_${category.slug}`} itemCount={products.length}>
             <ProductGrid products={products} compare

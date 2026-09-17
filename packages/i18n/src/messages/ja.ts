@@ -105,6 +105,10 @@ export const ja: Dictionary = {
   'empty.widen_price': '価格帯を広げてみてください。',
   'empty.widen_category': 'カテゴリーを広げてみてください。',
   'empty.widen_both': '価格帯とカテゴリーを広げてみてください。',
+  'empty.widen_filters': '選んだ色・サイズ・ブランドを減らしてみてください。',
+  'empty.widen_price_filters': '価格帯を広げ、選んだ色・サイズ・ブランドを減らしてみてください。',
+  'empty.clearFilters': '条件をクリアして見直す',
+  'empty.browseCategories': 'カテゴリを見る',
   'empty.other_term': '別のキーワードをお試しいただくか、綴りをご確認ください。',
   'empty.no_products': 'まだ登録された商品がありません。',
 

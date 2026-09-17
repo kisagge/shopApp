@@ -135,6 +135,26 @@ describe('빈 결과 안내', () => {
       'no_products',
     );
   });
+
+  /*
+   * 브랜드 칩 하나로 결과가 비었는데 "다른 검색어를 써 보라" 고 했다 — 사람은 멀쩡한 검색어를 바꿨다.
+   */
+  it('색상·사이즈·브랜드를 골랐으면 그것부터 풀라고 한다', () => {
+    expect(emptyResultReason({ hasQuery: true, hasPriceRange: false, hasCategory: false, hasFilters: true }))
+      .toBe('widen_filters');
+    expect(emptyResultReason({ hasQuery: false, hasPriceRange: false, hasCategory: true, hasFilters: true }))
+      .toBe('widen_filters');
+  });
+
+  it('고른 조건과 가격 범위가 함께 있으면 둘 다 넓히라고 한다', () => {
+    expect(emptyResultReason({ hasQuery: true, hasPriceRange: true, hasCategory: false, hasFilters: true }))
+      .toBe('widen_price_filters');
+  });
+
+  it('고른 조건이 없으면 예전과 같다', () => {
+    expect(emptyResultReason({ hasQuery: true, hasPriceRange: false, hasCategory: false, hasFilters: false }))
+      .toBe('other_term');
+  });
 });
 
 

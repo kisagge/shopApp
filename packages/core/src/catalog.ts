@@ -157,6 +157,8 @@ export const EMPTY_RESULT_REASON = [
   'widen_price',
   'widen_category',
   'widen_both',
+  'widen_filters',
+  'widen_price_filters',
   'other_term',
   'no_products',
 ] as const;
@@ -167,7 +169,15 @@ export function emptyResultReason(applied: {
   hasQuery: boolean;
   hasPriceRange: boolean;
   hasCategory: boolean;
+  /**
+   * 색상·사이즈·브랜드를 골랐는가.
+   *
+   * **이것을 모르고 "다른 검색어를 써 보라" 고 했다.** 브랜드 칩 하나로 결과가 비었는데 검색어를 탓하니, 사람은 멀쩡한
+   * 검색어를 바꿨다. 고른 조건이 있으면 그것을 먼저 풀어 보라고 한다 — 검색어·카테고리보다 좁히는 힘이 세다.
+   */
+  hasFilters?: boolean;
 }): EmptyResultReason {
+  if (applied.hasFilters) return applied.hasPriceRange ? 'widen_price_filters' : 'widen_filters';
   if (applied.hasPriceRange && applied.hasCategory) return 'widen_both';
   if (applied.hasPriceRange) return 'widen_price';
   if (applied.hasCategory) return 'widen_category';
