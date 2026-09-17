@@ -3,6 +3,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { returnRequestSchema } from '@shop/contract';
 import { requestReturn, ReturnError } from '~/lib/orders/return-request';
 import { unauthorized } from '~/lib/api/respond';
+import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 
 /** 고객의 반품·교환 신청 */
@@ -24,7 +25,10 @@ export async function POST(
   const { orderNo } = await params;
 
   try {
-    return NextResponse.json(await requestReturn(orderNo, parsed.data, user));
+    const result = await requestReturn(orderNo, parsed.data, user);
+    // 교환 신청은 바꿀 옵션의 재고를 잡는다 — 안 털면 마지막 한 장이 캐시 수명만큼 남아 있는 것으로 보인다
+    revalidateCatalog();
+    return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ReturnError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });

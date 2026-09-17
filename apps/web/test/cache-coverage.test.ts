@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 /**
  * 캐시와 무효화가 짝을 이루는지 지킨다.
@@ -69,6 +69,17 @@ const CATALOG_WRITERS = [
   'app/api/orders/[orderNo]/cancel-items/route.ts',
   'app/api/admin/orders/[orderNo]/status/route.ts',
   'app/api/admin/orders/[orderNo]/return/route.ts',
+  /*
+   * **교환 신청도 재고를 잡는다.** 바꿀 옵션을 그 자리에서 빼 두므로(requestReturn), 안 털면 마지막
+   * 한 장이 캐시 수명만큼 남아 있는 것으로 보인다. 반려는 그 재고를 도로 푼다 — 그쪽은 같은 파일의
+   * 다른 갈래라 아래 '갈래마다' 검사가 지킨다.
+   */
+  'app/api/orders/[orderNo]/return/route.ts',
+  /*
+   * **가맹점 정지·승인도 매대를 바꾼다.** 매대는 승인된 가맹점 상품만 보여 준다(shelf). 안 털면
+   * 정지한 가맹점의 상품이 캐시 수명만큼 계속 팔리고, 승인한 가맹점의 상품은 그만큼 안 보인다.
+   */
+  'app/api/admin/merchants/[id]/status/route.ts',
 ] as const;
 
 const BANNER_WRITERS = [
@@ -190,6 +201,99 @@ describe('무효화한 자리', () => {
 
   it.each(POLICY_WRITERS)('%s 가 약관·방침을 턴다', (rel) => {
     expect(read(rel)).toContain('revalidatePolicies()');
+  });
+
+  /*
+   * **한 파일에 갈래가 여럿이면 파일에 한 번 있는 것으로는 모자란다.** 반품 창구는 회수·교환발송에서
+   * 털면서 승인·반려 갈래에서는 털지 않았다 — 목록 검사는 파일에 글자가 있는지만 보아 통과했다.
+   */
+  it('반품 창구는 재고가 오가는 갈래마다 카탈로그를 턴다', () => {
+    const source = read('app/api/admin/orders/[orderNo]/return/route.ts');
+    const branch = (action: string) => {
+      const at = source.indexOf(`parsed.data.action === '${action}'`);
+      expect(at, `${action} 갈래가 없다 — 검사가 헛돌고 있다`).toBeGreaterThan(-1);
+      return source.slice(at, source.indexOf('return NextResponse.json', at));
+    };
+
+    // 물건이 돌아오고(COMPLETE), 새 물건이 나간다(SHIP_EXCHANGE)
+    expect(branch('COMPLETE')).toContain('revalidateCatalog()');
+    expect(branch('SHIP_EXCHANGE')).toContain('revalidateCatalog()');
+    // 도착 확인은 표시만 남긴다 — 재고는 환불할 때 움직인다
+    expect(branch('RECEIVE')).not.toContain('revalidateCatalog()');
+
+    /*
+     * 승인·반려는 if 가 없는 마지막 갈래다. **교환 반려가 잡아 둔 재고를 푼다** — 여기만 털지 않아
+     * 아무도 안 받을 물건이 캐시 수명만큼 품절로 보였고, 파일에 글자가 있어 목록 검사는 통과했다.
+     */
+    expect(source.slice(source.lastIndexOf('const result = await resolveReturn'))).toContain('revalidateCatalog()');
+  });
+
+  /**
+   * **재고를 건드리는 길은 목록에 적히지 않아도 잡는다.**
+   *
+   * 손으로 적은 목록은 적히지 않은 것을 보지 못한다. 교환 신청이 그랬다 — 재고를 잡는 새 창구가
+   * 생겼는데 아무 검사에도 안 걸렸다. 재고를 바꾸는 lib 를 타고 들어가는 창구를 찾아, 카탈로그를
+   * 털거나 아래 면제 목록에 까닭과 함께 적히도록 한다.
+   */
+  it('재고를 바꾸는 lib 를 쓰는 창구는 카탈로그를 턴다', () => {
+    /** 털지 않아도 되는 창구와 그 까닭 */
+    const EXEMPT: Record<string, string> = {
+      // 읽기만 한다 — 재고 파일을 내려받을 뿐이다
+      'app/api/admin/products/stock/export/route.ts': '내려받기(읽기)',
+      // 복제본은 초안으로 생긴다. 매대에 나오지 않으므로 털 것이 없다
+      'app/api/admin/products/[id]/duplicate/route.ts': '초안으로 복제',
+    };
+
+    const all: string[] = [];
+    const walkAll = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const full = join(dir, name);
+        if (statSync(full).isDirectory()) walkAll(full);
+        else if (name.endsWith('.ts')) all.push(full);
+      }
+    };
+    walkAll(SRC);
+    const source = new Map(all.map((f) => [f, readFileSync(f, 'utf8')]));
+
+    const resolveImport = (from: string, spec: string): string | null => {
+      const base = spec.startsWith('~/') ? join(SRC, spec.slice(2))
+        : spec.startsWith('.') ? resolve(dirname(from), spec) : null;
+      if (base === null) return null;
+      for (const candidate of [`${base}.ts`, join(base, 'index.ts')]) {
+        if (source.has(candidate)) return candidate;
+      }
+      return null;
+    };
+    const importsOf = new Map(
+      [...source].map(([f, s]) => [
+        f,
+        [...s.matchAll(/from '([^']+)'/g)].map((m) => resolveImport(f, m[1]!)).filter((x): x is string => x !== null),
+      ]),
+    );
+
+    // 재고를 바꾸는 lib, 그리고 그것을 타고 들어가는 lib 까지
+    const touches = new Set(
+      [...source]
+        .filter(([f, s]) => f.includes('/lib/') && /productVariant\.update(Many)?\(/.test(s) && /stock: \{ (in|de)crement|stock: [a-z]/.test(s))
+        .map(([f]) => f),
+    );
+    for (let grew = true; grew; ) {
+      grew = false;
+      for (const [f, deps] of importsOf) {
+        if (!f.includes('/lib/') || touches.has(f)) continue;
+        if (deps.some((d) => touches.has(d))) { touches.add(f); grew = true; }
+      }
+    }
+    expect(touches.size, '재고를 바꾸는 lib 를 하나도 못 찾았다 — 검사가 헛돌고 있다').toBeGreaterThan(3);
+
+    const missing = [...source.keys()]
+      .filter((f) => f.endsWith('/route.ts') && f.includes(`${join('app', 'api')}/`))
+      .filter((f) => importsOf.get(f)!.some((d) => touches.has(d)))
+      .filter((f) => !/revalidate(Catalog|Reviews)\(\)/.test(source.get(f)!))
+      .map((f) => f.slice(SRC.length + 1))
+      .filter((rel) => !(rel in EXEMPT));
+
+    expect(missing).toEqual([]);
   });
 
   it('무효화를 부르는 라우트는 전부 목록에 있다', () => {

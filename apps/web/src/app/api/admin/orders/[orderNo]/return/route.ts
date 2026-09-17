@@ -81,6 +81,10 @@ export async function POST(
 
     const result = await resolveReturn(orderNo, parsed.data, actor);
 
+    // 교환을 반려하면 잡아 둔 옵션 재고가 풀린다 — 아무도 안 받을 물건이 품절로 남으면 안 된다.
+    // 승인은 재고를 건드리지 않는다(물건은 아직 오는 중이다)
+    if (parsed.data.action === 'REJECT') revalidateCatalog();
+
     // 돈과 재고가 걸린 판단이라 누가 언제 했는지 남긴다
     await recordAudit({
       actor,

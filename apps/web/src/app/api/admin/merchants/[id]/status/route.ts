@@ -6,6 +6,7 @@ import { updateMerchantStatus, AccessError } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
 import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { revalidateCatalog } from '~/lib/cache';
 
 /** 입점 승인·정지. 슈퍼관리자만. */
 export async function PATCH(
@@ -42,6 +43,11 @@ export async function PATCH(
       after: { status: after.status, reason: parsed.data.reason },
       request,
     });
+    /*
+     * **매대는 승인된 가맹점 상품만 보여 준다(shelf 의 조건).** 안 털면 정지한 가맹점의 상품이 캐시 수명만큼
+     * 계속 팔리고, 방금 승인한 가맹점의 상품은 그만큼 안 보인다.
+     */
+    revalidateCatalog();
     return NextResponse.json(after);
   } catch (error) {
     if (error instanceof AccessError) {

@@ -66,6 +66,14 @@ describe('운영 반품 창구', () => {
     expect(revalidateCatalog).not.toHaveBeenCalled();
   });
 
+  it('반려는 카탈로그를 턴다 — 교환이면 잡아 둔 옵션 재고가 풀린다', async () => {
+    resolveReturn.mockResolvedValue({ orderNo: '20260914-0000002', status: 'REJECTED', orderStatus: 'DELIVERED' });
+
+    await call({ action: 'REJECT', rejectReason: '사용 흔적' });
+
+    expect(revalidateCatalog).toHaveBeenCalled();
+  });
+
   it('승인 안 된 신청이면 거절 사유를 그대로 전하고 기록하지 않는다', async () => {
     completeReturn.mockRejectedValue(new ReturnError('NOT_APPROVED', '승인한 신청만 회수 확인할 수 있습니다.'));
     const response = await call({ action: 'COMPLETE' });
