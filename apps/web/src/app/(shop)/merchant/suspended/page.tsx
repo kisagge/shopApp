@@ -29,7 +29,10 @@ export default async function MerchantSuspendedPage() {
   if (!user.merchantBlocked || user.blockedMerchantId === null) redirect('/');
 
   const [merchant, t] = await Promise.all([
-    prisma.merchant.findUnique({ where: { id: user.blockedMerchantId }, select: { name: true, status: true } }),
+    prisma.merchant.findUnique({
+      where: { id: user.blockedMerchantId },
+      select: { name: true, status: true, suspendedReason: true },
+    }),
     getT(),
   ]);
 
@@ -52,6 +55,17 @@ export default async function MerchantSuspendedPage() {
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
           {t('merchSuspended.lead', { merchant: merchant?.name ?? '—', status: MERCHANT_STATUS_LABEL[status] })}
         </p>
+        {/*
+          **까닭을 적는다.** 처분에는 사유를 받아 왔는데 그 글이 감사 로그에만 남아, 멈춘 쪽은 "무엇을 고치면
+          되는지" 를 물어야만 알 수 있었다. 줄바꿈을 살린다 — 운영자가 여러 줄로 적는 칸이다.
+        */}
+        {merchant?.suspendedReason && (
+          <div className="rounded-sm bg-[var(--surface)] px-4 py-3">
+            <h3 className="text-[12px] font-semibold text-[var(--fg-muted)]">{t('merchSuspended.reason')}</h3>
+            <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed">{merchant.suspendedReason}</p>
+          </div>
+        )}
+
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
           {t('merchSuspended.what')}
         </p>

@@ -29,7 +29,7 @@ const blocked = {
 beforeEach(() => {
   vi.clearAllMocks();
   getNavUser.mockResolvedValue(blocked);
-  findMerchant.mockResolvedValue({ name: '무어', status: 'SUSPENDED' });
+  findMerchant.mockResolvedValue({ name: '무어', status: 'SUSPENDED', suspendedReason: null });
 });
 
 describe('가맹점 정지 안내', () => {
@@ -47,7 +47,9 @@ describe('가맹점 정지 안내', () => {
 
   it('멈춘 가게를 blockedMerchantId 로 찾는다 — 권한이 쓰는 merchantId 는 비어 있다', async () => {
     render(await Page());
-    expect(findMerchant).toHaveBeenCalledWith({ where: { id: 'm-a' }, select: { name: true, status: true } });
+    expect(findMerchant).toHaveBeenCalledWith({
+      where: { id: 'm-a' }, select: { name: true, status: true, suspendedReason: true },
+    });
   });
 
   it('가맹점 이름과 지금 상태, 무엇이 그대로인지, 어디에 물을지를 적는다', async () => {
@@ -62,8 +64,25 @@ describe('가맹점 정지 안내', () => {
     expect(screen.getByRole('link', { name: '매장 둘러보기' })).toHaveAttribute('href', '/');
   });
 
+  it('까닭이 적혀 있으면 그대로 옮긴다 — 줄바꿈까지', async () => {
+    findMerchant.mockResolvedValue({
+      name: '무어', status: 'SUSPENDED', suspendedReason: '정산 계좌 명의가 다릅니다.\n서류를 보내 주세요.',
+    });
+    render(await Page());
+
+    expect(screen.getByText('까닭')).toBeInTheDocument();
+    const reason = screen.getByText(/정산 계좌 명의가 다릅니다/);
+    expect(reason).toHaveTextContent('서류를 보내 주세요');
+    expect(reason).toHaveClass('whitespace-pre-wrap');
+  });
+
+  it('까닭이 없으면 그 칸을 내밀지 않는다 — 빈 상자는 "지워졌다" 로 읽힌다', async () => {
+    render(await Page());
+    expect(screen.queryByText('까닭')).toBeNull();
+  });
+
   it('해지된 가맹점에는 해지라고 적는다 — 정지와 다른 일이다', async () => {
-    findMerchant.mockResolvedValue({ name: '무어', status: 'TERMINATED' });
+    findMerchant.mockResolvedValue({ name: '무어', status: 'TERMINATED', suspendedReason: null });
     render(await Page());
     expect(screen.getByRole('region', { name: /무어 — 해지/ })).toBeInTheDocument();
   });

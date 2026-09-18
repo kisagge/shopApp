@@ -183,6 +183,11 @@ model Merchant {
   /// 상품 검수의 publishRejection 과 같은 결이다.
   rejectionReason String?
 
+  /// 정지·해지 사유. 반려와 칸을 나눈 까닭은 **둘이 다른 일**이기 때문이다 — 반려는 못 들어온 것이고
+  /// 정지는 장사하던 가게가 멈춘 것이다. 한 칸에 두면 신청 화면이 지난 정지 사유를 반려 사유로 읽는다.
+  /// 받아 두기만 하고 감사 로그에만 남겼다 — 정작 멈춘 쪽은 까닭을 몰랐다.
+  suspendedReason String?
+
   // ── 사업자 정보
   businessName   String
   businessNumber String @unique
@@ -1817,6 +1822,9 @@ enum NotificationKind {
   MERCHANT_APPROVED
   /// 입점 신청이 반려됐다. 사유를 함께 싣는다 — 반려된 사람에게는 운영 화면이 없다
   MERCHANT_REJECTED
+  /// 장사하던 가게가 멈췄다 / 끝났다. 사유와 함께 매장 알림함에 뜬다 — 그 순간 콘솔이 닫힌다
+  MERCHANT_SUSPENDED
+  MERCHANT_TERMINATED
   /// 내 리뷰에 판매자가 답했다
   REVIEW_REPLIED
   /// 교환한 상품을 보냈다

@@ -26,6 +26,8 @@ export const NOTIFICATION_PARAMS = {
   PRODUCT_REJECTED: ['productName', 'reason'],
   MERCHANT_APPROVED: ['merchantName'],
   MERCHANT_REJECTED: ['merchantName', 'reason'],
+  MERCHANT_SUSPENDED: ['merchantName', 'reason'],
+  MERCHANT_TERMINATED: ['merchantName', 'reason'],
   REVIEW_REPLIED: ['productName'],
   EXCHANGE_SHIPPED: ['orderNo'],
   ORDER_CANCELLED: ['orderNo'],

@@ -96,6 +96,13 @@ export async function updateMerchantStatus(
       data: {
         status: input.status,
         rejectionReason: input.status === 'REJECTED' ? input.reason : null,
+        /*
+         * **정지·해지의 사유도 행에 남긴다.** 받아 두고 감사 로그에만 남겨서, 정작 멈춘 가게는 콘솔이 닫힌
+         * 것만 보았다. 반려와 칸을 나눈다 — 신청 화면이 지난 정지 사유를 반려 사유로 읽으면 안 된다.
+         * 다시 승인하면 지운다: 지난 정지의 이유가 멀쩡한 가맹점 화면에 남아 있으면 지금 상태를 잘못 읽는다.
+         */
+        suspendedReason:
+          input.status === 'SUSPENDED' || input.status === 'TERMINATED' ? input.reason : null,
       },
       select: { id: true, name: true, status: true, approvedAt: true },
     });

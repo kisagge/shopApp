@@ -711,10 +711,14 @@ async function main(): Promise<void> {
    * 정지된 가맹점 — 상태는 **늘 되돌린다.** 검사가 화면에서 푸는 일은 없지만, 운영 화면에서 눌러 본 뒤
    * 시드를 다시 돌리면 정지 화면을 보는 명세가 조용히 통과해 버린다.
    */
+  const SUSPENDED_REASON = '정산 계좌 명의가 사업자와 달라 확인이 필요합니다. 서류를 보내 주시면 다시 열어 드립니다.';
   await prisma.merchant.upsert({
     where: { businessNumber: SUSPENDED_MERCHANT.businessNumber },
-    update: { status: 'SUSPENDED' },
-    create: { ...SUSPENDED_MERCHANT, status: 'SUSPENDED', approvedAt: new Date('2026-01-15T00:00:00Z') },
+    update: { status: 'SUSPENDED', suspendedReason: SUSPENDED_REASON },
+    create: {
+      ...SUSPENDED_MERCHANT, status: 'SUSPENDED', suspendedReason: SUSPENDED_REASON,
+      approvedAt: new Date('2026-01-15T00:00:00Z'),
+    },
   });
 
   // 자사 상품(PLAIN LABEL)을 받는 플랫폼 반품지

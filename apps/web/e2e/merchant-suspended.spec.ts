@@ -37,6 +37,9 @@ test('헤더에 콘솔로 가는 문이 없고, 주소로 가면 까닭을 말�
   await expect(notice).toBeVisible();
   // 돈과 물건이 사라진 것이 아니라는 말이 먼저다
   await expect(notice).toContainText('주문·상품·정산은 그대로 있고');
+  // **까닭이 적힌다.** 처분에는 사유를 받아 왔는데 그 글이 감사 로그에만 남아, 멈춘 쪽은 물어야만 알 수 있었다
+  await expect(notice).toContainText('까닭');
+  await expect(notice).toContainText('정산 계좌 명의가 사업자와 달라');
   await expect(notice.getByRole('link', { name: '고객센터에 문의하기' })).toHaveAttribute('href', '/support/ask');
 });
 

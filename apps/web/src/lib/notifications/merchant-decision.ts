@@ -12,7 +12,11 @@ import { recordNotifications, type NoticeInput } from './record';
  * 만들어 놓고 아무 말도 안 해서, 신청자는 로그인해 보고서야 알았다.
  *
  * **매장 알림함으로 간다.** 반려된 사람에게는 운영 화면이 아예 없고, 승인된 사람도
- * 신청은 매장에서 했다 — 결과를 보러 갈 자리가 거기다.
+ * 신청은 매장에서 했다 — 결과를 보러 갈 자리가 거기다. 정지·해지도 같다: 그 순간 콘솔이 닫히므로
+ * 운영 알림함에 넣으면 아무도 못 읽는다.
+ *
+ * **정지·해지는 그 가게의 계정들도 함께 듣는다.** 신청한 사람이 아직 그 가게에 있다는 보장이 없고,
+ * 운영진이 직접 만든 가맹점에는 신청자가 아예 없다 — 그러면 멈췄다는 말을 들을 사람이 하나도 없다.
  *
  * 재고 부족·검수 결과와 같은 규칙으로 던지지 않는다. 부르는 자리에서는 처분이 이미
  * 끝났고, 알림을 못 남겼다고 그것을 무를 수는 없다.
@@ -21,11 +25,10 @@ export async function notifyMerchantDecision(input: {
   readonly merchantId: string;
   readonly merchantName: string;
   readonly status: MerchantStatus;
-  /** 반려 사유. 승인일 때는 빈 문자열 */
+  /** 처분 사유. 승인일 때는 빈 문자열 */
   readonly reason: string;
 }): Promise<void> {
-  // 알릴 것이 있는 처분만. 정지·해지는 아직 이 길을 타지 않는다.
-  if (input.status !== 'APPROVED' && input.status !== 'REJECTED') return;
+  if (input.status === 'PENDING') return;
 
   try {
     const merchant = await prisma.merchant.findUnique({
@@ -33,11 +36,29 @@ export async function notifyMerchantDecision(input: {
       select: { applicantId: true },
     });
 
+    const applicantId = merchant?.applicantId ?? null;
+
+    if (input.status === 'SUSPENDED' || input.status === 'TERMINATED') {
+      // 그 가게의 계정들 + 신청한 사람. 정지된 계정에는 보내지 않는다 — 볼 수 없는 알림함이다
+      const people = await prisma.user.findMany({
+        where: { suspendedAt: null, OR: [{ merchantId: input.merchantId }, ...(applicantId ? [{ id: applicantId }] : [])] },
+        select: { id: true },
+      });
+      const userIds = [...new Set(people.map((p) => p.id))];
+      await recordNotifications(userIds.map((userId): NoticeInput => ({
+        userId,
+        kind: input.status === 'SUSPENDED' ? 'MERCHANT_SUSPENDED' : 'MERCHANT_TERMINATED',
+        // 까닭과 다음에 할 일이 적힌 자리로 간다 — 그 사람들에게는 이제 콘솔이 없다
+        params: { merchantName: input.merchantName, reason: shortenReason(input.reason) },
+        linkPath: '/merchant/suspended',
+      })));
+      return;
+    }
+
     /*
      * 운영진이 직접 만든 가맹점에는 신청자가 없다. 알릴 사람이 없는 것이지
      * 빠뜨린 것이 아니다 — 승인 시 계정을 만드는 코드도 같은 곳에서 갈린다.
      */
-    const applicantId = merchant?.applicantId;
     if (!applicantId) return;
 
     // 눌렀을 때 신청 상태를 볼 수 있는 자리로 간다

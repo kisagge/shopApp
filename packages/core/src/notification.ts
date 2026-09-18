@@ -58,6 +58,14 @@ export const NOTIFICATION_KIND = [
    */
   'MERCHANT_APPROVED',
   'MERCHANT_REJECTED',
+  /**
+   * 장사하던 가게가 멈췄다 / 끝났다. 사유를 함께 싣는다.
+   *
+   * **멈춘 쪽이 까닭을 몰랐다.** 처분에는 사유를 받아 왔는데 그 글은 감사 로그에만 남았고, 가맹점 계정은
+   * 어느 날 콘솔이 닫힌 것만 보았다. 매장 알림함으로 간다 — 그 사람들에게는 이제 운영 화면이 없다.
+   */
+  'MERCHANT_SUSPENDED',
+  'MERCHANT_TERMINATED',
   /** 내 리뷰에 판매자가 답했다. 답은 늦게 달리는 일이 많아, 알리지 않으면 쓴 사람은 다시 와서 볼 일이 없다 */
   'REVIEW_REPLIED',
   /**

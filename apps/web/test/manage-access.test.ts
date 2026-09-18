@@ -390,6 +390,38 @@ describe('상태 전이', () => {
   });
 });
 
+/**
+ * **처분의 까닭이 행에 남는가.** 사유는 진작 받고 있었는데 정지·해지에서는 감사 로그에만 남아, 정작 멈춘 가게는
+ * 콘솔이 닫힌 것만 보았다. 반려와 칸을 나눈다 — 신청 화면이 지난 정지 사유를 반려 사유로 읽으면 안 된다.
+ */
+describe('처분의 까닭을 남긴다', () => {
+  const written = () => db.merchant.update.mock.calls.at(-1)![0].data as Record<string, unknown>;
+  const asStatus = (current: string) =>
+    db.merchant.findUnique.mockResolvedValue({
+      id: MERCHANT_ID, name: '무어', status: current, approvedAt: null,
+    });
+
+  it('정지·해지 사유는 정지 칸에, 반려 칸은 비운다', async () => {
+    for (const s of ['SUSPENDED', 'TERMINATED'] as const) {
+      asStatus('APPROVED');
+      await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: s, reason: '정산 계좌 확인이 필요합니다' }));
+      expect(written(), s).toMatchObject({ suspendedReason: '정산 계좌 확인이 필요합니다', rejectionReason: null });
+    }
+  });
+
+  it('반려 사유는 반려 칸에, 정지 칸은 비운다', async () => {
+    asStatus('PENDING');
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'REJECTED', reason: '서류 미비' }));
+    expect(written()).toMatchObject({ rejectionReason: '서류 미비', suspendedReason: null });
+  });
+
+  it('다시 승인하면 둘 다 지운다 — 지난 처분의 이유가 멀쩡한 가맹점 화면에 남으면 안 된다', async () => {
+    asStatus('SUSPENDED');
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
+    expect(written()).toMatchObject({ rejectionReason: null, suspendedReason: null });
+  });
+});
+
 describe('심사 결과를 신청자에게', () => {
   it('승인하면 알린다 — 계정만 만들어 주고 아무 말도 안 했다', async () => {
     await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
@@ -406,6 +438,20 @@ describe('심사 결과를 신청자에게', () => {
 
     expect(notifyMerchantDecision).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'REJECTED', reason: '브랜드 서류가 없습니다' }),
+    );
+  });
+
+  it('정지·해지도 사유를 실어 알린다 — 멈춘 쪽이 까닭을 몰랐다', async () => {
+    db.merchant.findUnique.mockResolvedValue({
+      id: MERCHANT_ID, name: '무어', status: 'APPROVED', approvedAt: new Date('2026-01-15'),
+    });
+
+    await updateMerchantStatus(
+      superAdmin, MERCHANT_ID, status({ status: 'SUSPENDED', reason: '정산 계좌 확인이 필요합니다' }),
+    );
+
+    expect(notifyMerchantDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'SUSPENDED', reason: '정산 계좌 확인이 필요합니다' }),
     );
   });
 

@@ -3,6 +3,7 @@ import { NOTICE_REASON_MAX } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   merchant: { findUnique: vi.fn<(...a: any[]) => any>() },
+  user: { findMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve([])) },
   notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 0 })) },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -83,14 +84,68 @@ describe('무엇이 실리는가', () => {
 });
 
 describe('알릴 것이 있는 처분만', () => {
-  it.each(['PENDING', 'SUSPENDED', 'TERMINATED'] as const)(
-    '%s 는 아직 이 길을 타지 않는다',
-    async (status) => {
-      await decide({ status, reason: '사유' });
-      expect(db.merchant.findUnique).not.toHaveBeenCalled();
-      expect(db.notification.createMany).not.toHaveBeenCalled();
-    },
-  );
+  it('PENDING 은 이 길을 타지 않는다 — 심사 중이라는 것은 신청한 사람이 이미 안다', async () => {
+    await decide({ status: 'PENDING', reason: '사유' });
+    expect(db.merchant.findUnique).not.toHaveBeenCalled();
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **멈춘 쪽이 까닭을 몰랐다.** 처분에는 사유를 받아 왔는데 그 글은 감사 로그에만 남았고, 가맹점 계정은 어느 날
+ * 콘솔이 닫힌 것만 보았다. 신청자 하나가 아니라 **그 가게의 계정들**이 듣는다 — 신청한 사람이 아직 그 가게에
+ * 있다는 보장이 없고, 운영진이 직접 만든 가맹점에는 신청자가 아예 없다.
+ */
+describe('정지·해지', () => {
+  beforeEach(() => {
+    db.user.findMany.mockResolvedValue([{ id: 'u-staff' }, { id: 'u-applicant' }]);
+  });
+
+  it('그 가게의 계정과 신청한 사람이 듣는다 — 정지된 계정은 빼고', async () => {
+    await decide({ status: 'SUSPENDED', reason: '정산 계좌 확인이 필요합니다' });
+
+    expect(db.user.findMany.mock.calls[0]![0].where).toEqual({
+      suspendedAt: null,
+      OR: [{ merchantId: 'm-1' }, { id: 'u-applicant' }],
+    });
+    expect(rows()?.map((r) => r.userId)).toEqual(['u-staff', 'u-applicant']);
+  });
+
+  it('까닭이 실리고, 까닭이 적힌 자리로 간다 — 그 사람들에게는 이제 콘솔이 없다', async () => {
+    await decide({ status: 'SUSPENDED', reason: '정산 계좌 확인이 필요합니다' });
+
+    expect(rows()?.[0]).toMatchObject({
+      kind: 'MERCHANT_SUSPENDED',
+      params: { merchantName: '스튜디오 눈', reason: '정산 계좌 확인이 필요합니다' },
+      linkPath: '/merchant/suspended',
+    });
+  });
+
+  it('해지는 해지라고 말한다 — 정지와 다른 일이다', async () => {
+    await decide({ status: 'TERMINATED', reason: '계약 종료' });
+    expect(rows()?.[0]?.kind).toBe('MERCHANT_TERMINATED');
+  });
+
+  it('긴 까닭은 여기서도 줄여서 싣는다', async () => {
+    await decide({ status: 'SUSPENDED', reason: '가'.repeat(300) });
+    expect((rows()?.[0]?.params['reason'] ?? '').endsWith('…')).toBe(true);
+  });
+
+  it('신청자가 없어도 그 가게의 계정들은 듣는다', async () => {
+    db.merchant.findUnique.mockResolvedValue({ applicantId: null });
+    db.user.findMany.mockResolvedValue([{ id: 'u-staff' }]);
+
+    await decide({ status: 'SUSPENDED', reason: '사유' });
+
+    expect(db.user.findMany.mock.calls[0]![0].where.OR).toEqual([{ merchantId: 'm-1' }]);
+    expect(rows()?.map((r) => r.userId)).toEqual(['u-staff']);
+  });
+
+  it('들을 사람이 하나도 없으면 아무것도 쓰지 않는다', async () => {
+    db.user.findMany.mockResolvedValue([]);
+    await decide({ status: 'SUSPENDED', reason: '사유' });
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
 });
 
 describe('실패해도 처분을 무르지 않는다', () => {
