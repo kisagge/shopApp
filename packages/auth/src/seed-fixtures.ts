@@ -108,6 +108,15 @@ export const SEED_ACCOUNT = {
    * 다른 검사에서 쓸 수 없고, 로그인 화면이 막는지가 곧 검사 대상이다.
    */
   suspendTarget: 'suspend-target@plain.test',
+
+  /**
+   * 정지된 가맹점의 담당자 — merchant-suspended.
+   *
+   * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 이 계정이 보는 것은 "콘솔이 없는 화면" 이고,
+   * 명세 안에서 로그인해 그것을 본다. 승인된 가맹점(스튜디오눈)을 정지시켜 보면 그 가맹점을 쓰는
+   * 다른 명세가 함께 무너진다 — 정지된 가맹점을 따로 하나 둔다.
+   */
+  suspendedMerchant: 'suspended-merchant@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */

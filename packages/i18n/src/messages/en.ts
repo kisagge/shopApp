@@ -753,6 +753,11 @@ export const en: Dictionary = {
   'merch.approvedTail': '.',
   'merch.rejected': 'Your last application was declined. You can revise it and apply again.',
   'merch.terminated': 'Your previous store was closed. You can apply again.',
+  'merchSuspended.heading': 'Your seller console is on hold',
+  'merchSuspended.lead': '{merchant} is currently "{status}", so the console is unavailable. Your orders, products and settlements are untouched and return when the hold is lifted.',
+  'merchSuspended.what': 'Contact support for the reason and the steps to reopen. You can still sign in, browse and order as a customer.',
+  'merchSuspended.ask': 'Contact support',
+  'merchSuspended.shop': 'Browse the shop',
 
   'offline.heading': 'You are offline',
   'offline.note': 'Check your connection and try again.',

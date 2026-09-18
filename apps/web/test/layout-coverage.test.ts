@@ -26,6 +26,8 @@ const EXCLUDED: Readonly<Record<string, string>> = {
   '/offline':
     '서비스워커가 네트워크가 끊겼을 때만 꺼내는 화면이라 주소로 열어도 그 상태가 아니다.',
   '/account/closed': '탈퇴 직후에만 뜻이 있는 안내 한 장이다. 상자에 담긴 글자가 없다.',
+  '/merchant/suspended':
+    '정지된 가맹점의 세션이 아니면 열리지 않는다. merchant-suspended 가 그 세션으로 네 폭을 잰다.',
 };
 
 /**

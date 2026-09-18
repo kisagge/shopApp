@@ -777,6 +777,11 @@ export const ko = {
   'merch.approvedTail': '을 쓰실 수 있습니다.',
   'merch.rejected': '지난 신청은 반려되었습니다. 내용을 고쳐 다시 신청하실 수 있습니다.',
   'merch.terminated': '지난 입점은 해지되었습니다. 다시 신청하실 수 있습니다.',
+  'merchSuspended.heading': '가맹점 운영이 멈춰 있습니다',
+  'merchSuspended.lead': '{merchant} 의 입점 상태가 "{status}" 라서 운영 콘솔을 쓸 수 없습니다. 주문·상품·정산은 그대로 있고, 상태가 풀리면 다시 쓰실 수 있습니다.',
+  'merchSuspended.what': '까닭과 다시 여는 절차는 고객센터 문의로 알려 드립니다. 로그인은 그대로 되며, 손님으로 둘러보고 주문하실 수 있습니다.',
+  'merchSuspended.ask': '고객센터에 문의하기',
+  'merchSuspended.shop': '매장 둘러보기',
 
   'offline.heading': '연결할 수 없습니다',
   'offline.note': '네트워크 상태를 확인한 뒤 다시 시도해 주세요.',

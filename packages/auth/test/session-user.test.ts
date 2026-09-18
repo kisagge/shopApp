@@ -5,7 +5,7 @@ vi.mock('../src/index', () => ({ auth: { api: { getSession } } }));
 const findMerchant = vi.hoisted(() => vi.fn());
 vi.mock('@shop/db', () => ({ prisma: { merchant: { findUnique: findMerchant } } }));
 
-const { getSessionUser, getActor, normalizeRole } = await import('../src/session-user');
+const { getSessionUser, getActor, getCurrentUser, normalizeRole } = await import('../src/session-user');
 
 beforeEach(() => {
   getSession.mockReset();
@@ -115,5 +115,58 @@ describe('getActor — 가맹점 상태', () => {
     getSession.mockResolvedValue({ user: { id: 'u-a', email: 'a@b', name: 'n', role: 'ADMIN', merchantId: null } });
     await getActor(new Headers());
     expect(findMerchant).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **정지된 가맹점에게 까닭을 말해 주려면, 손님으로 떨어뜨린 사실 자체가 남아 있어야 한다.**
+ * 역할만 낮추면 "원래 가맹점이었다" 가 사라져 헤더도 가드도 그냥 손님으로 다룬다 — 어제까지 쓰던 콘솔이
+ * 말없이 사라진 것으로 보인다.
+ */
+describe('getCurrentUser — 지금의 사람', () => {
+  const merchantSession = {
+    user: { id: 'u-m', email: 'm@b.test', name: '가맹점', role: 'MERCHANT', merchantId: 'm-1' },
+  };
+
+  it('승인된 가맹점은 막힌 것이 아니다', async () => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue({ status: 'APPROVED' });
+
+    expect(await getCurrentUser(new Headers())).toEqual({
+      id: 'u-m', email: 'm@b.test', name: '가맹점', role: 'MERCHANT', merchantId: 'm-1',
+      merchantBlocked: false, blockedMerchantId: null,
+    });
+  });
+
+  it.each(['SUSPENDED', 'TERMINATED', 'PENDING', 'REJECTED'])('%s 가맹점의 계정은 손님이 되고, 막혔다고 남긴다', async (status) => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue({ status });
+
+    /*
+     * 권한이 쓰는 merchantId 는 null 이다 — 그 범위를 더 갖지 않는다. 어느 가게였는지는 따로 남는다:
+     * 안내 화면이 "무엇이 멈췄는지" 를 말하려면 이름이 필요하고, 그 값으로 권한을 판정하지는 않는다.
+     */
+    expect(await getCurrentUser(new Headers())).toMatchObject({
+      role: 'CUSTOMER', merchantId: null, merchantBlocked: true, blockedMerchantId: 'm-1',
+    });
+  });
+
+  it('손님·운영진은 막힌 것이 아니고, 가맹점을 묻지도 않는다', async () => {
+    getSession.mockResolvedValue({ user: { id: 'u-a', email: 'a@b', name: 'n', role: 'ADMIN', merchantId: null } });
+
+    expect(await getCurrentUser(new Headers())).toMatchObject({ role: 'ADMIN', merchantBlocked: false });
+    expect(findMerchant).not.toHaveBeenCalled();
+  });
+
+  it('비로그인은 null', async () => {
+    getSession.mockResolvedValue(null);
+    expect(await getCurrentUser(new Headers())).toBeNull();
+  });
+
+  it('getActor 는 여기서 권한 판정에 쓰는 세 값만 떼어 낸다 — 이메일·이름이 정책에 새면 안 된다', async () => {
+    getSession.mockResolvedValue(merchantSession);
+    findMerchant.mockResolvedValue({ status: 'SUSPENDED' });
+
+    expect(await getActor(new Headers())).toEqual({ id: 'u-m', role: 'CUSTOMER', merchantId: null });
   });
 });

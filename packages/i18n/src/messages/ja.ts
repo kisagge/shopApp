@@ -749,6 +749,11 @@ export const ja: Dictionary = {
   'merch.approvedTail': 'をご利用いただけます。',
   'merch.rejected': '前回の申請は却下されました。内容を修正して再度申請できます。',
   'merch.terminated': '前回の出店は終了しました。再度申請できます。',
+  'merchSuspended.heading': '出店の運営が停止しています',
+  'merchSuspended.lead': '{merchant} の状態が「{status}」のため、運営コンソールをご利用いただけません。ご注文・商品・精算はそのまま残っており、状態が戻れば再びご利用いただけます。',
+  'merchSuspended.what': '理由と再開の手続きはカスタマーサポートよりご案内します。ログインは通常どおりで、お客様として閲覧・ご注文いただけます。',
+  'merchSuspended.ask': 'カスタマーサポートに問い合わせる',
+  'merchSuspended.shop': 'ショップを見る',
 
   'offline.heading': '接続できません',
   'offline.note': 'ネットワークの状態をご確認のうえ、もう一度お試しください。',

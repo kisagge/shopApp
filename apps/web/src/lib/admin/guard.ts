@@ -2,7 +2,7 @@ import 'server-only';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { hasPermission, type Actor, type Permission } from '@shop/core';
-import { getActor } from '@shop/auth/session';
+import { getCurrentUser } from '@shop/auth/session';
 
 /**
  * 어드민 진입 가드.
@@ -12,8 +12,18 @@ import { getActor } from '@shop/auth/session';
  * 쓰기 동작은 각 라우트에서 assertPermission 을 다시 부른다.
  */
 export async function requireAdmin(permission: Permission = 'admin:access'): Promise<Actor> {
-  const actor = await getActor(await headers());
-  if (!actor) redirect('/login?next=/admin');
+  const user = await getCurrentUser(await headers());
+  if (!user) redirect('/login?next=/admin');
+  const actor: Actor = { id: user.id, role: user.role, merchantId: user.merchantId };
+
+  /*
+   * **정지·해지된 가맹점의 계정에는 까닭을 말해 준다.**
+   *
+   * 여기서도 첫 화면으로 말없이 보내면, 어제까지 쓰던 콘솔이 오늘 갑자기 사라진 것으로만 보인다 — 로그인이 깨진
+   * 줄 알고 다시 로그인하거나 고객센터에 "화면이 안 열린다" 고 묻게 된다. 어드민 경로의 존재를 감출 이유도 없다:
+   * 이 사람은 어제까지 그 경로를 쓰던 사람이다.
+   */
+  if (user.merchantBlocked) redirect('/merchant/suspended');
 
   /**
    * 콘솔 진입 권한을 **항상** 함께 본다.

@@ -6,11 +6,11 @@ import { CartBadge } from './cart-badge';
 import { SearchBox } from './search-box';
 import { NotificationBell } from './notification-bell';
 import { getT } from '~/lib/i18n/server';
-import { getViewer } from '~/lib/viewer';
+import { getNavUser } from '~/lib/viewer';
 
 /** 모든 페이지가 쓰는 헤더. 카테고리는 서버에서 읽는다. */
 export async function SiteHeader() {
-  const [categories, t, viewer] = await Promise.all([getTopCategories(), getT(), getViewer()]);
+  const [categories, t, viewer] = await Promise.all([getTopCategories(), getT(), getNavUser()]);
 
   /*
    * sticky + safe-t 는 웹뷰 때문이다.

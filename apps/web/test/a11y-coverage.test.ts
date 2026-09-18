@@ -24,6 +24,8 @@ const E2E = join(process.cwd(), 'e2e');
 const EXCLUDED: Readonly<Record<string, string>> = {
   '/checkout/success':
     '토스가 돌아오는 자리다. 열쇠 없이 열면 항상 /checkout/fail 로 넘기고, 그쪽은 훑는다.',
+  '/merchant/suspended':
+    '정지된 가맹점의 세션이 아니면 열리지 않는다(다른 사람은 첫 화면으로 보낸다). merchant-suspended 가 그 세션으로 훑는다.',
 };
 
 function routes(dir: string, prefix = ''): string[] {

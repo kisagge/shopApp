@@ -7,8 +7,14 @@ const redirect = vi.hoisted(() => vi.fn<(...a: any[]) => never>((to: string) => 
 vi.mock('next/navigation', () => ({ redirect }));
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve(new Headers()) }));
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const getCurrentUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('@shop/auth/session', () => ({ getCurrentUser }));
+
+/** 가드는 이제 "지금의 사람" 을 받는다 — 세션의 역할이 아니라 지금 상태로 판정한다 */
+const getActor = {
+  mockResolvedValue: (actor: Actor | null) =>
+    getCurrentUser.mockResolvedValue(actor && { ...actor, email: 'a@b.test', name: '아무개', merchantBlocked: false }),
+};
 
 const { requireAdmin } = await import('~/lib/admin/guard');
 
@@ -38,8 +44,8 @@ describe('어드민 가드', () => {
 
   it('가맹점은 자기 권한 안에서 들어간다', async () => {
     getActor.mockResolvedValue(merchant);
-    await expect(requireAdmin('order:read')).resolves.toBe(merchant);
-    await expect(requireAdmin('product:write')).resolves.toBe(merchant);
+    await expect(requireAdmin('order:read')).resolves.toEqual(merchant);
+    await expect(requireAdmin('product:write')).resolves.toEqual(merchant);
   });
 
   it('가맹점도 없는 권한은 막힌다', async () => {
@@ -55,8 +61,19 @@ describe('어드민 가드', () => {
 
   it('운영진은 통과한다', async () => {
     getActor.mockResolvedValue(admin);
-    await expect(requireAdmin()).resolves.toBe(admin);
-    await expect(requireAdmin('order:refund')).resolves.toBe(admin);
+    await expect(requireAdmin()).resolves.toEqual(admin);
+    await expect(requireAdmin('order:refund')).resolves.toEqual(admin);
+  });
+
+  it('정지된 가맹점의 계정에는 까닭을 말해 준다 — 첫 화면으로 말없이 보내지 않는다', async () => {
+    /*
+     * 어제까지 쓰던 콘솔이 갑자기 사라지면 로그인이 깨진 줄 안다. 이 사람에게는 어드민 경로를 감출 것이 없다.
+     */
+    getCurrentUser.mockResolvedValue({
+      id: 'u-m', role: 'CUSTOMER', merchantId: null, email: 'm@b.test', name: '무어', merchantBlocked: true,
+    });
+    await expect(requireAdmin()).rejects.toThrow('REDIRECT:/merchant/suspended');
+    await expect(requireAdmin('order:read')).rejects.toThrow('REDIRECT:/merchant/suspended');
   });
 
   it('운영진에게 없는 권한은 막는다', async () => {
