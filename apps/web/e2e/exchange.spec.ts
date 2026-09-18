@@ -87,6 +87,16 @@ test('다른 옵션으로 교환 신청하면 그 재고가 잡히고, 운영이
     await expect(page.getByText('교환 진행 중')).toHaveCount(0);
     await expect(page.getByText(new RegExp(`${toLabel.replace(/[/()]/g, '\\$&')} · 1`))).toBeVisible();
     await expect(page.getByText(/5555-?6666-?7777/)).toBeVisible();
+    /*
+     * **새로 보낸 물건도 조회할 수 있어야 한다.** 첫 배송에는 조회 링크가 있는데 교환 송장은 번호만 적혀 있어,
+     * 손님이 택배사 누리집에 번호를 옮겨 적어야 했다. 번호가 뜨는 것만 보면 그 차이를 못 본다 — 링크를 본다.
+     */
+    const track = page.getByRole('link', { name: /한진택배에서 조회/ });
+    await expect(track).toHaveAttribute('href', /hanjin\.com.*wblnumText2=555566667777/);
+    // 새 창으로 뜨는 링크다 — 주문 화면을 잃지 않게, 그리고 그 사실이 낭독기에도 들리게
+    await expect(track).toHaveAttribute('target', '_blank');
+    await expect(track).toHaveAttribute('rel', /noopener/);
+    await expect(track).toContainText('(새 창)');
     await expect(page.getByRole('term').filter({ hasText: '결제 금액' }).locator('xpath=following-sibling::dd')).toHaveText(payable);
     await expect(page.getByRole('term').filter({ hasText: '돌려받은 금액' })).toHaveCount(0);
     expect(await stockOf(page, fromVariant!), '돌아온 옵션의 재고가 안 돌아왔다').toBe(fromStock + 1);
