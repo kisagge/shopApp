@@ -36,7 +36,7 @@ const detail = (over: Record<string, unknown> = {}) => ({
   brandNames: ['MOOR'], appliedBrandName: null, applicant: null,
   userCount: 1, approvedAt: new Date('2026-01-15'), createdAt: new Date('2025-08-31'),
   hasReturnAddress: true, hasSettlementAccount: true,
-  rejectionReason: null, productCount: 12, settlementCount: 2,
+  rejectionReason: null, suspendedReason: null, productCount: 12, settlementCount: 2,
   staff: [{ id: 'u-a', name: '무어운영', email: 'contact@moor.test' }],
   ...over,
 });
@@ -49,6 +49,35 @@ beforeEach(() => {
 });
 
 const renderPage = async () => render(await Page({ params: Promise.resolve({ id: 'm-a' }) }));
+
+describe('정지·해지 사유', () => {
+  it('정지됐으면 사유를 보여 준다 — 다시 열어 줄지 판단할 때 가장 먼저 묻는 것이다', async () => {
+    getMerchantDetail.mockResolvedValue(
+      detail({ status: 'SUSPENDED', suspendedReason: '정산 계좌 명의가 다릅니다' }),
+    );
+
+    await renderPage();
+
+    expect(screen.getByText('정지 사유')).toBeInTheDocument();
+    expect(screen.getByText('정산 계좌 명의가 다릅니다')).toBeInTheDocument();
+  });
+
+  it('해지에는 해지라고 적는다 — 정지와 다른 일이다', async () => {
+    getMerchantDetail.mockResolvedValue(
+      detail({ status: 'TERMINATED', suspendedReason: '계약이 끝났습니다' }),
+    );
+
+    await renderPage();
+
+    expect(screen.getByText('해지 사유')).toBeInTheDocument();
+    expect(screen.queryByText('정지 사유')).toBeNull();
+  });
+
+  it('멀쩡한 가맹점에는 그 줄이 없다', async () => {
+    await renderPage();
+    expect(screen.queryByText(/정지 사유|해지 사유/)).toBeNull();
+  });
+});
 
 describe('반려 사유', () => {
   it('반려됐으면 사유를 보여 준다', async () => {

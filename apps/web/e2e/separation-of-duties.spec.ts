@@ -141,6 +141,25 @@ test.describe('화면도 같은 선을 긋는다', () => {
     }
   });
 
+  /**
+   * **처분한 쪽에는 까닭을 볼 자리가 없었다.** 사유는 진작 받고 있었는데 가맹점에게만 닿았고, 운영진은
+   * 감사 로그를 뒤져야 했다 — "왜 멈췄나" 는 다시 열어 줄지 판단할 때 가장 먼저 묻는 것이다.
+   */
+  test('멈춘 가맹점의 상세에 정지 사유가 적혀 있다', async ({ page }) => {
+    await page.goto('/admin/merchants');
+    await ready(page);
+    // 같은 줄의 "반품지 등록"·"정보 수정" 도 가게 이름을 이름표에 달고 있다 — 이름 그대로인 것만 고른다
+    await page.getByRole('row').filter({ hasText: '쉬는가게' })
+      .getByRole('link', { name: '쉬는가게', exact: true }).click();
+    await page.waitForURL(/\/admin\/merchants\/[^/]+$/);
+    await ready(page);
+
+    const reason = page.getByRole('term').filter({ hasText: '정지 사유' }).locator('xpath=following-sibling::dd');
+    await expect(reason).toContainText('정산 계좌 명의가 사업자와 달라');
+    // 반려와 섞이지 않는다 — 반려는 못 들어온 것이고 정지는 장사하던 가게가 멈춘 것이다
+    await expect(page.getByRole('term').filter({ hasText: '반려 사유' })).toHaveCount(0);
+  });
+
   test('관리자의 가맹점 화면은 승인이 자기 일이 아니라고 밝힌다', async ({ page, browser }) => {
     await page.goto('/admin/merchants');
     await ready(page);

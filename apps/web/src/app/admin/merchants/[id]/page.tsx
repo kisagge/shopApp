@@ -97,6 +97,19 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
                 <dd className="whitespace-pre-wrap">{merchant.rejectionReason}</dd>
               </>
             )}
+
+            {/*
+              정지·해지 사유도 같다 — 가맹점에게는 안내 화면이 보여 주는데, 처분한 쪽에는 볼 자리가 없었다.
+              "왜 멈췄나" 는 다시 열어 줄지 판단할 때 가장 먼저 묻는 것이다.
+            */}
+            {merchant.suspendedReason && (
+              <>
+                <dt className="text-[var(--fg-muted)]">
+                  {merchant.status === 'TERMINATED' ? '해지 사유' : '정지 사유'}
+                </dt>
+                <dd className="whitespace-pre-wrap">{merchant.suspendedReason}</dd>
+              </>
+            )}
           </dl>
 
           {canChangeStatus && (

@@ -185,6 +185,11 @@ export interface MerchantDetail extends MerchantRow {
    * 운영진은 나중에 이유를 못 봤다 — 감사 로그를 뒤지는 수밖에 없었다.
    */
   readonly rejectionReason: string | null;
+  /**
+   * 정지·해지 사유. 반려 사유와 칸이 다르다 — 반려는 못 들어온 것이고 정지는 장사하던 가게가 멈춘 것이다.
+   * 가맹점에게는 안내 화면이 이것을 보여 주는데, 처분한 운영진 쪽에는 볼 자리가 없었다.
+   */
+  readonly suspendedReason: string | null;
   /** 이 가맹점 브랜드로 올라간 상품 수. 보관한 것은 빼고 센다 */
   readonly productCount: number;
   /** 확정됐는데 아직 지급되지 않은 정산 건수 — 계좌가 없으면 이것들이 묶인다 */
@@ -214,7 +219,7 @@ export async function getMerchantDetail(actor: Actor, id: string): Promise<Merch
       id: true, name: true, status: true,
       businessName: true, businessNumber: true, representative: true,
       contactEmail: true, contactPhone: true, commissionPercent: true,
-      approvedAt: true, createdAt: true, rejectionReason: true,
+      approvedAt: true, createdAt: true, rejectionReason: true, suspendedReason: true,
       brandName: true,
       applicant: { select: { name: true, email: true } },
       brands: { select: { name: true } },
@@ -254,6 +259,7 @@ export async function getMerchantDetail(actor: Actor, id: string): Promise<Merch
     hasReturnAddress: m.returnAddress !== null,
     hasSettlementAccount: hasSettlementAccount(m),
     rejectionReason: m.rejectionReason,
+    suspendedReason: m.suspendedReason,
     productCount,
     settlementCount: m._count.settlements,
     staff: m.users,

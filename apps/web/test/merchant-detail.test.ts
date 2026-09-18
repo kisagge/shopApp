@@ -25,7 +25,7 @@ const raw = (over: Record<string, unknown> = {}) => ({
   businessName: '무어컴퍼니', businessNumber: '000-00-00012', representative: '홍길동',
   contactEmail: 'contact@moor.test', contactPhone: '02-0000-0003', commissionPercent: 15,
   approvedAt: new Date('2026-01-15'), createdAt: new Date('2025-08-31'),
-  rejectionReason: null, brandName: null,
+  rejectionReason: null, suspendedReason: null, brandName: null,
   applicant: null,
   brands: [{ name: 'MOOR' }],
   users: [{ id: 'u-a', name: '무어운영', email: 'contact@moor.test' }],
@@ -73,6 +73,18 @@ describe('무엇을 담는가', () => {
     const detail = await getMerchantDetail(superAdmin, 'm-a');
 
     expect(detail?.rejectionReason).toBe('브랜드 서류가 없습니다');
+  });
+
+  it('정지·해지 사유도 싣는다 — 처분한 쪽에는 볼 자리가 없었다', async () => {
+    db.merchant.findUnique.mockResolvedValue(
+      raw({ status: 'SUSPENDED', suspendedReason: '정산 계좌 확인이 필요합니다' }),
+    );
+
+    const detail = await getMerchantDetail(superAdmin, 'm-a');
+
+    expect(detail?.suspendedReason).toBe('정산 계좌 확인이 필요합니다');
+    // 반려 칸과 섞이지 않는다 — 반려는 못 들어온 것이고 정지는 멈춘 것이다
+    expect(detail?.rejectionReason).toBeNull();
   });
 
   it('사업자번호는 뒤 두 자리를 가린다 — 목록과 같은 규칙이다', async () => {
