@@ -24,6 +24,12 @@ function projectMatchers(): RegExp[] {
   return found.map(([, body = '']) => new RegExp(body));
 }
 
+/** 프로젝트 이름 — 어느 프로젝트가 겹쳐 잡는지 말해 주려고 함께 읽는다 */
+function projectNames(): string[] {
+  const source = readFileSync(CONFIG, 'utf8');
+  return [...source.matchAll(/name:\s*'([^']+)'/g)].map(([, name = '']) => name);
+}
+
 describe('e2e 파일이 빠짐없이 돌아간다', () => {
   const matchers = projectMatchers();
   const specs = readdirSync(E2E).filter((f) => /\.(spec|setup)\.ts$/.test(f));
@@ -32,6 +38,28 @@ describe('e2e 파일이 빠짐없이 돌아간다', () => {
     // 정규식을 못 읽으면 아래 검사가 전부 통과해 버린다
     expect(matchers.length).toBeGreaterThanOrEqual(4);
     expect(specs.length).toBeGreaterThan(20);
+  });
+
+  /**
+   * **두 프로젝트가 같은 파일을 잡으면 같은 명세가 두 번 돈다.**
+   *
+   * 이름에 `admin` 이 든 파일은 운영 프로젝트가 통째로 잡는다(`/(admin|…)/`). 그래서 새로 만든
+   * `merchant-suspension-admin.spec.ts` 가 손님 프로젝트와 운영 프로젝트에서 동시에 돌았고, 둘이 같은 가맹점을
+   * 멈췄다 풀었다 하며 서로 밀쳐 한 판이 졌다. 두 판이 각자 로그인·시드 데이터를 쥐는 명세라면 어디서든
+   * 같은 일이 난다 — 이름을 고르는 순간에 걸린다.
+   */
+  it('두 프로젝트가 같은 파일을 잡지 않는다', () => {
+    const names = projectNames();
+    const clashes = specs
+      .map((f) => ({ file: f, by: matchers.flatMap((re, i) => (re.test(f) ? [names[i] ?? `#${i}`] : [])) }))
+      .filter((r) => r.by.length > 1);
+
+    expect(
+      clashes,
+      '이 파일들은 여러 프로젝트에서 동시에 돈다. 같은 시드 데이터를 쥐면 서로 밀친다.\n' +
+        '파일 이름을 다른 프로젝트의 testMatch 에 걸리지 않게 바꾼다:\n' +
+        clashes.map((c) => `${c.file} — ${c.by.join(', ')}`).join('\n'),
+    ).toEqual([]);
   });
 
   it('어느 프로젝트에도 안 잡히는 파일이 없다', () => {

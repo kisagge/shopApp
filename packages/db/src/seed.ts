@@ -81,6 +81,21 @@ const SUSPENDED_MERCHANT = {
   commissionPercent: 15,
 };
 
+/**
+ * **검사가 직접 멈춰 보는 가게.** 정지는 화면에서 눌러 봐야 알 수 있는 것이 있다 — 누르는 순간 그 가게 사람들에게
+ * 알림이 가고 콘솔이 닫히는지. 쉬는가게는 이미 멈춰 있어서 그 순간을 볼 수 없고, 장사하는 가맹점을 멈추면 그
+ * 가맹점을 쓰는 다른 명세가 함께 무너진다. 그래서 **승인된 채로 비워 둔 가게**를 하나 더 둔다.
+ *
+ * 브랜드도 상품도 없다. 시드를 다시 돌리면 승인 상태로 돌아온다 — 검사가 멈춰 둔 채 끝나도 다음 판이 같은 자리에서
+ * 시작한다.
+ */
+const PAUSABLE_MERCHANT = {
+  name: '잠깐가게', businessName: '잠깐가게',
+  businessNumber: '000-00-00005', representative: '[대표자명]',
+  contactEmail: 'contact@pausable.test', contactPhone: '02-0000-0005',
+  commissionPercent: 15,
+};
+
 const BRANDS = [
   { slug: 'studio-noon', name: 'STUDIO NOON' },
   { slug: 'atelier-k', name: 'ATELIER K' },
@@ -721,13 +736,20 @@ async function main(): Promise<void> {
     },
   });
 
+  // 검사가 멈춰 보는 가게 — 늘 승인된 채로 시작한다(사유도 지운다)
+  await prisma.merchant.upsert({
+    where: { businessNumber: PAUSABLE_MERCHANT.businessNumber },
+    update: { status: 'APPROVED', suspendedReason: null },
+    create: { ...PAUSABLE_MERCHANT, status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
+  });
+
   // 자사 상품(PLAIN LABEL)을 받는 플랫폼 반품지
   await prisma.returnAddress.upsert({
     where: { id: 'platform' },
     update: {},
     create: { id: 'platform', recipient: 'PLAIN 반품센터', phone: '010-0000-0100', postalCode: '10881', address1: '경기 파주시 회동길 00', address2: 'PLAIN 물류센터 2층' },
   });
-  console.log(`  가맹점 ${MERCHANTS.length}개 + 정지된 가맹점 1개 (PLAIN LABEL 은 자사 브랜드)`);
+  console.log(`  가맹점 ${MERCHANTS.length}개 + 검사용 2개(정지된 가게·멈춰 볼 가게) (PLAIN LABEL 은 자사 브랜드)`);
 
 
   // ── 상품 · 옵션 · 변형

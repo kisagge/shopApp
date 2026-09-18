@@ -49,6 +49,8 @@ const USERS: SeedUser[] = [
   { email: SEED_ACCOUNT.suspendTarget, name: '정지 검사 손님', role: 'CUSTOMER', phone: '010-0000-2001' },
   // 정지된 가맹점의 담당자. 역할은 MERCHANT 인 채이고, 가맹점 상태가 SUSPENDED 다 — 그 엇갈림이 검사 대상이다
   { email: SEED_ACCOUNT.suspendedMerchant, name: '정지 가맹점 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00004', phone: '010-0000-2005' },
+  // 검사가 화면에서 멈춰 보는 가게의 담당자. 멈추는 순간 알림을 받고 콘솔이 닫히는지 본다
+  { email: SEED_ACCOUNT.pausableMerchant, name: '잠깐가게 담당자', role: 'MERCHANT', merchantBusinessNumber: '000-00-00005', phone: '010-0000-2006' },
   { email: SEED_ACCOUNT.pointAdjustTarget, name: '포인트 검사 손님', role: 'CUSTOMER', phone: '010-0000-2002' },
   { email: SEED_ACCOUNT.addressEditor, name: '배송지 검사 손님', role: 'CUSTOMER', phone: '010-0000-2003' },
   { email: SEED_ACCOUNT.couponCollector, name: '쿠폰 검사 손님', role: 'CUSTOMER', phone: '010-0000-2004' },

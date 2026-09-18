@@ -117,6 +117,14 @@ export const SEED_ACCOUNT = {
    * 다른 명세가 함께 무너진다 — 정지된 가맹점을 따로 하나 둔다.
    */
   suspendedMerchant: 'suspended-merchant@plain.test',
+
+  /**
+   * 검사가 멈춰 보는 가게("잠깐가게")의 담당자 — merchant-suspension-admin.
+   *
+   * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 검사 도중 이 계정의 콘솔이 닫히므로 미리 만든
+   * 세션은 다른 검사에서 쓸 수 없고, 닫히는 그 순간이 곧 검사 대상이다.
+   */
+  pausableMerchant: 'pausable-merchant@plain.test',
 } as const;
 
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
