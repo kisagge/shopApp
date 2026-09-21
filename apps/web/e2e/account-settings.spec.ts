@@ -146,3 +146,59 @@ test('이용 기록 수집을 끄면 다른 브라우저로 들어와도 꺼져 
     await fresh.close();
   }
 });
+
+/**
+ * 회원 탈퇴를 **실제로 눌러 본다.**
+ *
+ * 지우는 코드는 203줄인데(PII 익명화, 정산 근거 보존, 세션 무효화) 선 서버에서 눌린 적이 한 번도 없었다 —
+ * 손님 검사는 "실제로 누르지는 않는다 — 시드 계정이 사라지면 나머지 시험이 무너진다" 며 문구 입력까지만 봤다.
+ * 여기서는 이 검사만 쓰는 계정을 그 자리에서 만들어 끝까지 간다.
+ *
+ * 개인정보가 걸린 자리라 새면 비용이 크다. 화면에서 확인할 수 있는 것을 본다:
+ * 들고 있던 세션이 곧바로 끊기는가, 같은 열쇠로 다시 들어올 수 없는가, 그리고 **그 이메일이 풀려 있는가** —
+ * 계정을 지웠다면 같은 주소로 다시 가입할 수 있어야 한다.
+ */
+test('탈퇴하면 세션이 끊기고, 같은 열쇠로는 못 들어오며, 그 이메일로 다시 가입할 수 있다', async ({ page }) => {
+  test.setTimeout(120_000);
+  const email = `e2e-close-${Date.now()}@plain.test`;
+  const password = 'quiet-harbor-42';
+
+  const signUp = async (name: string): Promise<void> => {
+    await page.goto('/signup');
+    await ready(page);
+    await page.getByLabel(/^이메일/).fill(email);
+    await page.getByLabel(/^이름/).fill(name);
+    await page.getByLabel(/^비밀번호\*/).fill(password);
+    await page.getByLabel(/^비밀번호 확인/).fill(password);
+    await page.getByLabel(/이용약관에 동의합니다/).check();
+    await page.getByLabel(/개인정보 수집/).check();
+    await page.getByRole('button', { name: '가입하기' }).click();
+    await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible({ timeout: 20_000 });
+  };
+
+  await signUp('탈퇴 검사');
+
+  // ── 탈퇴. 되돌릴 수 없는 동작이라 문구를 옮겨 적기 전에는 누를 수 없다
+  await page.goto('/mypage/close');
+  await ready(page);
+  const submit = page.getByRole('button', { name: '탈퇴하기' });
+  await expect(submit).toBeDisabled();
+  await page.getByRole('textbox').fill('탈퇴합니다');
+  await submit.click();
+  await page.waitForURL(/\/account\/closed$/, { timeout: 20_000 });
+
+  // ── 들고 있던 세션이 곧바로 끊긴다. 쿠키가 남아 있어도 열리면 안 된다
+  await page.goto('/mypage');
+  await page.waitForURL(/\/login/);
+
+  // ── 같은 열쇠로는 못 들어온다(연결된 계정이 지워졌다)
+  await login(page, email, password);
+  await expect(page.getByRole('link', { name: '마이페이지' })).toHaveCount(0);
+  expect(new URL(page.url()).pathname, '탈퇴한 계정으로 들어와졌다').toBe('/login');
+
+  // ── 그 이메일은 풀려 있다 — 지웠다면 같은 주소로 다시 시작할 수 있어야 한다
+  await signUp('다시 온 손님');
+  await page.goto('/mypage');
+  await ready(page);
+  await expect(page.locator('#main')).toContainText('다시 온 손님');
+});
