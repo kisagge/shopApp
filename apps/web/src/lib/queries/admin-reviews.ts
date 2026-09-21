@@ -31,6 +31,14 @@ export interface ReportRow {
   readonly createdAt: Date;
   readonly resolvedAt: Date | null;
   readonly resolution: string | null;
+  /**
+   * 신고를 판단한 사람(core 의 actorLabel). 아직 안 봤으면 null.
+   *
+   * **적어 두기만 했다.** 언제·무엇으로(내림·문제없음)는 화면에 있는데 누가 했는지는 없어서, 담당자가 여럿이면
+   * "이 혹평을 누가 내렸나" 에 감사 로그로만 답할 수 있었다 — 정당한 리뷰를 내렸다는 분쟁에서 가장 먼저 묻는 것이다.
+   * 바로 옆 답글은 같은 문제를 진작 고쳤다.
+   */
+  readonly resolvedBy: string | null;
 }
 
 export interface AdminReviewRow {
@@ -108,7 +116,7 @@ const reviewSelect = {
     orderBy: { createdAt: 'desc' as const },
     select: {
       id: true, reason: true, detail: true, createdAt: true,
-      resolvedAt: true, resolution: true,
+      resolvedAt: true, resolution: true, resolvedById: true,
       reporter: { select: { name: true } },
     },
   },
@@ -122,7 +130,7 @@ type RawReview = {
   reply: string | null; repliedAt: Date | null; replyEditedAt: Date | null; repliedById: string | null;
   reports: {
     id: string; reason: ReportReason; detail: string | null; createdAt: Date;
-    resolvedAt: Date | null; resolution: string | null;
+    resolvedAt: Date | null; resolution: string | null; resolvedById: string | null;
     reporter: { name: string };
   }[];
 };
@@ -132,17 +140,26 @@ type RawReview = {
  * 관계가 없는 칸이라 줄마다 물으면 쪽마다 스무 번이 나간다.
  */
 async function toRows(actor: Actor, raws: readonly RawReview[]): Promise<AdminReviewRow[]> {
-  const repliers = await loadActors(raws.map((r) => (r.reply === null ? null : r.repliedById)));
-  return raws.map((raw) => toRow(
-    raw,
-    raw.reply === null
-      ? null
-      // 이 칸이 생기기 전에 단 답글은 누가 했는지 적혀 있지 않다
-      : actorLabel(actor, { id: raw.repliedById, identity: raw.repliedById ? repliers.get(raw.repliedById) ?? null : null }, '기록 없음'),
-  ));
+  /*
+   * 답글을 단 사람과 **신고를 판단한 사람**을 한 번에 읽는다. 둘 다 관계가 없는 칸이라 줄마다 물으면
+   * 쪽 하나에 스무 번이 나간다.
+   */
+  const people = await loadActors([
+    ...raws.map((r) => (r.reply === null ? null : r.repliedById)),
+    ...raws.flatMap((r) => r.reports.map((report) => (report.resolvedAt === null ? null : report.resolvedById))),
+  ]);
+  // 이 칸이 생기기 전의 줄은 누가 했는지 적혀 있지 않다
+  const who = (id: string | null) =>
+    actorLabel(actor, { id, identity: id ? people.get(id) ?? null : null }, '기록 없음');
+
+  return raws.map((raw) => toRow(raw, raw.reply === null ? null : who(raw.repliedById), who));
 }
 
-function toRow(raw: RawReview, repliedBy: string | null): AdminReviewRow {
+function toRow(
+  raw: RawReview,
+  repliedBy: string | null,
+  who: (id: string | null) => string,
+): AdminReviewRow {
   const open = raw.reports.filter((r) => r.resolvedAt === null);
 
   return {
@@ -174,6 +191,7 @@ function toRow(raw: RawReview, repliedBy: string | null): AdminReviewRow {
       createdAt: r.createdAt,
       resolvedAt: r.resolvedAt,
       resolution: r.resolution,
+      resolvedBy: r.resolvedAt === null ? null : who(r.resolvedById),
     })),
     priority: reportPriority(open),
   };

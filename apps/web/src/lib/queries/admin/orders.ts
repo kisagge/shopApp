@@ -154,7 +154,7 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
         select: {
           method: true, status: true, pgProvider: true, pgApprovalNo: true, approvedAt: true,
           // 취소한 주문에 들어온 입금 — 사람이 돌려줘야 한다(lib/admin/late-deposit)
-          lateDepositAt: true, lateDepositAmount: true, lateDepositResolvedAt: true,
+          lateDepositAt: true, lateDepositAmount: true, lateDepositResolvedAt: true, lateDepositResolvedBy: true,
         },
       },
       shipment: { select: { carrier: true, trackingNumber: true, shippedAt: true } },
@@ -215,18 +215,26 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
    * 가맹점과 운영진이 함께 다루는 반품에서 "누가 눌렀나" 를 감사 로그에서 찾아야 했다. 가맹점에게는 같은 가맹점
    * 사람만 이름으로, 운영진은 "운영진" 으로 보인다(core actorLabel).
    */
-  const people = active ? await loadActors([active.resolvedBy, active.receivedBy]) : new Map();
+  const people = await loadActors([
+    ...(active ? [active.resolvedBy, active.receivedBy] : []),
+    // 취소 뒤 들어온 입금을 돌려준 사람 — 돈이 밖으로 나간 동작인데 시각만 있고 사람이 없었다
+    order.payment?.lateDepositResolvedBy ?? null,
+  ]);
   const labelOf = (id: string | null) =>
     id === null ? null : actorLabel(actor, { id, identity: people.get(id) ?? null }, '기록 없음');
   const returnPeople = {
     resolved: active ? labelOf(active.resolvedBy) : null,
     received: active ? labelOf(active.receivedBy) : null,
   };
+  const lateDepositResolvedBy = order.payment?.lateDepositResolvedAt
+    ? labelOf(order.payment.lateDepositResolvedBy)
+    : null;
 
   return {
     ...order,
     returnMerchantIds,
     returnPeople,
+    lateDepositResolvedBy,
     /*
      * 주문자 개인정보는 가맹점에게 최소한만 준다.
      *

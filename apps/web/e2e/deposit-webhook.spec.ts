@@ -175,7 +175,8 @@ test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 
     await alert.getByRole('button', { name: '환불 처리함' }).click();
     await alert.getByRole('group', { name: '환불 처리 확인' }).getByRole('button', { name: '돌려주었음' }).click();
     await expect(ap.getByRole('alert').filter({ hasText: '취소한 뒤 입금이 들어왔습니다' })).toHaveCount(0, { timeout: 15_000 });
-    await expect(ap.getByText(/환불 처리$/)).toBeVisible();
+    // 돈이 밖으로 나간 동작이라 언제와 함께 **누가** 했는지도 적힌다(이름 · 역할)
+    await expect(ap.getByText(/환불 처리 · .+ · \S+$/)).toBeVisible();
 
     // 닫았으니 목록에서도 빠진다
     await ap.goto('/admin/orders?lateDeposit=1');

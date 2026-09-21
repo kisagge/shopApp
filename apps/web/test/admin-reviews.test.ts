@@ -6,6 +6,8 @@ const db = vi.hoisted(() => ({
     findMany: vi.fn<(...a: any[]) => any>(),
     count: vi.fn<(...a: any[]) => any>(),
   },
+  // 답글을 단 사람과 신고를 판단한 사람을 한 번에 읽는다(loadActors)
+  user: { findMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve([])) },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -221,5 +223,63 @@ describe('이름 가리기', () => {
 
     expect(page.rows[0]!.authorName).toBe('홍○동');
     expect(page.rows[0]!.reports[0]!.reporterName).toBe('김○수');
+  });
+});
+
+/**
+ * **신고를 누가 판단했는지.** 언제·무엇으로(내림·문제없음)는 화면에 있었는데 누가 했는지는 적어 두기만 했다 —
+ * 담당자가 여럿이면 "이 혹평을 누가 내렸나" 에 감사 로그로만 답할 수 있었다. 바로 옆 답글은 진작 고친 자리다.
+ */
+describe('신고를 판단한 사람', () => {
+  const reported = (over: Record<string, unknown> = {}) => ({
+    id: 'rv-1', rating: 2, content: '별로', _count: { images: 0 },
+    createdAt: new Date('2026-09-01'), deletedAt: null, productId: 'p-1',
+    user: { name: '김손님' },
+    product: { name: '울 코트', brand: { merchantId: 'm-a' } },
+    reply: null, repliedAt: null, replyEditedAt: null, repliedById: null,
+    reports: [{
+      id: 'rp-1', reason: 'ABUSE', detail: null, createdAt: new Date('2026-09-02'),
+      resolvedAt: new Date('2026-09-03'), resolution: 'removed', resolvedById: 'u-park',
+      reporter: { name: '박신고' },
+    }],
+    ...over,
+  });
+
+  beforeEach(() => {
+    db.review.findMany.mockResolvedValue([reported()]);
+    db.review.count.mockResolvedValue(1);
+    db.user.findMany.mockResolvedValue([{ id: 'u-park', name: '박운영', role: 'ADMIN', merchantId: null }]);
+  });
+
+  it('운영진에게는 이름과 역할로 보인다', async () => {
+    const list = await getAdminReviews(ADMIN, { tab: 'all' });
+
+    expect(list.rows[0]?.reports[0]?.resolvedBy).toBe('박운영 · 관리자');
+  });
+
+  it('가맹점에게 운영진의 이름은 새지 않는다', async () => {
+    const list = await getAdminReviews({ id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' }, { tab: 'all' });
+
+    expect(list.rows[0]?.reports[0]?.resolvedBy).toBe('운영진');
+  });
+
+  it('아직 안 본 신고에는 사람이 없다 — 빈 이름이 아니라 아무것도 아니다', async () => {
+    db.review.findMany.mockResolvedValue([reported({
+      reports: [{
+        id: 'rp-1', reason: 'ABUSE', detail: null, createdAt: new Date('2026-09-02'),
+        resolvedAt: null, resolution: null, resolvedById: null,
+        reporter: { name: '박신고' },
+      }],
+    })]);
+
+    const list = await getAdminReviews(ADMIN, { tab: 'all' });
+
+    expect(list.rows[0]?.reports[0]?.resolvedBy).toBeNull();
+  });
+
+  it('사람을 한 번에 묻는다 — 줄마다 물으면 쪽 하나에 스무 번이 나간다', async () => {
+    await getAdminReviews(ADMIN, { tab: 'all' });
+
+    expect(db.user.findMany).toHaveBeenCalledOnce();
   });
 });

@@ -134,6 +134,7 @@ export default async function NotificationTemplatesPage({
                 defaultBody={defaultBody}
                 customBody={row?.body ?? null}
                 updatedAt={row ? row.updatedAt.toISOString() : null}
+                updatedBy={row ? row.updatedBy : null}
                 params={NOTIFICATION_PARAMS[kind].map((name) => ({ name, label: PARAM_LABEL[name] ?? name }))}
                 sample={NOTIFICATION_SAMPLE_PARAMS}
               />

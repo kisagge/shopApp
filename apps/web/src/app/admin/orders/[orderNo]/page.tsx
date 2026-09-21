@@ -437,9 +437,12 @@ export default async function AdminOrderDetail({
                     {order.payment.lateDepositAt && (
                       <Row
                         label="취소 뒤 입금"
+                        // 돈이 밖으로 나간 동작이다 — 언제만 있고 누가 했는지가 없었다
                         value={`${format(won(order.payment.lateDepositAmount ?? 0))}원 · ${
                           order.payment.lateDepositResolvedAt
-                            ? `${adminTimestamp.format(order.payment.lateDepositResolvedAt)} 환불 처리`
+                            ? `${adminTimestamp.format(order.payment.lateDepositResolvedAt)} 환불 처리${
+                                order.lateDepositResolvedBy ? ` · ${order.lateDepositResolvedBy}` : ''
+                              }`
                             : '환불 필요'
                         }`}
                         small

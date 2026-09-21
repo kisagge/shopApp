@@ -21,6 +21,7 @@ export function TemplateForm({
   defaultBody,
   customBody,
   updatedAt,
+  updatedBy,
   params,
   sample,
 }: {
@@ -31,6 +32,8 @@ export function TemplateForm({
   defaultBody: string;
   customBody: string | null;
   updatedAt: string | null;
+  /** 마지막으로 고친 사람. 기본 문구면 null — 아무도 손대지 않았다 */
+  updatedBy: string | null;
   params: readonly { name: string; label: string }[];
   sample: Readonly<Record<string, string>>;
 }) {
@@ -89,6 +92,8 @@ export function TemplateForm({
             <>
               {' · '}
               <time dateTime={updatedAt}>{new Date(updatedAt).toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' })}</time>
+              {/* 손님에게 나가는 문구다 — 언제만 있고 누가 바꿨는지가 없었다 */}
+              {updatedBy && ` · ${updatedBy}`}
             </>
           )}
         </p>

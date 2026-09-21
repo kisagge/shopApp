@@ -2,9 +2,10 @@ import 'server-only';
 import { cache } from 'react';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, checkTemplate, isNotificationKind,
+  actorLabel, assertPermission, checkTemplate, isNotificationKind,
   type Actor, type NotificationKind, type TemplateProblem,
 } from '@shop/core';
+import { loadActors } from '~/lib/queries/admin/actors';
 import type { UpdateNotificationTemplateInput } from '@shop/contract';
 import type { Locale } from '@shop/i18n';
 import { describeTemplateProblem } from './template-problems';
@@ -36,11 +37,29 @@ export interface NotificationTemplateRow {
   readonly locale: string;
   readonly body: string;
   readonly updatedAt: Date;
+  /**
+   * 마지막으로 고친 사람(core 의 actorLabel). 이 칸이 생기기 전의 줄이면 "기록 없음".
+   *
+   * **적어 두기만 했다.** 손님에게 나가는 문구가 바뀌었는데 언제만 있고 누가 바꿨는지는 없었다 —
+   * 배송 정책·반품지·약관은 진작 적고 있는 줄이다(queries/admin/last-edit).
+   */
+  readonly updatedBy: string | null;
 }
 
 export async function getAllNotificationTemplates(actor: Actor): Promise<NotificationTemplateRow[]> {
   assertPermission(actor, 'notification:write');
-  return prisma.notificationTemplate.findMany({ select: { kind: true, locale: true, body: true, updatedAt: true } });
+  const rows = await prisma.notificationTemplate.findMany({
+    select: { kind: true, locale: true, body: true, updatedAt: true, updatedBy: true },
+  });
+  // 고친 사람을 한 번에 묻는다 — 줄마다 물으면 말 하나에 스무 번이 나간다
+  const people = await loadActors(rows.map((r) => r.updatedBy));
+  return rows.map((row) => ({
+    ...row,
+    updatedBy: actorLabel(actor, {
+      id: row.updatedBy,
+      identity: row.updatedBy ? people.get(row.updatedBy) ?? null : null,
+    }, '기록 없음'),
+  }));
 }
 
 export class TemplateError extends Error {

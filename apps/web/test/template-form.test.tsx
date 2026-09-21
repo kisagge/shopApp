@@ -27,6 +27,7 @@ const draw = (customBody: string | null = null) =>
       defaultBody="{couponName} 쿠폰이 도착했습니다"
       customBody={customBody}
       updatedAt={customBody ? '2026-09-15T00:00:00.000Z' : null}
+      updatedBy={customBody ? '박운영 · 관리자' : null}
       params={[{ name: 'couponName', label: '쿠폰 이름' }]}
       sample={NOTIFICATION_SAMPLE_PARAMS}
     />,
@@ -83,5 +84,23 @@ describe('알림 문구 폼', () => {
     await user.click(screen.getByRole('button', { name: '저장' }));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('중괄호'));
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **손님에게 나가는 문구가 바뀌었는데 누가 바꿨는지는 없었다.** 언제만 적혀 있었다 — 배송 정책·반품지·약관은
+ * 진작 사람을 함께 적고 있는 줄이다.
+ */
+describe('고친 사람', () => {
+  it('고친 문구에는 언제와 함께 누가 고쳤는지 적힌다', () => {
+    draw('{couponName} 쿠폰이 왔어요');
+
+    expect(screen.getByText(/고친 문구/)).toHaveTextContent('박운영 · 관리자');
+  });
+
+  it('기본 문구에는 아무도 안 적힌다 — 손댄 사람이 없다', () => {
+    draw(null);
+
+    expect(screen.getByText(/기본 문구/)).not.toHaveTextContent('·  ·');
   });
 });

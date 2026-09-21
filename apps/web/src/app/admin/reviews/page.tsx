@@ -218,7 +218,9 @@ export default async function AdminReviewsPage({
                               </time>
                               {report.resolvedAt && (
                                 <span className="text-[var(--fg-muted)]">
+                                  {/* 무엇으로 끝냈는지 옆에 누가 했는지까지 — 답글과 같은 결이다 */}
                                   · {report.resolution === 'removed' ? '내림' : '문제없음'}
+                                  {report.resolvedBy && ` · ${report.resolvedBy}`}
                                 </span>
                               )}
                             </p>
