@@ -15,6 +15,8 @@ export const TRACKED_STATUSES = [
 ] as const satisfies readonly OrderStatus[];
 
 export interface MyPageSummary {
+  /** 이용 기록 수집에 동의했는가. 고른 적 없으면 기본값(true)이다 — 거부만 명시적으로 남는다 */
+  readonly analyticsOptIn: boolean;
   readonly name: string;
   readonly email: string;
   readonly grade: MemberGrade;
@@ -32,7 +34,10 @@ export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | nu
   const userId = actor.id;
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { name: true, email: true, grade: true, pointBalance: true, marketingAgreedAt: true },
+    select: {
+      name: true, email: true, grade: true, pointBalance: true,
+      marketingAgreedAt: true, analyticsConsent: true,
+    },
   });
   if (!user) return null;
 
@@ -90,6 +95,11 @@ export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | nu
     reviewableCount,
     statusCounts,
     marketingOptIn: user.marketingAgreedAt !== null,
+    /*
+     * 아직 고른 적이 없으면(null) 기본값을 따른다 — 거부는 명시적으로 고른 것만이다.
+     * 화면은 이 값을 먼저 그리고, 이 브라우저의 값은 그다음이다.
+     */
+    analyticsOptIn: user.analyticsConsent !== 'DENIED',
   };
 }
 

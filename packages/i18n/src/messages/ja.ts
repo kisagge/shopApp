@@ -304,6 +304,7 @@ export const ja: Dictionary = {
   'my.analyticsOn': '収集中',
   'my.analyticsOff': '収集しない',
   'my.analyticsStop': '収集をやめる',
+  'my.analyticsFailed': '保存できませんでした。しばらくしてからもう一度お試しください。',
   'my.analyticsStart': '収集を許可する',
   'my.marketing': 'お得な情報を受け取る',
   'my.marketingNote': 'セールや特集のお知らせをメールでお送りします。注文・配送のご案内はこの設定に関わらず届きます。',

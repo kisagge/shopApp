@@ -321,6 +321,7 @@ export const ko = {
   'my.analyticsOn': '수집 중',
   'my.analyticsOff': '수집하지 않음',
   'my.analyticsStop': '수집 그만두기',
+  'my.analyticsFailed': '저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.',
   'my.analyticsStart': '수집 허용하기',
   'my.marketing': '혜택 소식 받기',
   'my.marketingNote': '할인과 기획전 소식을 메일로 보냅니다. 주문·배송 안내는 이 설정과 상관없이 나갑니다.',

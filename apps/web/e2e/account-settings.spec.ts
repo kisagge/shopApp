@@ -94,3 +94,55 @@ test('이름·연락처를 고치고 비밀번호를 바꾸면, 머리 이름이
   await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
   await expect(page.getByRole('banner').getByText('바뀐 이름', { exact: true }).locator('visible=true')).toHaveCount(1);
 });
+
+/**
+ * **끈 것이 이 기기에만 남았다.**
+ *
+ * 수집 창구는 계정의 거부를 존중하는데, 그 값을 만드는 곳이 탈퇴 처리뿐이라 화면의 토글은 이 브라우저의
+ * 저장소만 건드렸다 — 기기나 브라우저를 바꾸면 껐던 추적이 조용히 되살아났다. 마케팅 동의는 진작 계정에
+ * 저장하고 있어 일관성도 어긋났다.
+ *
+ * 그래서 **저장소를 통째로 버린 새 브라우저**로 다시 들어와 본다. 계정에 남지 않았다면 여기서 다시 "수집 중" 이
+ * 된다 — 이 검사가 잡으려는 것이 바로 그 자리다.
+ */
+test('이용 기록 수집을 끄면 다른 브라우저로 들어와도 꺼져 있다', async ({ page, browser }) => {
+  test.setTimeout(90_000);
+  const email = `e2e-consent-${Date.now()}@plain.test`;
+  const password = 'quiet-harbor-42';
+
+  await page.goto('/signup');
+  await ready(page);
+  await page.getByLabel(/^이메일/).fill(email);
+  await page.getByLabel(/^이름/).fill('동의 검사');
+  await page.getByLabel(/^비밀번호\*/).fill(password);
+  await page.getByLabel(/^비밀번호 확인/).fill(password);
+  await page.getByLabel(/이용약관에 동의합니다/).check();
+  await page.getByLabel(/개인정보 수집/).check();
+  await page.getByRole('button', { name: '가입하기' }).click();
+  await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
+
+  // ── 끈다. 저장을 기다린다 — 단추 글자만 보고 넘어가면 아직 안 적혔을 수 있다
+  await page.goto('/mypage');
+  await ready(page);
+  const [saved] = await Promise.all([
+    page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/api/account/consent')),
+    page.getByRole('button', { name: '수집 그만두기' }).click(),
+  ]);
+  expect(saved.status(), await saved.text()).toBe(200);
+  await expect(page.getByText('수집하지 않음')).toBeVisible();
+
+  // ── 저장소를 통째로 버린 브라우저로 다시
+  const fresh = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  try {
+    const fp = await fresh.newPage();
+    await login(fp, email, password);
+    await expect(fp.getByRole('link', { name: '마이페이지' })).toBeVisible({ timeout: 20_000 });
+    await fp.goto('/mypage');
+    await ready(fp);
+
+    await expect(fp.getByText('수집하지 않음'), '계정에 안 남아 껐던 추적이 되살아났다').toBeVisible();
+    await expect(fp.getByRole('button', { name: '수집 허용하기' })).toBeVisible();
+  } finally {
+    await fresh.close();
+  }
+});

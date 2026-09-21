@@ -229,7 +229,7 @@ export default async function MyPage() {
       </nav>
 
       {/* 거부할 길이 없으면 동의가 아니다 */}
-      <AnalyticsConsentToggle />
+      <AnalyticsConsentToggle initial={summary.analyticsOptIn} />
 
       {/* 가입 화면에서 받은 선택 동의를 되돌리는 자리 */}
       <MarketingConsentToggle initial={summary.marketingOptIn} />

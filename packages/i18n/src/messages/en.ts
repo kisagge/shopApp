@@ -308,6 +308,7 @@ export const en: Dictionary = {
   'my.analyticsOn': 'Collecting',
   'my.analyticsOff': 'Not collecting',
   'my.analyticsStop': 'Stop collecting',
+  'my.analyticsFailed': 'Could not save. Please try again in a moment.',
   'my.analyticsStart': 'Allow collecting',
   'my.marketing': 'Offer emails',
   'my.marketingNote': 'News about sales and collections. Order and delivery notices are sent regardless of this setting.',
