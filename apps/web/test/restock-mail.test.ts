@@ -5,8 +5,10 @@ const db = vi.hoisted(() => ({
     findMany: vi.fn<(...a: any[]) => any>(),
     updateMany: vi.fn<(...a: any[]) => any>(),
   },
+  // 표시는 조건부 UPDATE … RETURNING 로 한다
+  $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
-vi.mock('@shop/db', () => ({ prisma: db }));
+vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: (parts: unknown[]) => parts } }));
 
 const { notifyRestocked } = await import('~/lib/restock/notify');
 const { setMailerForTest } = await import('@shop/mail');
@@ -34,6 +36,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   sent.length = 0;
   db.restockNotification.updateMany.mockResolvedValue({ count: 1 });
+  // 부른 줄을 전부 이긴 것으로 둔다 — 누가 이겼는지는 restock 검사가 따로 본다
+  db.$queryRaw.mockImplementation(() =>
+    Promise.resolve((db.restockNotification.findMany.mock.results.at(-1)?.value ?? Promise.resolve([]))),
+  );
   setMailerForTest({
     name: 'test',
     send: (m) => { sent.push({ to: m.to, subject: m.subject, html: m.html }); return Promise.resolve(); },
@@ -95,6 +101,6 @@ describe('재입고 알림 메일', () => {
     await notifyRestocked(['v-1']);
 
     expect(sent).toHaveLength(0);
-    expect(db.restockNotification.updateMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
   });
 });

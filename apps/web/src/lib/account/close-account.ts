@@ -82,12 +82,21 @@ export async function closeAccount(
   const check = await inspectClosure(userId);
   if (!check.allowed) throw new ClosureError('BLOCKED', 409, check.blocks);
 
-  const user = await prisma.user.findUniqueOrThrow({
-    where: { id: userId },
-    select: { id: true, pointBalance: true },
-  });
-
   return prisma.$transaction(async (tx) => {
+    /*
+     * **잔액은 여기서, 잠근 뒤에 읽는다.**
+     *
+     * 예전에는 트랜잭션 밖에서 읽은 값을 그대로 썼다. 읽고 나서 여기까지 오는 사이에 적립이 들어오면(반품 기한이
+     * 지난 주문은 탈퇴를 막지 않으므로 자동 구매확정 배치가 실제로 그 틈에 적립을 넣는다) 원장에는 그 적립이
+     * 남는데 잔액은 옛 값만큼만 빼고 0 이 된다. 그 다음 날 대사 배치가 **"원장이 진실"** 이라며 탈퇴한 계정의
+     * 잔액을 되살린다. 손님에게 알린 소멸 금액도 그만큼 거짓이 된다.
+     */
+    await tx.$queryRaw`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`;
+    const user = await tx.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { id: true, pointBalance: true },
+    });
+
     /*
      * 리뷰를 지우는 경우, **상품 평점을 다시 세야 한다.**
      *

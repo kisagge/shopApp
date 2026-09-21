@@ -9,8 +9,10 @@ const db = vi.hoisted(() => ({
     findMany: vi.fn<(...a: any[]) => any>(),
     updateMany: vi.fn<(...a: any[]) => any>(),
   },
+  // 표시는 조건부 UPDATE … RETURNING 로 한다 — 누가 이겼는지 알아야 그 사람에게만 보낸다
+  $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
-vi.mock('@shop/db', () => ({ prisma: db }));
+vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: (parts: unknown[]) => parts } }));
 
 const { subscribeRestock, unsubscribeRestock, notifyRestocked, setRestockNotifiers } =
   await import('~/lib/restock/notify');
@@ -26,6 +28,8 @@ const variant = (over: Record<string, unknown> = {}) => ({
 });
 
 const sent: unknown[][] = [];
+/** 이번에 읽힌 대기자 — 표시가 그중 누구를 이겼는지 흉내 내는 데 쓴다 */
+let lastPending: { id: string }[] = [];
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -33,6 +37,8 @@ beforeEach(() => {
   db.productVariant.findUnique.mockResolvedValue(variant());
   db.restockNotification.count.mockResolvedValue(0);
   db.restockNotification.updateMany.mockResolvedValue({ count: 1 });
+  // 기본값: 부른 줄을 전부 이긴다
+  db.$queryRaw.mockImplementation(() => Promise.resolve(lastPending.map((p) => ({ id: p.id }))));
   setRestockNotifiers([
     { name: 'test', send: (n) => { sent.push([...n]); return Promise.resolve(); } },
   ]);
@@ -106,8 +112,13 @@ describe('발송', () => {
     },
   ];
 
+  const readsPending = (rows: { id: string }[]) => {
+    lastPending = rows;
+    db.restockNotification.findMany.mockResolvedValue(rows);
+  };
+
   it('기다리는 사람에게만 보낸다', async () => {
-    db.restockNotification.findMany.mockResolvedValue(pending);
+    readsPending(pending);
 
     const r = await notifyRestocked(['v-1']);
 
@@ -121,10 +132,10 @@ describe('발송', () => {
 
   it('보내기 전에 먼저 표시한다 — 반대면 같은 사람에게 두 번 간다', async () => {
     const order: string[] = [];
-    db.restockNotification.findMany.mockResolvedValue(pending);
-    db.restockNotification.updateMany.mockImplementation(() => {
+    readsPending(pending);
+    db.$queryRaw.mockImplementation(() => {
       order.push('mark');
-      return Promise.resolve({ count: 1 });
+      return Promise.resolve([{ id: 'r-1' }]);
     });
     setRestockNotifiers([
       { name: 'test', send: () => { order.push('send'); return Promise.resolve(); } },
@@ -136,12 +147,59 @@ describe('발송', () => {
   });
 
   it('기다리는 사람이 없으면 아무 일도 없다', async () => {
-    db.restockNotification.findMany.mockResolvedValue([]);
+    readsPending([]);
 
     const r = await notifyRestocked(['v-1']);
 
     expect(r.notified).toBe(0);
-    expect(db.restockNotification.updateMany).not.toHaveBeenCalled();
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **겹쳐 돌 때 같은 메일이 두 번 갔다.**
+   *
+   * 이 함수는 트랜잭션 밖에서 불린다(재고 수정·일괄 재고 업로드). 표시에 "아직 표시되지 않은 줄" 조건이 없으면
+   * 두 실행이 같은 목록을 읽고 둘 다 표시하고 둘 다 보낸다 — 바로 위에 적어 둔 "여러 번 받는 것보다 낫다" 는
+   * 판단이 지켜지지 않는다.
+   */
+  it('아직 표시되지 않은 줄에만 표시한다', async () => {
+    readsPending(pending);
+
+    await notifyRestocked(['v-1']);
+
+    // 태그드 템플릿이라 첫 인자가 글자 조각 배열이다
+    const [parts] = db.$queryRaw.mock.calls[0]! as [readonly string[]];
+    const sql = parts.join('?');
+    expect(sql, '조건이 없으면 겹쳐 돈 실행이 같은 사람에게 또 보낸다').toMatch(/notifiedAt" IS NULL/);
+  });
+
+  it('다른 실행이 먼저 가져간 사람에게는 보내지 않는다', async () => {
+    readsPending([
+      pending[0]!,
+      {
+        id: 'r-2', userId: 'u-2', variantId: 'v-1',
+        user: { email: 'b@plain.test' },
+        variant: { label: '블랙 / L', product: { name: '울 코트', slug: 'wool-coat' } },
+      },
+    ]);
+    // 첫 줄은 다른 실행이 이미 표시했다 — 이긴 줄만 돌아온다
+    db.$queryRaw.mockResolvedValue([{ id: 'r-2' }]);
+
+    const r = await notifyRestocked(['v-1']);
+
+    expect(r.notified).toBe(1);
+    expect(sent[0]).toHaveLength(1);
+    expect((sent[0] as { userId: string }[])[0]!.userId).toBe('u-2');
+  });
+
+  it('전부 다른 실행이 가져갔으면 아무에게도 안 보낸다', async () => {
+    readsPending(pending);
+    db.$queryRaw.mockResolvedValue([]);
+
+    const r = await notifyRestocked(['v-1']);
+
+    expect(r.notified).toBe(0);
+    expect(sent).toHaveLength(0);
   });
 
   it('빈 목록이면 조회조차 하지 않는다', async () => {

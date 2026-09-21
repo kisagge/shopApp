@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma } from '@shop/db';
+import { Prisma, prisma } from '@shop/db';
 import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { restockMail } from '~/lib/mail/notices';
@@ -192,13 +192,27 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
    * 반대로 하면 보내고 나서 표시가 실패했을 때 다음 실행이 같은 사람에게
    * 또 보낸다. 표시가 먼저면 최악의 경우 알림 하나를 못 받는데,
    * 같은 알림을 여러 번 받는 것보다 낫다.
+   *
+   * **표시는 아직 표시되지 않은 줄에만 건다.** 조건이 없으면 이 함수가 겹쳐 돌 때(두 운영자가 같은 옵션의 재고를
+   * 동시에 올리거나, 일괄 재고 업로드와 개별 수정이 엇갈릴 때) 두 실행이 같은 목록을 읽고 **둘 다** 보낸다 —
+   * 위에 적은 "여러 번 받는 것보다 낫다" 는 판단이 실제로는 지켜지지 않았다. 소멸 예고 알림은 같은 자리에
+   * 진작 조건을 걸고 있다(notifications/expiry-notice).
+   *
+   * 이긴 줄만 돌려받아 그 사람들에게만 보낸다 — updateMany 는 몇 줄인지만 알려 주므로 **누가** 이겼는지 알 수 없다.
    */
-  await prisma.restockNotification.updateMany({
-    where: { id: { in: pending.map((p) => p.id) } },
-    data: { notifiedAt: now },
-  });
+  const claimed = await prisma.$queryRaw<{ id: string }[]>`
+    UPDATE restock_notifications
+       SET "notifiedAt" = ${now}
+     WHERE id IN (${Prisma.join(pending.map((p) => p.id))})
+       AND "notifiedAt" IS NULL
+    RETURNING id
+  `;
+  const won = new Set(claimed.map((row) => row.id));
+  const mine = pending.filter((p) => won.has(p.id));
+  // 다른 실행이 전부 먼저 가져갔다
+  if (mine.length === 0) return { notified: 0, variantIds: [] };
 
-  const notices: RestockNotice[] = pending.map((p) => ({
+  const notices: RestockNotice[] = mine.map((p) => ({
     userId: p.userId,
     email: p.user.email,
     locale: localeOf(p.user.locale),
@@ -224,7 +238,7 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
   );
 
   return {
-    notified: pending.length,
-    variantIds: [...new Set(pending.map((p) => p.variantId))],
+    notified: mine.length,
+    variantIds: [...new Set(mine.map((p) => p.variantId))],
   };
 }

@@ -17,14 +17,16 @@ const tx = vi.hoisted(() => ({
   account: { deleteMany: vi.fn<(...a: any[]) => any>() },
   eventLog: { updateMany: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { create: vi.fn<(...a: any[]) => any>() },
-  user: { update: vi.fn<(...a: any[]) => any>() },
+  user: {
+    update: vi.fn<(...a: any[]) => any>(),
+    // 잔액은 트랜잭션 안에서, 잠근 뒤에 읽는다
+    findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
+  },
+  $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
 
 const db = vi.hoisted(() => ({
-  user: {
-    findFirst: vi.fn<(...a: any[]) => any>(),
-    findUniqueOrThrow: vi.fn<(...a: any[]) => any>(),
-  },
+  user: { findFirst: vi.fn<(...a: any[]) => any>() },
   order: { findMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
@@ -39,7 +41,8 @@ const ok = { phrase: '탈퇴합니다', eraseReviews: false };
 beforeEach(() => {
   vi.clearAllMocks();
   db.user.findFirst.mockResolvedValue({ id: USER, role: 'CUSTOMER' });
-  db.user.findUniqueOrThrow.mockResolvedValue({ id: USER, pointBalance: 0 });
+  tx.user.findUniqueOrThrow.mockResolvedValue({ id: USER, pointBalance: 0 });
+  tx.$queryRaw.mockResolvedValue([{ id: USER }]);
   db.order.findMany.mockResolvedValue([]);
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.order.updateMany.mockResolvedValue({ count: 2 });
@@ -161,7 +164,7 @@ describe('포인트', () => {
      * 잔액만 0 으로 만들면 원장 합계와 어긋나고, 그 뒤로 대사 배치가
      * 매번 이 계정을 어긋난 것으로 잡는다.
      */
-    db.user.findUniqueOrThrow.mockResolvedValue({ id: USER, pointBalance: 3200 });
+    tx.user.findUniqueOrThrow.mockResolvedValue({ id: USER, pointBalance: 3200 });
 
     const result = await closeAccount(USER, ok);
 
@@ -170,6 +173,8 @@ describe('포인트', () => {
     });
     expect(tx.user.update.mock.calls[0]![0].data.pointBalance).toBe(0);
     expect(result.forfeitedPoints).toBe(3200);
+    // 잔액은 트랜잭션 밖이 아니라 여기서 읽는다 — 아래 검사가 그 까닭을 적어 둔다
+    expect(db).not.toHaveProperty('user.findUniqueOrThrow');
   });
 
   it('잔액이 0 이면 원장에 적지 않는다 — 0 짜리 줄이 쌓일 이유가 없다', async () => {
@@ -231,5 +236,34 @@ describe('한 트랜잭션', () => {
     await closeAccount(USER, ok);
 
     expect(db.$transaction).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * **잔액을 트랜잭션 밖에서 읽으면 그 사이에 들어온 적립이 사라진다.**
+ *
+ * 반품 기한이 지난 주문은 탈퇴를 막지 않으므로, 자동 구매확정 배치가 실제로 그 틈에 적립을 넣는다. 그러면 원장에는
+ * 그 적립이 남는데 잔액은 옛 값만큼만 빼고 0 이 되고, 다음 날 대사 배치가 "원장이 진실" 이라며 탈퇴한 계정의
+ * 잔액을 되살린다. 손님에게 알린 소멸 금액도 그만큼 거짓이 된다.
+ */
+describe('탈퇴 직전에 들어온 적립', () => {
+  it('잔액은 트랜잭션 안에서, 그 줄을 잠근 뒤에 읽는다', async () => {
+    await closeAccount(USER, ok);
+
+    expect(tx.$queryRaw, '사용자 줄을 잠그지 않았다').toHaveBeenCalled();
+    // 태그드 템플릿이라 첫 인자가 글자 조각 배열이다
+    const [parts] = tx.$queryRaw.mock.calls[0]! as [readonly string[]];
+    expect(parts.join('?')).toMatch(/FOR UPDATE/);
+    expect(tx.user.findUniqueOrThrow, '잔액을 트랜잭션 안에서 읽지 않았다').toHaveBeenCalled();
+  });
+
+  it('잠근 뒤 읽은 값으로 소멸한다 — 그 사이 늘어난 적립까지 함께 턴다', async () => {
+    // 트랜잭션 밖에서 읽었다면 3,200 이었을 값이, 잠그고 보니 8,200 이 되어 있다
+    tx.user.findUniqueOrThrow.mockResolvedValue({ id: USER, pointBalance: 8_200 });
+
+    const result = await closeAccount(USER, ok);
+
+    expect(tx.pointTransaction.create.mock.calls[0]![0].data.amount).toBe(-8_200);
+    expect(result.forfeitedPoints, '손님에게 알리는 소멸 금액도 지금 값이어야 한다').toBe(8_200);
   });
 });
