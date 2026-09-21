@@ -24,7 +24,19 @@ import { join } from 'node:path';
  */
 
 const SRC = join(process.cwd(), 'src');
-const ADMIN_API = join(SRC, 'app', 'api', 'admin');
+/**
+ * **사람만 기록을 남기는 것이 아니다.**
+ *
+ * 이 검사는 `/api/admin` 만 훑고 있었다. 그런데 돈과 재고를 움직이는 쓰기는 거기 밖에도 있다 — 배치(`api/cron`)가
+ * 적립을 지급하고 정산을 확정하고, 결제사 웹훅(`api/webhooks`)이 입금을 반영해 주문을 결제완료로 옮긴다.
+ * 배치들은 다들 남기고 있었지만 그건 규칙이 아니라 습관이었고, 웹훅은 실제로 한 줄도 남기지 않았다 —
+ * "이 주문이 왜 결제완료가 됐나" 에 답할 자리가 감사 로그에는 없었다.
+ */
+const WATCHED = [
+  join(SRC, 'app', 'api', 'admin'),
+  join(SRC, 'app', 'api', 'cron'),
+  join(SRC, 'app', 'api', 'webhooks'),
+];
 
 /** 상태를 바꾸는 메서드 */
 const WRITE = ['POST', 'PATCH', 'PUT', 'DELETE'] as const;
@@ -79,13 +91,22 @@ const READ_ONLY_WRITE_METHOD: Readonly<Record<string, string>> = {
     '저장하지 않은 문구로 메일을 만들어 돌려주기만 한다. 문구가 길고 한글이라 주소 대신 본문으로 받으려고 POST 다.',
 };
 
-const writers = routeFiles(ADMIN_API)
+const writers = WATCHED.flatMap(routeFiles)
   .map((file) => ({
     file,
     rel: file.slice(SRC.length + 1),
     methods: WRITE.filter((m) => new RegExp(`export async function ${m}\\b`).test(readFileSync(file, 'utf8'))),
   }))
   .filter((r) => r.methods.length > 0 && !(r.rel in READ_ONLY_WRITE_METHOD));
+
+/**
+ * 배치는 GET 으로 돈다 — 크론이 그 방식으로 부르기 때문이다. 메서드로 "쓰기" 를 가리는 위 규칙에 걸리지 않으니
+ * 따로 모은다. 하는 일은 어느 쓰기 창구보다 무겁다: 적립 지급·포인트 소멸·정산 확정·재고 해제.
+ */
+const batches = routeFiles(join(SRC, 'app', 'api', 'cron')).map((file) => ({
+  file,
+  rel: file.slice(SRC.length + 1),
+}));
 
 describe('운영진의 쓰기는 전부 감사 로그에 닿는다', () => {
   it('쓰기 창구를 실제로 찾아낸다 — 못 찾으면 이 검사는 아무것도 지키지 못한다', () => {
@@ -96,6 +117,17 @@ describe('운영진의 쓰기는 전부 감사 로그에 닿는다', () => {
     expect(writers.length, '어드민 쓰기 창구를 하나도 못 찾았다').toBeGreaterThan(20);
     expect(writers.some((w) => w.rel.includes('users'))).toBe(true);
     expect(writers.some((w) => w.rel.includes('settlements'))).toBe(true);
+    // 어드민 밖의 자리도 실제로 잡혔는가 — 폴더 이름이 바뀌면 조용히 0건이 된다
+    expect(writers.some((w) => w.rel.includes('webhooks')), '웹훅 창구를 못 찾았다').toBe(true);
+    expect(batches.length, '배치를 하나도 못 찾았다').toBeGreaterThan(5);
+  });
+
+  it.each(batches.map((b) => b.rel))('%s — 배치도 남긴다', (rel) => {
+    const batch = batches.find((b) => b.rel === rel)!;
+    expect(
+      reachesAudit(batch.file),
+      `${rel} 이 감사 로그를 남기지 않는다. 사람이 안 보는 시간에 돈과 재고를 움직이는 자리다.`,
+    ).toBe(true);
   });
 
   it.each(writers.map((w) => [w.rel, w.methods.join('·')] as const))(

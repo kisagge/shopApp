@@ -77,6 +77,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'banner.image': '배너 이미지 교체',
   'order.refund': '환불',
   'order.autoConfirm': '구매 자동 확정',
+  // 사람이 아니라 결제사 웹훅이 한 일이다 — 가상계좌 입금이 확인돼 주문이 결제완료로 갔다
+  'payment.deposit': '가상계좌 입금 반영',
   'order.releaseHold': '재고 잠금 해제',
   'collection.create': '기획전 등록',
   'collection.update': '기획전 수정',

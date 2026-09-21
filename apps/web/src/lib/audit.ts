@@ -49,6 +49,19 @@ function isSystemActor(actor: Actor): boolean {
   return actor.id.startsWith('system:');
 }
 
+/**
+ * 결제사 웹훅이 남기는 행위자.
+ *
+ * 크론(CRON_ACTOR)과 같은 결이다 — 사람이 아니므로 사용자 표에 행이 없고, 이름만 남는다. 역할은 권한을 주는
+ * 값이 아니라 **기록에 찍히는 값**이다: 웹훅은 권한을 묻지 않고(공개 주소다) 본문도 믿지 않으며, 무엇을 할지는
+ * 결제사에 직접 물어 정한다.
+ */
+export const WEBHOOK_ACTOR: Actor = {
+  id: 'system:webhook:toss',
+  role: 'SUPER_ADMIN',
+  merchantId: null,
+};
+
 export interface AuditInput {
   readonly actor: Actor;
   /** '<대상>.<동작>' 형태. 'order.refund', 'user.assignRole' */

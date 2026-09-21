@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { applyDeposit } from '~/lib/payments/deposit';
+import { recordAudit, WEBHOOK_ACTOR } from '~/lib/audit';
 
 /**
  * 토스 웹훅.
@@ -40,6 +41,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       // 정상적인 경우도 많다(이미 반영·입금 전). 시끄럽게 만들지 않는다.
       return NextResponse.json({ received: true, applied: false, reason: outcome.reason });
     }
+    /*
+     * **돈이 움직인 자리다.** 입금이 반영되면 주문이 결제완료가 되는데, 그 일을 한 것은 사람이 아니라 웹훅이다.
+     * 남기지 않으면 "이 주문이 왜 결제완료가 됐나" 에 답할 자리가 이벤트 로그뿐이다 — 운영진이 무엇을 했는지
+     * 보는 곳(감사 로그)에는 이 줄이 없었다. 반영된 것만 남긴다: 이미 반영·입금 전은 아무 일도 없던 것이다.
+     */
+    await recordAudit({
+      actor: WEBHOOK_ACTOR,
+      action: 'payment.deposit',
+      targetType: 'order',
+      targetId: outcome.orderNo,
+      after: { status: outcome.status },
+      request,
+    });
     return NextResponse.json({ received: true, applied: true, orderNo: outcome.orderNo });
   } catch (error) {
     // 여기서 500 을 주면 토스가 재시도한다. 그편이 맞다 — 우리 쪽 장애다.
