@@ -17,7 +17,21 @@ import { STATE_FILE, ready } from './state';
  * 그대로 부른다는 것은 shipment-bulk-route 가 지킨다.
  */
 
+/**
+ * 도구를 펼친다.
+ *
+ * 내려받기·일괄 처리는 접혀 있다 — 펼친 채로 두면 좁은 화면에서 첫 주문 줄이 한 화면 아래로 밀린다. 주문
+ * 화면을 여는 까닭은 목록이고, 이 도구는 가끔 쓴다. 여기서는 그 도구가 대상이므로 먼저 펼친다.
+ */
+async function openTools(page: Page): Promise<void> {
+  const tools = page.getByRole('group', { name: '내려받기 · 일괄 처리' });
+  if (await tools.getByRole('button', { name: 'CSV 내려받기' }).isVisible()) return;
+  await tools.getByRole('heading', { name: '내려받기 · 일괄 처리' }).click();
+  await expect(tools.getByRole('button', { name: 'CSV 내려받기' })).toBeVisible();
+}
+
 async function download(page: Page): Promise<{ bytes: Buffer; rows: string[][] }> {
+  await openTools(page);
   const [file] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'CSV 내려받기' }).click(),
@@ -89,12 +103,13 @@ test('내려받은 파일을 그대로 다시 올리면 아무것도 새로 등�
   const { bytes, rows } = await download(page);
   expect(rows.length, `${STATUS.label} 주문이 없다`).toBeGreaterThan(1);
 
+  await openTools(page);
   await page.getByLabel('CSV 파일').setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: bytes });
   await page.getByRole('button', { name: '송장 올리기' }).click();
 
   await expect(page.getByText(/^0건 등록/)).toBeVisible();
   // 화면 전체의 alert 를 세면 Next 의 경로 알림이 함께 잡힌다 — 이 영역 안만 본다
-  await expect(page.getByRole('region', { name: '내려받기 · 일괄 처리' }).getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('group', { name: '내려받기 · 일괄 처리' }).getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('table', { name: /등록하지 못한 줄/ })).toHaveCount(0);
 });
 
@@ -103,6 +118,7 @@ test('틀린 줄은 줄 번호와 사유로 돌려준다', async ({ page }) => {
   await ready(page);
 
   const csv = '주문번호,택배사,송장번호\r\n19990101-0000000,CJ대한통운,123456789012\r\n19990101-0000001,비둘기택배,123456789012\r\n';
+  await openTools(page);
   await page.getByLabel('CSV 파일').setInputFiles({ name: 'fix.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   await page.getByRole('button', { name: '송장 올리기' }).click();
 

@@ -28,14 +28,34 @@ export function OrderBulkActions({
   filter: OrderExportFilter;
   canFulfill: boolean;
 }) {
+  /*
+   * **접어 둔다.** 펼친 채로 두었더니 좁은 화면에서 이 덩이가 473px 을 차지해, 첫 주문 줄이 919px 지점으로
+   * 밀렸다 — 폰에서는 한 화면을 다 넘기고도 더 내려가야 목록이 보인다. 주문 화면을 여는 까닭은 목록을 보려는
+   * 것이고, 내려받기·송장 올리기는 가끔 쓰는 도구다. 상품 목록의 좁혀 보기가 같은 이유로 접혀 있다.
+   *
+   * details 를 쓴다 — 여닫는 데 자바스크립트가 필요 없고 summary 는 그 자체로 낭독기가 읽는 단추다.
+   */
   return (
-    <section aria-labelledby="bulk-heading" className="mb-5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4">
-      <h2 id="bulk-heading" className="text-[14px] font-semibold">내려받기 · 일괄 처리</h2>
+    <details
+      // 접힌 덩이에도 이름을 준다 — summary 는 여는 단추로 읽히고, 이름이 없으면 그 안이 무엇인지 안 들린다
+      aria-label="내려받기 · 일괄 처리"
+      className="group mb-5 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4"
+    >
+      <summary className="flex cursor-pointer list-none items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 [&::-webkit-details-marker]:hidden">
+        <span
+          aria-hidden="true"
+          className="text-[10px] text-[var(--fg-muted)] transition-transform group-open:rotate-90"
+        >
+          &#9654;
+        </span>
+        {/* 제목은 제목으로 남긴다 — 안의 h3 가 h2 없이 뜨면 제목으로 훑는 사람에게 소속이 흐려진다 */}
+        <h2 className="text-[14px] font-semibold">내려받기 · 일괄 처리</h2>
+      </summary>
       <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:gap-10">
         <ExportOrders filter={filter} />
         {canFulfill && <UploadShipments />}
       </div>
-    </section>
+    </details>
   );
 }
 

@@ -26,7 +26,7 @@ const csvFile = (text: string) => new File([text], 'orders.csv', { type: 'text/c
 describe('구조', () => {
   it('제목이 붙은 영역이고, 파일 입력에 라벨과 설명이 있다', () => {
     render(<OrderBulkActions filter={{}} canFulfill />);
-    expect(screen.getByRole('region', { name: '내려받기 · 일괄 처리' })).toBeDefined();
+    expect(screen.getByRole('group', { name: '내려받기 · 일괄 처리' })).toBeDefined();
 
     const input = screen.getByLabelText('CSV 파일');
     expect(input.getAttribute('type')).toBe('file');

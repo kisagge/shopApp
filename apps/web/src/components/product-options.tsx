@@ -309,8 +309,12 @@ function OptionGroup({
                       : 'border-[var(--border-strong)] bg-[var(--bg)] text-[var(--fg)]',
                 ].join(' ')}
               >
-                {/* 줄만 긋지 않는다 — 색·줄은 못 보는 사람에게 아무 말도 안 한다 */}
-                <span className={available ? '' : 'line-through'}>{value.value}</span>
+                {/*
+                  **줄을 긋지 않는다.** 줄만으로는 못 보는 사람에게 아무 말도 안 해서 "품절" 을 함께 적어 두었는데,
+                  그 줄이 짧은 글자 위를 지나며 **글자를 다른 글자로 만들었다** — L 에 줄이 그어지면 ㄴ 으로 읽힌다.
+                  품절이라는 사실은 옅은 색과 아래 "품절" 이 이미 말하고, 이름은 이름대로 읽혀야 한다.
+                */}
+                <span>{value.value}</span>
                 {/* 사이 공백은 화면에는 안 보이고(세로 배치) 이름을 "XL 품절" 로 띄어 읽게 한다 */}
                 {!available && <>{' '}<span className="text-[10px] font-normal">{t('catalog.soldOut')}</span></>}
               </button>
