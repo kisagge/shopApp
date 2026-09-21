@@ -4,7 +4,7 @@ import { expirePoints } from '~/lib/points/expire';
 import { recordAudit } from '~/lib/audit';
 
 /**
- * 포인트 소멸 배치. 매일 KST 04:00 (UTC 19:00 전날) 에 돈다.
+ * 포인트 소멸 배치. 매일 KST 02:00 (UTC 17:00 전날) 에 돈다.
  *
  * **대사보다 먼저 돈다.** 소멸이 잔액과 원장을 함께 바꾸므로, 대사가 먼저
  * 돌면 곧 소멸시킬 값을 정상으로 보고 지나간다. 순서가 반대여도 틀리지는

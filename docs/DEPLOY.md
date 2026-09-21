@@ -248,7 +248,7 @@ SEED_REMOTE=yes DATABASE_URL="<운영 풀링 주소>" pnpm db:seed
 
 ## 5. 크론
 
-`apps/web/vercel.json` 에 여섯 개가 정의돼 있다. **크론 표현식은 UTC 로 읽힌다** —
+`apps/web/vercel.json` 에 일곱 개가 정의돼 있다. **크론 표현식은 UTC 로 읽힌다** —
 아래 시각은 거기에 9시간을 더한 값이다.
 
 | 경로 | 주기 | 하는 일 |

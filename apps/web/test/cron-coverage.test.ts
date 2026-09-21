@@ -107,19 +107,19 @@ describe('함수 리전', () => {
  *
  * 그래서 표를 읽지 않고 `vercel.json` 에서 계산해 맞춰 본다.
  */
-describe('배치 시각이 문서와 같다', () => {
-  /** UTC 크론 표현식을 문서가 쓰는 KST 문장으로 바꾼다 */
-  function kstLabel(schedule: string): string {
-    const [min, hour, dayOfMonth] = schedule.split(/\s+/) as [string, string, string];
-    const shifted = Number(hour) + 9;
-    const kstHour = shifted % 24;
-    const time = `KST ${String(kstHour).padStart(2, '0')}:${String(Number(min)).padStart(2, '0')}`;
-    if (dayOfMonth === '*') return `매일 ${time}`;
-    // 9시간을 더하다 자정을 넘으면 날짜도 하루 넘어간다 — 정산이 그 경우다
-    const day = Number(dayOfMonth) + (shifted >= 24 ? 1 : 0);
-    return `매달 ${day}일 ${time}`;
-  }
+/** UTC 크론 표현식을 문서·주석이 쓰는 KST 문장으로 바꾼다 — 표도 주석도 같은 계산을 본다 */
+function kstLabel(schedule: string): string {
+  const [min, hour, dayOfMonth] = schedule.split(/\s+/) as [string, string, string];
+  const shifted = Number(hour) + 9;
+  const kstHour = shifted % 24;
+  const time = `KST ${String(kstHour).padStart(2, '0')}:${String(Number(min)).padStart(2, '0')}`;
+  if (dayOfMonth === '*') return `매일 ${time}`;
+  // 9시간을 더하다 자정을 넘으면 날짜도 하루 넘어간다 — 정산이 그 경우다
+  const day = Number(dayOfMonth) + (shifted >= 24 ? 1 : 0);
+  return `매달 ${day}일 ${time}`;
+}
 
+describe('배치 시각이 문서와 같다', () => {
   const doc = () => readFileSync(join(process.cwd(), '..', '..', 'docs', 'DEPLOY.md'), 'utf8');
 
   it.each([...scheduled])('%s 의 시각이 문서에 그대로 적혀 있다', (path, schedule) => {
@@ -131,6 +131,70 @@ describe('배치 시각이 문서와 같다', () => {
   it('표에 적힌 배치 수가 실제와 같다', () => {
     const rows = doc().match(/\| `\/api\/cron\/[a-z-]+` \|/g) ?? [];
     expect(rows).toHaveLength(scheduled.size);
+  });
+
+  /**
+   * **표는 맞는데 그 위의 문장이 틀려 있었다.** "여섯 개가 정의돼 있다" 고 적힌 채 일곱 줄이 서 있었다 —
+   * 줄 수만 세는 검사는 그 문장을 보지 못한다. 숫자도 vercel.json 에서 세어 맞춘다.
+   */
+  it('문장에 적힌 배치 수도 실제와 같다', () => {
+    const KOREAN = ['하나', '둘', '셋', '넷', '다섯', '여섯', '일곱', '여덟', '아홉', '열'];
+    const said = doc().match(/vercel\.json` 에 (\S+) 개가 정의돼 있다/)?.[1];
+    expect(said, 'DEPLOY.md 가 배치 개수를 말하지 않는다').toBeTruthy();
+    expect(said, `배치는 ${scheduled.size}개다`).toBe(KOREAN[scheduled.size - 1]);
+  });
+});
+
+/**
+ * 라우트 주석에 적힌 시각이 실제 주기와 같은가.
+ *
+ * **표는 검사가 지키는데 주석은 아무도 안 봤다.** 그 사이 셋이 어긋났다 — 소멸 배치는 주석에 04:00 이라 적힌 채
+ * 02:00 에 돌고 있었고(옮긴 날 주석만 남았다), 정산은 "매달 1일" 이라 적혀 있었지만 실제로는 2일이며(DEPLOY.md 는
+ * 이미 고쳤다), 알림 배치는 "소멸 배치(04:00)가 먼저 돌아" 라는 근거를 옛 시각으로 적고 있었다.
+ *
+ * 주석의 시각은 **읽는 사람이 순서를 따지는 근거**다: 소멸이 대사보다 먼저 도는가, 알림이 소멸 뒤에 오는가.
+ * 근거가 틀리면 그 위에 쌓은 판단도 틀린다. 그래서 주석도 vercel.json 에서 계산해 맞춘다.
+ */
+describe('배치 주석이 실제 주기와 같다', () => {
+  /**
+   * 크론 표현식의 UTC 시각 — 주석이 괄호 안에 적어 두는 값이다.
+   *
+   * 사이에 날짜가 끼는 것을 허락한다("UTC 1일 20:00"): 달에 한 번 도는 정산은 UTC 날짜가 곧 의미다.
+   */
+  function utcTime(schedule: string): RegExp {
+    const [min, hour] = schedule.split(/\s+/) as [string, string];
+    const hh = String(Number(hour)).padStart(2, '0');
+    const mm = String(Number(min)).padStart(2, '0');
+    return new RegExp(`UTC (\\d+일 )?${hh}:${mm}`);
+  }
+
+  const source = (path: string) =>
+    readFileSync(join(CRON_DIR, path.replace('/api/cron/', ''), 'route.ts'), 'utf8');
+
+  it.each([...scheduled])('%s 가 자기 시각을 적어 둔다', (path, schedule) => {
+    const head = source(path).split('export async function')[0] ?? '';
+
+    expect(head, `${path} 주석에 "${kstLabel(schedule)}" 이 없다 — 언제 도는지 적어 둔다`)
+      .toContain(kstLabel(schedule));
+    // UTC 값까지 적는다. 크론 표현식이 UTC 로 읽힌다는 것을 잊으면 9시간이 조용히 어긋난다
+    expect(head, `${path} 주석의 UTC 시각이 ${schedule}(UTC) 와 다르다`).toMatch(utcTime(schedule));
+  });
+
+  /**
+   * **남의 배치 시각은 여기 옮겨 적지 않는다.**
+   *
+   * 알림 배치가 "소멸 배치(04:00)가 먼저 돌아" 라는 근거를 적어 둔 사이 소멸은 02:00 으로 옮겨 갔다. 옮겨 적은
+   * 값은 원본이 움직여도 따라오지 않는다 — 그리고 이런 문장은 순서를 따지는 **근거**라 틀리면 그 위에 쌓은
+   * 판단까지 틀린다. 가리킬 때는 이름으로 가리키면 된다("소멸 배치가 먼저 돌아"): 이름은 안 낡는다.
+   *
+   * 자기 시각은 위 검사가 vercel.json 과 맞추므로 여기서 걸리지 않는다.
+   */
+  it.each([...scheduled])('%s 주석이 남의 배치 시각을 옮겨 적지 않는다', (path, schedule) => {
+    const head = source(path).split('export async function')[0] ?? '';
+    const mine = kstLabel(schedule).replace(/^.*KST /, '');
+
+    const quoted = [...head.matchAll(/배치\s*\((\d{2}:\d{2})\)/g)].map(([, t]) => t!);
+    expect(quoted.filter((t) => t !== mine), '남의 배치는 시각 말고 이름으로 가리킨다').toEqual([]);
   });
 });
 

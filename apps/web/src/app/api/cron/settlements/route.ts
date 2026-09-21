@@ -5,7 +5,11 @@ import { closeSettlements, SettlementCloseError } from '~/lib/admin/close-settle
 import { recordAudit } from '~/lib/audit';
 
 /**
- * 월 정산 확정 배치. 매달 1일 KST 05:00 (UTC 20:00 전날) 에 돈다.
+ * 월 정산 확정 배치. 매달 2일 KST 05:00 (UTC 1일 20:00) 에 돈다.
+ *
+ * **1일이 아니라 2일이다.** 크론은 UTC 로 읽히고 KST 는 아홉 시간 앞이라, UTC 1일 20:00 이 KST 로는 2일
+ * 05:00 이다. KST 1일에 돌리려면 크론이 "전달 마지막 날" 을 가리켜야 하는데 그런 표현이 없다 — 앞 달이
+ * 확실히 끝난 뒤에 도는 편이 정산에는 맞기도 하다(DEPLOY.md 에 같은 설명이 있다).
  *
  * 앞 달을 대상으로 한다. 여러 번 돌아도 결과가 같으므로 재실행이 안전하다.
  */
