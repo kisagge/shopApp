@@ -152,30 +152,57 @@ export async function completeReturn(
   const firstLines = requestedLines(first, firstRequest.itemIds);
   if (firstLines.length === 0) throw new ReturnError('NO_ITEMS', '돌려받을 상품이 없습니다.');
 
-  // ── 전부 반품: 주문째 반품완료로 옮기고 기존 환불을 탄다
+  /*
+   * ── 전부 반품: 주문째 반품완료로 옮기고 기존 환불을 탄다.
+   *
+   * **세 걸음이 각자 다른 트랜잭션이다**(상태 → 환불 → 신청 닫기). 환불은 PG 를 부르므로 한 덩이로 묶을 수
+   * 없고, 그래서 중간에 끊길 수 있다 — 인스턴스가 내려가거나 PG 가 늦게 답하면 주문은 반품완료인데 신청은
+   * 승인된 채로 남는다.
+   *
+   * 예전에는 그 상태에서 **같은 문으로 다시 끝낼 수 없었다.** 첫 걸음이 "반품접수일 때만" 이라 두 번째
+   * 누름은 "이미 처리된 주문입니다" 로 막혔고, 돈이 이미 나갔다면 신청은 반품 대기줄에 영영 남았다.
+   *
+   * 그래서 **걸음마다 이미 지난 자리를 알아보고 이어서 한다.** 환불은 제 안에 잠금과 멱등키를 갖고 있어
+   * 두 번 나가지 않고(refund-order), 신청 닫기는 조건부라 두 번 눌러도 한 번만 적힌다.
+   */
   if (firstLines.length === first.items.filter((i) => !i.canceledAt).length) {
-    await prisma.$transaction(async (tx) => {
-      const { count } = await tx.order.updateMany({
-        where: { id: first.id, status: 'RETURN_REQUESTED' },
-        data: { status: transition('RETURN_REQUESTED', 'RETURNED') },
+    const alreadyMoved = first.status === 'RETURNED' || first.status === 'REFUNDED';
+    if (!alreadyMoved) {
+      await prisma.$transaction(async (tx) => {
+        const { count } = await tx.order.updateMany({
+          where: { id: first.id, status: 'RETURN_REQUESTED' },
+          data: { status: transition('RETURN_REQUESTED', 'RETURNED') },
+        });
+        if (count === 0) throw new ReturnError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+        await tx.orderItem.updateMany({
+          where: { orderId: first.id, canceledAt: null, id: { in: firstLines.map((l) => l.id) } },
+          data: { status: 'RETURNED' },
+        });
+        await tx.orderStatusLog.create({
+          data: { orderId: first.id, from: 'RETURN_REQUESTED', to: 'RETURNED', actor: actor.id, note: '반품 회수 확인' },
+        });
       });
-      if (count === 0) throw new ReturnError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
-      await tx.orderItem.updateMany({
-        where: { orderId: first.id, canceledAt: null, id: { in: firstLines.map((l) => l.id) } },
-        data: { status: 'RETURNED' },
-      });
-      await tx.orderStatusLog.create({
-        data: { orderId: first.id, from: 'RETURN_REQUESTED', to: 'RETURNED', actor: actor.id, note: '반품 회수 확인' },
-      });
-    });
+    }
 
-    const refund = await refundOrder(orderNo, actor, '반품 회수 확인', gateway);
-    await prisma.returnRequest.update({
-      where: { id: firstRequest.id },
+    /*
+     * 돈이 이미 나갔으면 다시 부르지 않는다 — 환불은 이미 환불된 주문을 거절하므로(ALREADY_REFUNDED),
+     * 그대로 부르면 신청을 닫으러 가는 길이 그 예외에 막힌다. 돌려준 몫은 장부에서 읽는다.
+     */
+    const refund = first.status === 'REFUNDED'
+      ? await (async () => {
+          const soFar = await refundedSoFar(prisma, first);
+          return { refunded: soFar.cash, pointsReturned: soFar.points, orderStatus: first.status };
+        })()
+      : await refundOrder(orderNo, actor, '반품 회수 확인', gateway);
+
+    const now = new Date();
+    // 조건부 — 두 번 눌러도 처음 닫은 때와 사람이 남는다
+    await prisma.returnRequest.updateMany({
+      where: { id: firstRequest.id, status: 'APPROVED' },
       data: {
-        status: 'COMPLETED', resolvedAt: new Date(), resolvedBy: actor.id,
+        status: 'COMPLETED', resolvedAt: now, resolvedBy: actor.id,
         // 가맹점이 먼저 확인했으면 그 기록을 남기고, 아니면 운영진이 눌렀을 때가 확인한 때다
-        ...(firstRequest.receivedAt ? {} : { receivedAt: new Date(), receivedBy: actor.id }),
+        ...(firstRequest.receivedAt ? {} : { receivedAt: now, receivedBy: actor.id }),
       },
     });
     return {

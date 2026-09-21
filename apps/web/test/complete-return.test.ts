@@ -38,7 +38,7 @@ const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>() },
   orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { findFirst: vi.fn<(...a: any[]) => any>() },
-  returnRequest: { update: vi.fn<(...a: any[]) => any>() },
+  returnRequest: { update: vi.fn<(...a: any[]) => any>(), updateMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -163,7 +163,7 @@ describe('전부 돌려받기', () => {
 
     expect(tx.order.updateMany.mock.calls[0]![0].data.status).toBe('RETURNED');
     expect(refundOrder).toHaveBeenCalledWith('20260914-0000002', admin, expect.any(String), pg);
-    expect(db.returnRequest.update.mock.calls[0]![0].data.status).toBe('COMPLETED');
+    expect(db.returnRequest.updateMany.mock.calls[0]![0].data.status).toBe('COMPLETED');
     expect(result).toMatchObject({ kind: 'full', refunded: 81_000 });
     expect(pg.cancel, '부분 취소를 따로 부르면 돈이 두 번 나간다').not.toHaveBeenCalled();
   });
@@ -217,5 +217,55 @@ describe('미리보기', () => {
     expect(await previewCompleteReturn('20260914-0000002', admin))
       .toEqual({ kind: 'partial', cash: 24_000, points: 0, shippingDeducted: 3_000 });
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **세 걸음이 각자 다른 트랜잭션이라 중간에 끊긴다.**
+ *
+ * 전부 반품은 주문 상태 → 환불(PG) → 신청 닫기 순으로 간다. 환불은 바깥을 부르므로 한 덩이로 묶을 수 없고,
+ * 인스턴스가 내려가거나 PG 가 늦게 답하면 그 사이에서 멈춘다. 예전에는 그 자리에서 **같은 문으로 다시 끝낼 수
+ * 없었다** — 첫 걸음이 "반품접수일 때만" 이라 두 번째 누름이 "이미 처리된 주문입니다" 로 막혔고, 돈이 이미
+ * 나갔다면 신청은 반품 대기줄에 영영 남았다.
+ */
+describe('중간에 끊긴 뒤 다시 누르면', () => {
+  const approved = [{ id: 'rr-1', status: 'APPROVED', reason: 'DEFECT', itemIds: ['i-coat', 'i-knit'] }];
+
+  it('환불 전에 끊겼으면 — 주문은 이미 옮겨졌으니 환불부터 이어서 한다', async () => {
+    // 첫 걸음까지만 끝난 자리: 주문은 반품완료, 신청은 승인된 채
+    useOrder(order({ status: 'RETURNED', returnRequests: approved }));
+    refundOrder.mockResolvedValue({ orderStatus: 'REFUNDED', refunded: 81_000, pointsReturned: 0 });
+
+    const result = await completeReturn('20260914-0000002', admin, gateway());
+
+    // 상태를 또 옮기려 들지 않는다 — 그 조건은 이제 맞지 않아 막히기만 한다
+    expect(tx.order.updateMany).not.toHaveBeenCalled();
+    expect(refundOrder, '돈이 아직 안 나갔다 — 환불은 해야 한다').toHaveBeenCalled();
+    expect(db.returnRequest.updateMany.mock.calls[0]![0].data.status).toBe('COMPLETED');
+    expect(result).toMatchObject({ kind: 'full', refunded: 81_000 });
+  });
+
+  it('환불까지 갔으면 — 돈은 두 번 내보내지 않고 신청만 닫는다', async () => {
+    // 돈은 나갔는데 신청을 닫다 끊긴 자리
+    useOrder(order({ status: 'REFUNDED', returnRequests: approved }));
+    db.orderRefund.aggregate.mockResolvedValue({
+      _sum: { amount: 81_000, points: 0, shippingDeducted: 0 }, _count: { _all: 1 },
+    });
+
+    const result = await completeReturn('20260914-0000002', admin, gateway());
+
+    expect(refundOrder, '이미 환불된 주문을 또 부르면 거절당하고, 신청은 영영 안 닫힌다').not.toHaveBeenCalled();
+    expect(db.returnRequest.updateMany.mock.calls[0]![0].data.status).toBe('COMPLETED');
+    // 돌려준 몫은 장부에서 읽는다 — 화면이 0원이라고 말하면 안 된다
+    expect(result).toMatchObject({ kind: 'full', refunded: 81_000 });
+  });
+
+  it('신청은 승인된 것만 닫는다 — 두 사람이 동시에 눌러도 처음 닫은 때가 남는다', async () => {
+    useOrder(order({ status: 'RETURNED', returnRequests: approved }));
+    refundOrder.mockResolvedValue({ orderStatus: 'REFUNDED', refunded: 81_000, pointsReturned: 0 });
+
+    await completeReturn('20260914-0000002', admin, gateway());
+
+    expect(db.returnRequest.updateMany.mock.calls[0]![0].where).toMatchObject({ id: 'rr-1', status: 'APPROVED' });
   });
 });
