@@ -7,6 +7,15 @@ import { expect } from '@playwright/test';
  * 한쪽이 비우는 순간 다른 쪽 것이 사라진다 — 그런데 이 명세들은 하나같이
  * "먼저 비우고 담는" 것으로 시작한다. 자세한 사연은 seed-fixtures 에 있다.
  */
+/**
+ * 검사에서만 쓰는 배치 열쇠.
+ *
+ * 배치 라우트(/api/cron/*)는 CRON_SECRET 으로만 열린다. **진짜 열쇠를 검사에 들이지 않는다** — 설정이 이 값을
+ * 서버에 건네고(playwright.config), 명세는 같은 값을 들고 두드린다. 시드 비밀번호와 같은 결이다: 커밋에 있는
+ * 것은 로컬·CI 에서만 쓰는 값이고, 운영의 값은 배포 환경에만 있다.
+ */
+export const E2E_CRON_SECRET = 'e2e-cron-secret';
+
 export const STATE_FILE = {
   customer: 'test-results/.auth/customer.json',
   admin: 'test-results/.auth/admin.json',

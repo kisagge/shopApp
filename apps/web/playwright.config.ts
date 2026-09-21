@@ -1,5 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
-import { STATE_FILE } from './e2e/state';
+import { E2E_CRON_SECRET, STATE_FILE } from './e2e/state';
 
 /**
  * E2E 설정.
@@ -71,7 +71,7 @@ export default defineConfig({
       name: 'guest',
       use: { ...devices['Desktop Chrome'] },
       testMatch:
-        /(auth|merchant-suspended|merchant-pause|account-settings|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n|dark-contrast|theme-flip|theme-choice)\.spec\.ts/,
+        /(auth|merchant-suspended|merchant-pause|cron-guard|account-settings|shopping|a11y|a11y-public|pwa|i18n|recently-viewed|support|recommendations|search-suggest|collections|security-headers|brand-and-filters|compare|layout|image-priority|bundle-budget|web-vitals|sitemap|structured-data|layout-i18n|dark-contrast|theme-flip|theme-choice)\.spec\.ts/,
     },
     {
       name: 'customer',
@@ -154,6 +154,14 @@ export default defineConfig({
        * 단위 검사가 지킨다.
        */
       PAYMENT_GATEWAY: 'mock',
+      /**
+       * 배치 열쇠를 검사용 값으로 덮는다.
+       *
+       * 배치(/api/cron/*)는 돈과 재고를 건드린다 — 적립을 지급하고, 포인트를 소멸시키고, 정산을 확정한다.
+       * 그 문이 진짜로 닫혀 있는지는 **선 서버**에서만 확인할 수 있는데, 그러자면 명세가 열쇠를 알아야 한다.
+       * 개발자 기계의 진짜 열쇠를 검사에 들이는 대신 여기서 검사용 값으로 덮는다(시드 비밀번호와 같은 결).
+       */
+      CRON_SECRET: E2E_CRON_SECRET,
     },
   },
 });

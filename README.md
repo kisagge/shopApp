@@ -191,7 +191,7 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 
 ```
 core 1,268 · web 3,556 · contract 268 · ui 130 · auth 57 · i18n 39 · db 29 · native 22 · mail 7
-e2e 930 (Playwright, 87 파일)
+e2e 939 (Playwright, 88 파일)
 ```
 
 ```bash
