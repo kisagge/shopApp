@@ -64,9 +64,13 @@ export default async function RestockPage() {
       </p>
 
       {rows.length === 0 ? (
-        <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
-          {t('my.restockEmpty')}
-        </p>
+        // 알림은 품절 옵션을 골라야 걸 수 있다 — 그 옵션이 있는 자리로 보낸다
+        <div className="flex flex-col items-center gap-3 py-16">
+          <p className="text-[13px] text-[var(--fg-muted)]">{t('my.restockEmpty')}</p>
+          <Link href="/" className="mt-2 inline-flex h-11 items-center rounded-sm border border-[var(--border-strong)] px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]">
+            {t('my.wishlistGo')}
+          </Link>
+        </div>
       ) : (
         <ul className="flex flex-col gap-2.5">
           {rows.map((r) => (

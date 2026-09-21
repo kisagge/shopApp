@@ -66,9 +66,13 @@ export default async function PointsPage({
       <section aria-labelledby="history-title" className="mt-8">
         <h2 id="history-title" className="mb-3.5 text-[15px] font-semibold">{t('my.pointsHistory')}</h2>
         {history.items.length === 0 ? (
-          <p className="py-16 text-center text-[13px] text-[var(--fg-muted)]">
-            {t('my.pointsEmpty')}
-          </p>
+          // 포인트는 사야 쌓인다 — 빈 내역에서 갈 곳은 매대다
+          <div className="flex flex-col items-center gap-3 py-16">
+            <p className="text-[13px] text-[var(--fg-muted)]">{t('my.pointsEmpty')}</p>
+            <Link href="/" className="mt-2 inline-flex h-11 items-center rounded-sm border border-[var(--border-strong)] px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]">
+              {t('my.wishlistGo')}
+            </Link>
+          </div>
         ) : (
           <table className="data-table">
             <caption className="sr-only">{t('my.pointsHistoryCaption')}</caption>

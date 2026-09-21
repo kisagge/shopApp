@@ -46,9 +46,16 @@ export default async function MyInquiriesPage({
       </header>
 
       {page.items.length === 0 ? (
-        <p className="py-24 text-center text-[13px] text-[var(--fg-muted)]">
-          {t('support.noInquiries')}
-        </p>
+        /*
+          **빈 목록에 다음 걸음을 둔다.** 문의하러 들어왔다가 "없습니다" 만 보고 되돌아 나가야 했다 —
+          문의를 남기는 자리는 다른 화면에 있고 여기서 가는 길이 없었다(찜 목록은 진작 그 길을 갖고 있다).
+        */
+        <div className="flex flex-col items-center gap-3 py-24">
+          <p className="text-[13px] text-[var(--fg-muted)]">{t('support.noInquiries')}</p>
+          <Link href="/support/ask" className="mt-2 inline-flex h-11 items-center rounded-sm border border-[var(--border-strong)] px-5 text-[13px] text-[var(--fg)] no-underline hover:bg-[var(--surface-2)]">
+            {t('support.askHeading')}
+          </Link>
+        </div>
       ) : (
         <ul className="flex flex-col gap-4">
           {page.items.map((row) => (
