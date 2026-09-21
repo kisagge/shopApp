@@ -29,7 +29,7 @@ export default async function MyPage() {
     getLocale(),
     getT(),
   ]);
-  if (!summary) redirect('/login');
+  if (!summary) redirect('/login?next=%2Fmypage');
   const recent = recentPage.items;
 
   const { gradeProgress: gp } = summary;

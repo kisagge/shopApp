@@ -62,6 +62,9 @@ export const SEED_ACCOUNT = {
   /** 주문 내역을 검색·기간으로 좁혀 본다 — 자기 주문을 만들고 찾는다 */
   orderSearch: 'order-search@plain.test',
 
+  /** 남이 자기 주문을 열 수 있는지 본다 — order-privacy. 자기 주문을 만들어야 하므로 자기 장바구니를 쥔다 */
+  orderPrivacy: 'order-privacy@plain.test',
+
   /** 재고를 기준 너머로 내려 가맹점 알림을 부른다 */
   lowStockBuyer: 'low-stock-buyer@plain.test',
 
@@ -132,5 +135,5 @@ export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
   'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
-  'purchaseConfirmer', 'reviewEditor', 'reorderer',
+  'purchaseConfirmer', 'reviewEditor', 'reorderer', 'orderPrivacy',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

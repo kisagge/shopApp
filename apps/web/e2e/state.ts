@@ -42,6 +42,8 @@ export const STATE_FILE = {
   doubleSpender: 'test-results/.auth/double-spend.json',
   /** 주문 내역 검색 — order-search */
   orderSearch: 'test-results/.auth/order-search.json',
+  /** 자기 주문을 만들어 두고, 남이 그것을 여는지 본다 — order-privacy */
+  orderPrivacy: 'test-results/.auth/order-privacy.json',
   /** 재고를 기준 너머로 내리는 손님 — low-stock-alert */
   lowStockBuyer: 'test-results/.auth/low-stock-buyer.json',
   /** 두 줄을 사서 한 줄만 취소한다 — partial-cancel */

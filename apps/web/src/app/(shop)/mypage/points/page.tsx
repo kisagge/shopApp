@@ -33,7 +33,7 @@ export default async function PointsPage({
     getLocale(),
     getT(),
   ]);
-  if (!summary) redirect('/login');
+  if (!summary) redirect('/login?next=%2Fmypage%2Fpoints');
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 pb-24 md:px-10">

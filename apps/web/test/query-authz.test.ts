@@ -75,11 +75,32 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
      * 두면 새로 만든 모듈이 목록 밖에 있어 조용히 빠진다 — 이 검사가 막으려는
      * 실수와 정확히 같은 모양의 실수다.
      */
-    const dir = join(process.cwd(), 'src/lib/queries/admin');
-    const src = readdirSync(dir)
-      .filter((f) => f.endsWith('.ts'))
-      .map((f) => readFileSync(join(dir, f), 'utf8'))
+    /*
+     * **어드민 폴더만 훑고 있었다.** 운영 조회가 전부 거기 있는 줄 알았는데, 감사 로그·문의 대기줄·리뷰 관리·
+     * 고객센터 글은 `queries/` 바로 아래에 손님 조회와 섞여 있다(손님 쪽과 같은 표를 읽기 때문이다). 그래서
+     * 그 여섯은 이 검사를 한 번도 받지 않았다 — 지금은 다들 권한을 확인하지만, 그건 규칙이 아니라 습관이다.
+     *
+     * 손님 조회도 Actor 를 받는다 — "내 것" 을 알아내려고, 또는 보는 사람에 따라 가릴 것을 가리려고. 그쪽은
+     * 권한 문이 아니라 범위·가림이 문제라 아래에서 까닭과 함께 빼고, 무엇을 읽는지는 customer-query-scope 가 본다.
+     */
+    const dirs = [join(process.cwd(), 'src/lib/queries/admin'), join(process.cwd(), 'src/lib/queries')];
+    const src = dirs
+      .flatMap((dir) =>
+        readdirSync(dir, { withFileTypes: true })
+          .filter((e) => e.isFile() && e.name.endsWith('.ts'))
+          .map((e) => readFileSync(join(dir, e.name), 'utf8')),
+      )
       .join('\n');
+
+    /**
+     * 권한 문이 아닌 조회 — 막을 것이 아니라 **보는 사람에 따라 달라질** 것들이다.
+     * 여기에 넣으면 "누가 볼 수 있나" 는 다른 검사가 본다(까닭에 적는다).
+     */
+    const VIEWER_SCOPED: Readonly<Record<string, string>> = {
+      getMyPageSummary: '마이페이지 요약 — actor 는 "내가 누구인가" 일 뿐, 남의 것을 읽을 길이 없다(customer-query-scope)',
+      getReviewableItems: '내 주문 줄에서 아직 안 쓴 후기를 고른다 — 같은 결',
+      getProductInquiries: '상품 화면의 공개 문의 목록이다. viewer 는 막는 열쇠가 아니라 비밀글을 가릴지 정하는 값이고, 그 가림은 core(canAnswerInquiry)와 문의 검사가 본다',
+    };
     /*
      * **훑기가 헛돌면 이 검사가 통과한다.** 폴더를 빈 곳으로 바꿔 돌려 보니
      * `missing` 이 비어 그대로 통과했다. 훑은 것이 있는지 먼저 못 박는다.
@@ -94,11 +115,18 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
       const at = (m.index ?? 0) + m[0].length;
       const body = src.slice(at, at + 800);
       // 공용 가드(assertAdminQuery)든 직접 확인이든, 무엇이든 보아야 한다
-      const guarded = body.includes('assertAdminQuery') || body.includes('assertPermission');
+      if (name! in VIEWER_SCOPED) continue;
+      // 공용 가드(assertAdminQuery)든 직접 확인이든, 무엇이든 보아야 한다.
+      // hasPermission 은 던지지 않고 범위를 좁히는 쪽이라 그것도 "보았다" 로 센다
+      const guarded = body.includes('assertAdminQuery') || body.includes('assertPermission')
+        || body.includes('hasPermission');
       if (!guarded) missing.push(name!);
     }
 
     expect(found.length, 'Actor 를 받는 어드민 조회를 하나도 못 찾았다').toBeGreaterThan(5);
     expect(missing).toEqual([]);
+
+    // 빼 둔 이름이 실제로 있는 조회인지 — 목록만 남고 함수가 사라지면 안 된다
+    expect(Object.keys(VIEWER_SCOPED).filter((n) => !src.includes(`function ${n}(`))).toEqual([]);
   });
 });

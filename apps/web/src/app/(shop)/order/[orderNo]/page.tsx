@@ -41,7 +41,8 @@ export default async function OrderPage({
 }) {
   const { orderNo } = await params;
   const user = await getViewer();
-  if (!user) redirect('/login');
+  // 돌아올 곳을 들고 간다 — 영수증 화면이 진작 그렇게 한다. 없으면 로그인한 뒤 첫 화면에 떨어진다
+  if (!user) redirect(`/login?next=${encodeURIComponent(`/order/${orderNo}`)}`);
 
   const [order, locale, t, query] = await Promise.all([
     getOrderForUser(orderNo, user.id),
