@@ -11,7 +11,7 @@
 
 export const MAIL_TEMPLATE_KIND = [
   'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
-  'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'REFUND_COMPLETED',
+  'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_WITHDRAWN', 'REFUND_COMPLETED',
   'POINTS_GRANTED', 'POINTS_DEDUCTED', 'ACCOUNT_SUSPENDED', 'ACCOUNT_RESTORED',
   'COUPON_EXPIRING', 'POINTS_EXPIRING',
 ] as const;
@@ -36,6 +36,7 @@ export const MAIL_TEMPLATE_PARAMS = {
   ORDER_CANCELLED: { subject: ['orderNo'], heading: [], lead: ['name'] },
   RETURN_APPROVED: { subject: ['orderNo'], heading: [], lead: ['name'] },
   RETURN_REJECTED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  RETURN_WITHDRAWN: { subject: ['orderNo'], heading: [], lead: ['name'] },
   REFUND_COMPLETED: { subject: ['orderNo'], heading: [], lead: ['name'] },
   POINTS_GRANTED: { subject: ['points'], heading: [], lead: ['name', 'points'] },
   POINTS_DEDUCTED: { subject: ['points'], heading: [], lead: ['name', 'points'] },

@@ -521,3 +521,80 @@ describe('회수 확인', () => {
     await expect(receiveReturn('20260901-0000001', merchant)).rejects.toMatchObject({ code: 'MIXED_MERCHANTS' });
   });
 });
+
+/**
+ * **승인한 뒤에는 되돌릴 길이 없었다.**
+ *
+ * 교환을 승인하면 바꿀 옵션의 재고를 그 자리에서 잡는다. 물건이 오지 않으면 그 재고는 영영 묶이는데, 반려는
+ * 접수 상태에서만 되므로 승인 뒤에는 풀 문이 아예 없었다 — 아무도 안 받을 물건이 품절로 보이고, 재고표의
+ * 숫자와 창고가 갈린다.
+ *
+ * 무르는 일은 반려와 같은 자리로 되돌리되(재고·주문·줄) 남는 이름이 다르다. 처음부터 거절한 것과 승인해 놓고
+ * 끝내지 못한 것은 다른 일이고, 나중에 "왜 안 끝났나" 를 물을 때 그 둘이 구분돼야 한다.
+ */
+describe('승인한 신청을 무른다', () => {
+  const approvedExchange = {
+    id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
+    confirmedAt: null, deliveredAt: delivered,
+    items: [{ id: 'i-coat', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' }],
+    returnRequests: [{
+      id: 'r-1', type: 'EXCHANGE', status: 'APPROVED', itemIds: ['i-coat'],
+      exchangeLines: [{ orderItemId: 'i-coat', fromVariantId: 'v-m', toVariantId: 'v-l', quantity: 1 }],
+    }],
+  };
+
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(approvedExchange);
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a')]);
+  });
+
+  it('잡아 둔 옵션 재고를 풀어 준다 — 아무도 안 받을 물건이 품절로 보이면 안 된다', async () => {
+    await resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '물건이 오지 않았습니다' }, admin);
+
+    expect(db.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-l' },
+      data: { stock: { increment: 1 } },
+    });
+  });
+
+  it('반려가 아니라 철회로 남는다 — 처음부터 거절한 것과 다른 일이다', async () => {
+    const r = await resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '물건이 오지 않았습니다' }, admin);
+
+    expect(r.status).toBe('CANCELLED');
+    expect(db.returnRequest.updateMany.mock.calls[0]![0]).toMatchObject({
+      // 승인된 것만 무른다 — 두 사람이 동시에 눌러도 재고가 두 번 풀리지 않는다
+      where: { id: 'r-1', status: 'APPROVED' },
+      data: { status: 'CANCELLED', rejectReason: '물건이 오지 않았습니다' },
+    });
+  });
+
+  it('주문을 신청 전 자리로 되돌린다 — 반품접수에 갇히면 아무것도 못 한다', async () => {
+    const r = await resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '사유' }, admin);
+
+    expect(r.orderStatus).toBe('DELIVERED');
+    expect(db.orderStatusLog.create.mock.calls[0]![0].data.note).toContain('교환 철회');
+  });
+
+  it('아직 접수 상태인 신청은 무르지 못한다 — 그건 반려다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...approvedExchange,
+      returnRequests: [{ ...approvedExchange.returnRequests[0], status: 'REQUESTED' }],
+    });
+
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '사유' }, admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+    expect(db.returnRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('이미 끝난 신청도 무르지 못한다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      ...approvedExchange,
+      returnRequests: [{ ...approvedExchange.returnRequests[0], status: 'COMPLETED' }],
+    });
+
+    await expect(
+      resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '사유' }, admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+  });
+});

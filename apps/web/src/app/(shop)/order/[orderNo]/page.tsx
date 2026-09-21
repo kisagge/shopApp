@@ -512,9 +512,15 @@ export default async function OrderPage({
               </div>
             )}
           </dl>
-          {activeReturn.status === 'REJECTED' && activeReturn.rejectReason && (
+          {/*
+            까닭은 **끝난 신청 모두**에 보여 준다. 반려에만 보여 주다가, 승인된 교환을 무를 수 있게 되면서
+            철회된 신청에는 "철회됨" 만 뜨고 왜인지는 어디에도 없었다 — 승인을 받고 기다리던 사람에게 그건
+            물건이 그냥 사라진 것으로 읽힌다.
+          */}
+          {(activeReturn.status === 'REJECTED' || activeReturn.status === 'CANCELLED') && activeReturn.rejectReason && (
             <p className="mt-3 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
-              {t('order.rejectReason')}: {activeReturn.rejectReason}
+              {t(activeReturn.status === 'CANCELLED' ? 'order.withdrawReason' : 'order.rejectReason')}
+              : {activeReturn.rejectReason}
             </p>
           )}
         </section>

@@ -50,12 +50,15 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
     case 'ORDER_CANCELLED':
     case 'RETURN_APPROVED':
     case 'RETURN_REJECTED':
+    case 'RETURN_WITHDRAWN':
     case 'REFUND_COMPLETED':
       return afterSaleMail({
         kind, to: order.to, name: order.buyerName, orderNo: order.orderNo, locale,
         items: [{ productName: '울 코트', optionLabel: '오트 / M', quantity: 1 }],
         ...(kind === 'RETURN_REJECTED' ? { reason: '착용 흔적이 있어 반품을 받을 수 없습니다.' } : {}),
-        ...(kind === 'RETURN_APPROVED' || kind === 'RETURN_REJECTED' ? { returnType: 'RETURN' as const } : {}),
+        ...(kind === 'RETURN_WITHDRAWN' ? { reason: '보내 주신 물건이 오지 않아 신청을 무릅니다.' } : {}),
+        ...(kind === 'RETURN_APPROVED' || kind === 'RETURN_REJECTED' || kind === 'RETURN_WITHDRAWN'
+          ? { returnType: 'RETURN' as const } : {}),
         ...(kind === 'RETURN_APPROVED'
           ? { returnTo: ['스튜디오눈 반품담당 · (04799) 서울 성동구 성수이로 00 스튜디오눈 물류창고 1층 · 010-0000-0101'] }
           : {}),

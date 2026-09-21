@@ -112,3 +112,87 @@ test('다른 옵션으로 교환 신청하면 그 재고가 잡히고, 운영이
     await admin.close();
   }
 });
+
+/**
+ * **승인한 교환을 무를 수 있어야 한다.**
+ *
+ * 교환은 승인하는 순간 바꿀 옵션의 재고를 잡는다. 물건이 오지 않으면 그 재고는 영영 묶이는데, 반려는 접수
+ * 상태에서만 되므로 승인 뒤에는 되돌릴 문이 아예 없었다 — 아무도 안 받을 물건이 품절로 보인다.
+ */
+test('승인한 교환을 무르면 잡아 둔 재고가 돌아오고, 손님은 그것을 철회로 본다', async ({ page, browser }) => {
+  test.setTimeout(150_000);
+
+  const fromVariant = await addProductToCart(page, RACE_PRODUCT.exchange);
+  expect(fromVariant, '담을 수 있는 옵션이 없다').not.toBeNull();
+
+  await page.goto('/checkout');
+  await ready(page);
+  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+
+  const admin = await browser.newContext({ storageState: STATE_FILE.admin });
+  try {
+    for (const step of [
+      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
+      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
+      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
+    ]) {
+      const res = await step();
+      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
+    }
+
+    // ── 손님: 교환 신청 — 바꿀 옵션의 재고가 잡힌다
+    await page.goto(`/order/${orderNo}`);
+    await ready(page);
+    await page.getByRole('button', { name: '반품 · 교환 신청' }).click();
+    await page.getByRole('radio', { name: '교환' }).check();
+    const exchangeTo = page.getByRole('group', { name: '바꿀 옵션' }).getByRole('combobox');
+    const toVariant = await exchangeTo.inputValue();
+    const toStockBefore = await stockOf(page, toVariant);
+
+    await page.getByRole('radio', { name: /불량/ }).check();
+    await page.getByRole('button', { name: '신청하기' }).click();
+    await expect(page.getByText('교환 진행 중')).toHaveCount(1, { timeout: 20_000 });
+    expect(await stockOf(page, toVariant), '신청 순간 재고가 잡히지 않았다').toBe(toStockBefore - 1);
+
+    // ── 운영: 승인한 뒤, 물건이 오지 않아 무른다
+    const ap = await admin.newPage();
+    await ap.goto(`/admin/orders/${orderNo}`);
+    await ready(ap);
+    const section = ap.getByRole('region', { name: /교환 신청/ });
+    await section.getByRole('button', { name: '교환 승인' }).click();
+    await expect(section.getByRole('button', { name: '승인 철회' })).toBeVisible({ timeout: 20_000 });
+
+    await section.getByRole('button', { name: '승인 철회' }).click();
+    await section.getByLabel(/철회 사유/).fill('기한 안에 물건이 오지 않았습니다');
+    /*
+     * **응답을 기다린다.** 누르는 순간 단추 이름이 "무르는 중…" 으로 바뀌므로, 이름이 사라지기만 기다리면
+     * 요청이 끝나기도 전에 통과한다 — 그 상태로 재고를 읽어 "안 돌아왔다" 고 한 판이 졌다.
+     */
+    const [withdrawn] = await Promise.all([
+      ap.waitForResponse((r) => r.request().method() === 'POST' && r.url().includes(`/orders/${orderNo}/return`)),
+      section.getByRole('form', { name: '승인 철회' }).getByRole('button', { name: '승인 철회' }).click(),
+    ]);
+    expect(withdrawn.status(), await withdrawn.text()).toBe(200);
+
+    // ── 잡아 둔 재고가 돌아온다. 이것이 이 검사의 요점이다
+    expect(await stockOf(page, toVariant), '무른 교환의 재고가 안 돌아왔다').toBe(toStockBefore);
+
+    // ── 손님: 반려가 아니라 철회로 읽히고, 주문은 신청 전 자리로 돌아간다
+    await page.goto(`/order/${orderNo}`);
+    await ready(page);
+    await expect(page.getByText('교환 진행 중')).toHaveCount(0);
+    await expect(page.locator('#main')).toContainText('기한 안에 물건이 오지 않았습니다');
+
+    await page.goto('/mypage/notifications');
+    await ready(page);
+    await expect(
+      page.getByRole('list', { name: '알림' }).getByRole('link').filter({ hasText: `주문 ${orderNo} 의 반품·교환 승인이 철회` }),
+    ).toHaveCount(1);
+  } finally {
+    await admin.close();
+  }
+});

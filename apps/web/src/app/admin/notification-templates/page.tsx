@@ -45,6 +45,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   INQUIRY_RECEIVED: '상품 문의 접수',
   SUPPORT_INQUIRY_RECEIVED: '고객센터 문의 접수',
   MERCHANT_APPLIED: '입점 신청 접수',
+  RETURN_WITHDRAWN: '반품·교환 철회',
   MERCHANT_SUSPENDED: '가맹점 정지',
   MERCHANT_TERMINATED: '가맹점 해지',
   LATE_DEPOSIT_RECEIVED: '취소 뒤 입금 확인(손님)',

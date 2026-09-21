@@ -83,7 +83,16 @@ export const RETURNABLE_LINE_STATUS = ['SHIPPED', 'DELIVERED', 'CONFIRMED'] as c
 export const isReturnableLine = (line: { readonly status: OrderStatus; readonly canceledAt: Date | null }): boolean =>
   line.canceledAt === null && (RETURNABLE_LINE_STATUS as readonly OrderStatus[]).includes(line.status);
 
-export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'] as const;
+/**
+ * 신청이 갈 수 있는 자리.
+ *
+ * **CANCELLED 는 승인한 뒤에 무른 것이다** — 반려(REJECTED)와 다르다. 반려는 처음부터 받지 않은 것이고, 철회는
+ * 받아 놓고 끝내지 못한 것이다. 교환은 승인하는 순간 바꿀 옵션의 재고를 잡아 두므로, 물건이 오지 않는 채로
+ * 두면 **아무도 안 받을 물건이 품절로 보인다.** 그 재고를 풀 길이 승인 뒤에는 없었다.
+ *
+ * 둘을 한 값으로 뭉치면 나중에 "왜 안 끝났나" 를 물을 때 처음부터 거절한 것과 구분되지 않는다.
+ */
+export const RETURN_STATUS = ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'] as const;
 export type ReturnStatus = (typeof RETURN_STATUS)[number];
 
 /** 아직 끝나지 않은 신청 — 이것이 있으면 주문을 확정하지 않는다(손님 확정·자동 확정이 같은 목록을 본다) */

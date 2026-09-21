@@ -1472,9 +1472,9 @@ model ReturnRequest {
   /// SELLER 를 보내 반송비를 넘길 수 있다.
   shippingBorneBy String
 
-  /// REQUESTED | APPROVED | REJECTED | COMPLETED
+  /// REQUESTED | APPROVED | REJECTED | COMPLETED | CANCELLED(승인 뒤 무름)
   status       String  @default("REQUESTED")
-  /// 반려 사유. 고객에게 그대로 보여 준다.
+  /// 끝낸 까닭 — 반려하거나 승인 뒤 무를 때 적는다. 고객에게 그대로 보여 준다.
   rejectReason String?
 
   requestedAt DateTime  @default(now())
@@ -1835,6 +1835,8 @@ enum NotificationKind {
   RETURN_APPROVED
   /// 반품·교환 신청이 반려됐다
   RETURN_REJECTED
+  /// 승인했던 반품·교환을 물렀다 — 반려와 다른 말이다(손님은 승인을 받고 기다리던 중이었다)
+  RETURN_WITHDRAWN
   /// 환불이 끝났다
   REFUND_COMPLETED
   /// 운영진이 적립금을 줬다 / 뺐다

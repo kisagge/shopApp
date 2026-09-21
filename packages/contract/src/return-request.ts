@@ -65,6 +65,20 @@ export const resolveReturnSchema = z.discriminatedUnion('action', [
         return digits.length >= 9 && digits.length <= 20;
       }, 'valid.trackingFormat'),
   }),
+  /**
+   * 승인한 신청을 무른다.
+   *
+   * **교환은 승인하는 순간 바꿀 옵션의 재고를 잡는다.** 물건이 오지 않으면 그 재고는 영영 묶이고, 승인 뒤에는
+   * 풀 길이 없었다. 반려와 같은 칸에 까닭을 적되 상태는 따로 남긴다(CANCELLED) — 처음부터 거절한 것과 다르다.
+   */
+  z.object({
+    action: z.literal('WITHDRAW'),
+    rejectReason: z
+      .string({ error: 'valid.rejectReasonRequired' })
+      .trim()
+      .min(1, 'valid.rejectReasonRequired')
+      .max(300, 'valid.tooLongChars'),
+  }),
   z.object({
     action: z.literal('REJECT'),
     /**

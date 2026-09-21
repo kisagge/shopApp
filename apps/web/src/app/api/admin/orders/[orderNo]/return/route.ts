@@ -81,9 +81,9 @@ export async function POST(
 
     const result = await resolveReturn(orderNo, parsed.data, actor);
 
-    // 교환을 반려하면 잡아 둔 옵션 재고가 풀린다 — 아무도 안 받을 물건이 품절로 남으면 안 된다.
+    // 교환을 반려·철회하면 잡아 둔 옵션 재고가 풀린다 — 아무도 안 받을 물건이 품절로 남으면 안 된다.
     // 승인은 재고를 건드리지 않는다(물건은 아직 오는 중이다)
-    if (parsed.data.action === 'REJECT') revalidateCatalog();
+    if (parsed.data.action === 'REJECT' || parsed.data.action === 'WITHDRAW') revalidateCatalog();
 
     // 돈과 재고가 걸린 판단이라 누가 언제 했는지 남긴다
     await recordAudit({
@@ -96,7 +96,9 @@ export async function POST(
     });
 
     await notifyAfterSale({
-      kind: parsed.data.action === 'APPROVE' ? 'RETURN_APPROVED' : 'RETURN_REJECTED',
+      // 철회는 반려와 다른 말이다 — 손님은 승인을 받고 기다리던 중이었다
+      kind: parsed.data.action === 'APPROVE' ? 'RETURN_APPROVED'
+        : parsed.data.action === 'WITHDRAW' ? 'RETURN_WITHDRAWN' : 'RETURN_REJECTED',
       orderNo: result.orderNo,
       actorId: actor.id,
     });

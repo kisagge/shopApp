@@ -33,6 +33,7 @@ export const NOTIFICATION_PARAMS = {
   ORDER_CANCELLED: ['orderNo'],
   RETURN_APPROVED: ['orderNo'],
   RETURN_REJECTED: ['orderNo'],
+  RETURN_WITHDRAWN: ['orderNo'],
   REFUND_COMPLETED: ['orderNo'],
   POINTS_GRANTED: ['points'],
   POINTS_DEDUCTED: ['points'],

@@ -9,7 +9,9 @@ import {
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
 import { LateDepositButton } from './late-deposit-button';
-import { ReturnActions, CompleteReturnButton, ReceiveReturnButton, ShipExchangeForm } from './return-actions';
+import {
+  ReturnActions, CompleteReturnButton, ReceiveReturnButton, ShipExchangeForm, WithdrawReturnButton,
+} from './return-actions';
 import { previewCompleteReturn } from '~/lib/orders/complete-return';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrder } from '~/lib/queries/admin/orders';
@@ -329,6 +331,13 @@ export default async function AdminOrderDetail({
                   preview={returnPreview}
                   received={activeReturn.receivedAt !== null}
                 />
+              )}
+              {/*
+                **승인한 뒤에도 무를 수 있다.** 물건이 오지 않으면 신청은 승인된 채로 남고, 교환이라면 바꿀
+                옵션의 재고가 함께 묶인다 — 아무도 안 받을 물건이 품절로 보인다. 되돌릴 길이 없었다.
+              */}
+              {activeReturn.status === 'APPROVED' && canResolveReturn && (
+                <WithdrawReturnButton orderNo={order.orderNo} exchange={isExchange} />
               )}
             </section>
           )}

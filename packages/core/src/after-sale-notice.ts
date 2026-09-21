@@ -8,7 +8,9 @@ import type { NotificationKind } from './notification';
  * 다시 열어야 알았고, 모르고 넘어가면 "환불 언제 되나요" 가 문의로 왔다.
  */
 
-export const AFTER_SALE_KIND = ['ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'REFUND_COMPLETED'] as const;
+export const AFTER_SALE_KIND = [
+  'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_WITHDRAWN', 'REFUND_COMPLETED',
+] as const;
 export type AfterSaleKind = (typeof AFTER_SALE_KIND)[number] & NotificationKind & MailTemplateKind;
 
 /** 누가 일으켰는가 — 손님 자신, 운영진·가맹점, 배치 */

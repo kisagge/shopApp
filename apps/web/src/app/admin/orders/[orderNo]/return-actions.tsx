@@ -15,6 +15,91 @@ import type { CompleteReturnPreview } from '~/lib/orders/complete-return';
  * 승인은 돈을 움직이지 않는다. 회수를 기다리는 상태가 될 뿐이고, 환불은
  * order:refund 권한이 따로 있는 동작이다.
  */
+/**
+ * 승인한 신청을 무른다.
+ *
+ * **교환은 승인하는 순간 바꿀 옵션의 재고를 잡는다.** 물건이 오지 않으면 그 재고는 영영 묶이고, 승인 뒤에는
+ * 되돌릴 길이 아예 없었다 — 반려는 접수 상태에서만 되기 때문이다. 아무도 안 받을 물건이 품절로 보인다.
+ *
+ * 반려와 같은 칸에 까닭을 적지만 남는 이름은 다르다(철회). 손님은 승인을 받고 기다리던 중이라, 그 사실이
+ * 손님에게도 철회로 간다.
+ */
+export function WithdrawReturnButton({ orderNo, exchange = false }: { orderNo: string; exchange?: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const value = new FormData(event.currentTarget).get('withdrawReason');
+    const reason = typeof value === 'string' ? value.trim() : '';
+    setPending(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/admin/orders/${orderNo}/return`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ action: 'WITHDRAW', rejectReason: reason }),
+      });
+      const result = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        setError(result.message ?? '처리하지 못했습니다.');
+        return;
+      }
+      setOpen(false);
+      router.refresh();
+    } catch {
+      setError('네트워크 오류로 처리하지 못했습니다.');
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-[var(--border)] pt-4">
+      {error && <p role="alert" className="mb-2 text-[13px] text-accent">{error}</p>}
+
+      {open ? (
+        <form onSubmit={onSubmit} aria-label="승인 철회" className="flex flex-col gap-2.5">
+          <label htmlFor="withdrawReason" className="text-xs font-medium text-[var(--fg-secondary)]">
+            철회 사유 <span className="text-accent">*</span>
+            <span className="sr-only"> (필수)</span>
+          </label>
+          <textarea
+            id="withdrawReason"
+            name="withdrawReason"
+            required
+            rows={2}
+            maxLength={300}
+            placeholder="고객에게 그대로 보입니다. 예: 기한 안에 물건이 오지 않았습니다."
+            className="rounded-sm border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--ring)]"
+          />
+          <div className="flex gap-2">
+            <Button type="submit" size="md" variant="accent" disabled={pending}>
+              {pending ? '무르는 중…' : '승인 철회'}
+            </Button>
+            <Button type="button" size="md" variant="secondary" onClick={() => setOpen(false)} disabled={pending}>
+              그만두기
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <Button type="button" size="md" variant="secondary" onClick={() => setOpen(true)}>
+            승인 철회
+          </Button>
+          <p className="text-[12px] leading-relaxed text-[var(--fg-muted)]">
+            {exchange
+              ? '물건이 오지 않아 끝낼 수 없으면 무릅니다. 바꿀 옵션으로 잡아 둔 재고가 풀립니다.'
+              : '물건이 오지 않아 끝낼 수 없으면 무릅니다. 주문은 신청 전 상태로 돌아갑니다.'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ReturnActions({ orderNo, exchange = false }: { orderNo: string; exchange?: boolean }) {
   const router = useRouter();
   const [rejecting, setRejecting] = useState(false);

@@ -40,6 +40,7 @@ const KEY: Readonly<Record<AfterSaleKind, string>> = {
   ORDER_CANCELLED: 'mail.cancelled',
   RETURN_APPROVED: 'mail.returnApproved',
   RETURN_REJECTED: 'mail.returnRejected',
+  RETURN_WITHDRAWN: 'mail.returnWithdrawn',
   REFUND_COMPLETED: 'mail.refunded',
 };
 
@@ -73,6 +74,9 @@ export function afterSaleMail(input: AfterSaleMailInput, wording?: MailWording):
       ? t(input.returnType === 'EXCHANGE' ? 'mail.returnApproved.nextExchange' : 'mail.returnApproved.nextReturn')
       : input.kind === 'RETURN_REJECTED'
         ? t('mail.returnRejected.ask')
+        // 무른 신청에는 다시 신청할 수 있다고 적는다 — 반려와 달리 손님이 잘못한 것이 아니다
+        : input.kind === 'RETURN_WITHDRAWN'
+          ? t('mail.returnWithdrawn.ask')
         : money && money.refunded > 0
           ? t('mail.afterSale.cardNote')
           : null;
@@ -142,7 +146,8 @@ export async function notifyAfterSale(input: {
       actorId: input.actorId, customerId: order.userId, system: input.actorId === CRON_ACTOR.id,
     });
     const request = order.returnRequests[0];
-    const isReturn = input.kind === 'RETURN_APPROVED' || input.kind === 'RETURN_REJECTED';
+    const isReturn = input.kind === 'RETURN_APPROVED' || input.kind === 'RETURN_REJECTED'
+      || input.kind === 'RETURN_WITHDRAWN';
 
     const pick = (ids: readonly string[] | undefined) =>
       ids && ids.length ? order.items.filter((i) => ids.includes(i.id)) : order.items;
@@ -164,7 +169,7 @@ export async function notifyAfterSale(input: {
      * 끝나서뿐이라 받는 사람의 말로 적는다 — 배치가 넘긴 한국어를 영어 메일에 그대로 싣지 않는다.
      */
     const reason =
-      input.kind === 'RETURN_REJECTED' ? request?.rejectReason
+      input.kind === 'RETURN_REJECTED' || input.kind === 'RETURN_WITHDRAWN' ? request?.rejectReason
         : by === 'system' ? createTranslator(locale)('mail.afterSale.holdExpired')
           : input.reason;
     await deliverNotice({

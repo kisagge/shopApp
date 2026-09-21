@@ -310,12 +310,27 @@ export async function receiveReturn(
  */
 export async function resolveReturn(
   orderNo: string,
-  input: { action: 'APPROVE' | 'REJECT'; rejectReason?: string | undefined },
+  input: { action: 'APPROVE' | 'REJECT' | 'WITHDRAW'; rejectReason?: string | undefined },
   actor: Actor,
 ): Promise<{ orderNo: string; status: string; orderStatus: string }> {
   const { order, request, lines } = await loadForResolve(orderNo, actor);
-  if (request.status !== 'REQUESTED') {
-    throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
+
+  /**
+   * **철회는 승인한 뒤에 무르는 것이다.**
+   *
+   * 교환을 승인하면 바꿀 옵션의 재고를 그 자리에서 잡는다. 물건이 오지 않으면 그 재고는 영영 묶이는데,
+   * 승인 뒤에는 되돌릴 길이 아예 없었다 — 반려는 접수 상태에서만 되기 때문이다. 아무도 안 받을 물건이
+   * 품절로 보이고, 재고표의 숫자와 창고가 갈린다.
+   *
+   * 무르는 일은 반려와 같은 자리로 되돌린다(재고·주문·줄). 다른 것은 **어디서 출발하는가**와 남는 이름뿐이다.
+   */
+  const withdraw = input.action === 'WITHDRAW';
+  const from = withdraw ? 'APPROVED' : 'REQUESTED';
+  if (request.status !== from) {
+    throw new ReturnError(
+      'ALREADY_RESOLVED',
+      withdraw ? '승인된 신청만 무를 수 있습니다.' : '이미 처리된 신청입니다.',
+    );
   }
 
   const approve = input.action === 'APPROVE';
@@ -350,9 +365,9 @@ export async function resolveReturn(
      * 반려하면 둘 다 "처리했다" 를 받고 나중 것이 남았다.
      */
     const { count } = await tx.returnRequest.updateMany({
-      where: { id: request.id, status: 'REQUESTED' },
+      where: { id: request.id, status: from },
       data: {
-        status: approve ? 'APPROVED' : 'REJECTED',
+        status: approve ? 'APPROVED' : withdraw ? 'CANCELLED' : 'REJECTED',
         ...(approve ? {} : { rejectReason: input.rejectReason ?? null }),
         resolvedAt: new Date(),
         resolvedBy: actor.id,
@@ -362,7 +377,7 @@ export async function resolveReturn(
 
     if (approve) return;
 
-    // 교환을 반려하면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다
+    // 교환을 반려·철회하면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다
     for (const line of request.exchangeLines) {
       await tx.productVariant.updateMany({
         where: { id: line.toVariantId },
@@ -394,14 +409,14 @@ export async function resolveReturn(
         from: order.status,
         to: nextOrderStatus,
         actor: actor.id,
-        note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} 반려 — ${input.rejectReason ?? ''}`,
+        note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} ${withdraw ? '철회' : '반려'} — ${input.rejectReason ?? ''}`,
       },
     });
   });
 
   return {
     orderNo: order.orderNo,
-    status: approve ? 'APPROVED' : 'REJECTED',
+    status: approve ? 'APPROVED' : withdraw ? 'CANCELLED' : 'REJECTED',
     orderStatus: approve ? order.status : nextOrderStatus,
   };
 }
