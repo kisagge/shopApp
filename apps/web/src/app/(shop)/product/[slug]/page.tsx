@@ -100,15 +100,6 @@ export default async function ProductPage({ params, searchParams }: Params) {
   if (movedTo) permanentRedirect(`/product/${movedTo}`);
   if (!product) notFound();
 
-  /**
-   * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**
-   *
-   * 예전에는 1% 라고 못 박혀 있었다. 등급이 올라 2% 를 받는 사람에게도
-   * 1% 라고 적혀 있었다는 뜻이다 — 마이페이지에서 고쳤던 것과 같은 어긋남이,
-   * 상품 화면에는 그대로 남아 있었다. 등급을 정하는 곳에서 같이 받아 온다.
-   */
-  const rewardPercent = viewer ? (await getEffectiveGrade(viewer.id)).rewardPercent : GRADE_REWARD_PERCENT.BASIC;
-
   /*
    * **첫 화면에 필요한 것만 기다린다.**
    *
@@ -116,7 +107,7 @@ export default async function ProductPage({ params, searchParams }: Params) {
    * 준비된 뒤에도 **화면 아래쪽 조회가 끝날 때까지 아무 픽셀도 나가지
    * 않았다.** 아래쪽은 Suspense 로 내려보내고 여기서는 히어로만 챙긴다.
    */
-  const [wishlisted, restockOn, coupons] = await Promise.all([
+  const [wishlisted, restockOn, coupons, grade] = await Promise.all([
     viewer ? getWishlistedIds(viewer.id, [product.id]) : Promise.resolve(new Set<string>()),
     // 품절 옵션에 이미 알림을 걸어 뒀는지. 옵션마다 물으면 옵션 수만큼 쿼리가 나간다.
     viewer
@@ -124,7 +115,17 @@ export default async function ProductPage({ params, searchParams }: Params) {
       : Promise.resolve(new Set<string>()),
     // 이 상품에 쓸 수 있는, 누구나 받는 쿠폰. 못 쓰는 쿠폰을 내밀면 받고 나서 헛걸음한다
     listDownloadableCoupons({ userId: viewer?.id ?? null, product: { id: product.id, brandId: product.brandId, categoryId: product.categoryId } }),
+    // 적립률도 이 사람에게 달린 값이다 — 혼자 앞에 세워 두면 왕복이 한 번 더 직렬로 쌓인다
+    viewer ? getEffectiveGrade(viewer.id) : Promise.resolve(null),
   ]);
+  /**
+   * 여기 적는 적립률은 **실제로 붙을 적립률이어야 한다.**
+   *
+   * 예전에는 1% 라고 못 박혀 있었다. 등급이 올라 2% 를 받는 사람에게도
+   * 1% 라고 적혀 있었다는 뜻이다 — 마이페이지에서 고쳤던 것과 같은 어긋남이,
+   * 상품 화면에는 그대로 남아 있었다. 등급을 정하는 곳에서 같이 받아 온다.
+   */
+  const rewardPercent = grade?.rewardPercent ?? GRADE_REWARD_PERCENT.BASIC;
 
   /*
    * 검색엔진이 읽는 구조화 데이터.

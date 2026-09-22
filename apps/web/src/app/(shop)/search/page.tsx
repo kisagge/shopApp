@@ -39,26 +39,33 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   const price = resolvePriceRange(parsed);
   const term = parsed.q ? normalizeSearchTerm(parsed.q) : null;
 
-  // 검색어가 있으면 인기 검색어를 묻지 않는다 — 보여 줄 자리가 없다
-  const [t, popular] = await Promise.all([getT(), term ? [] : getPopularSearches()]);
-
-  // 검색어가 없거나 너무 짧으면 조회하지 않는다.
-  // 한 글자로 카탈로그 전체를 긁는 것은 검색이 아니다.
-  const page = term
-    ? await searchProducts({
-        q: term,
-        sort: parsed.sort,
-        minPrice: price.min ?? undefined,
-        maxPrice: price.max ?? undefined,
-        color: parsed.color,
-        size: parsed.size,
-        brands: parsed.brand,
-        cursor: parsed.cursor,
-      })
-    : null;
-
-  // 검색어 안에 실제로 있는 값만 고르게 한다
-  const facets = term ? await getFacets({ q: term }) : undefined;
+  /*
+   * **한 번에 던진다.** 결과·면·브랜드는 셋 다 `term` 만 보고 서로의 결과를 쓰지 않는데,
+   * 줄줄이 await 하면 왕복이 세 번 직렬로 쌓인다 — 같은 일을 하는 카테고리 화면은
+   * 진작 한 덩어리로 묶여 있었고 검색 화면만 빠져 있었다.
+   *
+   * 검색어가 없으면 아무것도 묻지 않는다. 한 글자로 카탈로그 전체를 긁는 것은 검색이 아니고,
+   * 인기 검색어도 검색어가 있으면 보여 줄 자리가 없다.
+   */
+  const [t, popular, page, facets, brands] = await Promise.all([
+    getT(),
+    term ? [] : getPopularSearches(),
+    term
+      ? searchProducts({
+          q: term,
+          sort: parsed.sort,
+          minPrice: price.min ?? undefined,
+          maxPrice: price.max ?? undefined,
+          color: parsed.color,
+          size: parsed.size,
+          brands: parsed.brand,
+          cursor: parsed.cursor,
+        })
+      : null,
+    // 검색어 안에 실제로 있는 값만 고르게 한다
+    term ? getFacets({ q: term }) : undefined,
+    term ? getBrandOptions({ q: term }) : [],
+  ]);
 
   const hasPrice = price.min !== null || price.max !== null;
   const hasFilters = parsed.color.length + parsed.size.length + parsed.brand.length > 0;
@@ -70,8 +77,6 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
   const [emptyPopular, categories] = empty
     ? await Promise.all([getPopularSearches(), getTopCategories()])
     : [[], []];
-  const brands = term ? await getBrandOptions({ q: term }) : [];
-
   return (
     <div className="mx-auto w-full max-w-[1280px] px-4 pb-24 md:px-10">
       <header className="flex flex-col gap-2 py-8">

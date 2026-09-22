@@ -268,8 +268,14 @@ export const getIndexableCategorySlugs = cachedRead(
   { key: ['indexable-categories'], tags: [TAG.catalog], revalidate: TTL.catalog },
 );
 
-/** 카테고리 트리 — 목록 페이지의 사이드바 */
-export async function getCategoryWithChildren(slug: string) {
+/**
+ * 카테고리 트리 — 목록 페이지의 사이드바.
+ *
+ * **한 요청 안에서는 한 번만 읽는다.** 같은 화면이 제목(generateMetadata)과 본문에서
+ * 각각 이 함수를 부르는데, 감싸 두지 않으면 같은 조회가 두 번 나간다 — 이 파일의
+ * 다른 조회들은 진작 그렇게 하고 있었고 여기만 빠져 있었다.
+ */
+export const getCategoryWithChildren = cache(async (slug: string) => {
   return prisma.category.findUnique({
     where: { slug },
     select: {
@@ -278,7 +284,7 @@ export async function getCategoryWithChildren(slug: string) {
       children: { select: { name: true, slug: true }, orderBy: { sortOrder: 'asc' } },
     },
   });
-}
+});
 
 /**
  * 옛 주소로 들어왔을 때 갈 곳.

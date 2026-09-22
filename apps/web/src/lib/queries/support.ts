@@ -1,4 +1,5 @@
 import 'server-only';
+import { cache } from 'react';
 import { prisma } from '@shop/db';
 import {
   assertPermission, asRichTextDoc,
@@ -69,7 +70,15 @@ export async function getNotices(limit?: number): Promise<SupportPostSummary[]> 
   return (await noticeRows(limit ?? null)).map(reviveDate);
 }
 
-export async function getNotice(id: string): Promise<SupportPostView | null> {
+/**
+ * 공지 한 건.
+ *
+ * **한 요청 안에서는 한 번만 읽는다.** 제목(generateMetadata)과 본문이 같은 공지를
+ * 각각 부른다 — 목록(noticeRows)은 진작 캐시를 지나는데 본문만 맨 조회로 남아 있었다.
+ * 여기서 `cachedRead` 까지 가지 않는 것은 날짜가 문자열로 돌아오는 함정 때문이다
+ * (위 reviveDate 주석) — 요청 안 중복만 없애면 이 화면의 왕복은 둘에서 하나가 된다.
+ */
+export const getNotice = cache(async (id: string): Promise<SupportPostView | null> => {
   const post = await prisma.supportPost.findFirst({
     where: { id, ...visible('NOTICE') },
     select: {
@@ -78,7 +87,7 @@ export async function getNotice(id: string): Promise<SupportPostView | null> {
     },
   });
   return post === null ? null : { ...post, bodyRich: asRichTextDoc(post.bodyRich) };
-}
+});
 
 export interface FaqGroup {
   readonly topic: InquiryTopic;

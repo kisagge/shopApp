@@ -49,23 +49,28 @@ export async function getProductInquiries(
   viewer: Actor | null,
   options: { cursor?: string | undefined } = {},
 ): Promise<{ items: PublicInquiry[]; nextCursor: string | null }> {
-  const product = await prisma.product.findUnique({
-    where: { id: productId },
-    select: { brand: { select: { merchantId: true } } },
-  });
+  /*
+   * 둘을 한 번에 던진다. 가맹점이 누구인지는 **답을 달 수 있는지**를 가리는 데만 쓰고,
+   * 문의 조회의 조건은 `productId` 뿐이라 앞의 답을 기다릴 이유가 없다.
+   */
+  const [product, rows] = await Promise.all([
+    prisma.product.findUnique({
+      where: { id: productId },
+      select: { brand: { select: { merchantId: true } } },
+    }),
+    prisma.inquiry.findMany({
+      where: { productId, deletedAt: null },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: PAGE_SIZE + 1,
+      ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
+      select: {
+        id: true, content: true, isPrivate: true, createdAt: true,
+        answer: true, answeredAt: true, authorId: true,
+        author: { select: { name: true } },
+      },
+    }),
+  ]);
   const scope = { merchantId: product?.brand.merchantId ?? null };
-
-  const rows = await prisma.inquiry.findMany({
-    where: { productId, deletedAt: null },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: PAGE_SIZE + 1,
-    ...(options.cursor ? { cursor: { id: options.cursor }, skip: 1 } : {}),
-    select: {
-      id: true, content: true, isPrivate: true, createdAt: true,
-      answer: true, answeredAt: true, authorId: true,
-      author: { select: { name: true } },
-    },
-  });
 
   const hasMore = rows.length > PAGE_SIZE;
   const page = hasMore ? rows.slice(0, PAGE_SIZE) : rows;

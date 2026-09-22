@@ -29,7 +29,12 @@ export default async function CheckoutPage({
   // 고정된 경로라 인코딩하지 않는다(마이페이지들과 같은 모양) — 쿼리 값 안의 `?` 는 그대로 읽힌다
   if (!user) redirect(buyNow ? '/login?next=/checkout?now=1' : '/login?next=/checkout');
 
-  const [address, t] = await Promise.all([getDefaultAddress(user.id), getT()]);
+  // 도서산간 할증은 화면이 처음부터 적어 둬야 하는 값이다 — JSX 안에서 기다리면 왕복이 하나 더 붙는다
+  const [address, t, shipping] = await Promise.all([
+    getDefaultAddress(user.id),
+    getT(),
+    getShippingPolicy(),
+  ]);
 
   /*
    * **결제 방식은 서버가 정하고 브라우저는 받아서 쓴다.**
@@ -53,7 +58,7 @@ export default async function CheckoutPage({
           buyNow={buyNow}
           defaultAddress={address}
           paymentMode={payment.mode}
-          remoteSurcharge={(await getShippingPolicy()).remoteSurcharge}
+          remoteSurcharge={shipping.remoteSurcharge}
         />
       )}
     </div>

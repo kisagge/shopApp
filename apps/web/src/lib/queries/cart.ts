@@ -61,29 +61,36 @@ export async function quoteCartDetailed(
 }> {
   const requested = new Map(input.lines.map((l) => [l.variantId, l.quantity]));
 
-  const variants = await prisma.productVariant.findMany({
-    where: { id: { in: [...requested.keys()] } },
-    select: {
-      id: true, label: true, stock: true, isActive: true, priceOverride: true,
-      product: {
-        select: {
-          id: true, slug: true, name: true, listPrice: true, salePrice: true,
-          status: true, deletedAt: true,
-          // 대상이 정해진 쿠폰의 판정에 쓴다
-          brandId: true, categoryId: true,
-          // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면
-          // 정지 처분이 판매를 멈추지 못한다.
-          brand: { select: { name: true, merchant: { select: { status: true } } } },
-          // 담은 것이 무엇인지 눈으로 확인할 수 있게. 첫 장이면 된다.
-          images: {
-            select: { url: true, alt: true, blurDataUrl: true },
-            orderBy: { sortOrder: 'asc' },
-            take: 1,
+  /*
+   * 배송 정책은 장바구니에 무엇이 담겼든 같은 한 줄이다. 맨 끝에서 혼자 기다리던 것을
+   * 여기서 함께 던진다 — 견적은 담고 빼고 쿠폰을 누를 때마다 지나는 창구라 왕복 하나가 그대로 체감된다.
+   */
+  const [variants, shippingPolicy] = await Promise.all([
+    prisma.productVariant.findMany({
+      where: { id: { in: [...requested.keys()] } },
+      select: {
+        id: true, label: true, stock: true, isActive: true, priceOverride: true,
+        product: {
+          select: {
+            id: true, slug: true, name: true, listPrice: true, salePrice: true,
+            status: true, deletedAt: true,
+            // 대상이 정해진 쿠폰의 판정에 쓴다
+            brandId: true, categoryId: true,
+            // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면
+            // 정지 처분이 판매를 멈추지 못한다.
+            brand: { select: { name: true, merchant: { select: { status: true } } } },
+            // 담은 것이 무엇인지 눈으로 확인할 수 있게. 첫 장이면 된다.
+            images: {
+              select: { url: true, alt: true, blurDataUrl: true },
+              orderBy: { sortOrder: 'asc' },
+              take: 1,
+            },
           },
         },
       },
-    },
-  });
+    }),
+    getShippingPolicy(),
+  ]);
   const byId = new Map(variants.map((v) => [v.id, v]));
 
   const lines: CartQuoteLine[] = input.lines.map((l) => {
@@ -165,8 +172,6 @@ export async function quoteCartDetailed(
   ]);
 
   const pointsAvailable = won(viewer?.pointBalance ?? 0);
-
-  const shippingPolicy = await getShippingPolicy();
 
   if (payableLines.length === 0) {
     return { allocations: [], shippingPolicy, quote: {

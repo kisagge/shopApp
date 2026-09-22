@@ -32,25 +32,30 @@ export interface MyPageSummary {
 
 export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | null> {
   const userId = actor.id;
-  const user = await prisma.user.findUnique({
+  const now = new Date();
+
+  /*
+   * 사용자 행도 같은 묶음에 넣는다. 예전에는 이 행을 받은 뒤에야 나머지를 던졌는데,
+   * 아래 조회들은 `userId` 말고 이 행에서 오는 것이 없다 — 등급 하나 때문에 왕복이
+   * 둘로 갈렸다. 등급은 값 대신 약속으로 넘겨 집계와 나란히 보낸다.
+   */
+  const row = prisma.user.findUnique({
     where: { id: userId },
     select: {
       name: true, email: true, grade: true, pointBalance: true,
       marketingAgreedAt: true, analyticsConsent: true,
     },
   });
-  if (!user) return null;
 
-  const now = new Date();
-
-  const [effective, counts, couponCount, wishlistCount, reviewableCount] = await Promise.all([
+  const [user, effective, counts, couponCount, wishlistCount, reviewableCount] = await Promise.all([
+    row,
     /*
      * 등급과 적립률은 **견적이 쓰는 것과 같은 함수**에서 낸다.
      *
      * 여기서 따로 계산하던 때에는 화면이 "적립률 3%" 라고 적어 놓고 실제
      * 주문에는 기본 1% 가 붙었다. 같은 곳에서 내면 그렇게 갈라질 수 없다.
      */
-    getEffectiveGrade(userId, user.grade),
+    getEffectiveGrade(userId, row.then((u) => u?.grade ?? 'BASIC')),
     prisma.order.groupBy({
       by: ['status'],
       where: { userId, status: { in: [...TRACKED_STATUSES] } },
@@ -75,6 +80,8 @@ export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | nu
       })
       : 0,
   ]);
+
+  if (!user) return null;
 
   const statusCounts = Object.fromEntries(
     TRACKED_STATUSES.map((s) => [s, counts.find((c) => c.status === s)?._count._all ?? 0]),

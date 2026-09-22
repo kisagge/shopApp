@@ -39,10 +39,14 @@ async function totalSpentOf(userId: string): Promise<Won> {
  * storedGrade 를 넘기면 사용자 행을 다시 읽지 않는다.
  *
  * 마이페이지는 이미 사용자를 읽은 뒤라 한 번 더 읽을 이유가 없다.
+ *
+ * **아직 오지 않은 값도 받는다.** 등급을 기다렸다가 이 함수를 부르면 누적 구매액 집계가
+ * 그 뒤에 줄을 서서, 왕복 두 번이 직렬로 쌓인다 — DB 가 바다 건너에 있으면 그대로 지연이다.
+ * 사용자 조회의 약속을 그냥 넘기면 둘이 나란히 나간다. 값이든 약속이든 여기서는 같다.
  */
 export async function getEffectiveGrade(
   userId: string,
-  storedGrade?: MemberGrade,
+  storedGrade?: MemberGrade | PromiseLike<MemberGrade>,
 ): Promise<EffectiveGrade> {
   const [totalSpent, stored] = await Promise.all([
     totalSpentOf(userId),
@@ -74,12 +78,16 @@ export interface QuoteViewer {
  * 예정 금액과 실제로 쌓이는 금액이 갈라진다.
  */
 export async function getQuoteViewer(userId: string): Promise<QuoteViewer | null> {
-  const user = await prisma.user.findUnique({
+  const row = prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, pointBalance: true, grade: true },
   });
+  // 등급을 손에 쥔 뒤에 집계를 시작하면 왕복이 둘로 나뉜다 — 약속을 넘겨 나란히 보낸다
+  const [user, { rewardPercent }] = await Promise.all([
+    row,
+    getEffectiveGrade(userId, row.then((u) => u?.grade ?? 'BASIC')),
+  ]);
   if (!user) return null;
 
-  const { rewardPercent } = await getEffectiveGrade(user.id, user.grade);
   return { id: user.id, pointBalance: user.pointBalance, rewardPercent };
 }

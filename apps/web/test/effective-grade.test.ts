@@ -102,4 +102,26 @@ describe('견적에 넘길 사람', () => {
     db.user.findUnique.mockResolvedValue(null);
     expect(await getQuoteViewer('u-x')).toBeNull();
   });
+
+  /**
+   * **등급을 손에 쥔 뒤에 집계를 시작하지 않는다.**
+   *
+   * 견적은 담고 빼고 쿠폰을 누를 때마다 지나는 창구인데, 사용자 행을 기다렸다가
+   * 누적 구매액을 물으면 왕복 두 번이 직렬로 쌓인다 — DB 가 바다 건너에 있으면
+   * 그대로 지연이다. 등급은 값 대신 약속으로 넘겨 둘이 나란히 나가야 한다.
+   */
+  it('사용자 행을 기다리지 않고 집계를 함께 보낸다', async () => {
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    db.user.findUnique.mockImplementation(async () => {
+      await held;
+      return { id: 'u-1', pointBalance: 5000, grade: 'BASIC' };
+    });
+
+    const pending = getQuoteViewer('u-1');
+
+    expect(db.order.aggregate, '사용자 행이 아직 안 왔는데 집계가 나가 있어야 한다').toHaveBeenCalled();
+    release();
+    expect(await pending).toMatchObject({ id: 'u-1' });
+  });
 });
