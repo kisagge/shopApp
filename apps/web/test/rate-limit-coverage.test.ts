@@ -90,7 +90,8 @@ const EXEMPT_ZONE: readonly { prefix: string; reason: string; proof: RegExp }[] 
   {
     prefix: 'api/cron/',
     reason: '배치 전용. CRON_SECRET 없이는 401 이다.',
-    proof: /authorizeCron/,
+    // 문지기는 cronRoute 감싸개 안에 있다 — 라우트는 그 감싸개를 쓰는 것으로 증명한다
+    proof: /cronRoute\(|authorizeCron/,
   },
   {
     prefix: 'api/auth/',

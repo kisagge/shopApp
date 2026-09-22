@@ -1,8 +1,6 @@
-import { NextResponse } from 'next/server';
-import { authorizeCron } from '~/lib/cron';
+import { cronRoute } from '~/lib/cron';
 import { runEventRollup } from '~/lib/analytics/rollup';
 import { pruneOldNotifications } from '~/lib/queries/notifications';
-import { recordAudit } from '~/lib/audit';
 
 /**
  * 하루치 정리 배치. 매일 KST 04:00 (UTC 19:00 전날) 에 돈다.
@@ -18,12 +16,7 @@ import { recordAudit } from '~/lib/audit';
  * 여러 번 돌아도 결과가 같다 — 접는 것은 원본을 다시 세서 덮어쓰고,
  * 지우는 것은 이미 지운 것을 또 지울 뿐이다.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  const auth = authorizeCron(request);
-  if (!auth.ok) {
-    return NextResponse.json({ code: auth.code, message: auth.message }, { status: auth.status });
-  }
-
+export const GET = cronRoute('event.rollup', async () => {
   const result = await runEventRollup();
 
   /*
@@ -33,29 +26,28 @@ export async function GET(request: Request): Promise<NextResponse> {
    */
   const prunedNotifications = await pruneOldNotifications();
 
-  // 원본을 지웠으면 남긴다. 되돌릴 수 없는 동작이라 언제 얼마나 지웠는지는
-  // 남아 있어야 한다. 아무것도 안 지운 날까지 남기면 감사 로그가 잡음으로 찬다.
-  if (result.deletedRows > 0) {
-    await recordAudit({
-      actor: auth.actor,
-      action: 'event.prune',
-      targetType: 'event_log',
-      targetId: result.deletedThrough ?? 'unknown',
-      after: { deletedRows: result.deletedRows, through: result.deletedThrough },
-      request,
-    });
-  }
+  /*
+   * 지운 것만 남긴다. 되돌릴 수 없는 동작이라 언제 얼마나 지웠는지는 남아 있어야
+   * 하고, 아무것도 안 지운 날까지 남기면 감사 로그가 잡음으로 찬다.
+   */
+  const audits = [
+    ...(result.deletedRows > 0
+      ? [{
+          action: 'event.prune',
+          targetType: 'event_log' as const,
+          targetId: result.deletedThrough ?? 'unknown',
+          after: { deletedRows: result.deletedRows, through: result.deletedThrough },
+        }]
+      : []),
+    ...(prunedNotifications > 0
+      ? [{
+          action: 'notification.prune',
+          targetType: 'notification' as const,
+          targetId: 'retention',
+          after: { deletedRows: prunedNotifications },
+        }]
+      : []),
+  ];
 
-  if (prunedNotifications > 0) {
-    await recordAudit({
-      actor: auth.actor,
-      action: 'notification.prune',
-      targetType: 'notification',
-      targetId: 'retention',
-      after: { deletedRows: prunedNotifications },
-      request,
-    });
-  }
-
-  return NextResponse.json({ ...result, prunedNotifications });
-}
+  return { body: { ...result, prunedNotifications }, audits };
+});

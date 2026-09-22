@@ -1,7 +1,5 @@
-import { NextResponse } from 'next/server';
-import { authorizeCron } from '~/lib/cron';
+import { cronRoute } from '~/lib/cron';
 import { expirePoints } from '~/lib/points/expire';
-import { recordAudit } from '~/lib/audit';
 
 /**
  * 포인트 소멸 배치. 매일 KST 02:00 (UTC 17:00 전날) 에 돈다.
@@ -12,25 +10,19 @@ import { recordAudit } from '~/lib/audit';
  *
  * 여러 번 돌아도 안전하다 — 소멸 기록이 다음 계산에서 차감으로 들어간다.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  const auth = authorizeCron(request);
-  if (!auth.ok) {
-    return NextResponse.json({ code: auth.code, message: auth.message }, { status: auth.status });
-  }
-
+export const GET = cronRoute('points.expire', async () => {
   const result = await expirePoints();
 
-  // 돈이 사라진 날만 남긴다. 0건인 날까지 남기면 봐야 할 줄이 묻힌다.
-  if (result.total > 0) {
-    await recordAudit({
-      actor: auth.actor,
-      action: 'points.expire',
-      targetType: 'user',
-      targetId: `${result.expired.length}명`,
-      after: { total: result.total, users: result.expired.length },
-      request,
-    });
-  }
-
-  return NextResponse.json(result);
-}
+  return {
+    body: result,
+    // 돈이 사라진 날만 남긴다. 0건인 날까지 남기면 봐야 할 줄이 묻힌다.
+    audits: result.total > 0
+      ? [{
+          action: 'points.expire',
+          targetType: 'user' as const,
+          targetId: `${result.expired.length}명`,
+          after: { total: result.total, users: result.expired.length },
+        }]
+      : [],
+  };
+});

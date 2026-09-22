@@ -1,7 +1,5 @@
-import { NextResponse } from 'next/server';
-import { authorizeCron } from '~/lib/cron';
+import { cronRoute } from '~/lib/cron';
 import { releaseAbandonedHolds } from '~/lib/orders/release-holds';
-import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 
 /**
@@ -16,26 +14,21 @@ import { revalidateCatalog } from '~/lib/cache';
  * vercel.json 의 schedule 만 `0 * * * *` 로 바꾸면 된다 — 배치 자체는 몇
  * 번을 돌려도 안전하다.
  */
-export async function GET(request: Request): Promise<NextResponse> {
-  const auth = authorizeCron(request);
-  if (!auth.ok) {
-    return NextResponse.json({ code: auth.code, message: auth.message }, { status: auth.status });
-  }
-
+export const GET = cronRoute('order.releaseHold', async () => {
   const result = await releaseAbandonedHolds();
 
-  if (result.released > 0) {
-    // 재고가 늘었다 — 품절로 보이던 것이 다시 보여야 한다
-    revalidateCatalog();
-    await recordAudit({
-      actor: auth.actor,
-      action: 'order.releaseHold',
-      targetType: 'order',
-      targetId: `${result.released}건`,
-      after: { released: result.released, orderNos: result.orderNos },
-      request,
-    });
-  }
+  // 재고가 늘었다 — 품절로 보이던 것이 다시 보여야 한다
+  if (result.released > 0) revalidateCatalog();
 
-  return NextResponse.json(result);
-}
+  return {
+    body: result,
+    audits: result.released > 0
+      ? [{
+          action: 'order.releaseHold',
+          targetType: 'order' as const,
+          targetId: `${result.released}건`,
+          after: { released: result.released, orderNos: result.orderNos },
+        }]
+      : [],
+  };
+});

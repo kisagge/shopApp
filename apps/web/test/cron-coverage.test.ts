@@ -26,9 +26,19 @@ describe('배치', () => {
     expect(routes.length).toBeGreaterThan(0);
   });
 
-  it.each(routes)('%s 가 인증을 건다', (name) => {
+  /**
+   * **문지기를 부르는 대신 감싸개를 쓴다.**
+   *
+   * 일곱 라우트가 같은 네 줄로 시작하던 때에는 "authorizeCron 을 부르는가" 를 봤다.
+   * 이제 문을 여는 곳은 `cronRoute` 하나뿐이라, 그것을 썼는지 보는 편이 더 단단하다 —
+   * 감싸개는 문지기를 빠뜨릴 수 없지만 손으로 적은 네 줄은 빠뜨릴 수 있다.
+   */
+  it.each(routes)('%s 가 cronRoute 로 문을 연다', (name) => {
     const source = readFileSync(join(CRON_DIR, name, 'route.ts'), 'utf8');
-    expect(source).toContain('authorizeCron');
+    expect(
+      /export const GET = cronRoute\(/.test(source),
+      `${name} 이 cronRoute 를 쓰지 않는다 — 문지기와 감사 로그를 손으로 다시 적으면 빠뜨린다.`,
+    ).toBe(true);
   });
 
   it.each(routes)('%s 가 vercel.json 에 등록돼 있다', (name) => {

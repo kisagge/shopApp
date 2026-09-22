@@ -1,6 +1,8 @@
 import 'server-only';
 import { timingSafeEqual } from 'node:crypto';
+import { NextResponse } from 'next/server';
 import type { Actor } from '@shop/core';
+import { recordAudit, type AuditTargetType } from './audit';
 
 /**
  * 크론 요청 인증.
@@ -49,4 +51,74 @@ export function authorizeCron(request: Request): CronAuth {
   }
 
   return { ok: true, actor: CRON_ACTOR };
+}
+
+/** 배치가 감사 로그에 남길 한 줄. 무엇을 언제 남길지는 배치가 정한다. */
+export interface CronAudit {
+  readonly action: string;
+  readonly targetType: AuditTargetType;
+  readonly targetId: string;
+  /** 남길 내용. 감사 로그가 지울 키(비밀번호·계좌 따위)는 recordAudit 이 지운다 */
+  readonly after: unknown;
+}
+
+/** 배치가 내놓는 것 — 응답에 실을 몸통과, 남길 것이 있으면 그 목록 */
+export interface CronOutcome {
+  readonly body: unknown;
+  /**
+   * 남길 줄. **0건인 날은 빈 목록을 준다** — 아무 일도 없던 날까지 남기면
+   * 정작 봐야 할 줄이 잡음에 묻힌다. 그 기준은 배치마다 다르므로 배치가 정한다.
+   */
+  readonly audits?: readonly CronAudit[];
+}
+
+/** 상태와 코드를 스스로 아는 오류인가 — 배치가 던지는 도메인 오류의 모양이다 */
+function knownFailure(error: unknown): { status: number; code: string; message: string } | null {
+  if (typeof error !== 'object' || error === null) return null;
+  const e = error as { status?: unknown; code?: unknown; message?: unknown };
+  return typeof e.status === 'number' && typeof e.code === 'string' && typeof e.message === 'string'
+    ? { status: e.status, code: e.code, message: e.message }
+    : null;
+}
+
+/**
+ * 배치 라우트의 뼈대.
+ *
+ * **일곱 개가 같은 네 줄로 시작하고 있었다** — 문지기를 부르고, 막히면 코드와
+ * 메시지를 그대로 실어 돌려보낸다. 감사 로그를 거는 모양도, "0건인 날은 남기지
+ * 않는다" 는 주석도 일곱 번 각자 적혀 있었다. 문지기를 한 곳에서만 부르면
+ * 그 검사를 빠뜨린 여덟 번째 배치가 생길 수 없다.
+ *
+ * 배치가 할 일만 `run` 에 남는다 — 무엇을 부르고, 무엇을 응답에 싣고, 무엇을 남기는가.
+ *
+ * **넘어지면 로그에 남긴다.** 배치는 보는 사람이 없어서, 조용히 500 이 나면
+ * 아무도 모른 채 며칠이 지난다. 상태를 스스로 아는 오류는 그대로 돌려보내고
+ * 나머지는 다시 던진다 — 모르는 고장을 200 으로 덮지 않는다.
+ */
+export function cronRoute(
+  name: string,
+  run: (actor: Actor) => Promise<CronOutcome>,
+): (request: Request) => Promise<NextResponse> {
+  return async (request: Request): Promise<NextResponse> => {
+    const auth = authorizeCron(request);
+    if (!auth.ok) {
+      return NextResponse.json({ code: auth.code, message: auth.message }, { status: auth.status });
+    }
+
+    let outcome: CronOutcome;
+    try {
+      outcome = await run(auth.actor);
+    } catch (error) {
+      const known = knownFailure(error);
+      if (!known) throw error;
+      console.error(`[cron] ${name} 실패`, { code: known.code, message: known.message });
+      return NextResponse.json({ code: known.code, message: known.message }, { status: known.status });
+    }
+
+    for (const entry of outcome.audits ?? []) {
+      await recordAudit({ ...entry, actor: auth.actor, request });
+    }
+
+    return NextResponse.json(outcome.body);
+  };
 }
