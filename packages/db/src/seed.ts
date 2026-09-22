@@ -96,6 +96,22 @@ const PAUSABLE_MERCHANT = {
   commissionPercent: 15,
 };
 
+/**
+ * **지급액이 음수인 정산**을 만들기 위한 가게.
+ *
+ * 앞 달에 확정된 매출과 **그 달에 확정 뒤 돌아간 환불**이 같은 금액이면 남는 것은 수수료뿐이고, 그만큼 순액이
+ * 음수가 된다 — 가맹점이 우리에게 빚진 상태다. 그 정산은 지급하지 않고 다음 달로 넘긴다(CARRIED).
+ *
+ * 그 자리를 화면에서 보려면 **앞 달 데이터**가 있어야 하는데, 앞 달의 확정·환불 시각은 창구로 만들 수 없다.
+ * 그래서 시드가 심는다. 다른 가맹점과 섞이지 않게 제 가게·제 상품을 쓴다.
+ */
+const CARRY_MERCHANT = {
+  name: '빚진가게', businessName: '빚진가게',
+  businessNumber: '000-00-00006', representative: '[대표자명]',
+  contactEmail: 'contact@carry.test', contactPhone: '02-0000-0006',
+  commissionPercent: 20,
+};
+
 const BRANDS = [
   { slug: 'studio-noon', name: 'STUDIO NOON' },
   { slug: 'atelier-k', name: 'ATELIER K' },
@@ -662,6 +678,56 @@ const PRODUCTS: SeedProduct[] = [
   },
 ];
 
+/**
+ * 지급액이 음수인 **두 달 전** 정산 하나를 확정된 채로 심는다.
+ *
+ * 매출(확정)에서 수수료와 그 달 환불을 빼면 남는 것이 없고 수수료만큼 모자란다 — 가맹점이 우리에게 빚진 달이다.
+ * 그런 정산은 지급하지 않고 다음 달로 넘긴다(CARRIED).
+ *
+ * **왜 두 달 전인가.** 음수는 확정되는 순간이 아니라 **다음 달을 확정할 때** 넘어간다(close-settlement 의
+ * carryWhere). 앞 달에 심으면 그것을 넘길 다음 달이 아직 안 끝나 확정할 수 없다. 두 달 전에 두면 앞 달을
+ * 확정하는 그 자리에서 이월이 일어난다.
+ *
+ * **주문은 심지 않는다.** 넘길지 말지는 확정된 정산 행만 보고 정한다(확정된 행은 다시 계산하지 않는다).
+ * 주문까지 만들면 그 주인이 있어야 하는데 계정 시드는 이 시드보다 **뒤에** 돌아서, 새 DB 에서는 손님이 없어
+ * 통째로 건너뛰었다 — 문지기에서 그렇게 한 판이 조용히 지나갔다.
+ *
+ * 시각은 돌릴 때마다 그때의 두 달 전으로 잡는다 — 달이 바뀌어도 같은 자리에 있어야 한다.
+ */
+async function seedCarryOverSettlement(): Promise<void> {
+  const merchant = await prisma.merchant.upsert({
+    where: { businessNumber: CARRY_MERCHANT.businessNumber },
+    update: { status: 'APPROVED' },
+    create: { ...CARRY_MERCHANT, status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
+  });
+
+  /** 두 달 전의 정산 기간 — KST 로 자른다(close-settlement 의 settlementPeriod 와 같은 경계다) */
+  const kstNow = new Date(Date.now() + 9 * 60 * 60 * 1000);
+  const periodStart = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth() - 2, 1) - 9 * 60 * 60 * 1000);
+  const periodEnd = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth() - 1, 1) - 9 * 60 * 60 * 1000);
+
+  await prisma.settlement.upsert({
+    where: {
+      merchantId_periodStart_periodEnd: { merchantId: merchant.id, periodStart, periodEnd },
+    },
+    // 이미 넘어갔으면(CARRIED) 되돌린다 — 시드를 다시 돌리면 검사도 같은 자리에서 다시 시작해야 한다
+    update: { status: 'CONFIRMED', carriedIntoId: null, netAmount: -10_000 },
+    create: {
+      merchantId: merchant.id,
+      periodStart, periodEnd,
+      grossAmount: 50_000,
+      commissionAmount: 10_000,
+      commissionPercent: CARRY_MERCHANT.commissionPercent,
+      refundAmount: 50_000,
+      carriedAmount: 0,
+      // 매출 − 수수료 − 환불. 남는 것은 수수료뿐이라 음수다
+      netAmount: -10_000,
+      status: 'CONFIRMED',
+    },
+  });
+  console.log(`  이월 검사용 정산 한 건(확정·음수) — ${CARRY_MERCHANT.name}`);
+}
+
 async function main(): Promise<void> {
   // 어디에 쓰는지 먼저 밝힌다. 원격이면 승인이 없을 때 여기서 멈춘다.
   assertSeedTarget('시드');
@@ -742,6 +808,8 @@ async function main(): Promise<void> {
     update: { status: 'APPROVED', suspendedReason: null },
     create: { ...PAUSABLE_MERCHANT, status: 'APPROVED', approvedAt: new Date('2026-01-15T00:00:00Z') },
   });
+
+  await seedCarryOverSettlement();
 
   // 자사 상품(PLAIN LABEL)을 받는 플랫폼 반품지
   await prisma.returnAddress.upsert({

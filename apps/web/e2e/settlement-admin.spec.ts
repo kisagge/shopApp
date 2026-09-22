@@ -348,3 +348,37 @@ test('지급은 슈퍼관리자가 하고, 두 번 나가지 않는다', async (
     await context.close();
   }
 });
+
+/**
+ * **지급액이 음수인 정산은 지급하지 않고 다음 달로 넘긴다.**
+ *
+ * 앞 달에 확정된 매출과 그 달에 확정 뒤 돌아간 환불이 같으면 남는 것은 수수료뿐이고, 그만큼 순액이 음수가 된다 —
+ * 가맹점이 우리에게 빚진 상태다. 예전에는 그런 정산이 확정된 채로 멈춰 있었다: 지급할 수도 없고(음수를 보낼 수는
+ * 없다) 사라지지도 않아, 정산 화면에 영영 남았다.
+ *
+ * 그 자리를 화면에서 보려면 앞 달 데이터가 있어야 하는데 확정·환불 시각은 창구로 만들 수 없다 — 시드가 그 가게
+ * 하나를 따로 심는다(빚진가게).
+ *
+ * **위 확정 검사 뒤에 온다.** 같은 기간을 함께 쓰므로 순서가 정해져 있다(이 파일은 serial 이다).
+ */
+test('지급액이 음수인 정산은 이월로 넘어가고, 지급 대상에 서지 않는다', async ({ page }) => {
+  await openPeriod(page, PERIOD);
+
+  /*
+   * 시드가 심은 두 달 전 음수 정산은, 앞 검사가 **이 달을 확정하는 순간** 넘어간다(carryWhere). 그 줄을
+   * 기간으로 찾지 않고 가게 이름으로 찾는다 — 두 기간의 줄이 같은 표에 함께 있다.
+   */
+  const mine = (await rows(page, '확정된 정산 내역')).filter((r) => cell(r, '가맹점').includes('빚진가게'));
+  expect(mine.length, '시드가 심은 음수 정산이 확정 내역에 없다').toBeGreaterThan(0);
+
+  const moved = mine.find((r) => cell(r, '상태').includes('이월'));
+  expect(moved, `음수 정산이 넘어가지 않았다 — 상태: ${mine.map((r) => cell(r, '상태')).join(', ')}`).toBeDefined();
+  // 어느 달이 떠안았는지도 적힌다
+  expect(cell(moved!, '기간')).toBeTruthy();
+
+  /*
+   * **지급 단추가 서지 않는다.** 음수를 보낼 수는 없다 — 단추가 있으면 누군가 누르고, 그 순간 돈이 거꾸로 나간다.
+   */
+  const row = page.getByRole('row').filter({ hasText: '빚진가게' });
+  await expect(row.getByRole('button', { name: /지급/ })).toHaveCount(0);
+});
