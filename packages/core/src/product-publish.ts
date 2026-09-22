@@ -1,4 +1,5 @@
 import type { Permission } from './authz';
+import type { MerchantStatus } from './merchant-application';
 
 /**
  * 상품 게시 규칙. 순수 로직만, I/O 없음.
@@ -33,6 +34,36 @@ export const VISIBLE_STATUS: readonly ProductStatus[] = ['ACTIVE', 'SOLD_OUT'];
 
 export function isVisibleStatus(status: ProductStatus): boolean {
   return VISIBLE_STATUS.includes(status);
+}
+
+/**
+ * 이 상품이 지금 **매대에 서 있는가.**
+ *
+ * 스토어프론트 질의는 `onDisplay()` + `sellableBrand()` 한 쌍으로 거르는데,
+ * 손에 이미 행을 쥐고 같은 판단을 해야 하는 자리가 셋 있다 — 재입고 알림 신청,
+ * 기획전 편집 화면의 "매대에 있음" 표시, 운영 상품 검색의 같은 표시.
+ * 셋이 각자 조건을 적어 두었더니 **하나가 다른 답을 냈다**: 상태를 `DRAFT`·`HIDDEN`
+ * 만 빼는 식으로 적어서 **검수 대기 중인 상품에 재입고 알림을 걸 수 있었다.**
+ * 매대에는 없는 상품인데 "들어오면 알려 드립니다" 를 약속한 셈이다.
+ *
+ * 같은 목록을 두 번 적지 않게, 판단은 여기서 한 번만 한다.
+ *
+ * 가맹점 상태는 **자사 직매입이면 null** 이다 — 승인을 물을 상대가 없다.
+ */
+export function isOnDisplay(input: {
+  readonly deletedAt: Date | null;
+  readonly publishedAt: Date | null;
+  readonly status: ProductStatus;
+  /** 이 브랜드를 파는 가맹점의 상태. 자사 브랜드면 null */
+  readonly merchantStatus: MerchantStatus | null;
+}): boolean {
+  return (
+    input.deletedAt === null &&
+    input.publishedAt !== null &&
+    isVisibleStatus(input.status) &&
+    // 가맹점을 정지시켰는데 상품이 계속 서 있으면 처분이 처분이 아니다
+    (input.merchantStatus === null || input.merchantStatus === 'APPROVED')
+  );
 }
 
 /**

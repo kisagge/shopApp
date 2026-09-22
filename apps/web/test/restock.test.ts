@@ -66,6 +66,22 @@ describe('신청 조건', () => {
     await expect(subscribeRestock('u-1', 'v-1')).rejects.toMatchObject({ code: 'NOT_SELLABLE' });
   });
 
+  /**
+   * **검수 대기 상품에는 걸 수 없다.**
+   *
+   * 조건을 여기서 손으로 적던 때에는 상태를 DRAFT·HIDDEN 만 뺐다. 그래서 아직 매대에
+   * 서지도 않은 상품에 "들어오면 알려 드립니다" 를 약속할 수 있었다 — 그 상품은
+   * 심사에서 떨어지면 영영 안 들어온다. 판단은 이제 core 의 isOnDisplay 하나가 한다.
+   */
+  it('검수 대기 상품에는 걸 수 없다 — 매대에 서지도 않았다', async () => {
+    db.productVariant.findUnique.mockResolvedValue(
+      variant({ product: { ...variant().product, status: 'PENDING_REVIEW' } }),
+    );
+
+    await expect(subscribeRestock('u-1', 'v-1')).rejects.toMatchObject({ code: 'NOT_SELLABLE' });
+    expect(db.restockNotification.upsert).not.toHaveBeenCalled();
+  });
+
   it('정지된 가맹점 상품에도 걸 수 없다', async () => {
     db.productVariant.findUnique.mockResolvedValue(
       variant({ product: { ...variant().product, brand: { merchant: { status: 'SUSPENDED' } } } }),

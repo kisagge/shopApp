@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
   assertPermission, resequence, verifyImageBytes, imageObjectKey,
-  publishStatus, isVisibleStatus, MAX_COLLECTION_ITEMS, isSlugTaken,
+  publishStatus, isOnDisplay, MAX_COLLECTION_ITEMS, isSlugTaken,
   type Actor, type PublishStatus, type BannerTone,
 } from '@shop/core';
 import {
@@ -136,11 +136,12 @@ export async function getCollectionItemsFor(
       name: p.name,
       brandName: p.brand.name,
       imageUrl: p.images[0]?.url ?? null,
-      onDisplay:
-        p.deletedAt === null &&
-        p.publishedAt !== null &&
-        isVisibleStatus(p.status) &&
-        (p.brand.merchant === null || p.brand.merchant.status === 'APPROVED'),
+      onDisplay: isOnDisplay({
+        deletedAt: p.deletedAt,
+        publishedAt: p.publishedAt,
+        status: p.status,
+        merchantStatus: p.brand.merchant?.status ?? null,
+      }),
     });
   }
 

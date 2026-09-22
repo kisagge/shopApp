@@ -1,6 +1,6 @@
 import 'server-only';
 import { Prisma, prisma } from '@shop/db';
-import { checkRestockEligibility, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
+import { checkRestockEligibility, isOnDisplay, MAX_RESTOCK_SUBSCRIPTIONS } from '@shop/core';
 import type { Locale } from '@shop/i18n';
 import { restockMail } from '~/lib/mail/notices';
 import { getMailWording, type MailWording } from '~/lib/mail/templates';
@@ -103,13 +103,18 @@ export async function subscribeRestock(userId: string, variantId: string): Promi
   });
   if (!variant) throw new RestockError('NOT_FOUND', '옵션을 찾을 수 없습니다.', 404);
 
+  /*
+   * 매대에 서 있는 상품인지는 core 가 정한다. 여기서 손으로 적어 두었더니
+   * 상태를 DRAFT·HIDDEN 만 빼는 모양이 되어 **검수 대기 상품에도 알림을 걸 수 있었다** —
+   * 매대에 없는 상품을 두고 "들어오면 알려 드립니다" 를 약속한 셈이다.
+   */
   const p = variant.product;
-  const productSellable =
-    p.deletedAt === null &&
-    p.publishedAt !== null &&
-    p.status !== 'DRAFT' &&
-    p.status !== 'HIDDEN' &&
-    (p.brand.merchant?.status ?? 'APPROVED') === 'APPROVED';
+  const productSellable = isOnDisplay({
+    deletedAt: p.deletedAt,
+    publishedAt: p.publishedAt,
+    status: p.status,
+    merchantStatus: p.brand.merchant?.status ?? null,
+  });
 
   const eligibility = checkRestockEligibility({
     stock: variant.stock,

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@shop/db';
 import { getActor } from '@shop/auth/session';
-import { hasPermission, isVisibleStatus, merchantScope } from '@shop/core';
+import { hasPermission, isOnDisplay, merchantScope } from '@shop/core';
 import { forbidden } from '~/lib/api/respond';
 
 /**
@@ -45,7 +45,8 @@ export async function GET(request: Request): Promise<NextResponse> {
     take: 20,
     select: {
       id: true, slug: true, name: true, status: true, publishedAt: true,
-      brand: { select: { name: true } },
+      // 정지된 가맹점의 상품은 매대에서 내려간다 — 표시도 그 판단을 따라야 한다
+      brand: { select: { name: true, merchant: { select: { status: true } } } },
       images: { select: { url: true }, orderBy: { sortOrder: 'asc' }, take: 1 },
     },
   });
@@ -57,7 +58,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       name: p.name,
       brandName: p.brand.name,
       imageUrl: p.images[0]?.url ?? null,
-      onDisplay: p.publishedAt !== null && isVisibleStatus(p.status),
+      // 매대에 서 있는지는 core 가 정한다 — 지운 상품은 위 where 가 이미 뺐다
+      onDisplay: isOnDisplay({
+        deletedAt: null,
+        publishedAt: p.publishedAt,
+        status: p.status,
+        merchantStatus: p.brand.merchant?.status ?? null,
+      }),
     })),
   });
 }
