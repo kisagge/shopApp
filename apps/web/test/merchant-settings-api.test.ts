@@ -8,8 +8,9 @@ import type { Actor } from '@shop/core';
  * 요청에 끼워 넣는 길이 남는다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 

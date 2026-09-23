@@ -8,8 +8,9 @@ import type { Actor } from '@shop/core';
  * 대한 동의였는지 답할 수 있다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const revalidatePolicies = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

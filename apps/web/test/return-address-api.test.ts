@@ -8,8 +8,9 @@ import type { Actor } from '@shop/core';
  * 물건을 자기 창고로 돌릴 수 있다 — 권한을 제일 먼저 본다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 

@@ -7,8 +7,9 @@ const redirect = vi.hoisted(() => vi.fn<(...a: any[]) => never>((to: string) => 
 vi.mock('next/navigation', () => ({ redirect }));
 vi.mock('next/headers', () => ({ headers: () => Promise.resolve(new Headers()) }));
 
-const getCurrentUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getCurrentUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getCurrentUser = session.getCurrentUser;
 
 /** 가드는 이제 "지금의 사람" 을 받는다 — 세션의 역할이 아니라 지금 상태로 판정한다 */
 const getActor = {

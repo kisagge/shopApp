@@ -6,8 +6,9 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 
 const { GET } = await import('~/app/api/admin/products/search/route');
 

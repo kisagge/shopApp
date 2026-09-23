@@ -7,8 +7,9 @@ import type { Actor } from '@shop/core';
  * 금액과 장부는 cancel-items 가 본다. 여기서는 **창구가 그 함수를 올바르게 부르는가**다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));

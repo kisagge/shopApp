@@ -3,8 +3,9 @@ import type { Actor } from '@shop/core';
 
 /** 이용 정지 창구 — 정지·해제가 끝난 뒤 손님에게 알리고, 막히면 알리지 않는다 */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 vi.mock('~/lib/audit', () => ({ recordAudit: vi.fn() }));
 const suspendUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/manage-access', async (importOriginal) => ({

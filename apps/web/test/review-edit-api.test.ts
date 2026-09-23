@@ -6,9 +6,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * 사진이 오가는 자리라 **자격을 먼저 보고 그다음에 올린다.** 순서가 반대면 남의 리뷰 id 를 적어 파일만 올리는 길이 열린다.
  */
 
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser, getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+// getActor 는 쓰지 않지만 모듈에는 있어야 한다 — 공용 흉내가 이미 내고 있다
+const getSessionUser = session.getSessionUser;
 
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));

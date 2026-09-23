@@ -11,8 +11,9 @@ const db = vi.hoisted(() => ({
 vi.mock('@shop/db', () => ({ prisma: db }));
 const recordNotification = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/notifications/record', () => ({ recordNotification }));
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const revalidateReviews = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

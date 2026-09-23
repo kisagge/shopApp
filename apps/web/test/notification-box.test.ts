@@ -22,8 +22,9 @@ const notification = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: { notification } }));
 
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getSessionUser = session.getSessionUser;
 
 const { getMyNotifications, countUnread } = await import('~/lib/queries/notifications');
 const { POST: markRead } = await import('~/app/api/notifications/read/route');

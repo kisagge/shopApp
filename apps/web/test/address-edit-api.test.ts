@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 /** 배송지 고치기 창구 — 로그인, 계약 검사(칸별 오류), 없는 배송지 */
 
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getSessionUser = session.getSessionUser;
 const lib = vi.hoisted(() => ({
   updateAddress: vi.fn<(...a: any[]) => any>(),
   setDefaultAddress: vi.fn<(...a: any[]) => any>(),

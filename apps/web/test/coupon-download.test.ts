@@ -13,8 +13,9 @@ vi.mock('~/lib/admin/manage-coupon', async (importOriginal) => ({
   ...(await importOriginal<typeof import('~/lib/admin/manage-coupon')>()),
   issueCouponToUser,
 }));
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getSessionUser = session.getSessionUser;
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 

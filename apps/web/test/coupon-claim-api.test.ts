@@ -9,8 +9,9 @@ import { setRateLimiterForTest, type RateLimiter } from '~/lib/rate-limit';
  * 발급하는 규칙은 `manage-coupon` 의 몫이라 갈아 끼운다.
  */
 
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getSessionUser = session.getSessionUser;
 
 const claimCouponByCode = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/manage-coupon', async (importOriginal) => {

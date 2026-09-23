@@ -8,8 +8,9 @@ import { csvDocument, type Actor } from '@shop/core';
  * 무언가 바뀌었을 때만 카탈로그 캐시를 터는지 본다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

@@ -7,8 +7,9 @@ import type { Actor } from '@shop/core';
  * 무엇을 어떻게 알리는지는 after-sale-notice 가 본다. 여기서는 창구가 알맞은 종류와 돈으로 부르는지, 막히면 안 부르는지다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 vi.mock('~/lib/audit', () => ({ recordAudit: vi.fn() }));
 vi.mock('~/lib/cache', () => ({ revalidateCatalog: vi.fn() }));
 const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

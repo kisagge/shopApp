@@ -15,7 +15,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  */
 
 const user = vi.hoisted(() => ({ value: null as { id: string } | null }));
-vi.mock('@shop/auth/session', () => ({ getSessionUser: async () => user.value }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+// 검사 중간에 로그인 상태를 갈아 끼운다 — 손잡이는 위의 user 하나다
+session.getSessionUser.mockImplementation(async () => user.value);
 vi.mock('@shop/auth', () => ({
   sessionCookie: {
     name: '__Secure-better-auth.session_token',

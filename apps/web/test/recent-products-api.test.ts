@@ -5,7 +5,10 @@ import { MAX_RECENT } from '~/stores/recently-viewed';
 
 const findMany = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/db', () => ({ prisma: { product: { findMany } } }));
-vi.mock('@shop/auth/session', () => ({ getSessionUser: vi.fn(async () => null) }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+// 이 창구는 로그인 여부를 보지 않는다 — 늘 비로그인으로 둔다
+session.getSessionUser.mockResolvedValue(null);
 
 const { GET } = await import('~/app/api/products/recent/route');
 

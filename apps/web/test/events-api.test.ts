@@ -8,8 +8,11 @@ vi.mock('~/lib/analytics/server', async (importOriginal) => {
 });
 
 // 세션도 갈아 끼운다. 라우트가 세션을 어떻게 쓰는지가 이 테스트의 관심사다.
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve(null as unknown)));
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const sessionModule = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => sessionModule);
+const getSessionUser = sessionModule.getSessionUser;
+// 기본은 로그인하지 않은 사람 — 수집 창구는 그 경우가 가장 흔하다
+getSessionUser.mockResolvedValue(null);
 
 // 동의는 세션이 아니라 DB 에서 읽는다
 const findUniqueUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve({ analyticsConsent: null })));

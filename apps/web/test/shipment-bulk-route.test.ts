@@ -8,8 +8,9 @@ import { csvDocument, type Actor } from '@shop/core';
  * 일괄 창구가 따로 들고 있으면 반드시 갈린다. 그리고 한 줄이 틀려도 나머지는 들어간다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));

@@ -7,8 +7,9 @@ import type { Actor } from '@shop/core';
  * 돈이 나가는 동작이라 감사 로그와 카탈로그 캐시(돌아온 재고)를 함께 본다.
  */
 
-const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getActor }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

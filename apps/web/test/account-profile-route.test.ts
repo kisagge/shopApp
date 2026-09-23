@@ -7,8 +7,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * 옮겨야 머리에 옛 이름이 5분 동안 남지 않는다. 계약에서 먼저 막아 칸마다 우리 말 문구를 준다.
  */
 
-const getSessionUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('@shop/auth/session', () => ({ getSessionUser }));
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+const getSessionUser = session.getSessionUser;
 const updateUser = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/auth', () => ({ auth: { api: { updateUser } } }));
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
