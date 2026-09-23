@@ -54,6 +54,47 @@ export async function uploadImageFiles(
 }
 
 /**
+ * 사진 한 장을 갈아 끼운다 — 올리고, 적고, 옛것을 지운다.
+ *
+ * **순서가 요점이다.** 네 자리(상품 사진·브랜드 로고·배너·기획전)가 같은 순서를 각자 적고
+ * 있었고, 그중 둘은 **가운데가 실패했을 때 되돌리지 않았다** — 적기가 넘어지면 아무도
+ * 가리키지 않는 파일이 저장소에 남는다.
+ *
+ * 1. **올린다.** 검사·다듬기(위치 정보 제거)·키 만들기는 uploadImageFiles 가 한다.
+ * 2. **적는다.** 적기가 실패하면 방금 올린 것을 지운다.
+ * 3. **옛것을 지운다.** 적은 뒤에 지운다 — 먼저 지우면 적기가 실패했을 때 화면에 깨진
+ *    사진이 남는다. 옛 키를 모르면(주소만 적혀 있던 시절의 줄) 지우지 않는다. 우리가
+ *    올린 것인지 알 수 없다.
+ */
+export async function replaceImage<T>(input: {
+  readonly file: ImageFile;
+  readonly keyFor: (contentType: ImageContentType, token: string) => string;
+  /** 로그에 찍히는 꼬리표. '[banners]' 처럼 어느 화면의 일인지 알아볼 수 있게 */
+  readonly tag: string;
+  /** 지금 걸려 있는 파일의 키. 처음 올리는 것이면 null */
+  readonly previousKey: string | null;
+  /** 올린 것을 어디에 적는가. 여기서 던지면 올린 파일을 도로 지운다. */
+  readonly write: (uploaded: UploadedImage) => Promise<T>;
+}): Promise<T> {
+  const [uploaded] = await uploadImageFiles([input.file], input.keyFor, input.tag);
+  const image = uploaded!;
+
+  let written: T;
+  try {
+    written = await input.write(image);
+  } catch (error) {
+    await discardImageKeys([image.key], input.tag);
+    throw error;
+  }
+
+  if (input.previousKey && input.previousKey !== image.key) {
+    await discardImageKeys([input.previousKey], input.tag);
+  }
+
+  return written;
+}
+
+/**
  * 올린 파일을 되돌린다. **던지지 않는다** — 부르는 자리는 이미 다른 오류를 처리하는 중이고, 여기서 또 던지면 원래 오류가
  * 묻힌다. 남은 객체는 눈에 보이는 피해가 없어 로그로만 남긴다.
  */

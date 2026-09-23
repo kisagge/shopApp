@@ -13,9 +13,14 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { PrismaClientKnownRequestError: class {} } }));
 
-const uploadImageFiles = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+/*
+ * 올리고·적고·옛것을 지우는 **순서**는 네 화면이 함께 쓰는 replaceImage 의 일이고,
+ * 그쪽은 image-replace 검사가 저장소까지 놓고 본다. 여기서 보는 것은 브랜드가
+ * 그 길에 **무엇을 건네는가** 다 — 어떤 키로, 어떤 옛 파일을 갈아 끼우라고.
+ */
+const replaceImage = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const discardImageKeys = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/images/upload-files', () => ({ uploadImageFiles, discardImageKeys }));
+vi.mock('~/lib/images/upload-files', () => ({ replaceImage, discardImageKeys }));
 
 const getActor = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('@shop/auth/session', () => ({ getActor }));
@@ -40,9 +45,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.brand.findUnique.mockResolvedValue(brand());
   db.brand.update.mockResolvedValue({});
-  uploadImageFiles.mockImplementation(async (_files: unknown, keyFor: (t: string, token: string) => string) => [
-    { url: 'https://cdn.test/brands/b-1/new.png', key: keyFor('image/png', 'newtoken1234'), blurDataUrl: null },
-  ]);
+  replaceImage.mockImplementation(async (input: {
+    keyFor: (t: string, token: string) => string;
+    write: (u: { url: string; key: string; blurDataUrl: null }) => Promise<unknown>;
+  }) => input.write({
+    url: 'https://cdn.test/brands/b-1/new.png',
+    key: input.keyFor('image/png', 'newtoken1234'),
+    blurDataUrl: null,
+  }));
   discardImageKeys.mockResolvedValue(undefined);
   getActor.mockResolvedValue(admin);
 });
@@ -59,42 +69,29 @@ describe('올리기', () => {
     expect(discardImageKeys).not.toHaveBeenCalled();
   });
 
-  it('바꾸면 옛 파일을 **적은 뒤에** 지운다', async () => {
-    /*
-     * 먼저 지우면 적기가 실패했을 때 화면에 깨진 로고가 남는다.
-     */
+  it('바꿀 때는 지금 걸린 파일을 갈아 끼우라고 넘긴다', async () => {
     db.brand.findUnique.mockResolvedValue(brand({ logoUrl: 'https://cdn.test/old.png', logoKey: 'brands/b-1/old.png' }));
-    const order: string[] = [];
-    db.brand.update.mockImplementation(async () => { order.push('write'); });
-    discardImageKeys.mockImplementation(async (keys: string[]) => { order.push(`discard:${keys.join()}`); });
 
     const result = await setBrandLogo(admin, 'b-1', PNG);
 
-    expect(order).toEqual(['write', 'discard:brands/b-1/old.png']);
+    expect(replaceImage.mock.calls[0]![0]).toMatchObject({
+      tag: 'brand-logo',
+      previousKey: 'brands/b-1/old.png',
+    });
     expect(result.replaced).toBe(true);
   });
 
-  it('적기가 실패하면 방금 올린 것을 지우고, 옛 파일은 건드리지 않는다', async () => {
-    db.brand.findUnique.mockResolvedValue(brand({ logoUrl: 'https://cdn.test/old.png', logoKey: 'brands/b-1/old.png' }));
-    db.brand.update.mockRejectedValue(new Error('db down'));
-
-    await expect(setBrandLogo(admin, 'b-1', PNG)).rejects.toThrow('db down');
-
-    expect(discardImageKeys).toHaveBeenCalledTimes(1);
-    expect(discardImageKeys).toHaveBeenCalledWith(['brands/b-1/newtoken1234.png'], 'brand-logo');
-  });
-
-  it('키 없이 주소만 적힌 옛 로고는 지우지 않는다 — 우리가 올린 것인지 알 수 없다', async () => {
+  it('키 없이 주소만 적힌 옛 로고는 지우라고 하지 않는다 — 우리가 올린 것인지 알 수 없다', async () => {
     db.brand.findUnique.mockResolvedValue(brand({ logoUrl: 'https://elsewhere.test/logo.png', logoKey: null }));
 
     const result = await setBrandLogo(admin, 'b-1', PNG);
 
+    expect(replaceImage.mock.calls[0]![0]).toMatchObject({ previousKey: null });
     expect(result.replaced).toBe(true);
-    expect(discardImageKeys).not.toHaveBeenCalled();
   });
 
-  it('이미지가 아니면 올리지도 적지도 않는다', async () => {
-    uploadImageFiles.mockRejectedValue(new ImageError('UNSUPPORTED_TYPE'));
+  it('이미지가 아니면 적지 않는다', async () => {
+    replaceImage.mockRejectedValue(new ImageError('UNSUPPORTED_TYPE'));
 
     await expect(setBrandLogo(admin, 'b-1', PNG)).rejects.toBeInstanceOf(ImageError);
     expect(db.brand.update).not.toHaveBeenCalled();
@@ -104,7 +101,7 @@ describe('올리기', () => {
     db.brand.findUnique.mockResolvedValue(brand({ merchantId: 'm-other' }));
 
     await expect(setBrandLogo(merchantA, 'b-1', PNG)).rejects.toMatchObject({ code: 'BRAND_NOT_ALLOWED', status: 403 });
-    expect(uploadImageFiles).not.toHaveBeenCalled();
+    expect(replaceImage, '권한을 보기 전에 올리면 남의 간판을 바꾼 뒤 거절하는 셈이다').not.toHaveBeenCalled();
   });
 
   it('자기 브랜드면 가맹점도 올린다 — 간판은 그 가게의 것이다', async () => {
@@ -172,7 +169,7 @@ describe('창구', () => {
   it('5MB 를 넘으면 읽기 전에 막는다', async () => {
     const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
     expect((await post(form(big))).status).toBe(400);
-    expect(uploadImageFiles).not.toHaveBeenCalled();
+    expect(replaceImage, '읽기도 전에 막아야 메모리에 5MB 가 올라오지 않는다').not.toHaveBeenCalled();
   });
 
   it('남의 브랜드면 403 을 그대로 준다', async () => {

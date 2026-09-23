@@ -5,7 +5,7 @@ import {
   searchTextFor,
   type Actor,
 } from '@shop/core';
-import { uploadImageFiles, discardImageKeys, type ImageFile } from '~/lib/images/upload-files';
+import { replaceImage, discardImageKeys, type ImageFile } from '~/lib/images/upload-files';
 import {
   BRAND_ERROR_MESSAGE,
   type BrandErrorCode, type CreateBrandInput, type UpdateBrandInput,
@@ -259,21 +259,17 @@ export async function setBrandLogo(
 ): Promise<{ logoUrl: string; replaced: boolean }> {
   const brand = await loadForLogo(actor, brandId);
 
-  const [uploaded] = await uploadImageFiles(
-    [file],
-    (contentType, token) => brandLogoObjectKey({ brandId, contentType, token }),
-    'brand-logo',
-  );
-  const { url, key } = uploaded!;
+  const url = await replaceImage({
+    file,
+    keyFor: (contentType, token) => brandLogoObjectKey({ brandId, contentType, token }),
+    tag: 'brand-logo',
+    previousKey: brand.logoKey,
+    write: async ({ url: logoUrl, key }) => {
+      await prisma.brand.update({ where: { id: brandId }, data: { logoUrl, logoKey: key } });
+      return logoUrl;
+    },
+  });
 
-  try {
-    await prisma.brand.update({ where: { id: brandId }, data: { logoUrl: url, logoKey: key } });
-  } catch (error) {
-    await discardImageKeys([key], 'brand-logo');
-    throw error;
-  }
-
-  if (brand.logoKey) await discardImageKeys([brand.logoKey], 'brand-logo');
   return { logoUrl: url, replaced: brand.logoUrl !== null };
 }
 

@@ -1,8 +1,7 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, resequence, verifyImageBytes, imageObjectKey,
+  assertPermission, resequence, imageObjectKey,
   publishStatus, isOnDisplay, MAX_COLLECTION_ITEMS, isSlugTaken,
   type Actor, type PublishStatus, type BannerTone,
 } from '@shop/core';
@@ -12,8 +11,7 @@ import {
   type CreateCollectionInput,
   type UpdateCollectionInput,
 } from '@shop/contract';
-import { getStorage } from '~/lib/storage';
-import { prepareImage } from '~/lib/images/prepare';
+import { replaceImage, discardImageKeys } from '~/lib/images/upload-files';
 
 export class CollectionError extends Error {
   constructor(readonly code: CollectionErrorCode, readonly status = 404) {
@@ -232,15 +230,8 @@ export async function deleteCollection(actor: Actor, collectionId: string): Prom
   await prisma.collection.delete({ where: { id: collection.id } });
   await resequenceCollections();
 
-  if (collection.storageKey) {
-    try {
-      await getStorage().remove(collection.storageKey);
-    } catch (error) {
-      console.error('[collections] 저장소 객체 삭제 실패 — 고아 객체 남음', {
-        key: collection.storageKey, error,
-      });
-    }
-  }
+  // 배너와 같은 판단 — 화면에서 사라지는 것이 우선이고, 남은 파일은 로그로만 남는다
+  if (collection.storageKey) await discardImageKeys([collection.storageKey], 'collections');
 }
 
 /**
@@ -332,32 +323,20 @@ export async function setCollectionImage(
   });
   if (!before) throw new CollectionError('COLLECTION_NOT_FOUND', 404);
 
-  const contentType = verifyImageBytes(file);
-  const key = imageObjectKey({
+  const after = await replaceImage({
+    file,
     // 상품과 같은 접두사를 쓴다 — 버킷 정책이 products/ 만 공개하기 때문이다
-    productId: `collection-${collectionId}`,
-    contentType,
-    token: randomBytes(12).toString('base64url'),
+    keyFor: (contentType, token) =>
+      imageObjectKey({ productId: `collection-${collectionId}`, contentType, token }),
+    tag: 'collections',
+    previousKey: before.storageKey,
+    write: ({ url, key, blurDataUrl }) =>
+      prisma.collection.update({
+        where: { id: collectionId },
+        data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
+        select,
+      }),
   });
-
-  const prepared = await prepareImage(file.bytes, contentType);
-  const { url } = await getStorage().put({ key, body: prepared.bytes, contentType });
-  const blurDataUrl = prepared.blurDataUrl;
-
-  const after = await prisma.collection.update({
-    where: { id: collectionId },
-    data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
-    select,
-  });
-
-  // 새 이미지가 자리를 잡은 뒤에 옛것을 지운다
-  if (before.storageKey && before.storageKey !== key) {
-    try {
-      await getStorage().remove(before.storageKey);
-    } catch (error) {
-      console.error('[collections] 이전 이미지 삭제 실패', { key: before.storageKey, error });
-    }
-  }
 
   return toRow(after, new Date());
 }

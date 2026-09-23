@@ -1,13 +1,11 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
-  canManageProduct, merchantScope, verifyImageBytes, imageObjectKey,
+  canManageProduct, merchantScope, imageObjectKey,
   defaultAlt, resequence, ImageError, MAX_IMAGES_PER_PRODUCT,
   type Actor,
 } from '@shop/core';
-import { getStorage } from '~/lib/storage';
-import { prepareImage } from '~/lib/images/prepare';
+import { replaceImage, discardImageKeys } from '~/lib/images/upload-files';
 import { ProductError } from './manage-product';
 
 /**
@@ -61,42 +59,37 @@ export async function addProductImage(
     throw new ImageError('TOO_MANY_IMAGES');
   }
 
-  // 내용에서 알아낸 형식을 쓴다. 선언값을 그대로 쓰면 검사한 의미가 없다.
-  const contentType = verifyImageBytes(file);
-
-  const key = imageObjectKey({
-    productId,
-    contentType,
-    // 파일 이름을 쓰지 않는다 — 경로 탈출과 덮어쓰기가 전부 거기서 나온다
-    token: randomBytes(12).toString('base64url'),
-  });
-
-  // 받은 그대로가 아니라 **다듬어서** 저장한다 — 크기를 줄이고 곁들여 온
-  // 정보(촬영 위치 등)를 떼어 낸다. 자리표시도 같은 한 번에 만든다.
-  const prepared = await prepareImage(file.bytes, contentType);
-  const { url } = await getStorage().put({ key, body: prepared.bytes, contentType });
-  const blurDataUrl = prepared.blurDataUrl;
-
   const sortOrder = product._count.images;
-  const image = await prisma.productImage.create({
-    data: {
-      productId,
-      url,
-      storageKey: key,
-      blurDataUrl,
-      sortOrder,
-      alt:
-        alt?.trim() ||
-        defaultAlt({
-          brandName: product.brand.name,
-          productName: product.name,
-          index: sortOrder,
-        }),
-    },
-    select: { id: true, url: true, alt: true, sortOrder: true },
-  });
 
-  return image;
+  /*
+   * 검사·다듬기(촬영 위치 제거)·키 만들기·되돌리기는 브랜드 로고·배너·기획전과 같은 길이다.
+   * 파일 이름은 키에 쓰지 않는다 — 경로 탈출과 덮어쓰기가 전부 거기서 나온다.
+   */
+  return replaceImage({
+    file,
+    keyFor: (contentType, token) => imageObjectKey({ productId, contentType, token }),
+    tag: 'product-image',
+    // 더하는 것이라 갈아 끼울 옛 파일이 없다
+    previousKey: null,
+    write: ({ url, key, blurDataUrl }) =>
+      prisma.productImage.create({
+        data: {
+          productId,
+          url,
+          storageKey: key,
+          blurDataUrl,
+          sortOrder,
+          alt:
+            alt?.trim() ||
+            defaultAlt({
+              brandName: product.brand.name,
+              productName: product.name,
+              index: sortOrder,
+            }),
+        },
+        select: { id: true, url: true, alt: true, sortOrder: true },
+      }),
+  });
 }
 
 export async function updateImageAlt(
@@ -152,14 +145,7 @@ export async function deleteProductImage(
   // 저장소 삭제는 실패해도 넘어간다. 화면에서 사라지는 것이 우선이고,
   // 남은 객체는 눈에 보이는 피해가 없다. 반대로 DB 만 남기면 깨진 이미지가 뜬다.
   if (image.storageKey && stillUsed === 0) {
-    try {
-      await getStorage().remove(image.storageKey);
-    } catch (error) {
-      console.error('[images] 저장소 객체 삭제 실패 — 고아 객체 남음', {
-        key: image.storageKey,
-        error,
-      });
-    }
+    await discardImageKeys([image.storageKey], 'images');
   }
 
   return { remaining: await resequenceImages(productId) };

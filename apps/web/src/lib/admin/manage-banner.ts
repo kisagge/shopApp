@@ -1,9 +1,8 @@
 import 'server-only';
-import { randomBytes } from 'node:crypto';
 import { prisma } from '@shop/db';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
 import {
-  assertPermission, resequence, verifyImageBytes, imageObjectKey,
+  assertPermission, resequence, imageObjectKey,
   isBannerLive, bannerStatus, MAX_BANNERS,
   type Actor, type BannerStatus, type BannerTone,
 } from '@shop/core';
@@ -11,8 +10,7 @@ import {
   BANNER_ERROR_MESSAGE,
   type BannerErrorCode, type CreateBannerInput, type UpdateBannerInput,
 } from '@shop/contract';
-import { getStorage } from '~/lib/storage';
-import { prepareImage } from '~/lib/images/prepare';
+import { replaceImage, discardImageKeys } from '~/lib/images/upload-files';
 
 export class BannerError extends Error {
   constructor(readonly code: BannerErrorCode, readonly status = 404) {
@@ -157,16 +155,8 @@ export async function deleteBanner(actor: Actor, bannerId: string): Promise<void
   await prisma.banner.delete({ where: { id: banner.id } });
   await resequenceBanners();
 
-  if (banner.storageKey) {
-    // 상품 이미지와 같은 판단 — 화면에서 사라지는 것이 우선이다
-    try {
-      await getStorage().remove(banner.storageKey);
-    } catch (error) {
-      console.error('[banners] 저장소 객체 삭제 실패 — 고아 객체 남음', {
-        key: banner.storageKey, error,
-      });
-    }
-  }
+  // 상품 이미지와 같은 판단 — 화면에서 사라지는 것이 우선이고, 남은 파일은 로그로만 남는다
+  if (banner.storageKey) await discardImageKeys([banner.storageKey], 'banners');
 }
 
 export async function reorderBanners(
@@ -205,32 +195,20 @@ export async function setBannerImage(
   });
   if (!before) throw new BannerError('BANNER_NOT_FOUND', 404);
 
-  const contentType = verifyImageBytes(file);
-  const key = imageObjectKey({
+  const after = await replaceImage({
+    file,
     // 상품과 같은 접두사를 쓴다 — 버킷 정책이 products/ 만 공개하기 때문이다
-    productId: `banner-${bannerId}`,
-    contentType,
-    token: randomBytes(12).toString('base64url'),
+    keyFor: (contentType, token) =>
+      imageObjectKey({ productId: `banner-${bannerId}`, contentType, token }),
+    tag: 'banners',
+    previousKey: before.storageKey,
+    write: ({ url, key, blurDataUrl }) =>
+      prisma.banner.update({
+        where: { id: bannerId },
+        data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
+        select,
+      }),
   });
-
-  const prepared = await prepareImage(file.bytes, contentType);
-  const { url } = await getStorage().put({ key, body: prepared.bytes, contentType });
-  const blurDataUrl = prepared.blurDataUrl;
-
-  const after = await prisma.banner.update({
-    where: { id: bannerId },
-    data: { imageUrl: url, storageKey: key, blurDataUrl, imageAlt: alt.trim() || null },
-    select,
-  });
-
-  // 새 이미지가 자리를 잡은 뒤에 옛것을 지운다
-  if (before.storageKey && before.storageKey !== key) {
-    try {
-      await getStorage().remove(before.storageKey);
-    } catch (error) {
-      console.error('[banners] 이전 이미지 삭제 실패', { key: before.storageKey, error });
-    }
-  }
 
   return toRow(after, new Date());
 }
