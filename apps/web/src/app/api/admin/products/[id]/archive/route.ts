@@ -2,12 +2,11 @@ import { NextResponse } from 'next/server';
 import { archiveProductSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { archiveProduct } from '~/lib/admin/archive-product';
-import { ProductError } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 상품 보관·되돌리기. 매대·검색에서 빠지거나 돌아오므로 카탈로그 캐시를 턴다.
@@ -53,9 +52,6 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof ProductError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

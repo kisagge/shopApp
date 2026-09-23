@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
-import { confirmPurchase, ConfirmPurchaseError } from '~/lib/orders/confirm-purchase';
+import { confirmPurchase } from '~/lib/orders/confirm-purchase';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 손님의 구매확정. 되돌릴 수 없어 화면이 한 번 더 묻고, 서버는 자기 주문·배송완료·반품 없음을 다시 본다.
@@ -24,9 +24,6 @@ export async function POST(
   try {
     return NextResponse.json(await confirmPurchase(orderNo, user));
   } catch (error) {
-    if (error instanceof ConfirmPurchaseError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

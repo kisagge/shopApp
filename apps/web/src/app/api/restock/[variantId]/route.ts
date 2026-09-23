@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
-import { subscribeRestock, unsubscribeRestock, RestockError } from '~/lib/restock/notify';
-import { unauthorized } from '~/lib/api/respond';
+import { subscribeRestock, unsubscribeRestock } from '~/lib/restock/notify';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ variantId: string }> };
 
@@ -21,10 +21,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
     await subscribeRestock(user.id, variantId);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof RestockError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }
 

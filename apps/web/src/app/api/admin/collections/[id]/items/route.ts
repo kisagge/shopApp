@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, hasPermission } from '@shop/core';
+import { hasPermission } from '@shop/core';
 import { setCollectionItemsSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { setCollectionItems, CollectionError } from '~/lib/admin/manage-collection';
+import { setCollectionItems } from '~/lib/admin/manage-collection';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 담긴 상품을 통째로 새로 쓴다. 보낸 순서가 곧 진열 순서다. */
 export async function PUT(
@@ -43,12 +43,6 @@ export async function PUT(
     });
     return NextResponse.json(collection);
   } catch (error) {
-    if (error instanceof CollectionError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

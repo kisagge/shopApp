@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getActor } from '@shop/auth/session';
 import { hasPermission } from '@shop/core';
-import { deleteInquiry, InquiryError } from '~/lib/inquiry/write';
+import { deleteInquiry } from '~/lib/inquiry/write';
 import { recordAudit } from '~/lib/audit';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /** 문의 삭제. 본인은 지우고, 운영진이 내리면 표시만 남긴다. */
 export async function DELETE(
@@ -28,9 +28,6 @@ export async function DELETE(
     }
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    if (error instanceof InquiryError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

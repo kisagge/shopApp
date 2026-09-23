@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getActor } from '@shop/auth/session';
 import { reviewProductSchema } from '@shop/contract';
-import { reviewProduct, ProductError } from '~/lib/admin/manage-product';
+import { reviewProduct } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 게시 검수 결정.
@@ -45,9 +45,6 @@ export async function POST(
     });
     return NextResponse.json({ product: after });
   } catch (error) {
-    if (error instanceof ProductError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

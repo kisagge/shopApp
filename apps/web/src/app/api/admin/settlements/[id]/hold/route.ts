@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError } from '@shop/core';
 import { settlementHoldSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { holdSettlement, SettlementCloseError } from '~/lib/admin/close-settlement';
+import { holdSettlement } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 지급 보류·해제. 슈퍼관리자만 — 지급을 멈추는 것도 지급의 일이다. */
 export async function POST(
@@ -43,12 +42,6 @@ export async function POST(
     });
     return NextResponse.json({ id: result.id, status: result.status, reason: result.reason });
   } catch (error) {
-    if (error instanceof SettlementCloseError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

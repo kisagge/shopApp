@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, canCreateBrand } from '@shop/core';
+import { canCreateBrand } from '@shop/core';
 import { createBrandSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { createBrand, BrandError } from '~/lib/admin/manage-brand';
+import { createBrand } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 자사 브랜드를 만든다. 가맹점 브랜드는 입점 승인이 만든다. */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -42,10 +42,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     revalidateCatalog();
     return NextResponse.json(brand, { status: 201 });
   } catch (error) {
-    if (error instanceof BrandError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) return await forbidden();
-    throw error;
+    return await apiError(error);
   }
 }

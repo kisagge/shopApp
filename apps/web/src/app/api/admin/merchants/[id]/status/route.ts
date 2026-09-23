@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { updateMerchantStatusSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { updateMerchantStatus, AccessError } from '~/lib/admin/manage-access';
+import { updateMerchantStatus } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 import { revalidateCatalog } from '~/lib/cache';
 
 /** 입점 승인·정지. 슈퍼관리자만. */
@@ -50,12 +49,6 @@ export async function PATCH(
     revalidateCatalog();
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof AccessError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

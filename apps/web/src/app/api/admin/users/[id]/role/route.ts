@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { assignRoleSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { assignRole, AccessError } from '~/lib/admin/manage-access';
+import { assignRole } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 권한 부여. 슈퍼관리자만, 자기 자신은 제외. */
 export async function PATCH(
@@ -44,12 +43,6 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof AccessError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

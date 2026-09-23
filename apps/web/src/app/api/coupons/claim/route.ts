@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { getSessionUser } from '@shop/auth/session';
 import { claimCouponSchema } from '@shop/contract';
-import { claimCouponByCode, CouponError } from '~/lib/admin/manage-coupon';
-import { unauthorized } from '~/lib/api/respond';
+import { claimCouponByCode } from '~/lib/admin/manage-coupon';
+import { apiError, unauthorized } from '~/lib/api/respond';
 import { validationFailed } from '~/lib/i18n/validation';
 
 /** 고객이 코드를 넣어 쿠폰을 받는다 */
@@ -26,9 +26,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     return NextResponse.json(await claimCouponByCode(parsed.data.code, user.id));
   } catch (error) {
-    if (error instanceof CouponError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

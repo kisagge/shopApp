@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { orderNoteSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { addOrderNote, OrderNoteError } from '~/lib/orders/order-notes';
+import { addOrderNote } from '~/lib/orders/order-notes';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 주문 내부 메모 남기기. 손님에게는 보이지 않는다 */
 export async function POST(
@@ -37,12 +36,6 @@ export async function POST(
     await recordAudit({ actor, action: 'order.note.add', targetType: 'order', targetId: orderNo, after: note, request });
     return NextResponse.json(note, { status: 201 });
   } catch (error) {
-    if (error instanceof OrderNoteError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

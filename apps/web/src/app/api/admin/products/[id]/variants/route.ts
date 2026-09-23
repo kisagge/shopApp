@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createVariantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { createVariant, ProductError } from '~/lib/admin/manage-product';
+import { createVariant } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 옵션 추가 */
 export async function POST(
@@ -44,9 +44,6 @@ export async function POST(
     });
     return NextResponse.json(variant, { status: 201 });
   } catch (error) {
-    if (error instanceof ProductError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

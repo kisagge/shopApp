@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import { adjustPointsSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { adjustPoints } from '~/lib/admin/adjust-points';
 import { notifyPointsAdjusted } from '~/lib/account/notify-account';
-import { AccessError } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 적립금 수동 지급·차감. 누가 누구에게 얼마를 왜 줬는지 감사 로그에 남긴다 — 포인트는 돈이다.
@@ -57,12 +55,6 @@ export async function POST(
     }
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof AccessError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

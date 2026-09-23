@@ -1,5 +1,6 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
+import { ForbiddenError } from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 import { getT } from '~/lib/i18n/server';
 
@@ -56,3 +57,57 @@ export const fileRequired = (): Promise<NextResponse> =>
 /** 이미지가 상한을 넘었다 */
 export const imageTooLarge = (): Promise<NextResponse> =>
   fail(400, 'TOO_LARGE', 'api.imageTooLarge');
+
+/**
+ * 도메인 오류를 응답으로 옮긴다.
+ *
+ * **같은 말미를 열다섯 곳이 적고 있었다** — 자기 도메인 오류를 `{ code, message }` 와
+ * 그 오류가 아는 상태로 내보내고, 권한 오류는 403 으로 돌리고, 나머지는 다시 던진다.
+ * 도메인 오류 클래스가 서른아홉인데 전부 같은 모양(`code`·`message`·`status`)이라,
+ * 새 오류를 하나 더할 때마다 그것을 던지는 라우트도 함께 고쳐야 했다.
+ *
+ * **모르는 고장은 다시 던진다.** 삼켜서 400 으로 내보내면 진짜 버그가 "잘못된 요청"
+ * 으로 둔갑하고, 그러면 아무도 그것을 고치지 않는다.
+ *
+ * 모양으로 알아본다(instanceof 가 아니라). 클래스 서른아홉 개를 여기서 알면 이 파일이
+ * 모든 도메인을 import 해야 하고, 그건 방향이 거꾸로다. 상태 코드가 숫자로 붙어 있는
+ * Error 만 도메인 오류로 본다 — Prisma 오류는 `code` 는 있어도 `status` 가 없다.
+ */
+export async function apiError(error: unknown): Promise<NextResponse> {
+  // 무엇이 모자란지는 말하지 않는다(forbidden 의 주석) — 도메인 메시지를 그대로 내보내지 않는 이유다
+  if (error instanceof ForbiddenError) return await forbidden();
+
+  const domain = asDomainError(error);
+  if (!domain) throw error;
+
+  return NextResponse.json(
+    {
+      code: domain.code,
+      message: domain.message,
+      // 어느 칸이 틀렸는지 아는 오류는 그것까지 넘긴다 — 폼이 그 칸에 표시한다
+      ...(domain.fields ? { fields: domain.fields } : {}),
+    },
+    { status: domain.status },
+  );
+}
+
+interface DomainError {
+  readonly code: string;
+  readonly message: string;
+  readonly status: number;
+  readonly fields?: Readonly<Record<string, string>>;
+}
+
+function asDomainError(error: unknown): DomainError | null {
+  if (!(error instanceof Error)) return null;
+
+  const e = error as unknown as Partial<DomainError>;
+  return typeof e.code === 'string' && typeof e.status === 'number'
+    ? {
+        code: e.code,
+        message: error.message,
+        status: e.status,
+        ...(e.fields && Object.keys(e.fields).length > 0 ? { fields: e.fields } : {}),
+      }
+    : null;
+}

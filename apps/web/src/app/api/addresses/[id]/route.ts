@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { addressInputSchema } from '@shop/contract';
-import { setDefaultAddress, deleteAddress, updateAddress, AddressError } from '~/lib/addresses/manage-address';
+import { setDefaultAddress, deleteAddress, updateAddress } from '~/lib/addresses/manage-address';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,10 +18,7 @@ export async function PATCH(request: Request, { params }: Params): Promise<NextR
     await setDefaultAddress(user.id, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof AddressError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -40,10 +37,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
   try {
     return NextResponse.json({ address: await updateAddress(user.id, id, parsed.data) });
   } catch (error) {
-    if (error instanceof AddressError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -57,9 +51,6 @@ export async function DELETE(request: Request, { params }: Params): Promise<Next
     await deleteAddress(user.id, id);
     return NextResponse.json({ ok: true });
   } catch (error) {
-    if (error instanceof AddressError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

@@ -14,7 +14,7 @@ import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 리뷰 수정.
@@ -112,9 +112,6 @@ export async function DELETE(
     }
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    if (error instanceof ReviewError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

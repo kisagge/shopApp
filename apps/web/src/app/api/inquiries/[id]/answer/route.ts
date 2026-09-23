@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { answerInquirySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { answerInquiry, InquiryError } from '~/lib/inquiry/write';
+import { answerInquiry } from '~/lib/inquiry/write';
 import { notifyInquiryAnswered } from '~/lib/inquiry/notify';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 문의 답변.
@@ -33,9 +33,6 @@ export async function POST(
     await notifyInquiryAnswered(answered);
     return NextResponse.json({ answered: true });
   } catch (error) {
-    if (error instanceof InquiryError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

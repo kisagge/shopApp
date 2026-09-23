@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server';
 import { merchantCommissionSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { MerchantSettingsError, updateMerchantCommission } from '~/lib/admin/merchant-settings';
+import { updateMerchantCommission } from '~/lib/admin/merchant-settings';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 수수료율 변경 — **슈퍼관리자만**(merchant:approve).
@@ -50,12 +49,6 @@ export async function PUT(
     });
     return NextResponse.json({ commissionPercent: result.after });
   } catch (error) {
-    if (error instanceof MerchantSettingsError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

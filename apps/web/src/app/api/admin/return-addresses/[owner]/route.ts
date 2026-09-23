@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { returnAddressInputSchema } from '@shop/contract';
-import { ForbiddenError, PLATFORM_RETURN_ADDRESS_ID } from '@shop/core';
+import { PLATFORM_RETURN_ADDRESS_ID } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { ReturnAddressError, updateReturnAddress } from '~/lib/orders/return-address';
+import { updateReturnAddress } from '~/lib/orders/return-address';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 반품지 등록·수정. `owner` 는 가맹점 id, 또는 자사 상품을 받는 플랫폼 반품지면 `platform`.
@@ -51,12 +51,6 @@ export async function PUT(
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof ReturnAddressError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

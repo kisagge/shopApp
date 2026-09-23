@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { policySchema, policyKindSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { savePolicy } from '~/lib/policies/policy';
 import { recordAudit } from '~/lib/audit';
 import { revalidatePolicies } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 약관·개인정보처리방침 저장.
@@ -56,9 +55,6 @@ export async function PUT(
     });
     return NextResponse.json({ effectiveAt: after.effectiveAt.toISOString() });
   } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

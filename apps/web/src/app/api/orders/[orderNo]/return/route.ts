@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { returnRequestSchema } from '@shop/contract';
-import { requestReturn, ReturnError } from '~/lib/orders/return-request';
-import { unauthorized } from '~/lib/api/respond';
+import { requestReturn } from '~/lib/orders/return-request';
+import { apiError, unauthorized } from '~/lib/api/respond';
 import { revalidateCatalog } from '~/lib/cache';
 import { notifyReturnRequested } from '~/lib/notifications/console-work';
 import { validationFailed } from '~/lib/i18n/validation';
@@ -33,9 +33,6 @@ export async function POST(
     await notifyReturnRequested({ orderNo: result.orderNo, itemIds: result.itemIds });
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof ReturnError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

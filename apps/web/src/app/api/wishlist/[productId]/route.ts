@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
-import { addToWishlist, removeFromWishlist, WishlistError } from '~/lib/wishlist/wishlist';
-import { unauthorized } from '~/lib/api/respond';
+import { addToWishlist, removeFromWishlist } from '~/lib/wishlist/wishlist';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 찜 넣기·빼기.
@@ -29,10 +29,7 @@ export async function PUT(
     await addToWishlist(user.id, productId);
     return NextResponse.json({ wishlisted: true });
   } catch (error) {
-    if (error instanceof WishlistError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }
 

@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError } from '@shop/core';
 import { updateShippingPolicySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateShippingPolicy } from '~/lib/admin/manage-shipping';
 import { recordAudit } from '~/lib/audit';
 import { revalidateShipping } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 배송비 정책 수정.
@@ -52,9 +51,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { updateProductSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateProduct, ProductError } from '~/lib/admin/manage-product';
+import { updateProduct } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 상품 수정. 재고는 여기서 못 고친다 — /stock 으로 따로 간다. */
 export async function PATCH(
@@ -51,9 +51,6 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof ProductError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

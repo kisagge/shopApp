@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { applyMerchantSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { applyForMerchant, MerchantApplicationError } from '~/lib/merchant/apply';
+import { applyForMerchant } from '~/lib/merchant/apply';
 import { notifyMerchantApplied } from '~/lib/notifications/console-work';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 입점 신청.
@@ -29,9 +29,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     await notifyMerchantApplied({ merchantName: application.name });
     return NextResponse.json({ application }, { status: 201 });
   } catch (error) {
-    if (error instanceof MerchantApplicationError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

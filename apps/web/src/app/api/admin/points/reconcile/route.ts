@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { reconcilePoints } from '~/lib/admin/reconcile-points';
 import { recordAudit } from '~/lib/audit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /** 포인트 잔액 대사 실행. 원장 → 잔액 방향으로만 고친다. */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -34,9 +33,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

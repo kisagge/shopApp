@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { addressInputSchema } from '@shop/contract';
-import { listAddresses, createAddress, AddressError } from '~/lib/addresses/manage-address';
+import { listAddresses, createAddress } from '~/lib/addresses/manage-address';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
@@ -41,9 +41,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     return NextResponse.json({ address: await createAddress(user.id, parsed.data) }, { status: 201 });
   } catch (error) {
-    if (error instanceof AddressError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

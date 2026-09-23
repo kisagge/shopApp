@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { resolveLateDeposit, LateDepositError } from '~/lib/admin/late-deposit';
+import { resolveLateDeposit } from '~/lib/admin/late-deposit';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /** 취소한 주문에 들어온 입금을 손님에게 돌려준 뒤 처리함으로 닫는다 */
 export async function POST(
@@ -26,10 +25,6 @@ export async function POST(
     });
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof LateDepositError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) return await forbidden();
-    throw error;
+    return await apiError(error);
   }
 }

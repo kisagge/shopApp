@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { reportReviewSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { reportReview, ReviewReportError } from '~/lib/reviews/report';
+import { reportReview } from '~/lib/reviews/report';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /**
  * 리뷰 신고.
@@ -35,9 +35,6 @@ export async function POST(
   try {
     return NextResponse.json(await reportReview(user.id, id, parsed.data));
   } catch (error) {
-    if (error instanceof ReviewReportError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

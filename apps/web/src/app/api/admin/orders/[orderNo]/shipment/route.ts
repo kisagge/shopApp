@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { registerShipmentSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { registerShipmentAudited, ShipmentError } from '~/lib/admin/manage-shipment';
+import { registerShipmentAudited } from '~/lib/admin/manage-shipment';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 export async function POST(
   request: Request,
@@ -27,9 +27,6 @@ export async function POST(
     const result = await registerShipmentAudited(orderNo, parsed.data, actor, request);
     return NextResponse.json(result);
   } catch (error) {
-    if (error instanceof ShipmentError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

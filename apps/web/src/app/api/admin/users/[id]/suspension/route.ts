@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
 import { suspendUserSchema } from '@shop/contract';
-import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { suspendUser, AccessError } from '~/lib/admin/manage-access';
+import { suspendUser } from '~/lib/admin/manage-access';
 import { notifySuspension } from '~/lib/account/notify-account';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 회원 이용 정지·해제. 사유와 함께 감사 로그에 남긴다 — 당사자가 물으면 이것으로 답한다 */
 export async function PATCH(
@@ -51,12 +50,6 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    if (error instanceof AccessError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

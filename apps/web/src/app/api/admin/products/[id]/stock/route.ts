@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { updateStockSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateStockAudited, ProductError } from '~/lib/admin/manage-product';
+import { updateStockAudited } from '~/lib/admin/manage-product';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /** 재고 조정. 실사 결과를 덮어쓰는 동작이라 절대값을 받는다. */
 export async function PATCH(
@@ -35,9 +35,6 @@ export async function PATCH(
     revalidateCatalog();
     return NextResponse.json({ updated: after.length, variants: after });
   } catch (error) {
-    if (error instanceof ProductError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

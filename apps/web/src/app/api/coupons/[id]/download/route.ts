@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { getSessionUser } from '@shop/auth/session';
 import { downloadCoupon } from '~/lib/coupons/downloadable';
-import { CouponError } from '~/lib/admin/manage-coupon';
-import { unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
 
 /** 받기 단추로 쿠폰을 받는다. 코드 입력과 같은 제한(coupon)을 건다 — id 를 바꿔 가며 두드리는 것을 막는다 */
 export async function POST(
@@ -21,9 +20,6 @@ export async function POST(
   try {
     return NextResponse.json(await downloadCoupon(id, user.id), { status: 201 });
   } catch (error) {
-    if (error instanceof CouponError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

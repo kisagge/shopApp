@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError } from '@shop/core';
 import { updateBrandSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateBrand, BrandError } from '~/lib/admin/manage-brand';
+import { updateBrand } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 이름과 주소를 고친다.
@@ -45,10 +44,6 @@ export async function PATCH(
     revalidateCatalog();
     return NextResponse.json(brand);
   } catch (error) {
-    if (error instanceof BrandError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof ForbiddenError) return await forbidden();
-    throw error;
+    return await apiError(error);
   }
 }
