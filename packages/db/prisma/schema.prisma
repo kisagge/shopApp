@@ -1327,6 +1327,9 @@ model Review {
   @@index([productId, createdAt])
   /// 도움순 정렬
   @@index([productId, helpfulCount])
+  /// 별점순 정렬(높은 순·낮은 순). 없을 때는 한 상품의 리뷰를 전부 읽어 메모리에서
+  /// 줄을 세웠다 — 리뷰가 몇 건뿐인 상품에서는 티가 안 나고 잘 팔린 상품에서만 드러난다.
+  @@index([productId, rating])
   @@index([userId])
   @@map("reviews")
 }

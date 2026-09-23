@@ -45,7 +45,7 @@ async function candidateUserIds(now: Date): Promise<string[]> {
 
 export async function expirePoints(now = new Date()): Promise<ExpiryResult> {
   const userIds = await candidateUserIds(now);
-  const expired: ExpiredUser[] = [];
+  const losses: { userId: string; amount: number }[] = [];
   let total = 0;
 
   for (const userId of userIds) {
@@ -83,13 +83,33 @@ export async function expirePoints(now = new Date()): Promise<ExpiryResult> {
 
     if (!updated) continue;
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true },
-    });
-    expired.push({ userId, name: user?.name ?? '(알 수 없음)', amount });
+    losses.push({ userId, amount });
     total += amount;
   }
 
-  return { checked: userIds.length, expired, total };
+  return { checked: userIds.length, expired: await withNames(losses), total };
+}
+
+/**
+ * 누가 잃었는지 이름을 붙인다.
+ *
+ * **한 번에 읽는다.** 예전에는 사람마다 이름 한 칸을 따로 물었다 — 소멸된 사람이
+ * 백 명이면 왕복이 백 번 더 나갔고, DB 가 바다 건너에 있으니 그것만으로 십여 초다.
+ * 목록 조회가 `loadActors` 로 진작 고친 것과 같은 모양이다.
+ *
+ * 이름은 보고용이라 여기서 실패해도 소멸 자체는 이미 끝나 있다.
+ */
+async function withNames(
+  losses: readonly { userId: string; amount: number }[],
+): Promise<ExpiredUser[]> {
+  if (losses.length === 0) return [];
+
+  const rows = await prisma.user.findMany({
+    where: { id: { in: losses.map((l) => l.userId) } },
+    select: { id: true, name: true },
+  });
+  const names = new Map(rows.map((r) => [r.id, r.name]));
+
+  // 이 사이에 탈퇴했으면 행이 없다. 소멸은 이미 일어났으므로 줄은 남긴다.
+  return losses.map((l) => ({ ...l, name: names.get(l.userId) ?? '(알 수 없음)' }));
 }

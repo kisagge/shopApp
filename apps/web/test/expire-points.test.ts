@@ -6,7 +6,7 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   pointTransaction: { findMany: vi.fn<(...a: any[]) => any>() },
-  user: { findUnique: vi.fn<(...a: any[]) => any>() },
+  user: { findMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -27,7 +27,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.$transaction.mockImplementation((fn: (t: typeof tx) => unknown) => fn(tx));
   tx.user.updateMany.mockResolvedValue({ count: 1 });
-  db.user.findUnique.mockResolvedValue({ name: '홍길동' });
+  db.user.findMany.mockResolvedValue([{ id: 'u-1', name: '홍길동' }]);
 });
 
 describe('대상자 추리기', () => {
@@ -120,5 +120,44 @@ describe('소멸', () => {
     const result = await expirePoints(NOW);
 
     expect(result.expired).toEqual([{ userId: 'u-1', name: '홍길동', amount: 1500 }]);
+  });
+
+  /**
+   * **이름은 한 번에 읽는다.**
+   *
+   * 사람마다 이름 한 칸을 따로 물으면 소멸된 사람 수만큼 왕복이 더 나간다.
+   * 배치는 사람이 안 보는 사이에 도는 것이라 느려도 티가 안 나는데, 그래서
+   * 이런 자리가 조용히 십여 초짜리가 된다.
+   */
+  it('사람이 여럿이어도 이름은 한 번에 읽는다', async () => {
+    db.pointTransaction.findMany
+      .mockResolvedValueOnce([{ userId: 'u-1' }, { userId: 'u-2' }, { userId: 'u-3' }])
+      .mockResolvedValue([{ amount: 1000, createdAt: day(-400), expiresAt: day(-35) }]);
+    db.user.findMany.mockResolvedValue([
+      { id: 'u-1', name: '홍길동' }, { id: 'u-2', name: '김철수' }, { id: 'u-3', name: '이영희' },
+    ]);
+
+    const result = await expirePoints(NOW);
+
+    expect(db.user.findMany).toHaveBeenCalledTimes(1);
+    expect(db.user.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['u-1', 'u-2', 'u-3'] } });
+    expect(result.expired.map((e) => e.name)).toEqual(['홍길동', '김철수', '이영희']);
+  });
+
+  it('아무도 안 잃은 날은 이름을 묻지도 않는다', async () => {
+    db.pointTransaction.findMany.mockResolvedValueOnce([]);
+
+    await expirePoints(NOW);
+
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('그사이 탈퇴한 사람도 줄은 남는다 — 소멸은 이미 일어났다', async () => {
+    ledger([{ amount: 1500, createdAt: day(-400), expiresAt: day(-35) }]);
+    db.user.findMany.mockResolvedValue([]);
+
+    const result = await expirePoints(NOW);
+
+    expect(result.expired).toEqual([{ userId: 'u-1', name: '(알 수 없음)', amount: 1500 }]);
   });
 });
