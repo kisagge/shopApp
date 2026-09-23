@@ -17,4 +17,3 @@ export const browserErrorSchema = z.object({
     .max(200, 'valid.tooLongChars')
     .regex(/^\/[^\s?#]*$/, 'valid.pathFormat'),
 });
-export type BrowserErrorInput = z.infer<typeof browserErrorSchema>;

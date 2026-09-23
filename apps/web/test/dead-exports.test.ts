@@ -107,22 +107,37 @@ function mentionCounts(): Map<string, number> {
   return counts;
 }
 
+/**
+ * 타입까지 보는 구역.
+ *
+ * 값과 함수는 어디서나 본다. **타입은 여기서만** 본다 — 밖에서 쓰는 패키지라면
+ * "지금 아무도 안 쓴다" 가 지울 이유가 되지 않지만, 이 둘은 이 저장소 안에서만
+ * 쓰인다(둘 다 private). 그래서 여기서는 안 쓰는 타입이 곧 죽은 타입이다.
+ *
+ * **실제로 마흔 개가 쌓여 있었다.** 대부분 스키마마다 붙이던 `z.infer` 별칭인데,
+ * 한 번도 불린 적이 없다. 읽는 사람은 그것이 창구의 입력 모양이라고 믿고 따라가다가
+ * 아무 데도 닿지 않는 것을 뒤늦게 안다 — 이 검사가 처음 생길 때 적어 둔 걱정이
+ * 그대로 일어난 셈이다.
+ */
+const TYPES_TOO = ['packages/contract/src', 'packages/core/src'];
+
 function deadExports(): Dead[] {
   const counts = mentionCounts();
 
   const dead: Dead[] = [];
   for (const file of files(DECLARED)) {
     const source = readFileSync(file, 'utf8');
-    /*
-     * 값과 함수만 본다. 타입과 인터페이스는 패키지의 공개 모양이라, 지금
-     * 아무도 안 쓴다는 것이 지울 이유가 되지 않는다.
-     */
-    for (const m of source.matchAll(/^export (?:const|(?:async )?function) (\w+)/gm)) {
+    const rel = file.slice(ROOT.length + 1);
+    const pattern = TYPES_TOO.some((dir) => rel.startsWith(dir))
+      ? /^export (?:const|(?:async )?function|type|interface) (\w+)/gm
+      : /^export (?:const|(?:async )?function) (\w+)/gm;
+
+    for (const m of source.matchAll(pattern)) {
       const name = m[1]!;
       if (FRAMEWORK.has(name)) continue;
 
       // 자기 선언 한 번을 빼고 남는 언급이 있으면 살아 있다
-      if ((counts.get(name) ?? 0) <= 1) dead.push({ file: file.slice(ROOT.length + 1), name });
+      if ((counts.get(name) ?? 0) <= 1) dead.push({ file: rel, name });
     }
   }
   return dead;
@@ -143,7 +158,15 @@ describe('아무도 부르지 않는 값', () => {
     expect(SEARCHED).toContain('apps/web/scripts');
   });
 
-  it('죽은 값·함수가 없다', () => {
+  it('타입까지 보는 구역이 실제로 그 자리를 가리킨다', () => {
+    // 경로가 어긋나면 타입은 아무도 안 보는 채로 다시 쌓인다
+    for (const dir of TYPES_TOO) {
+      expect(files([dir.split('/')[0] + '/' + dir.split('/')[1]]).length).toBeGreaterThan(0);
+    }
+    expect(files(DECLARED).some((f) => f.slice(ROOT.length + 1).startsWith(TYPES_TOO[0]!))).toBe(true);
+  });
+
+  it('죽은 값·함수·타입이 없다', () => {
     const dead = deadExports();
     expect(
       dead.map((d) => `${d.file} — ${d.name}`),

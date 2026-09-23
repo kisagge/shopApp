@@ -95,4 +95,3 @@ export const settlementHoldSchema = z.discriminatedUnion('hold', [
   z.object({ hold: z.literal(true), reason: trimmed(200) }),
   z.object({ hold: z.literal(false) }),
 ]);
-export type SettlementHoldInput = z.infer<typeof settlementHoldSchema>;

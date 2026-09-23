@@ -307,8 +307,6 @@ export const ORDER_FILTER_TAB = [
   'PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'DELIVERED', 'CONFIRMED', 'closed',
 ] as const;
 
-export type OrderFilterTab = (typeof ORDER_FILTER_TAB)[number];
-
 export function isOrderFilterGroup(value: string): value is OrderFilterGroup {
   return Object.hasOwn(ORDER_FILTER_GROUP, value);
 }

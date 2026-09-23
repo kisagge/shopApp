@@ -153,42 +153,6 @@ export function deletableThrough(input: {
   return input.lastRolledUp < cutoff ? input.lastRolledUp : cutoff;
 }
 
-// ── 집계 결과 ────────────────────────────────────────────────
-
-export interface DailyEventCount {
-  readonly day: DayKey;
-  readonly name: string;
-  /** 이벤트 수. **날짜끼리 더해도 된다.** */
-  readonly events: number;
-  /**
-   * 그날의 고유 세션 수.
-   *
-   * **날짜끼리 더하면 안 된다.** 이틀에 걸쳐 온 사람은 양쪽에 한 번씩 세어져
-   * 있어서, 더하면 실제 사람 수보다 많아진다. 주간 고유 세션이 필요하면
-   * 원본에서 다시 세야 한다 — 그래서 원본 보존 기간이 필요하다.
-   */
-  readonly sessions: number;
-  /** 그날의 고유 로그인 사용자 수. 세션과 같은 이유로 더하면 안 된다. */
-  readonly users: number;
-  /** 금액 합계(원). purchase·refund 에만 채워진다. 더해도 된다. */
-  readonly value: number;
-  /** 수량 합계. 더해도 된다. */
-  readonly quantity: number;
-}
-
-/**
- * 하루치 퍼널.
- *
- * `computeFunnel` 과 같은 strict 정의를 쓴다 — 앞 단계를 모두 거친 세션만
- * 다음 단계로 센다. 그래서 이 값은 `DailyEventCount.sessions` 와 다르다.
- * 이름별 세션 수만 접어 두면 strict 퍼널을 되살릴 수 없어서 따로 남긴다.
- */
-export interface DailyFunnelStep {
-  readonly day: DayKey;
-  readonly step: string;
-  readonly sessions: number;
-}
-
 // ── 대시보드 조회 기간 ────────────────────────────────────────
 
 /**

@@ -74,7 +74,6 @@ export const setCollectionItemsSchema = z.object({
     .max(MAX_COLLECTION_ITEMS, 'valid.tooManyItems')
     .refine((ids) => new Set(ids).size === ids.length, { message: 'valid.duplicateItems' }),
 });
-export type SetCollectionItemsInput = z.infer<typeof setCollectionItemsSchema>;
 
 export const reorderCollectionSchema = z.object({
   orderedIds: z.array(z.string()).min(1, 'valid.tooFewItems').max(50, 'valid.tooManyItems'),

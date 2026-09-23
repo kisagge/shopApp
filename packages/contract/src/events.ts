@@ -111,7 +111,6 @@ export const eventBatchSchema = z.object({
     .min(1, 'valid.eventsEmpty')
     .max(MAX_EVENTS_PER_BATCH, 'valid.eventsTooMany'),
 });
-export type EventBatch = z.infer<typeof eventBatchSchema>;
 
 // 계약을 통해 쓰던 곳이 깨지지 않게 그대로 다시 내보낸다
 export { MAX_EVENTS_PER_BATCH };

@@ -33,4 +33,3 @@ export const updateMailTemplateSchema = z.object({
   heading: mailField,
   lead: mailField,
 });
-export type UpdateMailTemplateInput = z.infer<typeof updateMailTemplateSchema>;

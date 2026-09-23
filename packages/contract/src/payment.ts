@@ -9,12 +9,10 @@ export const confirmPaymentRequestSchema = z.object({
    */
   amount: wonSchema,
 });
-export type ConfirmPaymentRequest = z.infer<typeof confirmPaymentRequestSchema>;
 
 export const cancelOrderRequestSchema = z.object({
   reason: z.string().trim().min(1, 'valid.cancelReasonRequired').max(200, 'valid.tooLongChars'),
 });
-export type CancelOrderRequest = z.infer<typeof cancelOrderRequestSchema>;
 
 /**
  * 일부 상품 취소.
@@ -32,7 +30,6 @@ export const cancelItemsRequestSchema = z.object({
   reason: z.string().trim().min(1, 'valid.cancelReasonRequired').max(200, 'valid.tooLongChars'),
   preview: z.boolean().default(false),
 });
-export type CancelItemsRequest = z.infer<typeof cancelItemsRequestSchema>;
 
 export const cancelItemsPreviewSchema = z.object({
   /** partial: 일부 취소 · full: 남는 상품이 없어 주문 전체가 취소된다 */

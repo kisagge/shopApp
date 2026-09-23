@@ -116,4 +116,3 @@ export const richTextSchema: z.ZodType<RichTextDoc> = z
     path: ['content'],
   });
 
-export type RichTextInput = z.infer<typeof richTextSchema>;

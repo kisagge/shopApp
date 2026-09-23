@@ -33,7 +33,6 @@ export const shippingAddressSchema = z.object({
   address1: z.string().trim().min(1, 'valid.addressRequired').max(200, 'valid.tooLongChars'),
   address2: z.string().trim().max(200, 'valid.tooLongChars').optional(),
 });
-export type ShippingAddressInput = z.infer<typeof shippingAddressSchema>;
 
 export const createOrderRequestSchema = z
   .object({
@@ -111,4 +110,3 @@ export type OrderError = z.infer<typeof orderErrorSchema>;
 export const orderNoteSchema = z.object({
   body: z.string({ error: 'valid.required' }).trim().min(1, 'valid.required').max(ORDER_NOTE_MAX, 'valid.tooLongChars'),
 });
-export type OrderNoteInput = z.infer<typeof orderNoteSchema>;

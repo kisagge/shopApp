@@ -19,7 +19,6 @@ export const registerShipmentSchema = z.object({
       return digits.length >= 9 && digits.length <= 20;
     }, 'valid.trackingFormat'),
 });
-export type RegisterShipmentInput = z.infer<typeof registerShipmentSchema>;
 
 /**
  * 송장 일괄 올리기.
@@ -34,7 +33,6 @@ export type RegisterShipmentInput = z.infer<typeof registerShipmentSchema>;
 export const bulkShipmentSchema = z.object({
   csv: z.string().min(1, 'valid.fileRequired').max(1_000_000, 'valid.tooLongChars'),
 });
-export type BulkShipmentInput = z.infer<typeof bulkShipmentSchema>;
 
 export interface BulkShipmentResult {
   readonly registered: number;

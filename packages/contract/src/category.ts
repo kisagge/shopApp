@@ -45,7 +45,6 @@ export const reorderCategorySchema = z.object({
   parentId: z.string().nullable(),
   orderedIds: z.array(z.string()).min(1, 'valid.tooFewItems').max(50, 'valid.tooManyItems'),
 });
-export type ReorderCategoryInput = z.infer<typeof reorderCategorySchema>;
 
 export const CATEGORY_ERROR = [
   'CATEGORY_NOT_FOUND',

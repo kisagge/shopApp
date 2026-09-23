@@ -17,4 +17,3 @@ const cartLineSchema = z.object({
 export const cartSyncSchema = z.object({
   lines: z.array(cartLineSchema).max(MAX_CART_LINES, 'valid.tooManyItems'),
 });
-export type CartSyncInput = z.infer<typeof cartSyncSchema>;

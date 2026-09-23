@@ -35,7 +35,6 @@ export const returnRequestSchema = z.object({
   message: 'valid.exchangeOptionRequired',
   path: ['exchanges'],
 });
-export type ReturnRequestInput = z.infer<typeof returnRequestSchema>;
 
 /** 운영진의 처리 */
 export const resolveReturnSchema = z.discriminatedUnion('action', [
@@ -94,4 +93,3 @@ export const resolveReturnSchema = z.discriminatedUnion('action', [
       .max(300, 'valid.tooLongChars'),
   }),
 ]);
-export type ResolveReturnInput = z.infer<typeof resolveReturnSchema>;

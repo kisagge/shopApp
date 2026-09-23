@@ -40,8 +40,6 @@ export const signUpSchema = z
     message: 'valid.passwordLikeEmail',
   });
 
-export type SignUpInput = z.infer<typeof signUpSchema>;
-
 /**
  * 비밀번호 재설정 폼 계약.
  *
@@ -61,14 +59,10 @@ export const resetPasswordSchema = z
     message: 'valid.passwordMismatch',
   });
 
-export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
-
 /** 재설정 메일을 요청하는 폼. */
 export const forgotPasswordSchema = z.object({
   email: z.email('valid.emailFormat'),
 });
-
-export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 
 /**
  * 회원정보 수정 계약. 이메일은 없다 — 바꾸려면 새 주소 확인이 필요하고, 그 전에는 로그인 주소를 바꿀 수 없다.
@@ -88,7 +82,6 @@ export const updateProfileSchema = z.object({
     .refine((v) => v === '' || PHONE_PATTERN.test(v), 'valid.phoneFormat')
     .default(''),
 });
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 
 /**
  * 비밀번호 변경 폼 계약.
@@ -118,4 +111,3 @@ export const changePasswordSchema = z
     path: ['newPassword'],
     message: 'valid.passwordLikeEmail',
   });
-export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;

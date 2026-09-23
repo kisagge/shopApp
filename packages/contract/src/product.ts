@@ -118,7 +118,6 @@ export const createVariantSchema = z.object({
   optionLabel: z.string().trim().min(1, 'valid.optionNameRequired').max(60, 'valid.tooLongChars'),
   stock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig').default(0),
 });
-export type CreateVariantInput = z.infer<typeof createVariantSchema>;
 
 export const PRODUCT_ERROR = [
   'SLUG_TAKEN', 'BRAND_NOT_ALLOWED', 'PRODUCT_NOT_FOUND', 'CATEGORY_NOT_FOUND', 'SKU_TAKEN',
@@ -147,7 +146,6 @@ export const PRODUCT_ERROR_MESSAGE: Readonly<Record<ProductErrorCode, string>> =
 export const archiveProductSchema = z.object({
   action: z.enum(ARCHIVE_ACTION),
 });
-export type ArchiveProductInput = z.infer<typeof archiveProductSchema>;
 
 /** 게시 검수 결정 */
 export const reviewProductSchema = z.object({
@@ -155,7 +153,6 @@ export const reviewProductSchema = z.object({
   /** 반려할 때만 쓴다. 승인에는 필요 없다. */
   reason: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
 });
-export type ReviewProductInput = z.infer<typeof reviewProductSchema>;
 
 /**
  * 재고 일괄 수정 — 내려받은 재고 파일을 고쳐 올린다.
@@ -165,4 +162,3 @@ export type ReviewProductInput = z.infer<typeof reviewProductSchema>;
 export const bulkStockSchema = z.object({
   csv: z.string().min(1, 'valid.fileRequired').max(1_000_000, 'valid.tooLongChars'),
 });
-export type BulkStockInput = z.infer<typeof bulkStockSchema>;

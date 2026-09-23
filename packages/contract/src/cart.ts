@@ -14,7 +14,6 @@ export const cartLineInputSchema = z.object({
   variantId: cuidSchema,
   quantity: quantitySchema,
 });
-export type CartLineInput = z.infer<typeof cartLineInputSchema>;
 
 export const cartQuoteRequestSchema = z.object({
   lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100, 'valid.tooManyItems'),
@@ -149,7 +148,6 @@ export const cartOptionSchema = z.object({
   stock: z.number().int(),
   available: z.boolean(),
 });
-export type CartOption = z.infer<typeof cartOptionSchema>;
 
 export const cartOptionsResponseSchema = z.object({
   productId: z.string(),
@@ -172,7 +170,6 @@ export type CartOptionsResponse = z.infer<typeof cartOptionsResponseSchema>;
 export const reorderRequestSchema = z.object({
   cartVariantIds: z.array(cuidSchema).max(100, 'valid.tooManyItems').default([]),
 });
-export type ReorderRequest = z.infer<typeof reorderRequestSchema>;
 
 export const reorderResponseSchema = z.object({
   /** 담을 줄. 장바구니 한 줄을 그대로 만들 수 있는 값이다 */

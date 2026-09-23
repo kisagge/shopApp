@@ -18,7 +18,6 @@ export const couponTargetSchema = z.object({
   targetType: z.enum(['PRODUCT', 'BRAND', 'CATEGORY']),
   targetId: z.string().min(1, 'valid.tooShortChars').max(40, 'valid.tooLongChars'),
 });
-export type CouponTargetInput = z.infer<typeof couponTargetSchema>;
 
 export const createCouponSchema = z.object({
   code: z

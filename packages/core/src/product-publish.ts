@@ -109,4 +109,3 @@ export const PUBLISH_ERROR = {
   NOT_AWAITING_REVIEW: '검수를 기다리는 상품이 아닙니다.',
   REJECT_REASON_REQUIRED: '반려 사유를 적어 주세요.',
 } as const;
-export type PublishErrorCode = keyof typeof PUBLISH_ERROR;

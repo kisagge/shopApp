@@ -35,22 +35,6 @@ export interface ShippingSnapshot {
   readonly deliveryMemo: string | null;
 }
 
-export interface OrderDraft {
-  readonly orderNo: string;
-  readonly userId: string;
-  readonly status: OrderStatus;
-  readonly items: readonly OrderItemDraft[];
-  readonly shipping: ShippingSnapshot;
-  readonly listTotal: Won;
-  readonly productDiscount: Won;
-  readonly couponDiscount: Won;
-  readonly pointsUsed: Won;
-  readonly shippingFee: Won;
-  readonly payable: Won;
-  readonly rewardPoints: Won;
-  readonly usedCouponId: string | null;
-}
-
 /**
  * 결제 수단에 따라 주문이 시작하는 상태가 다르다.
  *

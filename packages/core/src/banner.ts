@@ -5,7 +5,7 @@
  * 배너의 이름으로 다시 내보내기만 한다. 부르는 쪽을 고치지 않으면서 규칙은
  * 한 벌로 둔다.
  */
-import { isLive, publishStatus, type Schedule, type PublishStatus } from './schedule';
+import { isLive, publishStatus, type PublishStatus } from './schedule';
 
 export { hasValidWindow } from './schedule';
 
@@ -22,8 +22,6 @@ export function isBannerTone(value: string): value is BannerTone {
 
 /** 캐러셀이 감당할 수 있는 수. 이보다 많으면 아무도 끝까지 보지 않는다. */
 export const MAX_BANNERS = 6;
-
-export type BannerSchedule = Schedule;
 
 export const isBannerLive = isLive;
 

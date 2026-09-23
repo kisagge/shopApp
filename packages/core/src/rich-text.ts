@@ -46,7 +46,6 @@ export type RichTextMarkType = (typeof RICH_TEXT_MARK)[number];
  * 제목인지 알 수 없다. 단계를 건너뛰는 것(h2 다음 h4)도 같은 이유로 막는다.
  */
 export const RICH_TEXT_HEADING_LEVEL = [2, 3, 4] as const;
-export type RichTextHeadingLevel = (typeof RICH_TEXT_HEADING_LEVEL)[number];
 
 /*
  * **없음과 비어 있음을 둘 다 받는다.** 편집기는 안 쓰는 칸을 아예 빼고

@@ -104,7 +104,6 @@ export const FUNNEL_STEP_LABEL: Readonly<Record<FunnelStep, string>> = {
  * 가맹점이 찍혀 있으니 그쪽이 진실이다.
  */
 export const MERCHANT_FUNNEL_STEP = ['view_item', 'add_to_cart', 'purchase'] as const;
-export type MerchantFunnelStep = (typeof MERCHANT_FUNNEL_STEP)[number];
 
 export interface SessionEventNames {
   readonly sessionId: string;

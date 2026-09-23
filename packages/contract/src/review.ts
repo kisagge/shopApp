@@ -91,12 +91,6 @@ export const reportReviewSchema = z.object({
 });
 export type ReportReviewInput = z.infer<typeof reportReviewSchema>;
 
-/** 운영진의 신고 처리. 글을 내리는 것은 삭제 API 가 따로 맡는다. */
-export const dismissReportsSchema = z.object({
-  note: z.string().trim().max(500, 'valid.tooLongChars').nullable().default(null),
-});
-export type DismissReportsInput = z.infer<typeof dismissReportsSchema>;
-
 /**
  * 리뷰 판매자 답글. 앞뒤 공백을 지우고 1~1,000자. 지우기는 따로(DELETE) — 빈 문자열을 "지우기" 로 읽지 않는다.
  */
@@ -107,4 +101,3 @@ export const replyReviewSchema = z.object({
     .min(1, 'valid.replyRequired')
     .max(REVIEW_REPLY_MAX, 'valid.tooLongChars'),
 });
-export type ReplyReviewInput = z.infer<typeof replyReviewSchema>;
