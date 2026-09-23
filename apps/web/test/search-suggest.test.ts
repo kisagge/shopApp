@@ -11,17 +11,8 @@ vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: () => '' } }));
  * 캐시는 값을 **JSON 으로 저장한다.** 흉내에서도 직렬화해 본다 — 그러지
  * 않으면 bigint 가 섞여 들어와도 여기서는 통과하고 빌드한 서버에서만 터진다.
  */
-vi.mock('~/lib/cache', () => ({
-  cachedRead:
-    (fn: (...a: any[]) => any) =>
-    async (...a: any[]) => {
-      const value = await fn(...a);
-      JSON.stringify(value);
-      return value;
-    },
-  TAG: { catalog: 'catalog' },
-  TTL: { catalog: 60 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { getSearchSuggestions, getPopularSearches } = await import('~/lib/queries/catalog/suggest');
 

@@ -9,11 +9,8 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn<(...a: any[]) => any>().mockResolvedValue([]),
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: () => '' } }));
-vi.mock('~/lib/cache', () => ({
-  cachedRead: (fn: unknown) => fn,
-  TAG: { catalog: 'catalog' },
-  TTL: { catalog: 60 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { getRecommendations } = await import('~/lib/queries/catalog/recommend');
 

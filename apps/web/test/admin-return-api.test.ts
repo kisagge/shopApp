@@ -12,8 +12,9 @@ vi.mock('@shop/auth/session', () => session);
 const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
-const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidateCatalog = cache.revalidateCatalog;
 const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/notify-after-sale', () => ({ notifyAfterSale }));
 

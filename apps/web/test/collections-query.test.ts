@@ -15,16 +15,8 @@ const db = vi.hoisted(() => ({
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: () => '' } }));
 
 /** 캐시는 값을 JSON 으로 저장한다 — 흉내에서도 직렬화해 본다. */
-vi.mock('~/lib/cache', () => ({
-  cachedRead:
-    (fn: (...a: any[]) => any) =>
-    async (...a: any[]) => {
-      const value = await fn(...a);
-      return JSON.parse(JSON.stringify(value));
-    },
-  TAG: { catalog: 'catalog', collections: 'collections' },
-  TTL: { catalog: 60, collections: 60 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { getLiveCollections, getCollection } = await import('~/lib/queries/catalog/collections');
 

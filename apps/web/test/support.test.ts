@@ -12,11 +12,8 @@ const db = vi.hoisted(() => ({
 vi.mock('@shop/db', () => ({ prisma: db }));
 vi.mock('~/lib/audit', () => ({ recordAudit: vi.fn(async () => {}) }));
 // 캐시 감싸개는 요청 밖에서 돌지 않는다. 그대로 통과시킨다.
-vi.mock('~/lib/cache', () => ({
-  cachedRead: (fn: unknown) => fn,
-  TAG: { support: 'support' },
-  TTL: { support: 300 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { getFaq, getNotices, getAdminSupportPosts } = await import('~/lib/queries/support');
 const { createSupportPost, updateSupportPost } = await import('~/lib/admin/manage-support');

@@ -13,8 +13,9 @@ vi.mock('@shop/auth/session', () => session);
 const getActor = session.getActor;
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
-const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidateCatalog = cache.revalidateCatalog;
 
 const lib = vi.hoisted(() => ({ bulkUpdateStock: vi.fn<(...a: any[]) => any>(), exportStock: vi.fn<(...a: any[]) => any>() }));
 vi.mock('~/lib/admin/bulk-stock', async (importOriginal) => ({

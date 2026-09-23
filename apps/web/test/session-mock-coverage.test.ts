@@ -59,3 +59,59 @@ describe('세션 흉내', () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * 캐시 모듈도 같은 함정을 밟았다.
+ *
+ * `vi.mock('~/lib/cache', () => ({ revalidateCatalog }))` 는 모듈을 그 하나로 바꾼다.
+ * **배송 정책에 캐시를 씌우자마자** 그 파일에 닿는 검사들이 "No cachedRead export" 로
+ * 졌다 — 원인은 그 검사들과 아무 상관 없는 다른 파일이었다. 세션과 같은 모양이라
+ * 같은 방식으로 막는다.
+ */
+/**
+ * 캐시 감싸개에 **무엇을 건넸는지** 보는 검사는 예외다. 태그와 수명이 이 검사의 관심사라,
+ * 공용 흉내처럼 그냥 통과시키면 볼 것이 없어진다.
+ */
+const CACHE_BY_HAND: Readonly<Record<string, string>> = {
+  'shipping-policy-cache.test.ts': 'cachedRead 에 건넨 태그와 수명을 본다',
+};
+
+const cacheMockers = files
+  .filter((f) => f.name !== 'session-mock-coverage.test.ts')
+  .filter((f) => !(f.name in CACHE_BY_HAND))
+  .filter((f) => f.source.includes("vi.mock('~/lib/cache'"));
+
+describe('캐시 흉내', () => {
+  it('흉내 내는 파일을 실제로 찾았다', () => {
+    expect(cacheMockers.length).toBeGreaterThan(10);
+  });
+
+  it.each(cacheMockers.map((m) => m.name))('%s 는 공용 흉내를 쓴다', (name) => {
+    const file = cacheMockers.find((m) => m.name === name)!;
+    expect(
+      /vi\.mock\('~\/lib\/cache', \(\) => \w+\);/.test(file.source),
+      `${name} 이 캐시 모듈을 손으로 흉내 낸다. support/cache-mock 의 cacheMock() 을 쓰면 ` +
+        '캐시에 창구가 하나 더 생겨도 이 파일은 안 깨진다.',
+    ).toBe(true);
+  });
+
+  it('예외 목록에 죽은 줄이 없다 — 고친 뒤 남겨 두면 다음 사람이 믿는다', () => {
+    const stale = Object.keys(CACHE_BY_HAND).filter(
+      (name) => !files.some((f) => f.name === name && f.source.includes("vi.mock('~/lib/cache'")),
+    );
+    expect(stale, `이제 손으로 흉내 내지 않는다: ${stale.join(', ')}`).toEqual([]);
+  });
+
+  it('캐시 모듈이 내보내는 것을 빠짐없이 흉내 낸다', async () => {
+    const source = readFileSync(join(process.cwd(), 'src', 'lib', 'cache.ts'), 'utf8');
+    const exported = [...source.matchAll(/^export (?:const|function) (\w+)/gm)].map((m) => m[1]!);
+    const { cacheMock } = await import('./support/cache-mock');
+    const faked = Object.keys(cacheMock());
+
+    expect(exported.length, '캐시 모듈에서 창구를 못 읽었다').toBeGreaterThan(5);
+    expect(
+      exported.filter((name) => !faked.includes(name)),
+      'support/cache-mock 에 없는 창구가 있다 — 그것을 쓰는 파일이 나오면 검사가 무더기로 진다.',
+    ).toEqual([]);
+  });
+});

@@ -4,7 +4,7 @@ import { updateShippingPolicySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateShippingPolicy } from '~/lib/admin/manage-shipping';
 import { recordAudit } from '~/lib/audit';
-import { revalidateCatalog } from '~/lib/cache';
+import { revalidateShipping } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
@@ -15,8 +15,9 @@ import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
  * 하고, 되돌리려면 전에 무엇이었는지 남아 있어야 한다 — 감사 로그에 전후를
  * 함께 적는다.
  *
- * 매대와 상품 화면이 무료배송 기준을 적어 두므로 캐시도 함께 턴다. 안 털면
- * 결제는 새 값으로 계산하는데 상품 화면은 옛 값을 적고 있다.
+ * **고친 값이 곧바로 서야 한다.** 정책 자체가 캐시를 지나고(요청마다 한 줄짜리 표를
+ * 묻지 않으려고), 매대와 상품 화면도 무료배송 기준을 적어 둔다. 안 털면 결제는 새
+ * 값으로 계산하는데 화면은 옛 값을 적고 있다 — 손님이 보는 금액과 내는 금액이 갈린다.
  */
 export async function PATCH(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -38,7 +39,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
   try {
     const { before, after } = await updateShippingPolicy(actor, parsed.data);
-    revalidateCatalog();
+    // 정책 자체의 캐시와, 무료배송 기준을 적어 둔 매대를 함께 턴다
+    revalidateShipping();
     await recordAudit({
       actor,
       action: 'shipping.update',

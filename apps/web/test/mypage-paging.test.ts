@@ -15,11 +15,8 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 vi.mock('~/lib/grade/effective', () => ({ getEffectiveGrade: vi.fn() }));
-vi.mock('~/lib/cache', () => ({
-  cachedRead: (fn: unknown) => fn,
-  TAG: { catalog: 'catalog' },
-  TTL: { catalog: 3600 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { getPointHistory, POINT_HISTORY_PAGE_SIZE } = await import('~/lib/queries/mypage');
 const { getMyReviews, MY_REVIEW_PAGE_SIZE } = await import('~/lib/queries/reviews');

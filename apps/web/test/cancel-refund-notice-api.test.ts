@@ -11,7 +11,8 @@ const session = await vi.hoisted(async () => (await import('./support/session-mo
 vi.mock('@shop/auth/session', () => session);
 const getActor = session.getActor;
 vi.mock('~/lib/audit', () => ({ recordAudit: vi.fn() }));
-vi.mock('~/lib/cache', () => ({ revalidateCatalog: vi.fn() }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 const notifyAfterSale = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/notify-after-sale', () => ({ notifyAfterSale }));
 

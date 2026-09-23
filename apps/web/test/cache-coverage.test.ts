@@ -28,16 +28,15 @@ const CACHED_READS = [
   'lib/admin/manage-banner.ts',
   'lib/queries/support.ts',
   'lib/policies/policy.ts',
+  /*
+   * **배송 정책은 한 줄짜리 표인데 요청마다 물었다.** 상품 화면·장바구니 견적·체크아웃이
+   * 저마다 읽어서, 손님이 보고 담고 결제하는 동안 같은 답을 세 번 넘게 받아 왔다.
+   */
+  'lib/shipping-policy.ts',
 ] as const;
 
 /** 카탈로그를 털어야 하는 쓰기 창구 */
 const CATALOG_WRITERS = [
-  /*
-   * **배송비 정책도 카탈로그를 바꾼다.** 상품 화면과 비교가 무료배송 기준을
-   * 적어 두기 때문이다 — 안 털면 결제는 새 기준으로 계산하는데 상품 화면은
-   * 옛 기준을 적고 있다. 주문이 재고 때문에 카탈로그를 터는 것과 같은 결이다.
-   */
-  'app/api/admin/shipping/route.ts',
   /*
    * **브랜드 이름과 주소도 카탈로그다.** 매대의 브랜드 목록·상품 카드·브랜드 화면이
    * 그 값을 읽는다 — 안 털면 주소를 바꿔 놓고도 옛 이름이 한동안 걸려 있다.
@@ -135,6 +134,16 @@ const SUPPORT_WRITERS = [
 /** 약관·개인정보처리방침을 고치는 창구. 손님 화면이 캐시로 읽으므로 안 털면 시행일에 옛 문서가 걸려 있다 */
 const POLICY_WRITERS = ['app/api/admin/policies/[kind]/route.ts'] as const;
 
+/**
+ * 배송비 정책을 고치는 창구.
+ *
+ * **두 가지를 한꺼번에 털어야 한다.** 정책 자체의 캐시와, 무료배송 기준을 적어 둔
+ * 매대다. 안 털면 결제는 새 기준으로 계산하는데 상품 화면은 옛 기준을 적고 있고 —
+ * 돈이 걸린 값이라 다른 캐시보다 어긋남이 비싸다. `revalidateShipping` 이 둘을
+ * 함께 털고, 아래 검사가 그 함수가 정말 둘을 터는지 본다.
+ */
+const SHIPPING_WRITERS = ['app/api/admin/shipping/route.ts'] as const;
+
 describe('캐싱한 자리', () => {
   it.each(CACHED_READS)('%s 가 캐시를 쓴다', (rel) => {
     expect(read(rel)).toContain('cachedRead');
@@ -193,6 +202,25 @@ describe('무효화한 자리', () => {
 
   it.each(REVIEW_WRITERS)('%s 가 리뷰를 턴다', (rel) => {
     expect(read(rel)).toContain('revalidateReviews()');
+  });
+
+  it.each(SHIPPING_WRITERS)('%s 가 배송 정책을 턴다', (rel) => {
+    expect(read(rel)).toContain('revalidateShipping()');
+  });
+
+  it('배송 정책을 털면 매대도 함께 턴다', () => {
+    /*
+     * 상품 화면과 비교가 무료배송 기준을 적어 둔다. 정책 캐시만 털고 매대를 두면
+     * 결제는 새 기준으로 계산하는데 화면은 옛 기준을 적고 있다 — 손님이 보는 금액과
+     * 내는 금액이 갈린다.
+     */
+    const source = read('lib/cache.ts');
+    const at = source.indexOf('export const revalidateShipping');
+    expect(at).toBeGreaterThan(-1);
+
+    const body = source.slice(at, source.indexOf('};', at));
+    expect(body, 'revalidateShipping 이 매대를 안 턴다').toContain('TAG.catalog');
+    expect(body, 'revalidateShipping 이 정작 배송 정책을 안 턴다').toContain('TAG.shipping');
   });
 
   it.each(SUPPORT_WRITERS)('%s 가 공지·FAQ 를 턴다', (rel) => {
@@ -306,6 +334,7 @@ describe('무효화한 자리', () => {
       ...REVIEW_WRITERS,
       ...SUPPORT_WRITERS,
       ...POLICY_WRITERS,
+      ...SHIPPING_WRITERS,
     ]);
     const found: string[] = [];
 

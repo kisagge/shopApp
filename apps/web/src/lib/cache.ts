@@ -25,6 +25,8 @@ export const TAG = {
   support: 'support',
   /** 이용약관·개인정보처리방침 */
   policies: 'policies',
+  /** 배송비 정책 — 한 줄짜리 표인데 상품·장바구니·체크아웃이 저마다 읽는다 */
+  shipping: 'shipping',
 } as const;
 
 /**
@@ -62,6 +64,18 @@ export const TTL = {
    * 고친 순간에는 태그를 털어 곧바로 반영한다.
    */
   support: 3600,
+  /**
+   * 배송 정책만 **짧게 잡는다(5분).**
+   *
+   * 다른 캐시는 틀려 봐야 낡은 화면이지만 이 값은 **돈 계산에 그대로 들어간다** —
+   * 무료배송 기준을 내렸는데 옛 기준으로 견적이 나가면 손님이 화면에서 본 금액과
+   * 결제한 금액이 갈린다. 무효화가 그 자리에서 막지만(고치는 창구가 태그를 턴다),
+   * 안전망까지 한 시간으로 두면 빠뜨렸을 때의 창이 그만큼 길어진다.
+   *
+   * 5분이어도 값은 거의 다 건진다. 이 표는 하루에 몇 번 읽히는 값이 아니라
+   * **상품 화면·장바구니 견적·체크아웃이 지날 때마다** 읽는 값이다.
+   */
+  shipping: 300,
 } as const;
 
 interface CacheOptions {
@@ -115,6 +129,17 @@ export const revalidateSupport = (): void => bust(TAG.support);
 
 /** 약관이나 개인정보처리방침이 바뀌었다 */
 export const revalidatePolicies = (): void => bust(TAG.policies);
+
+/**
+ * 배송비 정책이 바뀌었다.
+ *
+ * **카탈로그도 함께 턴다.** 상품 화면과 비교가 무료배송 기준을 적어 두기 때문이다 —
+ * 고치는 창구가 진작 그렇게 하고 있었고, 이제 정책 자체의 캐시도 함께 턴다.
+ */
+export const revalidateShipping = (): void => {
+  bust(TAG.shipping);
+  bust(TAG.catalog);
+};
 
 /** 배너가 바뀌었다 */
 export const revalidateBanners = (): void => bust(TAG.banners);

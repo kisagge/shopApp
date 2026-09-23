@@ -14,8 +14,9 @@ const getSessionUser = session.getSessionUser;
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 
-const revalidateReviews = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({ revalidateReviews }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidateReviews = cache.revalidateReviews;
 
 const assertCanEditReview = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const updateReview = vi.hoisted(() => vi.fn<(...a: any[]) => any>());

@@ -14,11 +14,8 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn<(...a: any[]) => any>().mockResolvedValue([]),
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: () => '' } }));
-vi.mock('~/lib/cache', () => ({
-  cachedRead: (fn: unknown) => fn,
-  TAG: { catalog: 'catalog', collections: 'collections' },
-  TTL: { catalog: 60, collections: 60 },
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
 
 const { searchProducts, getFacets } = await import('~/lib/queries/catalog/search');
 const { getBrandBySlug } = await import('~/lib/queries/catalog/brands');

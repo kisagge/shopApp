@@ -16,8 +16,9 @@ vi.mock('@shop/auth/session', () => session);
 const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
-const revalidateReviews = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({ revalidateReviews }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidateReviews = cache.revalidateReviews;
 
 const { replyToReview, deleteReviewReply } = await import('~/lib/reviews/reply');
 const { PUT, DELETE } = await import('~/app/api/admin/reviews/[id]/reply/route');

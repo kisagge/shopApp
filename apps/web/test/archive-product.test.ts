@@ -18,8 +18,9 @@ const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
-const revalidateCatalog = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({ revalidateCatalog }));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidateCatalog = cache.revalidateCatalog;
 
 const { archiveProduct, countUnshippedLines } = await import('~/lib/admin/archive-product');
 const { PATCH } = await import('~/app/api/admin/products/[id]/archive/route');

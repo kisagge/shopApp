@@ -13,13 +13,9 @@ vi.mock('@shop/auth/session', () => session);
 const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
-const revalidatePolicies = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/cache', () => ({
-  revalidatePolicies,
-  TAG: { policies: 'policies' },
-  TTL: { support: 600 },
-  cachedRead: (fn: any) => fn,
-}));
+const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
+vi.mock('~/lib/cache', () => cache);
+const revalidatePolicies = cache.revalidatePolicies;
 
 const db = vi.hoisted(() => ({
   policy: { findUnique: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>() },
