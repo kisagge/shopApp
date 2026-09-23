@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, shipToDelivered } from './state';
 
 /**
  * 받은 주문을 손님이 스스로 구매확정한다.
@@ -30,28 +30,14 @@ test('받은 주문을 구매확정하면 적립금이 바로 들어오고 단�
   expect(variant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
   // ── 결제
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
 
   // 배송완료 전에는 확정할 수 없다 — 받지도 않은 물건을 "이대로 받겠다" 고 할 수 없다
   await expect(page.getByRole('button', { name: '구매확정' })).toHaveCount(0);
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {
-    for (const step of [
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
-    ]) {
-      const res = await step();
-      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
-    }
+    await shipToDelivered(admin, orderNo);
   } finally {
     await admin.close();
   }

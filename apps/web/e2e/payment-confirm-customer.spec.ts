@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart, ready } from './state';
+import { STATE_FILE, addFirstProductToCart, ready, orderNoOf, undoOrder } from './state';
 
 /*
  * **자기 손님으로 돈다.** 이 명세는 서버 장바구니를 비우고 채운다.
@@ -54,23 +54,6 @@ async function toCheckout(page: import('@playwright/test').Page): Promise<void> 
  * 되돌리는 길은 사용자가 쓰는 그 길이다. 결제완료 주문의 취소는 환불까지
  * 함께 도는 경로라, **이 정리 자체가 환불 경로를 한 번 더 밟는 셈**이다.
  */
-async function undo(
-  page: import('@playwright/test').Page,
-  orderNo: string,
-): Promise<void> {
-  const res = await page.request.post(`/api/orders/${orderNo}/cancel`, {
-    data: { reason: '검사가 만든 주문을 되돌립니다' },
-  });
-  // 못 되돌리면 다음 실행이 재고 없이 시작한다. 조용히 넘기지 않는다.
-  expect(res.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${res.status()})`).toBe(true);
-}
-
-/** 주문 번호를 주소에서 꺼낸다 */
-function orderNoOf(url: string): string {
-  const hit = /\/order\/([^/?#]+)/.exec(url);
-  expect(hit, `주문 화면으로 가지 않았다: ${url}`).not.toBeNull();
-  return decodeURIComponent(hit![1]!);
-}
 
 test('카드로 결제하면 결제완료까지 간다', async ({ page }) => {
   await toCheckout(page);
@@ -94,7 +77,7 @@ test('카드로 결제하면 결제완료까지 간다', async ({ page }) => {
   await ready(page);
   await expect(page.getByText(orderNo)).toBeVisible();
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('가상계좌는 결제완료가 아니라 입금대기다', async ({ page }) => {
@@ -144,7 +127,7 @@ test('가상계좌는 결제완료가 아니라 입금대기다', async ({ page 
   // 눌러서 가는 곳에 계좌가 있어야 이 알림이 쓸모가 있다
   await expect(notice).toHaveAttribute('href', `/order/${orderNo}`);
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 /**
@@ -198,7 +181,7 @@ test('승인이 실패해도 주문 화면에서 다시 결제할 수 있다', a
   await again.click();
   await expect(page.getByText('결제완료').first()).toBeVisible({ timeout: 30_000 });
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 /**
@@ -222,6 +205,6 @@ test('입금을 기다리는 가상계좌 주문에는 다시 결제하기가 �
   // 할 일은 송금이지 재결제가 아니다 — 취소는 그대로 열려 있어야 한다
   await expect(page.getByRole('button', { name: '주문 취소' })).toBeVisible();
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { SEED_PASSWORD, SEED_ACCOUNT } from '@shop/auth/seed-fixtures';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard } from './state';
 
 /**
  * 장바구니에서 옵션 바꾸기, 지난 주문 다시 담기.
@@ -76,13 +76,7 @@ test('지난 주문 화면에서 다시 담기를 누르면 그 옵션이 장바
   expect(variant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
   // ── 산다
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  await payWithCard(page);
   await ready(page);
 
   // 결제하면 산 줄은 장바구니에서 빠진다 — 다시 담기가 채우는 것을 보려고 비어 있는지 먼저 본다
@@ -129,12 +123,9 @@ test('바로 구매하면 그 하나만 결제 화면에 오고, 사고 나도 �
   await page.waitForURL(/\/checkout\?now=1$/);
   await ready(page);
   await expect(page.getByText('바로 구매하는 상품입니다. 장바구니에 담아 둔 것은 그대로 남습니다.')).toBeVisible();
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
 
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  // 이미 결제 화면에 와 있다 — 바로 구매는 장바구니를 거치지 않는다
+  await payWithCard(page, { goto: false });
   await ready(page);
 
   // 담아 둔 것은 그대로다 — 바로 산 옵션이 같더라도 지우지 않는다

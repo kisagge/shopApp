@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { REVIEW_REWARD } from '@shop/core';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard } from './state';
 import { layoutProblems, WIDTHS } from './layout';
 
 /**
@@ -36,14 +36,7 @@ test('쓴 리뷰를 고치면 손님 화면이 바뀌고, 고쳐졌다는 사실
   const variant = await addProductToCart(page, RACE_PRODUCT.reviewEdit);
   expect(variant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {

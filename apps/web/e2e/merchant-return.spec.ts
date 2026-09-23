@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf, payWithCard, shipToDelivered } from './state';
 
 /**
  * 가맹점이 자기 상품 반품을 처리한다 — 승인과 도착 확인은 가맹점이, 환불은 운영진이.
@@ -43,26 +43,12 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
   const stockSum = async () => (await stockOf(page, variants[0]!)) + (await stockOf(page, variants[1]!));
   const stockBefore = await stockSum();
 
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   const merchant = await browser.newContext({ storageState: STATE_FILE.merchant });
   try {
-    for (const step of [
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
-    ]) {
-      const res = await step();
-      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
-    }
+    await shipToDelivered(admin, orderNo);
 
     // ── 손님: 받은 두 줄을 전부 반품 신청(불량 — 반송비는 판매자)
     await page.goto(`/order/${orderNo}`);

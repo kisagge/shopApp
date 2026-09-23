@@ -333,3 +333,79 @@ export async function stockOf(page: import('@playwright/test').Page, variantId: 
   }
   throw new Error(`재고를 못 읽었다: ${String(lastError)}`);
 }
+
+/** 주소에서 주문번호를 읽는다. 주문 화면으로 가지 않았으면 그 자리에서 진다. */
+export function orderNoOf(url: string): string {
+  const hit = /\/order\/([^/?#]+)/.exec(url);
+  expect(hit, `주문 화면으로 가지 않았다: ${url}`).not.toBeNull();
+  return decodeURIComponent(hit![1]!);
+}
+
+/**
+ * 담아 둔 것을 **카드로 결제하고 주문번호를 받는다.**
+ *
+ * 같은 일곱 줄이 열 개 명세에 복사돼 있었다 — 체크아웃으로 가서, 결제 단추가 나타나기를
+ * 기다리고, 약관에 동의하고, 카드를 고르고, 누르고, 주문 화면을 기다려 주소에서 번호를 뽑는다.
+ * 단추의 이름(`원 결제하기`)을 바꾸는 순간 그 열 곳이 한꺼번에 졌다.
+ *
+ * **기다림을 빠뜨리기 쉬운 자리이기도 하다.** `ready` 없이 누르면 하이드레이션 전의 단추를
+ * 누르게 되고, 그러면 아무 일도 일어나지 않은 채 30초를 기다리다 진다.
+ *
+ * 바로 구매(`/checkout?now=1`)처럼 이미 체크아웃에 와 있으면 `goto: false` 로 부른다.
+ */
+export async function payWithCard(
+  page: import('@playwright/test').Page,
+  options: { readonly goto?: boolean } = {},
+): Promise<string> {
+  if (options.goto !== false) await page.goto('/checkout');
+  await ready(page);
+
+  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
+  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
+  await page.getByRole('radio', { name: '신용·체크카드' }).click();
+  await page.getByRole('button', { name: /원 결제하기/ }).click();
+
+  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  return orderNoOf(page.url());
+}
+
+/**
+ * 운영진이 주문을 **배송완료까지 민다** — 준비 → 송장(배송중) → 배송완료.
+ *
+ * 반품·교환·구매확정 명세가 이 세 줄을 각자 들고 있었다. 송장 번호까지 같은 값이라,
+ * 상태 전이 규칙이 바뀌면 네 곳을 손으로 맞춰야 했다.
+ *
+ * 한 걸음이라도 막히면 그 자리에서 진다 — 조용히 넘어가면 다음 단계가 "왜 배송완료가
+ * 아니지" 로 지고, 진짜 이유는 세 걸음 앞에 있다.
+ */
+export async function shipToDelivered(
+  admin: import('@playwright/test').BrowserContext,
+  orderNo: string,
+): Promise<void> {
+  for (const step of [
+    () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
+    () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, {
+      data: { carrier: 'CJ', trackingNumber: '123456789012' },
+    }),
+    () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
+  ]) {
+    const res = await step();
+    expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
+  }
+}
+
+/**
+ * 검사가 만든 주문을 되돌린다.
+ *
+ * 열 개 명세가 같은 두 줄을 적고 있었다. **되돌리기가 실패해도 조용하면 안 된다** — 재고가
+ * 묶인 채 남아, 나중에 엉뚱한 명세가 "품절" 로 진다. 거기서는 이유를 찾을 길이 없다.
+ */
+export async function undoOrder(
+  page: import('@playwright/test').Page,
+  orderNo: string,
+): Promise<void> {
+  const res = await page.request.post(`/api/orders/${orderNo}/cancel`, {
+    data: { reason: '검사가 만든 주문을 되돌립니다' },
+  });
+  expect(res.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${res.status()})`).toBe(true);
+}

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart, ready } from './state';
+import { STATE_FILE, addFirstProductToCart, ready, undoOrder } from './state';
 
 /**
  * 가상계좌에 돈이 들어왔을 때.
@@ -48,14 +48,6 @@ async function placeVirtualAccountOrder(page: import('@playwright/test').Page): 
   return decodeURIComponent(hit![1]!);
 }
 
-/** 되돌린다. 못 되돌리면 다음 실행이 재고 없이 시작한다. */
-async function undo(page: import('@playwright/test').Page, orderNo: string): Promise<void> {
-  const res = await page.request.post(`/api/orders/${orderNo}/cancel`, {
-    data: { reason: '검사가 만든 주문을 되돌립니다' },
-  });
-  expect(res.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${res.status()})`).toBe(true);
-}
-
 test('입금이 들어오면 입금대기가 결제완료가 된다', async ({ page }) => {
   const orderNo = await placeVirtualAccountOrder(page);
 
@@ -69,7 +61,7 @@ test('입금이 들어오면 입금대기가 결제완료가 된다', async ({ p
   await ready(page);
   await expect(page.getByText('결제완료').first()).toBeVisible();
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('본문이 결제됐다고 우겨도 믿지 않는다', async ({ page }) => {
@@ -101,7 +93,7 @@ test('본문이 결제됐다고 우겨도 믿지 않는다', async ({ page }) =>
   await expect(page.getByText('입금대기').first()).toBeVisible();
   await expect(page.getByText('결제완료')).toHaveCount(0);
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('같은 웹훅이 두 번 와도 한 번만 반영된다', async ({ page }) => {
@@ -119,7 +111,7 @@ test('같은 웹훅이 두 번 와도 한 번만 반영된다', async ({ page })
   expect(second.ok()).toBe(true);
   expect(await second.json()).toMatchObject({ applied: false });
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 돌려줄 곳에 뜬다', async ({ page, browser }) => {
@@ -132,7 +124,7 @@ test('취소한 주문에 입금이 들어오면 멈추지 않고, 운영진이 
    * 돌려준다 — 사람이 볼 곳에 남아야 한다.
    */
   const orderNo = await placeVirtualAccountOrder(page);
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 
   const res = await page.request.post('/api/webhooks/toss', {
     data: { eventType: 'PAYMENT_STATUS_CHANGED', data: { paymentKey: `mock_va_${orderNo}` } },

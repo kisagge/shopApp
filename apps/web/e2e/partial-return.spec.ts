@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf, payWithCard, shipToDelivered } from './state';
 
 /**
  * 받은 두 줄 중 한 줄만 반품한다 — 신청(손님) → 승인(운영) → 회수 확인·환불(운영 화면).
@@ -46,26 +46,12 @@ test('받은 두 줄 중 한 줄만 반품하면 그 줄만 돌려받고 주문�
   const stockBefore = await stockSum();
 
   // ── 결제
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {
     // ── 운영: 준비 → 송장(배송중) → 배송완료
-    for (const step of [
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
-    ]) {
-      const res = await step();
-      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
-    }
+    await shipToDelivered(admin, orderNo);
 
     // ── 손님: 한 줄만 골라 반품 신청
     await page.goto(`/order/${orderNo}`);

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf, payWithCard, shipToDelivered } from './state';
 
 /**
  * 받은 상품을 다른 옵션으로 교환한다 — 신청(손님) → 승인·교환 상품 발송(운영) → 손님이 바뀐 옵션과 송장을 본다.
@@ -24,27 +24,13 @@ test('다른 옵션으로 교환 신청하면 그 재고가 잡히고, 운영이
   expect(fromVariant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
   // ── 결제
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
   const payable = (await page.getByRole('term').filter({ hasText: '결제 금액' })
     .locator('xpath=following-sibling::dd').textContent())!;
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {
-    for (const step of [
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
-    ]) {
-      const res = await step();
-      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
-    }
+    await shipToDelivered(admin, orderNo);
 
     // ── 손님: 교환을 고르고 다른 옵션으로
     await page.goto(`/order/${orderNo}`);
@@ -125,24 +111,11 @@ test('승인한 교환을 무르면 잡아 둔 재고가 돌아오고, 손님은
   const fromVariant = await addProductToCart(page, RACE_PRODUCT.exchange);
   expect(fromVariant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
-  await page.goto('/checkout');
-  await ready(page);
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = await payWithCard(page);
 
   const admin = await browser.newContext({ storageState: STATE_FILE.admin });
   try {
-    for (const step of [
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'PREPARING' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/shipment`, { data: { carrier: 'CJ', trackingNumber: '123456789012' } }),
-      () => admin.request.post(`/api/admin/orders/${orderNo}/status`, { data: { to: 'DELIVERED' } }),
-    ]) {
-      const res = await step();
-      expect(res.ok(), `운영 처리가 막혔다 (${res.status()}) ${await res.text()}`).toBe(true);
-    }
+    await shipToDelivered(admin, orderNo);
 
     // ── 손님: 교환 신청 — 바꿀 옵션의 재고가 잡힌다
     await page.goto(`/order/${orderNo}`);

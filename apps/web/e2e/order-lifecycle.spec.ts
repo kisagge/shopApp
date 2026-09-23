@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, REVIEW_PRODUCT, ready } from './state';
+import { STATE_FILE, REVIEW_PRODUCT, ready, payWithCard } from './state';
 
 /**
  * 결제 뒤의 한 바퀴 — 배송준비 · 출고 · 배송완료 · 반품 · 환불.
@@ -54,16 +54,11 @@ async function placePaidOrder(page: import('@playwright/test').Page): Promise<st
   await page.goto('/checkout');
   await ready(page);
   await expect(page.getByRole('heading', { name: '배송지' })).toBeVisible();
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
+  // 배송지가 그려진 뒤에 결제한다 — 나머지는 다른 명세들과 같은 길이다
+  const orderNo = await payWithCard(page, { goto: false });
 
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
-  const hit = /\/order\/([^/?#]+)/.exec(page.url());
-  expect(hit, `주문 화면으로 가지 않았다: ${page.url()}`).not.toBeNull();
   await expect(page.getByText('결제완료').first()).toBeVisible();
-  return decodeURIComponent(hit![1]!);
+  return orderNo;
 }
 
 test('출고하고 반품·환불로 닫는다', async ({ page, browser }) => {

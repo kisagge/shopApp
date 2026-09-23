@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart, ready } from './state';
+import { STATE_FILE, addFirstProductToCart, ready, orderNoOf, undoOrder } from './state';
 
 /**
  * 화면에 적힌 금액이 **더해 보면 맞고, 실제로 그 값이 청구된다.**
@@ -169,16 +169,13 @@ test('화면에 보인 금액이 그대로 청구된다', async ({ page }) => {
   await page.waitForURL(/\/order\//, { timeout: 30_000 });
   await ready(page);
 
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
+  const orderNo = orderNoOf(page.url());
   // 주문 화면은 "결제 금액", 결제 화면은 "최종 결제 금액" 이다 — 같은 값의 다른 이름
   const charged = await row(page, '결제 금액');
   expect(charged, `주문 ${orderNo} 의 금액이 화면에 보인 것과 다르다`).toBe(shown);
 
   // 되돌린다. 못 되돌리면 다음 실행이 재고 없이 시작한다.
-  const undo = await page.request.post(`/api/orders/${orderNo}/cancel`, {
-    data: { reason: '검사가 만든 주문을 되돌립니다' },
-  });
-  expect(undo.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${undo.status()})`).toBe(true);
+  await undoOrder(page, orderNo);
 
   /*
    * **취소하면 쿠폰이 되살아난다.** 취소는 주문 생성이 한 일을 역순으로 푸는

@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf } from './state';
+import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, stockOf, payWithCard } from './state';
 import { layoutProblems, WIDTHS } from './layout';
 
 /**
@@ -54,13 +54,7 @@ test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금
   const stockBefore = await stockSum();
 
   // ── 결제
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  const orderNo = await payWithCard(page);
   await expect(page.getByText('결제완료').first()).toBeVisible();
   const payable = (await page.getByRole('term').filter({ hasText: '결제 금액' })
     .locator('xpath=following-sibling::dd').textContent())!;
@@ -140,7 +134,6 @@ test('두 줄 중 한 줄을 취소하면 그 줄만 무르고, 돌려받은 금
   expect(await stockSum(), '전부 취소했는데 재고가 처음으로 안 돌아왔다').toBe(stockBefore);
 
   // 스스로 취소한 것은 알림함에 남지 않는다 — 방금 누른 사람에게 "취소되었습니다" 는 소음이다(메일은 간다)
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
   await page.goto('/mypage/notifications');
   await ready(page);
   await expect(page.getByText(`주문 ${orderNo} 의 상품이 취소되었습니다.`)).toHaveCount(0);
@@ -166,15 +159,8 @@ test('일부 취소와 전액 취소가 동시에 들어와도 재고와 돈이 
   const stockSum = async () => (await stockOf(page, variants[0]!)) + (await stockOf(page, variants[1]!));
   const stockBefore = await stockSum();
 
-  await page.goto('/checkout');
-  await ready(page);
-  await expect(page.getByRole('button', { name: /원 결제하기/ })).toBeVisible();
-  await page.getByRole('checkbox', { name: /약관에 동의/ }).click();
-  await page.getByRole('radio', { name: '신용·체크카드' }).click();
-  await page.getByRole('button', { name: /원 결제하기/ }).click();
-  await page.waitForURL(/\/order\//, { timeout: 30_000 });
+  const orderNo = await payWithCard(page);
   await expect(page.getByText('결제완료').first()).toBeVisible();
-  const orderNo = decodeURIComponent(/\/order\/([^/?#]+)/.exec(page.url())![1]!);
   const payable = (await page.getByRole('term').filter({ hasText: '결제 금액' })
     .locator('xpath=following-sibling::dd').textContent())!;
 

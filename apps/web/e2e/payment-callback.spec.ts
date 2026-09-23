@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, addFirstProductToCart, defaultAddressId, ready } from './state';
+import { STATE_FILE, addFirstProductToCart, defaultAddressId, ready, undoOrder } from './state';
 
 /**
  * 결제창이 돌아오는 자리(`/checkout/success`).
@@ -68,13 +68,6 @@ async function placePending(page: Page): Promise<Placed> {
   return { orderNo: order.orderNo, payable: order.payable };
 }
 
-async function undo(page: Page, orderNo: string): Promise<void> {
-  const res = await page.request.post(`/api/orders/${orderNo}/cancel`, {
-    data: { reason: '검사가 만든 주문을 되돌립니다' },
-  });
-  expect(res.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${res.status()})`).toBe(true);
-}
-
 test('돌아오면 승인되고 주문 화면으로 간다', async ({ page }) => {
   const { orderNo, payable } = await placePending(page);
 
@@ -87,7 +80,7 @@ test('돌아오면 승인되고 주문 화면으로 간다', async ({ page }) =>
   expect(page.url(), '승인했다고 알리지 않는다').toContain('payment=done');
   await expect(page.getByText('결제완료').first()).toBeVisible();
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('쿼리에 적힌 금액을 믿지 않는다', async ({ page }) => {
@@ -125,7 +118,7 @@ test('쿼리에 적힌 금액을 믿지 않는다', async ({ page }) => {
     '다시 결제할 길이 없다',
   ).toBeVisible();
 
-  await undo(page, orderNo);
+  await undoOrder(page, orderNo);
 });
 
 test('반쪽짜리 콜백은 실패 화면으로 보낸다', async ({ page }) => {
