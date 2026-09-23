@@ -3,6 +3,7 @@ export * from './shipping';
 export * from './cart';
 export * from './coupon-pick';
 export * from './order-state';
+export * from './order-view';
 export * from './revenue';
 export * from './compare';
 export * from './authz';

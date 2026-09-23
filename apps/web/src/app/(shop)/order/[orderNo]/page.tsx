@@ -4,10 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import type { Metadata } from 'next';
 import {
-  isCancellableByCustomer, canRequestReturn, isRepayable, isReturnableLine, isPaidStatus,
-  isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber, canConfirmPurchase, isOpenReturn,
-  returnAddressLine, awaitingDeposit, depositExpired, trackingUrlFor, orderLineReviewLink,
-  type ReturnType, type ReturnReason, type ReturnStatus,
+  isReturnableLine, isReceiptIssuable, receiptTotals, carrierOf, formatTrackingNumber,
+  returnAddressLine, trackingUrlFor, orderLineReviewLink, orderView,
+  type OrderHeadline, type ReturnDestination, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { TrackingPanel } from '~/components/tracking-panel';
 import { CancelOrderButton } from '~/components/cancel-order-button';
@@ -20,7 +19,7 @@ import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { approvedReturnDestinations } from '~/lib/orders/return-address';
-import { getOrderForUser, getExchangeOptions, getDisplayedProductSlugs } from '~/lib/queries/orders';
+import { getOrderForUser, getExchangeOptions, getDisplayedProductSlugs, type ExchangeOption } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
 import { formatMoney, formatNumber, formatDateTime, type MessageKey } from '@shop/i18n';
 import { getLocale, getT } from '~/lib/i18n/server';
@@ -52,33 +51,38 @@ export default async function OrderPage({
   ]);
   if (!order) notFound();
 
-  /*
-   * **결제를 다시 걸 수 있는 주문인가.**
-   *
-   * 판정은 `@shop/core` 의 `isRepayable` 이 한다 — 주문 상태만으로는 못
-   * 가른다. 결제대기는 "승인이 안 된 것" 과 "가상계좌를 받아 입금을 기다리는
-   * 것" 을 함께 가리키는데, 뒤엣것에 다시 걸면 이미 받은 계좌가 버려진다.
-   *
-   * 결제 방식은 서버가 정해서 내려 준다(`serverPaymentMode`) — 브라우저가
-   * 스스로 정하다 서버와 갈려서 승인이 500 이 났던 적이 있다.
-   */
-  const repayable = isRepayable(order.status, order.payment?.status ?? null);
+  const liveItems = order.items.filter((i) => i.canceledAt === null);
+  const activeReturn = order.returnRequests[0] ?? null;
 
   /*
-   * 입금할 곳. 계좌번호가 없으면(옛 주문이나 PG 가 안 준 경우) 보여 줄 것이 없다 —
-   * 빈 칸이 늘어선 덩이는 "번호가 사라졌다" 로 읽힌다.
+   * **무엇을 세우고 무엇을 감출지는 core 가 정한다.**
+   *
+   * 판정 하나하나(다시 결제할 수 있는가·반품 신청을 낼 수 있는가·구매확정할 수 있는가)는
+   * 진작 순수 함수였는데, **그것들을 어떻게 엮는지는 이 화면에만 있었다.** 600줄짜리
+   * 컴포넌트 사이에 흩어져 있어서 "언제 일부 취소 단추가 보이는가" 를 고치려면 JSX 를
+   * 뒤져야 했고, 그 조합이 맞는지는 e2e 를 통째로 돌려야 알 수 있었다.
    */
-  const pay = order.payment;
-  const deposit =
-    pay && awaitingDeposit(pay.method, pay.status) && pay.virtualAccount
-      ? { bank: pay.virtualBank, account: pay.virtualAccount, dueDate: pay.virtualDueDate }
-      : null;
-  const expired = deposit !== null && depositExpired(deposit.dueDate);
-  const decided = repayable ? serverPaymentMode() : null;
-  /** 결제를 걸 수 있는 방식. 막혀 있으면 단추를 세우지 않는다 — 눌러도 될 일이 없다 */
+  const view = orderView({
+    status: order.status,
+    payment: order.payment,
+    itemCount: order.items.length,
+    liveItemCount: liveItems.length,
+    deliveredAt: order.deliveredAt,
+    // 상태는 String 칸이라 모양을 좁혀 넘긴다 — 아래 화면들도 같은 자리에서 같은 좁힘을 한다
+    returnStatus: (activeReturn?.status as ReturnStatus | undefined) ?? null,
+    now: new Date(),
+    /** 결제 화면에서 실패해 넘어왔는가. 갓 접수된 주문과 구분해야 한다 */
+    paymentFailed: query['payment'] === 'failed',
+    /** 방금 확정했는가 — 단추가 사라지므로 결과는 이 화면이 남긴다(confirm-purchase-button) */
+    confirmedJustNow: query['confirmed'] === '1',
+  });
+
+  /*
+   * 결제 방식은 서버가 정해서 내려 준다(`serverPaymentMode`) — 브라우저가 스스로 정하다
+   * 서버와 갈려서 승인이 500 이 났던 적이 있다. 막혀 있으면 단추를 세우지 않는다.
+   */
+  const decided = view.repayable ? serverPaymentMode() : null;
   const repayMode = decided && decided.mode !== 'blocked' ? decided.mode : null;
-  /** 결제 화면에서 실패해 넘어왔는가. 갓 접수된 주문과 구분해야 한다 */
-  const paymentFailed = query['payment'] === 'failed';
 
   const money = (amount: number) => formatMoney(locale, amount);
 
@@ -89,24 +93,14 @@ export default async function OrderPage({
     </div>
   );
 
-  /**
-   * 이 화면은 주문 직후에도, 나중에 주문 내역에서 들어와도 열린다.
-   * 그래서 문구가 상태를 따라가야 한다 — 배송중인 주문에 "결제가 확인되면
-   * 배송 준비를 시작합니다" 라고 적혀 있으면 무슨 말인지 알 수 없다.
-   */
-  const headline = repayable
-    ? /*
-       * **결제가 안 끝난 주문에 "접수되었습니다" 라고 쓰면 안 된다.**
-       * 아래에 "결제가 완료되지 않았습니다" 를 붙여 놓고 큰 제목은 접수됐다고
-       * 말하면 둘 중 무엇을 믿어야 할지 알 수 없다. 화면을 못 보는 사람에게는
-       * 더 나쁘다 — Next 의 경로 알림이 이 제목을 그대로 읽어 준다.
-       */
-      t('order.unpaidHeading')
-    : order.status === 'PENDING'
-      ? t('order.placedHeading')
-      : order.status === 'CANCELLED' || order.status === 'REFUNDED'
-        ? t('order.closedHeading')
-        : t('order.heading');
+  /** 큰 제목이 할 말은 core 가 고르고(orderView), 여기서는 그 말을 옮기기만 한다 */
+  const HEADLINE_KEY: Readonly<Record<OrderHeadline, MessageKey>> = {
+    unpaid: 'order.unpaidHeading',
+    placed: 'order.placedHeading',
+    closed: 'order.closedHeading',
+    default: 'order.heading',
+  };
+  const headline = t(HEADLINE_KEY[view.headline]);
 
   /** 다음에 무엇이 일어나는지. 갈래로 빠진 상태에는 할 말이 없다. */
   const NEXT_STEP: Partial<Record<typeof order.status, MessageKey>> = {
@@ -120,51 +114,25 @@ export default async function OrderPage({
   const nextStepKey = NEXT_STEP[order.status];
   const nextStep = nextStepKey ? t(nextStepKey) : null;
 
-  /*
-   * **일부 상품 취소를 열어 주는 조건.** 서버가 같은 조건으로 다시 막는다(cancel-items) —
-   * 여기서는 눌러 봐야 거절될 단추를 세우지 않으려는 것뿐이다. 남은 상품이 하나면 그건
-   * 주문 취소다.
-   */
-  const liveItems = order.items.filter((i) => i.canceledAt === null);
-  const canCancelItems =
-    order.status === 'PAID' &&
-    order.payment !== null && isPaidStatus(order.payment.status) &&
-    order.payment.method !== 'VIRTUAL_ACCOUNT' &&
-    // 남은 줄이 하나여도 세운다 — 부품이 단추를 감추고, 방금 끝난 취소의 안내를 남긴다
-    order.items.length >= 2 &&
-    liveItems.length >= 1;
-
   // 영수증과 같은 함수로 더한다 — 따로 더하면 두 화면의 환불 합이 갈린다
   const { refundedCash, refundedPoints, shippingDeducted } = receiptTotals(order.payable, order.refunds);
 
-  const activeReturn = order.returnRequests[0] ?? null;
-  /**
-   * 신청 버튼은 신청할 수 있을 때만.
-   *
-   * 반려된 뒤에는 다시 낼 수 있어야 한다 — 사유를 잘못 골랐을 수도 있고,
-   * 반려 사유를 보고 보완할 수도 있다. canRequestReturn 이 상태로 판단하므로
-   * 반려로 배송중에 돌아왔으면 자연히 다시 보인다.
-   */
-  const showReturnForm = canRequestReturn({
-    status: order.status,
-    deliveredAt: order.deliveredAt,
-    now: new Date(),
-  });
   const returnableItems = order.items.filter(isReturnableLine);
-  const openReturn = activeReturn !== null && isOpenReturn(activeReturn.status);
-  const canConfirm = canConfirmPurchase({ status: order.status, hasOpenReturn: openReturn });
-  /** 방금 확정했는가 — 단추가 사라지므로 결과는 이 화면이 남긴다(confirm-purchase-button) */
-  const justConfirmed = query['confirmed'] === '1' && order.status === 'CONFIRMED';
   /*
-   * 승인한 신청의 보낼 곳. **승인하고 아직 안 왔을 때만** 읽는다 — 그때만 보여 준다(core showsReturnAddress).
-   * 판매처가 둘이면 주소도 둘이다. 한 주소만 적어 주면 한쪽 물건이 남의 창고로 간다.
+   * 셋을 한 번에 던진다 — 서로의 결과를 쓰지 않는데 줄줄이 기다리면 왕복이 세 번 직렬로 쌓인다.
+   *
+   * - 보낼 곳: **승인하고 아직 안 왔을 때만** 읽는다(core showsReturnAddress). 판매처가 둘이면
+   *   주소도 둘이다 — 한 주소만 적어 주면 한쪽 물건이 남의 창고로 간다.
+   * - 교환 옵션: 폼을 띄울 때만. 같은 상품·같은 가격·재고가 있는 것.
+   * - 상품 링크: 줄마다 상품 화면으로. 매대에 나와 있는 상품만.
    */
-  const returnTo = activeReturn ? await approvedReturnDestinations(order.items, activeReturn) : [];
-
-  // 폼을 띄울 때만 읽는다 — 교환으로 바꿀 수 있는 옵션(같은 상품·같은 가격·재고)
-  const exchangeOptions = showReturnForm ? await getExchangeOptions(returnableItems) : {};
-  // 줄마다 상품 화면으로 가는 링크 — 매대에 나와 있는 상품만
-  const productSlugs = await getDisplayedProductSlugs(order.items.map((i) => i.variant.productId));
+  const [returnTo, exchangeOptions, productSlugs] = await Promise.all<
+    [Promise<ReturnDestination[]>, Promise<Record<string, ExchangeOption[]>>, Promise<ReadonlyMap<string, string>>]
+  >([
+    activeReturn ? approvedReturnDestinations(order.items, activeReturn) : Promise.resolve([]),
+    view.showReturnForm ? getExchangeOptions(returnableItems) : Promise.resolve({}),
+    getDisplayedProductSlugs(order.items.map((i) => i.variant.productId)),
+  ]);
 
   return (
     <div className="mx-auto w-full max-w-[560px] px-4 pb-24 md:px-10">
@@ -173,10 +141,10 @@ export default async function OrderPage({
         <span
           aria-hidden="true"
           className={`flex h-16 w-16 items-center justify-center rounded-full text-2xl ${
-            repayable ? 'bg-accent-soft text-accent-hover' : 'bg-[var(--brand)] text-[var(--bg)]'
+            view.repayable ? 'bg-accent-soft text-accent-hover' : 'bg-[var(--brand)] text-[var(--bg)]'
           }`}
         >
-          {repayable ? '!' : '✓'}
+          {view.repayable ? '!' : '✓'}
         </span>
         <h1 className="font-serif text-2xl font-medium tracking-tight">{headline}</h1>
         <p className="text-[13px] leading-relaxed text-[var(--fg-secondary)]">
@@ -203,7 +171,7 @@ export default async function OrderPage({
           `role="alert"` 은 결제 화면에서 실패해 막 넘어온 경우에만 쓴다 —
           나중에 주문 내역에서 다시 들어온 사람에게는 새로 난 일이 아니다.
         */}
-        {justConfirmed && (
+        {view.justConfirmed && (
           <p role="status" className="max-w-[420px] rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
             {order.rewardPoints > 0
               ? t('purchase.confirmed', { points: formatNumber(locale, order.rewardPoints) })
@@ -211,12 +179,12 @@ export default async function OrderPage({
           </p>
         )}
 
-        {repayable && (
+        {view.repayable && (
           <p
-            {...(paymentFailed ? { role: 'alert' as const } : { role: 'status' as const })}
+            {...(view.paymentFailed ? { role: 'alert' as const } : { role: 'status' as const })}
             className="max-w-[420px] rounded-sm border border-accent bg-accent-soft px-4 py-3 text-[13px] leading-relaxed text-accent-hover"
           >
-            {paymentFailed ? t('repay.failedNotice') : t('repay.pendingNotice')}
+            {view.paymentFailed ? t('repay.failedNotice') : t('repay.pendingNotice')}
           </p>
         )}
 
@@ -234,37 +202,37 @@ export default async function OrderPage({
           빼는 자리다. 할 일이 송금이지 재결제가 아니라서 맞는 판단인데, 그것이
           "아무 말도 안 한다" 가 되어 있었다.
         */}
-        {deposit && (
+        {view.deposit && (
           <section
-            aria-labelledby="deposit-title"
+            aria-labelledby="view.deposit-title"
             className="max-w-[420px] rounded-sm border border-[var(--border-strong)] bg-[var(--surface)] px-4 py-3"
           >
-            <h2 id="deposit-title" className="text-[13px] font-semibold">
-              {expired ? t('deposit.expiredHeading') : t('deposit.heading')}
+            <h2 id="view.deposit-title" className="text-[13px] font-semibold">
+              {view.depositExpired ? t('deposit.expiredHeading') : t('deposit.heading')}
             </h2>
             <p
               role="status"
               className="mt-1 text-[12px] leading-relaxed text-[var(--fg-secondary)]"
             >
-              {expired ? t('deposit.expiredNotice') : t('deposit.notice')}
+              {view.depositExpired ? t('deposit.expiredNotice') : t('deposit.notice')}
             </p>
 
             <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-              {deposit.bank && (
+              {view.deposit.bank && (
                 <>
                   <dt className="text-[var(--fg-muted)]">{t('deposit.bank')}</dt>
-                  <dd>{deposit.bank}</dd>
+                  <dd>{view.deposit.bank}</dd>
                 </>
               )}
               <dt className="text-[var(--fg-muted)]">{t('deposit.account')}</dt>
               {/* 옮겨 적는 번호다 — 자릿수가 흔들리지 않게 tnum 을 준다 */}
-              <dd className="tnum font-medium">{deposit.account}</dd>
-              {deposit.dueDate && (
+              <dd className="tnum font-medium">{view.deposit.account}</dd>
+              {view.deposit.dueDate && (
                 <>
                   <dt className="text-[var(--fg-muted)]">{t('deposit.due')}</dt>
                   <dd className="tnum">
-                    <time dateTime={deposit.dueDate.toISOString()}>
-                      {formatDateTime(locale, deposit.dueDate)}
+                    <time dateTime={view.deposit.dueDate.toISOString()}>
+                      {formatDateTime(locale, view.deposit.dueDate)}
                     </time>
                   </dd>
                 </>
@@ -589,7 +557,7 @@ export default async function OrderPage({
             paymentMode={repayMode}
           />
         )}
-        {canCancelItems && (
+        {view.canCancelItems && (
           <CancelItemsForm
             orderNo={order.orderNo}
             items={liveItems.map((i) => ({
@@ -598,13 +566,13 @@ export default async function OrderPage({
             }))}
           />
         )}
-        {isCancellableByCustomer(order.status) && (
+        {view.canCancel && (
           <CancelOrderButton orderNo={order.orderNo} />
         )}
-        {canConfirm && (
+        {view.canConfirmPurchase && (
           <ConfirmPurchaseButton orderNo={order.orderNo} points={formatNumber(locale, order.rewardPoints)} />
         )}
-        {showReturnForm && (
+        {view.showReturnForm && (
           <ReturnRequestForm
             orderNo={order.orderNo}
             status={order.status}

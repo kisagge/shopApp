@@ -246,3 +246,40 @@ test('작은 사진을 누르면 큰 사진이 바뀐다', async ({ page }) => {
   await expect(current).toHaveAccessibleName(/^2번째 사진 보기/);
   await expect.poll(() => big.getAttribute('src')).not.toBe(before);
 });
+
+/**
+ * **고른 사진의 테두리가 잘려 보였다.**
+ *
+ * 고른 것을 알리는 테두리와 키보드 초점 테두리는 둘 다 단추 **바깥**에 그려지는데, 작은
+ * 사진 줄은 가로로 넘겨 보는 상자다. 가로를 넘기면 세로도 함께 잘리는 것이 CSS 의 규칙이라
+ * 위쪽 2px 이 그대로 깎였고 맨 앞 사진은 옆구리도 깎였다 — 고른 자리를 알리는 표시가 반만
+ * 보이는 셈이다.
+ *
+ * **눈으로만 보이는 종류라 숫자로 박아 둔다.** 테두리는 box-shadow 라 자리를 재는 상자에
+ * 잡히지 않는다. 그래서 "단추와 상자 사이에 테두리가 설 자리가 있는가" 를 잰다.
+ */
+test('고른 사진의 테두리가 잘리지 않는다', async ({ page }) => {
+  await page.goto('/product/wool-varsity-blouson');
+  await ready(page);
+
+  const selected = page.getByRole('list', { name: /상품 사진 \d+장/ }).locator('button[aria-current="true"]');
+  await expect(selected).toBeVisible();
+
+  const room = await selected.evaluate((button) => {
+    const strip = button.closest('ul')!;
+    const u = strip.getBoundingClientRect();
+    const s = button.getBoundingClientRect();
+    return {
+      top: s.top - u.top,
+      bottom: u.bottom - s.bottom,
+      left: s.left - u.left,
+      clipped: strip.scrollHeight > strip.clientHeight,
+    };
+  });
+
+  // 테두리가 2px 이고, 키보드 초점 테두리는 그 바깥에 한 겹 더 선다
+  expect(room.top, '위쪽이 깎인다').toBeGreaterThanOrEqual(4);
+  expect(room.bottom, '아래쪽이 깎인다').toBeGreaterThanOrEqual(4);
+  expect(room.left, '맨 앞 사진의 옆구리가 깎인다').toBeGreaterThanOrEqual(4);
+  expect(room.clipped, '세로로 잘리고 있다').toBe(false);
+});

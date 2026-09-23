@@ -84,7 +84,18 @@ export function ProductGallery({ images, name }: { images: readonly GalleryImage
       {images.length > 1 && (
         <ul
           aria-label={t('product.gallery', { count: images.length })}
-          className="flex gap-2 overflow-x-auto pb-1"
+          /*
+           * **고른 사진의 테두리가 잘려 보였다.**
+           *
+           * 고른 것을 알리는 테두리(ring)와 키보드 초점 테두리는 둘 다 단추 **바깥**에
+           * 그려지는데, 이 줄은 가로로 넘겨 보는 상자(overflow-x-auto)다. 가로를 넘기면
+           * 세로도 함께 잘리는 것이 CSS 의 규칙이라, 위아래 2px 이 그대로 깎였고 맨 앞·맨
+           * 뒤 사진은 옆구리도 깎였다. 고른 자리를 알리는 표시가 반만 보이는 셈이다.
+           *
+           * 안쪽에 자리를 주고(p-1.5) 같은 만큼 바깥으로 당긴다(-m-1.5) — 테두리가 설 자리는
+           * 생기고 화면에서 차지하는 자리는 그대로다.
+           */
+          className="-m-1.5 flex gap-2 overflow-x-auto p-1.5"
         >
           {images.map((image, i) => (
             // 같은 파일을 두 번 올릴 수도 있다 — 주소만으로는 줄이 겹친다
