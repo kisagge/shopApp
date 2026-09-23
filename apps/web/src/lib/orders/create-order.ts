@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { DEFAULT_LOCALE, type Locale } from '@shop/i18n';
 import {
-  generateOrderNumber, INITIAL_ORDER_STATUS, won,
+  generateOrderNumber, INITIAL_ORDER_STATUS, won, checkOrder,
   type OrderItemDraft, type ShippingSnapshot, type Won,
   isRemoteAreaPostalCode, crossedLowStock,
 } from '@shop/core';
@@ -109,56 +109,34 @@ export async function createOrder(
   );
 
   /*
-   * **왜 안 되는지를 먼저 말한다.**
+   * **주문을 만들지 않는 이유는 core 가 안다.**
    *
-   * 품절이면 수량이 0 으로 깎이면서 issue 도 함께 선다(queries/cart). 그런데
-   * 빈 주문 검사가 앞에 있어서, 한 줄짜리 주문이 품절되면 "주문할 수 있는
-   * 상품이 없습니다" 가 나갔다 — 손님 눈앞에는 상품이 있는데. 마지막 한 개를
-   * 두 사람이 동시에 사는 검사가 이걸 잡았다: 진 쪽이 품절이 아니라 빈 주문을
-   * 받았다(막는 것은 제대로 막고 있었고, 말이 틀렸다).
-   *
-   * 품절·판매중지가 하나라도 있으면 주문을 만들지 않는다. 나머지만 조용히
-   * 처리하면 사용자가 무엇을 샀는지 모른 채 결제하게 된다.
+   * 여섯 개의 검사와 그 순서에 얽힌 사연이 이 함수 가운데 흩어져 있었다 — "왜 이 주문이
+   * 거절됐나" 에 답하려면 트랜잭션과 스냅샷 만들기를 지나쳐 읽어야 했다. 규칙은 core 에,
+   * 여기서는 그 답을 오류로 옮기기만 한다.
    */
-  const broken = quote.lines.filter((l) => l.issue !== null);
-  if (broken.length > 0) {
-    throw new OrderError('OUT_OF_STOCK', broken.map((l) => l.variantId));
+  const rejection = checkOrder({
+    lines: quote.lines,
+    pointsUsed: quote.pointsUsed,
+    couponDiscount: quote.couponDiscount,
+    requestedPoints: input.pointsToUse,
+    hasCouponCode: input.couponCode !== undefined,
+    allocationCount: allocations.length,
+  });
+  if (rejection) {
+    // 우리 쪽이 어긋난 것은 사용자 메시지로 바꾸지 않는다 — 조용히 넘기면 돈이 샌다
+    if (rejection.reason === 'INVARIANT') throw new Error(`[order] ${rejection.detail}`);
+    throw new OrderError(
+      rejection.reason,
+      rejection.reason === 'OUT_OF_STOCK' ? rejection.variantIds : [],
+    );
   }
 
-  // 살 수 있는 줄이 하나도 없다 — 위에서 걸리지 않은 경우를 위한 그물이다
   const buyable = quote.lines.filter((l) => l.quantity > 0);
-  if (buyable.length === 0) throw new OrderError('EMPTY_ORDER');
-
-  if (input.pointsToUse !== undefined && quote.pointsUsed < input.pointsToUse) {
-    throw new OrderError('INSUFFICIENT_POINTS');
-  }
-  if (input.couponCode !== undefined && quote.couponDiscount === 0) {
-    throw new OrderError('COUPON_INVALID');
-  }
-  /*
-   * **코드 없이 온 주문에 쿠폰 할인이 붙으면 만들지 않는다.**
-   *
-   * 쿠폰을 쓴 것으로 처리하는 일은 보낸 코드로만 한다. 그러니 코드 없는 주문의 할인은 누구의
-   * 쿠폰도 소진하지 않은 할인이다 — 한동안 실제로 그랬다(견적이 아무 말 없으면 쿠폰을 골랐다).
-   * 견적은 이제 부탁받지 않으면 고르지 않지만(core 의 couponChoice), 돈이 새는 자리라 여기서도
-   * 막는다. 사람이 고칠 수 있는 오류가 아니라 우리 쪽이 어긋난 것이므로 조용히 넘기지 않는다.
-   */
-  if (input.couponCode === undefined && quote.couponDiscount > 0) {
-    throw new Error(`[order] 코드 없는 주문에 쿠폰 할인 ${quote.couponDiscount}원이 붙었다 — 견적과 주문이 어긋났다`);
-  }
 
   // 스냅샷에 필요한 값(가맹점·대표 이미지)은 견적에 없어 따로 읽는다 — 위에서 함께 읽었다
   if (detailsRead.status === 'rejected') throw detailsRead.reason;
   const details = detailsRead.value;
-
-  /*
-   * 견적의 몫은 **살 수 있는 줄의 순서**로 온다(수량 0 인 줄은 계산에 안 들어간다) —
-   * 여기 `buyable` 과 같은 거름이다. 순서가 어긋나면 쿠폰 몫이 엉뚱한 줄에 박히므로
-   * 길이부터 맞춰 본다.
-   */
-  if (allocations.length !== buyable.length) {
-    throw new Error(`줄 몫(${allocations.length})과 살 수 있는 줄(${buyable.length})의 수가 다르다`);
-  }
 
   const items: OrderItemDraft[] = buyable.map((l, index) => {
     const d = details.get(l.variantId);
