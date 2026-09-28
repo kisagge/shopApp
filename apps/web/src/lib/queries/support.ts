@@ -2,10 +2,11 @@ import 'server-only';
 import { cache } from 'react';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, asRichTextDoc,
+  asRichTextDoc,
   type Actor, type InquiryTopic, type RichTextDoc, type SupportPostKind,
 } from '@shop/core';
 import { cachedRead, TAG, TTL } from '~/lib/cache';
+import { assertAdminQuery } from './admin/scope';
 
 /**
  * 고객센터 글 조회.
@@ -142,8 +143,7 @@ export interface AdminSupportPost extends SupportPostView {
  * 운영진의 목록. **내보내지 않은 글도 보인다** — 초안을 못 보면 고칠 수 없다.
  */
 export async function getAdminSupportPosts(actor: Actor): Promise<AdminSupportPost[]> {
-  assertPermission(actor, 'admin:access');
-  assertPermission(actor, 'support:write');
+  assertAdminQuery(actor, 'support:write');
 
   const rows = await prisma.supportPost.findMany({
     where: { deletedAt: null },

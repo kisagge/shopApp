@@ -1,7 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, offsetOf, readDateRange, type Actor, type UserRole } from '@shop/core';
+import { offsetOf, readDateRange, type Actor, type UserRole } from '@shop/core';
 import { clampToLastPage } from './paged';
+import { assertAdminQuery } from './admin/scope';
 
 /**
  * 감사 로그 조회.
@@ -96,7 +97,7 @@ export function auditLogWhere(filter: AuditLogFilter) {
 const MAX_TAKE = 50;
 
 export async function getAuditLogs(actor: Actor, query: AuditLogQuery = {}): Promise<AuditLogPage> {
-  assertPermission(actor, 'user:read');
+  assertAdminQuery(actor, 'user:read');
 
   const take = Math.min(query.take ?? 25, MAX_TAKE);
 
@@ -181,7 +182,7 @@ export type AuditLogExportRow = AuditLogRow;
  * 한도를 넘으면 **잘라서 주지 않는다.** 앞 5,000건만 담긴 파일은 "이 기간의 기록 전부" 로 읽힌다.
  */
 export async function exportAuditLogs(actor: Actor, filter: AuditLogFilter): Promise<AuditLogExportRow[]> {
-  assertPermission(actor, 'user:read');
+  assertAdminQuery(actor, 'user:read');
   const where = auditLogWhere(filter);
 
   const count = await prisma.adminAuditLog.count({ where });

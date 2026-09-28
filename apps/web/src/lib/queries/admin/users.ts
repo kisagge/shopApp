@@ -1,8 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { actorLabel, assertPermission, type Actor, type MemberGrade, type OrderStatus, type UserRole } from '@shop/core';
+import { actorLabel, type Actor, type MemberGrade, type OrderStatus, type UserRole } from '@shop/core';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { loadActors } from './actors';
+import { assertAdminQuery } from './scope';
 
 /** 한 번에 보여 줄 최근 주문·운영 기록 수. 더 보려면 주문·감사 로그 화면으로 간다 */
 export const USER_DETAIL_RECENT = 10;
@@ -70,7 +71,7 @@ export interface AdminUserDetail {
  * 행위자 필터가 갖는다.
  */
 export async function getAdminUserDetail(actor: Actor, userId: string, now = new Date()): Promise<AdminUserDetail | null> {
-  assertPermission(actor, 'user:read');
+  assertAdminQuery(actor, 'user:read');
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

@@ -3,10 +3,11 @@ import { prisma } from '@shop/db';
 import {
   offsetOf,
   hasPermission,
-  canReadInquiry, canAnswerInquiry, assertPermission, actorLabel,
+  canReadInquiry, canAnswerInquiry, actorLabel,
   type Actor, type InquiryTopic,
 } from '@shop/core';
 import { clampToLastPage } from './paged';
+import { assertAdminQuery } from './admin/scope';
 
 /**
  * 상품 문의 조회.
@@ -162,7 +163,7 @@ export async function getAdminInquiries(
   actor: Actor,
   query: { unanswered?: boolean; page?: number } = {},
 ): Promise<{ rows: AdminInquiryRow[]; total: number; pending: number }> {
-  assertPermission(actor, 'inquiry:answer');
+  assertAdminQuery(actor, 'inquiry:answer');
 
   const scoped = inquiryScope(actor);
   const where = { ...scoped, ...(query.unanswered ? { answeredAt: null } : {}) };

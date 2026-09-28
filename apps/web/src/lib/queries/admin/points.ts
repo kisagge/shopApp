@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, type Actor, type PointReason } from '@shop/core';
+import { type Actor, type PointReason } from '@shop/core';
+import { assertAdminQuery } from './scope';
 
 export interface AdminPointAccount {
   readonly id: string;
@@ -29,7 +30,7 @@ export async function getAdminPointAccount(
   userId: string,
   take = 30,
 ): Promise<AdminPointAccount | null> {
-  assertPermission(actor, 'user:read');
+  assertAdminQuery(actor, 'user:read');
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: {

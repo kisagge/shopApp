@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { actorLabel, assertPermission, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
+import { actorLabel, hasSettlementAccount, offsetOf, type Actor } from '@shop/core';
 import { assertAdminQuery, scopeOf } from './scope';
 import { clampToLastPage } from '../paged';
 import { loadActors } from './actors';
@@ -106,7 +106,7 @@ export async function getAdminUsers(
   actor: Actor,
   query: { q?: string | undefined; page?: number; take?: number } = {},
 ): Promise<AdminUserPage> {
-  assertPermission(actor, 'user:read');
+  assertAdminQuery(actor, 'user:read');
 
   const take = Math.min(query.take ?? 25, 50);
   const q = query.q?.trim();
@@ -167,7 +167,7 @@ export async function getAdminUsers(
 export async function getApprovedMerchants(
   actor: Actor,
 ): Promise<readonly { id: string; name: string }[]> {
-  assertPermission(actor, 'user:assignRole');
+  assertAdminQuery(actor, 'user:assignRole');
   return prisma.merchant.findMany({
     where: { status: 'APPROVED' },
     orderBy: { name: 'asc' },

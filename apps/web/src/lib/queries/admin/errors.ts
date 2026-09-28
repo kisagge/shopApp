@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { assertPermission, type Actor } from '@shop/core';
+import { type Actor } from '@shop/core';
+import { assertAdminQuery } from './scope';
 
 /**
  * 오류함 조회.
@@ -37,7 +38,7 @@ export async function getErrorGroups(
   actor: Actor,
   options: { readonly resolved?: boolean } = {},
 ): Promise<ErrorGroupList> {
-  assertPermission(actor, 'analytics:all');
+  assertAdminQuery(actor, 'analytics:all');
 
   const [rows, openCount] = await Promise.all([
     prisma.errorGroup.findMany({
@@ -89,7 +90,7 @@ export async function setErrorResolved(
   fingerprint: string,
   resolved: boolean,
 ): Promise<{ resolvedAt: Date | null }> {
-  assertPermission(actor, 'analytics:all');
+  assertAdminQuery(actor, 'analytics:all');
 
   const updated = await prisma.errorGroup.update({
     where: { fingerprint },

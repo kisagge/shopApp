@@ -1,12 +1,13 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  assertPermission, merchantScope, moderationState, reportPriority,
+  merchantScope, moderationState, reportPriority,
   type Actor, type ModerationState, type ReportReason,
   offsetOf, actorLabel,
 } from '@shop/core';
 import { clampToLastPage } from './paged';
 import { loadActors } from './admin/actors';
+import { assertAdminQuery } from './admin/scope';
 
 /**
  * 리뷰 관리 조회.
@@ -201,7 +202,7 @@ export async function getAdminReviews(
   actor: Actor,
   query: { tab?: ReviewTab; q?: string | undefined; page?: number } = {},
 ): Promise<AdminReviewList> {
-  assertPermission(actor, 'review:read');
+  assertAdminQuery(actor, 'review:read');
 
   /*
    * 운영진이면 null(전체), 가맹점이면 자기 id, 그 밖이면 undefined 다.

@@ -21,6 +21,7 @@ const { getAdminOrders, getAdminOrder } = await import('~/lib/queries/admin/orde
 const { getAdminProducts, getAdminProductDetail } = await import('~/lib/queries/admin/products');
 const { getSettlements } = await import('~/lib/queries/admin/settlements');
 const { getMerchants } = await import('~/lib/queries/admin/merchants');
+const { assertAdminQuery } = await import('~/lib/queries/admin/scope');
 
 const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
 const merchantNoScope: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: null };
@@ -114,19 +115,58 @@ describe('권한 확인을 빠뜨린 조회가 없다', () => {
       found.push(name!);
       const at = (m.index ?? 0) + m[0].length;
       const body = src.slice(at, at + 800);
-      // 공용 가드(assertAdminQuery)든 직접 확인이든, 무엇이든 보아야 한다
       if (name! in VIEWER_SCOPED) continue;
-      // 공용 가드(assertAdminQuery)든 직접 확인이든, 무엇이든 보아야 한다.
-      // hasPermission 은 던지지 않고 범위를 좁히는 쪽이라 그것도 "보았다" 로 센다
-      const guarded = body.includes('assertAdminQuery') || body.includes('assertPermission')
-        || body.includes('hasPermission');
+      /*
+       * **공용 가드 하나로 본다.**
+       *
+       * 예전에는 `assertPermission` 만 부르는 것도 통과시켰다. 값은 같았다 — 저 권한들을
+       * 고객이 하나도 갖고 있지 않아서다. 하지만 **고객이 가진 권한**(order:read ·
+       * product:read)으로 조회를 하나 만드는 날, 그 하나는 콘솔 진입을 안 보고 통과한다.
+       * requireAdmin 이 정확히 그 실수로 결함이었다.
+       *
+       * hasPermission 은 던지지 않고 범위를 좁히는 쪽이라 그것도 "보았다" 로 센다.
+       */
+      const guarded = body.includes('assertAdminQuery') || body.includes('hasPermission');
       if (!guarded) missing.push(name!);
     }
 
     expect(found.length, 'Actor 를 받는 어드민 조회를 하나도 못 찾았다').toBeGreaterThan(5);
-    expect(missing).toEqual([]);
+    expect(
+      missing,
+      `콘솔 진입을 함께 보지 않는 조회가 있다:\n${missing.join('\n')}\n` +
+        'queries/admin/scope 의 assertAdminQuery(actor, 권한) 을 쓰면 된다.',
+    ).toEqual([]);
 
     // 빼 둔 이름이 실제로 있는 조회인지 — 목록만 남고 함수가 사라지면 안 된다
     expect(Object.keys(VIEWER_SCOPED).filter((n) => !src.includes(`function ${n}(`))).toEqual([]);
+  });
+});
+
+/**
+ * 공용 가드가 실제로 콘솔 진입을 함께 보는가.
+ *
+ * **고객도 order:read 와 product:read 를 갖고 있다.** 개별 권한만 확인하는 조회는 그
+ * 손님을 그대로 통과시킨다 — requireAdmin 이 정확히 그 실수로 결함이었다. 한 관례로
+ * 모은 김에, 그 관례가 지키는 것이 무엇인지 여기서 못 박는다.
+ */
+describe('공용 가드', () => {
+  it('고객이 가진 권한이어도 콘솔 조회는 막는다', () => {
+    // 고객은 order:read 를 갖고 있다. 그래도 콘솔의 조회는 열리면 안 된다.
+    expect(() => assertAdminQuery(customer, 'order:read')).toThrow(ForbiddenError);
+  });
+
+  it('가맹점은 통과한다 — 콘솔은 그들도 쓴다', () => {
+    const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
+    expect(() => assertAdminQuery(merchant, 'order:read')).not.toThrow();
+  });
+
+  it('소속 없는 가맹점은 막는다 — 아무 범위도 없다', () => {
+    expect(() => assertAdminQuery(merchantNoScope, 'order:read')).toThrow(ForbiddenError);
+  });
+
+  it('콘솔에 들어와도 그 권한이 없으면 막는다', () => {
+    const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
+    // 가맹점은 환불하지 못한다 — 돈이 나가는 동작이다
+    expect(() => assertAdminQuery(merchant, 'order:refund')).toThrow(ForbiddenError);
   });
 });

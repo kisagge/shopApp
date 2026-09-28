@@ -1,7 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { actorLabel, assertPermission, canEditReturnAddress, ForbiddenError, type Actor, type PolicyKind } from '@shop/core';
+import { actorLabel, canEditReturnAddress, ForbiddenError, type Actor, type PolicyKind } from '@shop/core';
 import { loadActors } from './actors';
+import { assertAdminQuery } from './scope';
 
 /**
  * 한 벌짜리 설정을 마지막으로 고친 때와 사람.
@@ -39,7 +40,7 @@ const EDIT_SELECT = { updatedAt: true, updatedById: true } as const;
 
 /** 배송 정책. 한 번도 저장하지 않았으면(기본값으로 도는 중) null */
 export async function getShippingPolicyEdit(actor: Actor): Promise<LastEdit | null> {
-  assertPermission(actor, 'shipping:write');
+  assertAdminQuery(actor, 'shipping:write');
   const row = await prisma.shippingPolicy.findUnique({ where: { id: 'default' }, select: EDIT_SELECT });
   const [edit] = await describe(actor, [row]);
   return edit ?? null;
@@ -48,7 +49,7 @@ export async function getShippingPolicyEdit(actor: Actor): Promise<LastEdit | nu
 /** 반품지. merchantId 가 null 이면 자사 상품 반품지. 등록 전이면 null */
 export async function getReturnAddressEdit(actor: Actor, merchantId: string | null): Promise<LastEdit | null> {
   const permission = merchantId === null ? 'shipping:write' : 'merchant:write';
-  assertPermission(actor, permission);
+  assertAdminQuery(actor, permission);
   // 가맹점은 제 반품지만 — 남의 가맹점 것을 누가 고쳤는지는 알 일이 아니다
   if (!canEditReturnAddress(actor, merchantId)) throw new ForbiddenError(actor, permission);
   const row = await prisma.returnAddress.findFirst({ where: { merchantId }, select: EDIT_SELECT });
@@ -58,7 +59,7 @@ export async function getReturnAddressEdit(actor: Actor, merchantId: string | nu
 
 /** 약관·방침마다. 아직 쓰지 않은 문서는 빠진다 */
 export async function getPolicyEdits(actor: Actor): Promise<ReadonlyMap<PolicyKind, LastEdit>> {
-  assertPermission(actor, 'support:write');
+  assertAdminQuery(actor, 'support:write');
   const rows = await prisma.policy.findMany({ select: { kind: true, ...EDIT_SELECT } });
   const edits = await describe(actor, rows);
   return new Map(rows.flatMap((row, i) => {
