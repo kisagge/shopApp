@@ -144,3 +144,60 @@ export function readShipmentUpload(rows: readonly (readonly string[])[]): Shipme
 
   return { entries, problems, skipped };
 }
+
+
+/**
+ * 배송완료 일괄 처리 파일을 읽는다.
+ *
+ * **송장은 한 번에 올리는데 도착 처리는 주문마다 눌러야 했다.** 500건을 올려 놓고 500번을 누르는 셈이라,
+ * 주문이 조금만 늘어도 실제로는 안 눌린다. 그런데 **배송완료일부터 시계가 돈다** — 반품·교환 기한도,
+ * 자동 구매확정도, 후기를 쓸 수 있는 때도. 안 눌리면 손님은 반품 신청조차 못 한다.
+ *
+ * 같은 파일을 쓴다. 주문 내려받기 파일에는 주문번호 칸이 있으므로, 배송중인 주문을 내려받아 그대로
+ * 올리면 된다 — 송장 올리기가 "내려받은 파일이 곧 올리는 양식" 인 것과 같은 결이다.
+ *
+ * 저장은 하지 않는다. 어느 주문인지만 가른다 — 옮기는 일은 한 건 상태 변경과 같은 함수가 한다.
+ */
+export interface DeliveryEntry {
+  readonly orderNo: string;
+  /** 파일에서 이 주문이 처음 나온 줄(머리칸 다음이 2) */
+  readonly line: number;
+}
+
+export interface DeliveryUpload {
+  readonly entries: readonly DeliveryEntry[];
+  readonly problems: readonly { readonly kind: 'NO_HEADER'; readonly missing: readonly string[] }[];
+  /** 같은 주문이 여러 줄에 나와 묶인 수. 실패가 아니다 — 내보낸 파일은 항목마다 한 줄이다 */
+  readonly merged: number;
+}
+
+export function readDeliveryUpload(rows: readonly (readonly string[])[]): DeliveryUpload {
+  const [header, ...body] = rows;
+  const at = header ? findColumn(header, HEADER.orderNo) : -1;
+  if (at < 0) {
+    return { entries: [], problems: [{ kind: 'NO_HEADER', missing: [HEADER.orderNo[0]] }], merged: 0 };
+  }
+
+  /*
+   * **주문번호로 묶는다.** 내보낸 파일은 항목 하나당 한 줄이라 한 주문이 여러 번 나온다. 줄마다 옮기면
+   * 두 번째부터는 "이미 배송완료" 로 실패하고, 운영자는 멀쩡한 처리를 실패 목록으로 보게 된다.
+   */
+  const firstLine = new Map<string, number>();
+  let merged = 0;
+
+  body.forEach((cells, i) => {
+    const orderNo = (cells[at] ?? '').trim();
+    if (orderNo === '') return;
+    if (firstLine.has(orderNo)) {
+      merged += 1;
+      return;
+    }
+    firstLine.set(orderNo, i + 2);
+  });
+
+  return {
+    entries: [...firstLine].map(([orderNo, line]) => ({ orderNo, line })),
+    problems: [],
+    merged,
+  };
+}

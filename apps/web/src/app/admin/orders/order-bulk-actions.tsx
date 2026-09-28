@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import type { BulkShipmentResult } from '@shop/contract';
+import type { BulkShipmentResult, BulkDeliveryResult } from '@shop/contract';
 import { decodeUpload } from '~/lib/csv/decode-upload';
 import { saveResponseAsFile } from '~/lib/csv/save-download';
 import { failureMessage } from '~/lib/client/failure-message';
@@ -54,6 +54,7 @@ export function OrderBulkActions({
       <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:gap-10">
         <ExportOrders filter={filter} />
         {canFulfill && <UploadShipments />}
+        {canFulfill && <UploadDeliveries />}
       </div>
     </details>
   );
@@ -118,7 +119,48 @@ function ExportOrders({ filter }: { filter: OrderExportFilter }) {
   );
 }
 
-function UploadShipments() {
+interface UploadFailure {
+  readonly orderNo: string | null;
+  readonly lines: readonly number[];
+  readonly code: string;
+  readonly message: string;
+}
+
+interface UploadResult {
+  readonly failures: readonly UploadFailure[];
+}
+
+/**
+ * CSV 를 올려 일괄 처리한다 — 송장 등록과 배송완료가 같은 모양이다.
+ *
+ * **둘이 하는 일은 다르지만 올리는 방식은 같다**: 내려받은 파일을 고르고, 글자로 읽어 보내고, 몇 건이
+ * 됐는지 듣고, 안 된 줄을 줄 번호와 함께 표로 본다. 두 벌로 두면 한쪽만 고쳐진다 — 인코딩 처리(decodeUpload),
+ * 실패 표의 모양, 결과를 소리로 알리는 자리까지 전부 같은 것이다.
+ *
+ * 다른 것은 **무엇을 부르고 결과를 뭐라고 말하는가**뿐이라 그것만 받는다.
+ */
+function CsvUpload<T extends UploadResult>({
+  title, hint, endpoint, submitLabel, pendingLabel, fileLabel, failureLabel, summarize, changed,
+}: {
+  readonly title: string;
+  readonly hint: string;
+  readonly endpoint: string;
+  readonly submitLabel: string;
+  readonly pendingLabel: string;
+  /**
+   * 파일 칸의 이름.
+   *
+   * **둘 다 "CSV 파일" 이면 안 된다.** 한 화면에 파일 칸이 둘인데 이름이 같으면, 낭독기로 훑는 사람은
+   * 어느 것이 송장이고 어느 것이 배송완료인지 알 수 없다 — 올리는 순간 되돌리기 어려운 일이 일어난다.
+   */
+  readonly fileLabel: string;
+  /** 실패 표의 이름과 설명 */
+  readonly failureLabel: string;
+  /** 결과를 사람의 말로. 소리로도 읽히는 줄이다 */
+  readonly summarize: (result: T) => string;
+  /** 목록을 다시 그려야 하는 결과인가 — 아무것도 안 바뀌었으면 화면을 흔들지 않는다 */
+  readonly changed: (result: T) => boolean;
+}) {
   const router = useRouter();
   const inputId = useId();
   const hintId = useId();
@@ -126,7 +168,7 @@ function UploadShipments() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<BulkShipmentResult | null>(null);
+  const [result, setResult] = useState<T | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -142,19 +184,19 @@ function UploadShipments() {
     setPending(true);
     try {
       const csv = decodeUpload(await file.arrayBuffer());
-      const response = await fetch('/api/admin/orders/shipments', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ csv }),
       });
-      const body = (await response.json().catch(() => ({}))) as BulkShipmentResult & { message?: string };
+      const body = (await response.json().catch(() => ({}))) as T & { message?: string };
       if (!response.ok) {
-        setError(body.message ?? '송장을 올리지 못했습니다.');
+        setError(body.message ?? '올리지 못했습니다.');
         return;
       }
       setResult(body);
       formRef.current?.reset();
-      if (body.registered > 0) router.refresh();
+      if (changed(body)) router.refresh();
     } catch {
       setError('네트워크 오류로 올리지 못했습니다.');
     } finally {
@@ -164,15 +206,12 @@ function UploadShipments() {
 
   return (
     <form ref={formRef} onSubmit={(e) => void onSubmit(e)} className="flex min-w-0 flex-1 flex-col gap-2">
-      <h3 className="text-[13px] font-medium text-[var(--fg-secondary)]">송장 일괄 등록</h3>
-      <p id={hintId} className="text-[12px] text-[var(--fg-muted)]">
-        내려받은 파일의 택배사·송장번호 칸을 채워 올리세요. 송장이 빈 줄은 건너뜁니다.
-        배송준비 상태로 걸러 받으면 이미 보낸 주문이 섞이지 않습니다.
-      </p>
+      <h3 className="text-[13px] font-medium text-[var(--fg-secondary)]">{title}</h3>
+      <p id={hintId} className="text-[12px] text-[var(--fg-muted)]">{hint}</p>
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={inputId} className="text-xs font-medium text-[var(--fg-secondary)]">
-            CSV 파일
+            {fileLabel}
           </label>
           <input
             ref={fileRef}
@@ -190,7 +229,7 @@ function UploadShipments() {
           aria-disabled={pending}
           className="h-10 rounded-sm bg-[var(--brand)] px-4 text-[13px] font-medium text-[var(--bg)] disabled:cursor-not-allowed disabled:bg-[var(--bg-disabled)] disabled:text-[var(--fg-disabled)]"
         >
-          {pending ? '올리는 중…' : '송장 올리기'}
+          {pending ? pendingLabel : submitLabel}
         </button>
       </div>
 
@@ -202,18 +241,14 @@ function UploadShipments() {
 
       {/* 결과 요약은 소리로도 알린다. 실패 표는 요약을 듣고 찾아 들어간다 */}
       <p aria-live="polite" className="text-[13px] text-[var(--fg-secondary)]">
-        {result &&
-          `${result.registered.toLocaleString('ko-KR')}건 등록` +
-            (result.unchanged > 0 ? `, 이미 같은 송장 ${result.unchanged.toLocaleString('ko-KR')}건` : '') +
-            (result.skipped > 0 ? `, 송장이 빈 ${result.skipped.toLocaleString('ko-KR')}줄 건너뜀` : '') +
-            (result.failures.length > 0 ? `, ${result.failures.length.toLocaleString('ko-KR')}건 실패` : '')}
+        {result && summarize(result)}
       </p>
 
       {result && result.failures.length > 0 && (
-        <div className="table-scroll" tabIndex={0} role="region" aria-label="등록하지 못한 줄">
+        <div className="table-scroll" tabIndex={0} role="region" aria-label={failureLabel}>
           <table className="w-full">
             <caption className="py-1 text-left text-[12px] text-[var(--fg-muted)]">
-              등록하지 못한 줄 — 고쳐서 이 줄만 다시 올리면 됩니다
+              {failureLabel} — 고쳐서 이 줄만 다시 올리면 됩니다
             </caption>
             <thead>
               <tr className="border-b border-[var(--border)]">
@@ -235,5 +270,54 @@ function UploadShipments() {
         </div>
       )}
     </form>
+  );
+}
+
+const count = (n: number) => n.toLocaleString('ko-KR');
+
+function UploadShipments() {
+  return (
+    <CsvUpload<BulkShipmentResult>
+      title="송장 일괄 등록"
+      hint="내려받은 파일의 택배사·송장번호 칸을 채워 올리세요. 송장이 빈 줄은 건너뜁니다. 배송준비 상태로 걸러 받으면 이미 보낸 주문이 섞이지 않습니다."
+      endpoint="/api/admin/orders/shipments"
+      submitLabel="송장 올리기"
+      pendingLabel="올리는 중…"
+      fileLabel="송장 CSV 파일"
+      failureLabel="등록하지 못한 줄"
+      changed={(r) => r.registered > 0}
+      summarize={(r) =>
+        `${count(r.registered)}건 등록` +
+        (r.unchanged > 0 ? `, 이미 같은 송장 ${count(r.unchanged)}건` : '') +
+        (r.skipped > 0 ? `, 송장이 빈 ${count(r.skipped)}줄 건너뜀` : '') +
+        (r.failures.length > 0 ? `, ${count(r.failures.length)}건 실패` : '')
+      }
+    />
+  );
+}
+
+/**
+ * 배송완료 일괄 처리.
+ *
+ * **송장은 한 번에 올리는데 도착 처리는 주문마다 눌러야 했다.** 그런데 배송완료일부터 시계가 돈다 —
+ * 반품·교환 기한도, 자동 구매확정도, 후기를 쓸 수 있는 때도. 안 눌리면 손님은 반품 신청조차 못 한다.
+ */
+function UploadDeliveries() {
+  return (
+    <CsvUpload<BulkDeliveryResult>
+      title="배송완료 일괄 처리"
+      hint="배송중 상태로 걸러 내려받은 파일을 그대로 올리세요. 주문번호 칸만 봅니다. 도착한 주문만 담아 올려 주세요 — 되돌리려면 주문마다 상태를 바꿔야 합니다."
+      endpoint="/api/admin/orders/deliveries"
+      submitLabel="배송완료 처리"
+      pendingLabel="처리하는 중…"
+      fileLabel="배송완료 CSV 파일"
+      failureLabel="처리하지 못한 줄"
+      changed={(r) => r.delivered > 0}
+      summarize={(r) =>
+        `${count(r.delivered)}건 배송완료` +
+        (r.merged > 0 ? `, 같은 주문 ${count(r.merged)}줄 묶음` : '') +
+        (r.failures.length > 0 ? `, ${count(r.failures.length)}건 실패` : '')
+      }
+    />
   );
 }

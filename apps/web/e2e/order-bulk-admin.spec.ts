@@ -104,7 +104,7 @@ test('내려받은 파일을 그대로 다시 올리면 아무것도 새로 등�
   expect(rows.length, `${STATUS.label} 주문이 없다`).toBeGreaterThan(1);
 
   await openTools(page);
-  await page.getByLabel('CSV 파일').setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: bytes });
+  await page.getByLabel('송장 CSV 파일').setInputFiles({ name: 'orders.csv', mimeType: 'text/csv', buffer: bytes });
   await page.getByRole('button', { name: '송장 올리기' }).click();
 
   await expect(page.getByText(/^0건 등록/)).toBeVisible();
@@ -119,11 +119,39 @@ test('틀린 줄은 줄 번호와 사유로 돌려준다', async ({ page }) => {
 
   const csv = '주문번호,택배사,송장번호\r\n19990101-0000000,CJ대한통운,123456789012\r\n19990101-0000001,비둘기택배,123456789012\r\n';
   await openTools(page);
-  await page.getByLabel('CSV 파일').setInputFiles({ name: 'fix.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.getByLabel('송장 CSV 파일').setInputFiles({ name: 'fix.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
   await page.getByRole('button', { name: '송장 올리기' }).click();
 
   await expect(page.getByText('0건 등록, 2건 실패')).toBeVisible();
   const failures = page.getByRole('table', { name: /등록하지 못한 줄/ });
   await expect(failures.getByRole('row', { name: /19990101-0000000.*주문을 찾을 수 없습니다/ })).toBeVisible();
   await expect(failures.getByRole('row', { name: /19990101-0000001.*비둘기택배/ })).toBeVisible();
+});
+
+/**
+ * **배송완료도 한 번에.**
+ *
+ * 송장은 CSV 로 한 번에 올리는데 도착 처리는 주문마다 눌러야 했다 — 500건을 올려 놓고 500번을 누르는
+ * 셈이라 주문이 조금만 늘어도 실제로는 안 눌린다. 그런데 **배송완료일부터 시계가 돈다**: 반품·교환
+ * 기한도, 자동 구매확정도, 후기를 쓸 수 있는 때도. 안 눌리면 손님은 반품 신청조차 못 한다.
+ *
+ * **아무것도 바꾸지 않는다.** 배송완료는 되돌릴 수 없는 전이라 시드 주문에 걸면 다음 실행이 쓸 것이
+ * 없어진다. 없는 주문번호로 창구가 실제로 돌아가는지와, 안 된 줄을 줄 번호로 돌려주는지를 본다 —
+ * 실제 전이는 order-lifecycle 이 자기 주문으로 밟고, 일괄 창구가 같은 함수를 부르는 것은 단위 검사가 본다.
+ */
+test('배송완료 일괄 처리도 틀린 줄을 줄 번호와 사유로 돌려준다', async ({ page }) => {
+  await page.goto('/admin/orders');
+  await ready(page);
+
+  await openTools(page);
+  const csv = '주문번호\r\n19990101-0000000\r\n19990101-0000000\r\n';
+  await page.getByLabel('배송완료 CSV 파일').setInputFiles({
+    name: 'delivered.csv', mimeType: 'text/csv', buffer: Buffer.from(csv),
+  });
+  await page.getByRole('button', { name: '배송완료 처리' }).click();
+
+  // 같은 주문이 두 줄이어도 한 번만 시도한다 — 두 번째를 "이미 배송완료" 로 세면 멀쩡한 처리가 실패로 보인다
+  await expect(page.getByText('0건 배송완료, 같은 주문 1줄 묶음, 1건 실패')).toBeVisible();
+  const failures = page.getByRole('table', { name: /처리하지 못한 줄/ });
+  await expect(failures.getByRole('row', { name: /19990101-0000000.*주문을 찾을 수 없습니다/ })).toBeVisible();
 });

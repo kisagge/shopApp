@@ -48,3 +48,27 @@ export interface BulkShipmentResult {
     readonly message: string;
   }[];
 }
+
+/**
+ * 배송완료 일괄 처리.
+ *
+ * 송장 올리기와 **같은 파일**을 받는다 — 주문 내려받기 파일에는 주문번호 칸이 있다. 파싱 규칙은 core 에
+ * 하나뿐이고(parseCsv·readDeliveryUpload), 서버가 그 규칙으로 다시 읽는다.
+ */
+export const bulkDeliverySchema = z.object({
+  csv: z.string().min(1, 'valid.fileRequired').max(1_000_000, 'valid.tooLongChars'),
+});
+
+export interface BulkDeliveryResult {
+  /** 배송완료로 옮긴 주문 수 */
+  readonly delivered: number;
+  /** 같은 주문이 여러 줄에 나와 묶인 수 */
+  readonly merged: number;
+  /** 줄 번호와 이유. 파일을 고쳐 다시 올릴 수 있게 무엇이 왜 안 됐는지 적는다 */
+  readonly failures: readonly {
+    readonly orderNo: string | null;
+    readonly lines: readonly number[];
+    readonly code: string;
+    readonly message: string;
+  }[];
+}

@@ -28,7 +28,7 @@ describe('구조', () => {
     render(<OrderBulkActions filter={{}} canFulfill />);
     expect(screen.getByRole('group', { name: '내려받기 · 일괄 처리' })).toBeDefined();
 
-    const input = screen.getByLabelText('CSV 파일');
+    const input = screen.getByLabelText('송장 CSV 파일');
     expect(input.getAttribute('type')).toBe('file');
     expect(input.getAttribute('aria-describedby')).toBeTruthy();
   });
@@ -37,7 +37,19 @@ describe('구조', () => {
     // 눌러 보고 403 을 받느니 없는 편이 낫다
     render(<OrderBulkActions filter={{}} canFulfill={false} />);
     expect(screen.getByRole('button', { name: 'CSV 내려받기' })).toBeDefined();
-    expect(screen.queryByLabelText('CSV 파일')).toBeNull();
+    expect(screen.queryByLabelText('송장 CSV 파일')).toBeNull();
+    expect(screen.queryByLabelText('배송완료 CSV 파일')).toBeNull();
+  });
+
+  /**
+   * **파일 칸이 둘인데 이름이 같으면 안 된다.** 낭독기로 훑는 사람은 어느 것이 송장이고 어느 것이
+   * 배송완료인지 알 수 없고, 잘못 올리면 되돌리기 어려운 일이 일어난다.
+   */
+  it('파일 칸 둘이 서로 다른 이름을 갖는다', () => {
+    render(<OrderBulkActions filter={{}} canFulfill />);
+
+    expect(screen.getByLabelText('송장 CSV 파일')).toBeDefined();
+    expect(screen.getByLabelText('배송완료 CSV 파일')).toBeDefined();
   });
 });
 
@@ -80,7 +92,7 @@ describe('송장 올리기', () => {
     }));
     render(<OrderBulkActions filter={{}} canFulfill />);
 
-    await userEvent.upload(screen.getByLabelText('CSV 파일'), csvFile('주문번호,택배사,송장번호\r\n'));
+    await userEvent.upload(screen.getByLabelText('송장 CSV 파일'), csvFile('주문번호,택배사,송장번호\r\n'));
     await userEvent.click(screen.getByRole('button', { name: '송장 올리기' }));
 
     expect(await screen.findByText('3건 등록, 이미 같은 송장 4건, 송장이 빈 2줄 건너뜀, 1건 실패')).toBeDefined();
@@ -107,10 +119,66 @@ describe('송장 올리기', () => {
     fetchMock.mockResolvedValue(json(400, { message: '필요한 머리칸이 없습니다: 택배사' }));
     render(<OrderBulkActions filter={{}} canFulfill />);
 
-    await userEvent.upload(screen.getByLabelText('CSV 파일'), csvFile('a,b\r\n'));
+    await userEvent.upload(screen.getByLabelText('송장 CSV 파일'), csvFile('a,b\r\n'));
     await userEvent.click(screen.getByRole('button', { name: '송장 올리기' }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('택배사');
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 배송완료 일괄 처리.
+ *
+ * **송장은 한 번에 올리는데 도착 처리는 주문마다 눌러야 했다.** 배송완료일부터 반품 기한과 자동
+ * 구매확정 시계가 도는데, 안 눌리면 손님은 반품 신청조차 못 한다.
+ */
+describe('배송완료 일괄 처리', () => {
+  it('고른 파일을 글자로 보내고, 결과를 소리로 알린다', async () => {
+    fetchMock.mockResolvedValue(json(200, { delivered: 2, merged: 1, failures: [] }));
+    render(<OrderBulkActions filter={{}} canFulfill />);
+
+    await userEvent.upload(
+      screen.getByLabelText('배송완료 CSV 파일'),
+      csvFile('주문번호\r\n20260915-0000001\r\n20260915-0000001\r\n20260915-0000002\r\n'),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '배송완료 처리' }));
+
+    const [url, init] = fetchMock.mock.calls.at(-1)!;
+    expect(url).toBe('/api/admin/orders/deliveries');
+    const body = (init as RequestInit).body;
+    expect(typeof body).toBe('string');
+    expect(JSON.parse(body as string)).toMatchObject({
+      csv: expect.stringContaining('20260915-0000001'),
+    });
+
+    const summary = await screen.findByText(/2건 배송완료/);
+    expect(summary.getAttribute('aria-live')).toBe('polite');
+    expect(summary.textContent, '묶인 줄도 말해 줘야 숫자가 안 맞아 보이지 않는다').toContain('1줄 묶음');
+  });
+
+  it('처리하지 못한 줄을 표로 보여 준다 — 고쳐서 그 줄만 다시 올린다', async () => {
+    fetchMock.mockResolvedValue(json(200, {
+      delivered: 1,
+      merged: 0,
+      failures: [{ orderNo: '20260915-0000002', lines: [3], code: 'INVALID_TRANSITION', message: '취소된 주문입니다.' }],
+    }));
+    render(<OrderBulkActions filter={{}} canFulfill />);
+
+    await userEvent.upload(screen.getByLabelText('배송완료 CSV 파일'), csvFile('주문번호\r\n20260915-0000001\r\n'));
+    await userEvent.click(screen.getByRole('button', { name: '배송완료 처리' }));
+
+    const table = await screen.findByRole('region', { name: '처리하지 못한 줄' });
+    expect(table.textContent).toContain('취소된 주문입니다.');
+    expect(table.textContent).toContain('20260915-0000002');
+  });
+
+  it('파일을 고르지 않고 누르면 그 자리에서 말한다', async () => {
+    render(<OrderBulkActions filter={{}} canFulfill />);
+
+    await userEvent.click(screen.getByRole('button', { name: '배송완료 처리' }));
+
+    expect(await screen.findByRole('alert')).toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

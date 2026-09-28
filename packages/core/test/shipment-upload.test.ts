@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { csvDocument, parseCsv } from '../src/csv';
-import { readShipmentUpload, resolveCarrier } from '../src/shipment-upload';
+import { readShipmentUpload, resolveCarrier, readDeliveryUpload } from '../src/shipment-upload';
 
 /**
  * 송장 일괄 올리기 파일 읽기.
@@ -122,5 +122,65 @@ describe('택배사 읽기', () => {
   it('모르면 null 이다', () => {
     expect(resolveCarrier('빠른택배')).toBeNull();
     expect(resolveCarrier('')).toBeNull();
+  });
+});
+
+/**
+ * 배송완료 일괄 처리 파일.
+ *
+ * **송장은 한 번에 올리는데 도착 처리는 주문마다 눌러야 했다.** 그런데 배송완료일부터 시계가 돈다 —
+ * 반품·교환 기한도, 자동 구매확정도, 후기를 쓸 수 있는 때도. 안 눌리면 손님은 반품 신청조차 못 한다.
+ */
+describe('배송완료 올리기', () => {
+  it('주문번호 칸만 본다 — 내려받은 파일을 그대로 올린다', () => {
+    const upload = readDeliveryUpload([
+      ['주문번호', '택배사', '송장번호', '상품'],
+      ['20260915-0000001', 'CJ', '1234', '울 코트'],
+      ['20260915-0000002', '', '', '니트'],
+    ]);
+
+    expect(upload.entries.map((e) => e.orderNo)).toEqual(['20260915-0000001', '20260915-0000002']);
+    expect(upload.problems).toEqual([]);
+  });
+
+  it('머리칸이 없으면 무엇이 없는지 말한다', () => {
+    const upload = readDeliveryUpload([['이름', '수량'], ['울 코트', '1']]);
+
+    expect(upload.entries).toEqual([]);
+    expect(upload.problems[0]).toMatchObject({ kind: 'NO_HEADER', missing: ['주문번호'] });
+  });
+
+  /**
+   * 내보낸 파일은 **항목 하나당 한 줄**이라 한 주문이 여러 번 나온다. 줄마다 옮기면 두 번째부터는
+   * "이미 배송완료" 로 실패하고, 운영자는 멀쩡한 처리를 실패 목록으로 보게 된다.
+   */
+  it('한 주문이 여러 줄에 나와도 한 번만 옮긴다', () => {
+    const upload = readDeliveryUpload([
+      ['주문번호'],
+      ['20260915-0000001'],
+      ['20260915-0000001'],
+      ['20260915-0000002'],
+    ]);
+
+    expect(upload.entries.map((e) => e.orderNo)).toEqual(['20260915-0000001', '20260915-0000002']);
+    expect(upload.merged, '묶인 줄 수를 세어 화면이 말해 줄 수 있어야 한다').toBe(1);
+  });
+
+  it('처음 나온 줄 번호를 기억한다 — 실패하면 그 줄을 짚어야 한다', () => {
+    const upload = readDeliveryUpload([['주문번호'], [''], ['20260915-0000001']]);
+
+    expect(upload.entries[0]).toMatchObject({ orderNo: '20260915-0000001', line: 3 });
+  });
+
+  it('빈 줄은 건너뛴다', () => {
+    const upload = readDeliveryUpload([['주문번호'], ['  '], ['']]);
+
+    expect(upload.entries).toEqual([]);
+  });
+
+  it('영어 머리칸도 읽는다 — 송장 올리기와 같은 이름 목록이다', () => {
+    const upload = readDeliveryUpload([['orderNo'], ['20260915-0000001']]);
+
+    expect(upload.entries).toHaveLength(1);
   });
 });

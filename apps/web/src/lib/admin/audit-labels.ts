@@ -33,6 +33,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.status.preparing': '배송 준비',
   'order.status.shipped': '출고',
   'order.status.delivered': '배송 완료',
+  /* 일괄 처리는 한 줄로 남는다 — 500건이면 500줄이 쌓여 그날의 다른 기록이 통째로 묻힌다 */
+  'order.status.delivered.bulk': '배송 완료 일괄',
   'order.status.cancelled': '주문 취소',
   'order.status.refunded': '환불',
   'order.cancel': '주문 취소',
