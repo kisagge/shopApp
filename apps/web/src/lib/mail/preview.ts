@@ -4,6 +4,7 @@ import type { Locale } from '@shop/i18n';
 import { orderMail } from '~/lib/orders/notify';
 import { restockMail, inquiryAnswerMail } from './notices';
 import { exchangeShippedMail } from '~/lib/orders/notify-exchange';
+import { orderShippedMail, orderDeliveredMail } from '~/lib/orders/notify-shipment';
 import { afterSaleMail } from '~/lib/orders/notify-after-sale';
 import { accountMail } from '~/lib/account/notify-account';
 import { expiringCouponMail, expiringPointsMail } from '~/lib/notifications/expiry-notice';
@@ -35,6 +36,13 @@ export function previewMail(kind: MailTemplateKind, locale: Locale, wording: Mai
       }, wording);
     case 'ORDER_DEPOSITED':
       return orderMail('deposited', order, wording);
+    case 'ORDER_SHIPPED':
+      return orderShippedMail({
+        to: order.to, name: order.buyerName, orderNo: order.orderNo, locale,
+        shipment: { carrier: 'CJ', trackingNumber: '123456789012' },
+      }, wording);
+    case 'ORDER_DELIVERED':
+      return orderDeliveredMail({ to: order.to, name: order.buyerName, orderNo: order.orderNo, locale }, wording);
     case 'RESTOCK':
       return restockMail({ to: order.to, productName: '울 코트', optionLabel: '오트 / M', url: 'https://plain.test/product/wool-coat', locale }, wording);
     case 'INQUIRY_ANSWERED':

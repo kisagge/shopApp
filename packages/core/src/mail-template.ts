@@ -10,7 +10,8 @@
  */
 
 export const MAIL_TEMPLATE_KIND = [
-  'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
+  'ORDER_PAID', 'ORDER_PENDING', 'ORDER_DEPOSITED', 'ORDER_SHIPPED', 'ORDER_DELIVERED',
+  'RESTOCK', 'INQUIRY_ANSWERED', 'EXCHANGE_SHIPPED',
   'ORDER_CANCELLED', 'RETURN_APPROVED', 'RETURN_REJECTED', 'RETURN_WITHDRAWN', 'REFUND_COMPLETED',
   'POINTS_GRANTED', 'POINTS_DEDUCTED', 'ACCOUNT_SUSPENDED', 'ACCOUNT_RESTORED',
   'COUPON_EXPIRING', 'POINTS_EXPIRING',
@@ -38,6 +39,8 @@ export const MAIL_CONSENT: Readonly<Record<MailTemplateKind, MailConsent>> = {
   ORDER_PAID: 'transactional',
   ORDER_PENDING: 'transactional',
   ORDER_DEPOSITED: 'transactional',
+  ORDER_SHIPPED: 'transactional',
+  ORDER_DELIVERED: 'transactional',
   RESTOCK: 'transactional',
   INQUIRY_ANSWERED: 'transactional',
   EXCHANGE_SHIPPED: 'transactional',
@@ -88,6 +91,8 @@ export const MAIL_TEMPLATE_PARAMS = {
   ORDER_PAID: { subject: ['orderNo'], heading: [], lead: ['name'] },
   ORDER_PENDING: { subject: ['orderNo'], heading: [], lead: ['name'] },
   ORDER_DEPOSITED: { subject: ['orderNo'], heading: [], lead: [] },
+  ORDER_SHIPPED: { subject: ['orderNo'], heading: [], lead: ['name'] },
+  ORDER_DELIVERED: { subject: ['orderNo'], heading: [], lead: ['name'] },
   RESTOCK: { subject: ['item'], heading: [], lead: ['item'] },
   INQUIRY_ANSWERED: { subject: ['about'], heading: [], lead: ['about'] },
   EXCHANGE_SHIPPED: { subject: ['orderNo'], heading: [], lead: ['name'] },

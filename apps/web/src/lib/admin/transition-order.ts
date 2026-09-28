@@ -6,7 +6,7 @@ import {
   type Actor, type OrderStatus,
 } from '@shop/core';
 import { grantPurchaseReward } from '~/lib/orders/grant-reward';
-import { recordNotification } from '~/lib/notifications/record';
+import { notifyShipmentStage } from '~/lib/orders/notify-shipment';
 
 export class TransitionError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -226,11 +226,15 @@ export async function transitionOrder(
    * 무르는 셈이다.
    */
   if (result.moveOrder && (result.derived === 'SHIPPED' || result.derived === 'DELIVERED')) {
-    await recordNotification({
+    /*
+     * **메일도 함께 보낸다.** 예전에는 알림함에만 남겼다 — 주문접수·취소·환불·문의 답변, 심지어
+     * 교환 상품 발송까지 메일이 가는데 "보냈습니다 / 도착했습니다" 만 빠져 있었다. 사는 사람이
+     * 가장 기다리는 소식이 그것이고, 알림함 하나뿐이면 다시 들어오지 않는 한 모른다.
+     */
+    await notifyShipmentStage({
+      orderNo: order.orderNo,
       userId: order.userId,
-      kind: result.derived === 'SHIPPED' ? 'ORDER_SHIPPED' : 'ORDER_DELIVERED',
-      params: { orderNo: order.orderNo },
-      linkPath: `/order/${order.orderNo}`,
+      stage: result.derived,
     });
   }
 

@@ -53,3 +53,35 @@ test('재입고 메일 제목을 고쳐 미리 보고 저장하면 다시 열어
     });
   }
 });
+
+/**
+ * **출고·도착만 메일이 없었다.**
+ *
+ * 주문접수·입금·취소·환불·반품 판정·문의 답변, 심지어 교환 상품 발송까지 메일이 가는데 "보냈습니다 /
+ * 도착했습니다" 는 알림함에만 남았다. 문구를 고칠 자리도 없었다 — 운영이 다른 메일은 다 고치는데 이 둘만
+ * 못 고칠 이유가 없다.
+ *
+ * 여기서는 **그 자리가 생겼고 실제 메일이 만들어지는지**를 본다. 보내는 함수가 만든 미리보기가 끝점이다.
+ */
+test('출고·도착 메일도 운영 화면에서 고칠 수 있고, 미리보기가 실제 메일을 만든다', async ({ page }) => {
+  await page.goto('/admin/mail-templates?locale=ko&kind=ORDER_SHIPPED');
+  await ready(page);
+  await expect(page.getByRole('link', { name: '출고(송장 등록)' })).toHaveAttribute('aria-current', 'page');
+
+  await page.getByRole('button', { name: '미리보기' }).click();
+  await expect(page.getByTestId('mail-preview-subject')).toContainText('출고');
+
+  // 송장이 붙는다 — 알림을 받고 가장 먼저 하는 일이 배송 조회다
+  const shipped = page.frameLocator('iframe[title="출고(송장 등록) 메일 미리보기"]');
+  await expect(shipped.getByText('1234-5678-9012')).toBeVisible();
+  await expect(shipped.getByText('배송 조회')).toBeVisible();
+
+  await page.goto('/admin/mail-templates?locale=ko&kind=ORDER_DELIVERED');
+  await ready(page);
+  await page.getByRole('button', { name: '미리보기' }).click();
+  await expect(page.getByTestId('mail-preview-subject')).toContainText('배송 완료');
+
+  // 도착 메일은 주문 화면으로 보낸다 — 반품·교환을 신청하는 자리다
+  const delivered = page.frameLocator('iframe[title="배송 완료 메일 미리보기"]');
+  await expect(delivered.getByText('주문 상세 보기')).toBeVisible();
+});
