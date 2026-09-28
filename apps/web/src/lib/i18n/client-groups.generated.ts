@@ -43,6 +43,7 @@ export const CLIENT_MESSAGE_GROUPS: readonly string[] = [
   'reportReason',
   'restock',
   'ret',
+  'retCancel',
   'returnReason',
   'returnStatus',
   'returnType',

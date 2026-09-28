@@ -3,7 +3,7 @@ import {
   awaitingDeposit, depositExpired, isPaidStatus,
   type PaymentMethodCode, type PaymentStatusCode,
 } from './payment';
-import { canRequestReturn, isOpenReturn, type ReturnStatus } from './return-request';
+import { canCancelOwnReturn, canRequestReturn, isOpenReturn, type ReturnStatus } from './return-request';
 import { canConfirmPurchase } from './reward';
 
 /**
@@ -66,6 +66,8 @@ export interface OrderView {
   /** 아직 끝나지 않은 신청이 있는가 */
   readonly openReturn: boolean;
   readonly canConfirmPurchase: boolean;
+  /** 손님이 자기 반품·교환 신청을 무를 수 있는가 — 승인 전까지만이다 */
+  readonly canCancelReturn: boolean;
   /** 방금 확정해서 단추가 사라졌는가 — 결과는 이 화면이 남긴다 */
   readonly justConfirmed: boolean;
   readonly paymentFailed: boolean;
@@ -116,6 +118,7 @@ export function orderView(input: OrderViewInput): OrderView {
     }),
     openReturn,
     canConfirmPurchase: canConfirmPurchase({ status: input.status, hasOpenReturn: openReturn }),
+    canCancelReturn: input.returnStatus !== null && canCancelOwnReturn(input.returnStatus),
     justConfirmed: input.confirmedJustNow && input.status === 'CONFIRMED',
     paymentFailed: input.paymentFailed,
   };

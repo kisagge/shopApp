@@ -12,7 +12,8 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { requestReturn, resolveReturn, receiveReturn } = await import('~/lib/orders/return-request');
+const { requestReturn, resolveReturn, receiveReturn, cancelOwnReturn } =
+  await import('~/lib/orders/return-request');
 
 const addressOf = (merchantId: string | null) => ({
   merchantId, recipient: '반품담당', phone: '010-0000-0000', postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: null,
@@ -596,5 +597,118 @@ describe('승인한 신청을 무른다', () => {
     await expect(
       resolveReturn('20260901-0000001', { action: 'WITHDRAW', rejectReason: '사유' }, admin),
     ).rejects.toMatchObject({ code: 'ALREADY_RESOLVED' });
+  });
+});
+
+/**
+ * 손님이 자기 신청을 무른다.
+ *
+ * **들어가면 나올 문이 없었다.** 무르는 창구가 운영진 쪽에만 있어서, 줄을 잘못 골랐거나 마음이 바뀌면
+ * 주문이 반품접수에 갇혔다 — 구매확정도 자동 확정도 안 되고(적립금이 안 나오고 후기도 못 쓴다), 내용을
+ * 고쳐 다시 낼 수도 없었다(상태머신이 두 번째 신청을 막는다). 운영진은 "반려" 로 처리할 수밖에 없었고,
+ * 거절한 적이 없는데 거절로 남았다.
+ */
+describe('손님이 신청을 무른다', () => {
+  const customer: Actor = { id: 'u-1', role: 'CUSTOMER', merchantId: null };
+
+  /** 신청이 접수된 주문 — 그 순간 주문과 줄은 반품접수로 옮겨 가 있다 */
+  const requested = (over: Record<string, unknown> = {}) => order({
+    status: 'RETURN_REQUESTED',
+    items: order().items.map((i: { status: string }) =>
+      i.status === 'DELIVERED' ? { ...i, status: 'RETURN_REQUESTED' } : i),
+    ...over,
+  });
+
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(requested());
+  });
+
+  it('신청을 취소로 닫고 주문을 신청 전 자리로 되돌린다', async () => {
+    const r = await cancelOwnReturn('20260901-0000001', customer);
+
+    expect(db.returnRequest.updateMany.mock.calls[0]![0]).toMatchObject({
+      where: { id: 'rr-1', status: 'REQUESTED' },
+      data: { status: 'CANCELLED', resolvedBy: 'u-1' },
+    });
+    // 배송완료에서 왔으면 배송완료로 — 시각은 다시 쓰지 않는다
+    expect(r.orderStatus).toBe('DELIVERED');
+    expect(db.order.updateMany.mock.calls[0]![0].data).toEqual({ status: 'DELIVERED' });
+  });
+
+  it('남의 주문은 열 수 없다 — 주문번호만으로 찾지 않는다', async () => {
+    await cancelOwnReturn('20260901-0000001', customer).catch(() => {});
+
+    expect(db.order.findFirst.mock.calls[0]![0].where).toMatchObject({
+      orderNo: '20260901-0000001',
+      userId: 'u-1',
+    });
+  });
+
+  it('승인된 신청은 못 무른다 — 그때부터는 운영진이 무르는 일이다(철회)', async () => {
+    db.order.findFirst.mockResolvedValue(
+      requested({ returnRequests: [{ id: 'rr-1', type: 'RETURN', status: 'APPROVED', itemIds: [], exchangeLines: [] }] }),
+    );
+
+    await expect(cancelOwnReturn('20260901-0000001', customer)).rejects.toMatchObject({
+      code: 'ALREADY_RESOLVED',
+    });
+    expect(db.returnRequest.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('교환을 무르면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다', async () => {
+    db.order.findFirst.mockResolvedValue(
+      requested({
+        returnRequests: [{
+          id: 'rr-1', type: 'EXCHANGE', status: 'REQUESTED', itemIds: ['i-knit'],
+          exchangeLines: [{ toVariantId: 'v-knit-m', quantity: 2 }],
+        }],
+      }),
+    );
+
+    await cancelOwnReturn('20260901-0000001', customer);
+
+    expect(db.productVariant.updateMany).toHaveBeenCalledWith({
+      where: { id: 'v-knit-m' },
+      data: { stock: { increment: 2 } },
+    });
+  });
+
+  it('신청한 줄만 되돌린다', async () => {
+    db.order.findFirst.mockResolvedValue(
+      requested({ returnRequests: [{ id: 'rr-1', type: 'RETURN', status: 'REQUESTED', itemIds: ['i-knit'], exchangeLines: [] }] }),
+    );
+
+    await cancelOwnReturn('20260901-0000001', customer);
+
+    expect(db.orderItem.updateMany.mock.calls[0]![0].where).toMatchObject({
+      orderId: 'o-1', canceledAt: null, id: { in: ['i-knit'] },
+    });
+  });
+
+  it('그사이 운영진이 처리했으면 그것을 덮지 않는다', async () => {
+    // 조건부 UPDATE 가 0 줄을 고치면 이미 다른 사람이 끝낸 것이다
+    db.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(cancelOwnReturn('20260901-0000001', customer)).rejects.toMatchObject({
+      code: 'ALREADY_RESOLVED',
+    });
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('무슨 일이 있었는지 기록에 남긴다 — 반려와 구분되어야 한다', async () => {
+    await cancelOwnReturn('20260901-0000001', customer);
+
+    expect(db.orderStatusLog.create.mock.calls[0]![0].data).toMatchObject({
+      actor: 'u-1',
+      note: expect.stringContaining('취소'),
+    });
+  });
+
+  it('신청이 없으면 404', async () => {
+    db.order.findFirst.mockResolvedValue(requested({ returnRequests: [] }));
+
+    await expect(cancelOwnReturn('20260901-0000001', customer)).rejects.toMatchObject({
+      code: 'NO_REQUEST', status: 404,
+    });
   });
 });

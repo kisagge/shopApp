@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   shippingBorneBy, returnWindowDays, checkReturnEligibility, canRequestReturn,
-  availableReturnReasons, isOpenReturn,
+  availableReturnReasons, isOpenReturn, canCancelOwnReturn, OPEN_RETURN_STATUS,
   RETURN_REASON,
 } from '../src/return-request';
 
@@ -183,5 +183,36 @@ describe('isOpenReturn', () => {
     expect(isOpenReturn('APPROVED')).toBe(true);
     expect(isOpenReturn('REJECTED')).toBe(false);
     expect(isOpenReturn('COMPLETED')).toBe(false);
+  });
+});
+
+/**
+ * 손님이 자기 신청을 무를 수 있는 때.
+ *
+ * **들어가면 나올 문이 없었다.** 무르는 창구가 운영진 쪽에만 있어서, 잘못 신청하면 주문이 반품접수에
+ * 갇혀 구매확정도 자동 확정도 안 됐다 — 적립금이 안 나오고 후기도 못 쓴다. 운영진은 "반려" 로 처리할
+ * 수밖에 없었고, 거절한 적이 없는데 거절로 남았다.
+ */
+describe('손님이 무르기', () => {
+  it('접수된 신청은 무를 수 있다', () => {
+    expect(canCancelOwnReturn('REQUESTED')).toBe(true);
+  });
+
+  it('승인 뒤에는 못 무른다 — "보내 주세요" 라고 말한 뒤다', () => {
+    /*
+     * 승인하면 물건이 오는 중일 수 있다. 그때부터는 손님 혼자 정할 일이 아니라 운영진이 무르는 일이다(철회).
+     */
+    expect(canCancelOwnReturn('APPROVED')).toBe(false);
+  });
+
+  it('이미 끝난 신청도 못 무른다', () => {
+    for (const status of ['REJECTED', 'COMPLETED', 'CANCELLED']) {
+      expect(canCancelOwnReturn(status), status).toBe(false);
+    }
+  });
+
+  it('아직 끝나지 않은 신청 목록과 어긋나지 않는다', () => {
+    // 무를 수 있는 것은 끝나지 않은 것 중 하나여야 한다 — 끝난 것을 무르면 기록이 두 번 바뀐다
+    expect(OPEN_RETURN_STATUS).toContain('REQUESTED');
   });
 });

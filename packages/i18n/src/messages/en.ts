@@ -546,6 +546,16 @@ export const en: Dictionary = {
   'ret.exchangeNone': '{name} has no option available to exchange for. Please request a return instead.',
   'ret.pickItems': 'Choose the items to send back.',
 
+  'retCancel.button': 'Cancel {what} request',
+  'retCancel.return': 'return',
+  'retCancel.exchange': 'exchange',
+  'retCancel.confirm': 'Cancel this {what} request?',
+  'retCancel.note': 'The request ends and the order goes back to where it was. To request again you will need to pick the items from the start.',
+  'retCancel.yes': 'Cancel request',
+  'retCancel.pending': 'Cancelling…',
+  'retCancel.back': 'Go back',
+  'retCancel.failed': "Couldn't cancel the request.",
+
   'cancel.button': 'Cancel order',
   'cancel.confirm': 'Cancel this order?',
   'cancel.note': 'You will be refunded, and any points and coupons you used come back. This cannot be undone.',

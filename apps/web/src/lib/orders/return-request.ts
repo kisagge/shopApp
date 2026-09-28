@@ -4,8 +4,8 @@ import {
   checkReturnEligibility, shippingBorneBy, transition, isReturnableLine, hasPermission, canResolveReturnOf,
   checkExchangeOption, EXCHANGE_OPTION_MESSAGE,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
-  type Actor, type ReturnReason, type ReturnType,
-  statusBeforeReturn, missingReturnAddresses,
+  type Actor, type OrderStatus, type ReturnReason, type ReturnType,
+  statusBeforeReturn, missingReturnAddresses, canCancelOwnReturn,
 } from '@shop/core';
 import { destinationsFor } from './return-address';
 
@@ -360,7 +360,7 @@ export async function resolveReturn(
 
   await prisma.$transaction(async (tx) => {
     /*
-     * **아직 대기 중일 때만 처리한다.** 예전에는 위에서 읽은 상태만 보고 무조건 썼다. 두 사람이 동시에
+     * **아직 그 자리에 있을 때만 처리한다.** 예전에는 위에서 읽은 상태만 보고 무조건 썼다. 두 사람이 동시에
      * 반려하면 둘 다 통과해 교환으로 잡아 둔 재고가 두 번 풀렸고(없는 물건), 한 사람은 승인·한 사람은
      * 반려하면 둘 다 "처리했다" 를 받고 나중 것이 남았다.
      */
@@ -377,40 +377,12 @@ export async function resolveReturn(
 
     if (approve) return;
 
-    // 교환을 반려·철회하면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다
-    for (const line of request.exchangeLines) {
-      await tx.productVariant.updateMany({
-        where: { id: line.toVariantId },
-        data: { stock: { increment: line.quantity } },
-      });
-    }
-
-    // 읽은 뒤 주문이 옮겨 갔으면(다른 처리가 먼저 끝났다) 줄만 되돌리지 않는다 — 통째로 물린다
-    const moved = await tx.order.updateMany({
-      where: { id: order.id, status: order.status },
-      data: { status: nextOrderStatus },
-    });
-    if (moved.count === 0) throw new ReturnError('ALREADY_RESOLVED', '그사이 주문 상태가 바뀌었습니다. 새로 불러와 주세요.');
-    await tx.orderItem.updateMany({
-      /*
-       * 신청한 줄만 되돌린다. 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다 — 줄을 고르게
-       * 되기 전에는 그게 곧 신청한 줄이었다.
-       */
-      where: {
-        orderId: order.id,
-        canceledAt: null,
-        ...(request.itemIds.length > 0 ? { id: { in: request.itemIds } } : { status: 'RETURN_REQUESTED' }),
-      },
-      data: { status: nextOrderStatus },
-    });
-    await tx.orderStatusLog.create({
-      data: {
-        orderId: order.id,
-        from: order.status,
-        to: nextOrderStatus,
-        actor: actor.id,
-        note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} ${withdraw ? '철회' : '반려'} — ${input.rejectReason ?? ''}`,
-      },
+    await revertOrder(tx, {
+      order,
+      request,
+      nextOrderStatus,
+      actorId: actor.id,
+      note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} ${withdraw ? '철회' : '반려'} — ${input.rejectReason ?? ''}`,
     });
   });
 
@@ -419,4 +391,133 @@ export async function resolveReturn(
     status: approve ? 'APPROVED' : withdraw ? 'CANCELLED' : 'REJECTED',
     orderStatus: approve ? order.status : nextOrderStatus,
   };
+}
+
+/**
+ * 손님이 자기 신청을 무른다.
+ *
+ * **승인 전까지만이다**(core 의 canCancelOwnReturn). 승인 뒤에는 "보내 주세요" 라고 말한 것이고, 그때부터는
+ * 운영진이 무르는 일이다(철회).
+ *
+ * 되돌리는 일은 반려와 **같은 자리**로 간다 — 교환으로 잡아 둔 재고를 풀고, 주문과 줄을 신청 전 상태로
+ * 옮긴다. 다른 것은 기록에 남는 이름과 누가 했는가뿐이다.
+ *
+ * 남의 주문은 열 수 없다 — 주문번호와 함께 **자기 것인지**로 찾는다.
+ */
+export async function cancelOwnReturn(
+  orderNo: string,
+  actor: Actor,
+): Promise<{ orderNo: string; status: string; orderStatus: string }> {
+  const order = await prisma.order.findFirst({
+    where: { orderNo, userId: actor.id },
+    select: {
+      id: true, orderNo: true, status: true,
+      confirmedAt: true, deliveredAt: true,
+      items: { select: { id: true, status: true, canceledAt: true } },
+      returnRequests: {
+        orderBy: { requestedAt: 'desc' },
+        take: 1,
+        select: {
+          id: true, type: true, status: true, itemIds: true,
+          exchangeLines: { select: { toVariantId: true, quantity: true } },
+        },
+      },
+    },
+  });
+  if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+
+  const request = order.returnRequests[0];
+  if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+  if (!canCancelOwnReturn(request.status)) {
+    throw new ReturnError(
+      'ALREADY_RESOLVED',
+      '이미 처리된 신청입니다. 승인된 뒤에는 고객센터로 문의해 주세요.',
+    );
+  }
+
+  const nextOrderStatus = transition(order.status, statusBeforeReturn(order));
+
+  await prisma.$transaction(async (tx) => {
+    // 아직 접수 상태일 때만 — 그사이 운영진이 승인·반려했으면 손님의 취소가 그것을 덮지 않는다
+    const { count } = await tx.returnRequest.updateMany({
+      where: { id: request.id, status: 'REQUESTED' },
+      data: { status: 'CANCELLED', resolvedAt: new Date(), resolvedBy: actor.id },
+    });
+    if (count === 0) throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
+
+    await revertOrder(tx, {
+      order,
+      request,
+      nextOrderStatus,
+      actorId: actor.id,
+      note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} 신청 취소 — 손님이 무름`,
+    });
+  });
+
+  return { orderNo: order.orderNo, status: 'CANCELLED', orderStatus: nextOrderStatus };
+}
+
+/**
+ * 신청을 닫은 뒤 **왔던 자리로 되돌린다.**
+ *
+ * 반려(운영진)·철회(운영진)·취소(손님) 셋이 같은 일을 한다 — 교환으로 잡아 둔 재고를 풀고, 주문과 그 줄을
+ * 신청 전 상태로 옮기고, 무슨 일이 있었는지 기록에 남긴다. 다른 것은 **누가 했고 어떤 이름으로 남는가**뿐이다.
+ *
+ * 한 곳에 둔 이유는 그 셋 중 하나만 고쳐질 수 있기 때문이다. 재고를 안 풀면 아무도 안 받을 물건이 품절로
+ * 보이고, 주문을 안 되돌리면 반품접수에 갇혀 손님도 운영도 아무것도 못 한다.
+ */
+async function revertOrder(
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+  input: {
+    readonly order: { readonly id: string; readonly status: OrderStatus };
+    readonly request: {
+      readonly itemIds: readonly string[];
+      readonly exchangeLines: readonly { readonly toVariantId: string; readonly quantity: number }[];
+    };
+    readonly nextOrderStatus: OrderStatus;
+    readonly actorId: string;
+    readonly note: string;
+  },
+): Promise<void> {
+  const { order, request, nextOrderStatus } = input;
+
+  // 교환을 닫으면 잡아 둔 옵션 재고를 풀어 준다 — 안 풀면 아무도 안 받을 물건이 품절로 보인다
+  for (const line of request.exchangeLines) {
+    await tx.productVariant.updateMany({
+      where: { id: line.toVariantId },
+      data: { stock: { increment: line.quantity } },
+    });
+  }
+
+  // 읽은 뒤 주문이 옮겨 갔으면(다른 처리가 먼저 끝났다) 줄만 되돌리지 않는다 — 통째로 물린다
+  const moved = await tx.order.updateMany({
+    where: { id: order.id, status: order.status },
+    data: { status: nextOrderStatus },
+  });
+  if (moved.count === 0) {
+    throw new ReturnError('ALREADY_RESOLVED', '그사이 주문 상태가 바뀌었습니다. 새로 불러와 주세요.');
+  }
+
+  await tx.orderItem.updateMany({
+    /*
+     * 신청한 줄만 되돌린다. 옛 신청(줄을 안 고른)은 반품접수인 줄 전부다 — 줄을 고르게
+     * 되기 전에는 그게 곧 신청한 줄이었다.
+     */
+    where: {
+      orderId: order.id,
+      canceledAt: null,
+      ...(request.itemIds.length > 0 ? { id: { in: [...request.itemIds] } } : { status: 'RETURN_REQUESTED' }),
+    },
+    data: { status: nextOrderStatus },
+  });
+
+  await tx.orderStatusLog.create({
+    data: {
+      orderId: order.id,
+      from: order.status,
+      to: nextOrderStatus,
+      actor: input.actorId,
+      note: input.note,
+    },
+  });
 }

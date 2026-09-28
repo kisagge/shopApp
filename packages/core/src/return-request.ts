@@ -100,6 +100,21 @@ export const OPEN_RETURN_STATUS = ['REQUESTED', 'APPROVED'] as const satisfies r
 
 export const isOpenReturn = (status: string): boolean => (OPEN_RETURN_STATUS as readonly string[]).includes(status);
 
+/**
+ * 손님이 자기 신청을 무를 수 있는가.
+ *
+ * **들어가면 나올 문이 없었다.** 신청하는 창구는 있는데 무르는 창구가 운영진 쪽에만 있었다. 줄을 잘못 골랐거나
+ * 마음이 바뀌면 주문이 반품접수에 갇혀 **구매확정도 자동 확정도 안 되고**(적립금이 안 나오고 후기도 못 쓴다),
+ * 내용을 고쳐 다시 낼 수도 없었다(상태머신이 두 번째 신청을 막는다). 남은 길은 1:1 문의뿐이었고, 운영진은
+ * "반려" 로 처리할 수밖에 없어 **기록이 사실과 달라졌다** — 거절한 적이 없는데 거절로 남는다.
+ *
+ * **승인 전까지만이다.** 승인하면 "보내 주세요" 라고 말한 것이고, 그 뒤로는 물건이 오는 중일 수 있다. 그때부터는
+ * 손님 혼자 정할 일이 아니라 운영진이 무르는 일이다(철회).
+ */
+export function canCancelOwnReturn(status: string): boolean {
+  return status === 'REQUESTED';
+}
+
 /*
  * 이름표는 여기 없다.
  *

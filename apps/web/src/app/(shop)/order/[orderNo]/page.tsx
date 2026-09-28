@@ -18,6 +18,7 @@ import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
+import { CancelReturnButton } from '~/components/cancel-return-button';
 import { approvedReturnDestinations } from '~/lib/orders/return-address';
 import { getOrderForUser, getExchangeOptions, getDisplayedProductSlugs, type ExchangeOption } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
@@ -490,6 +491,17 @@ export default async function OrderPage({
               {t(activeReturn.status === 'CANCELLED' ? 'order.withdrawReason' : 'order.rejectReason')}
               : {activeReturn.rejectReason}
             </p>
+          )}
+          {/*
+            **무를 길을 여기 둔다.** 승인 전까지만이다(core 의 canCancelOwnReturn) — 승인 뒤에는 보내 달라고
+            말한 것이고, 그때부터는 운영진이 무르는 일이다. 이 단추가 없던 때에는 잘못 신청하면 주문이 반품접수에
+            갇혀 구매확정도 자동 확정도 안 됐다.
+          */}
+          {view.canCancelReturn && (
+            <CancelReturnButton
+              orderNo={order.orderNo}
+              type={activeReturn.type === 'EXCHANGE' ? 'EXCHANGE' : 'RETURN'}
+            />
           )}
         </section>
       )}

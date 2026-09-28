@@ -542,6 +542,16 @@ export const ja: Dictionary = {
   'ret.exchangeNone': '{name} は交換できるオプションがありません。返品で申請してください。',
   'ret.pickItems': '返送する商品を選んでください。',
 
+  'retCancel.button': '{what}申請の取り消し',
+  'retCancel.return': '返品',
+  'retCancel.exchange': '交換',
+  'retCancel.confirm': 'この{what}申請を取り消しますか？',
+  'retCancel.note': '申請は終了し、注文は申請前の状態に戻ります。もう一度申請するには商品を最初から選び直してください。',
+  'retCancel.yes': '申請を取り消す',
+  'retCancel.pending': '取り消し中…',
+  'retCancel.back': '戻る',
+  'retCancel.failed': '申請を取り消せませんでした。',
+
   'cancel.button': '注文キャンセル',
   'cancel.confirm': 'この注文をキャンセルしますか?',
   'cancel.note': 'お支払い金額は返金され、利用したポイントとクーポンは戻ります。取り消せません。',

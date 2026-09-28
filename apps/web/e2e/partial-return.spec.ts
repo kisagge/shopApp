@@ -114,3 +114,63 @@ test('받은 두 줄 중 한 줄만 반품하면 그 줄만 돌려받고 주문�
     await admin.close();
   }
 });
+
+/**
+ * **잘못 신청했을 때 나올 문.**
+ *
+ * 무르는 창구가 운영진 쪽에만 있어서, 줄을 잘못 골랐거나 마음이 바뀌면 주문이 반품접수에 갇혔다 —
+ * 구매확정도 자동 확정도 안 되고(적립금이 안 나오고 후기도 못 쓴다), 내용을 고쳐 다시 낼 수도 없었다.
+ * 남은 길은 1:1 문의뿐이었고, 운영진은 "반려" 로 처리할 수밖에 없어 **거절한 적이 없는데 거절로 남았다.**
+ *
+ * 여기서 보는 것은 **나왔다가 다시 들어갈 수 있는가**다: 무르면 주문이 배송완료로 돌아오고, 구매확정이
+ * 다시 서고, 반품을 처음부터 다시 신청할 수 있다.
+ */
+test('손님이 반품 신청을 무르면 주문이 제자리로 돌아오고, 다시 신청할 수 있다', async ({ page, browser }) => {
+  test.setTimeout(150_000);
+
+  const first = await addProductToCart(page, RACE_PRODUCT.partialReturn);
+  expect(first, '담을 수 있는 옵션이 없다').not.toBeNull();
+
+  const orderNo = await payWithCard(page);
+
+  const admin = await browser.newContext({ storageState: STATE_FILE.admin });
+  try {
+    await shipToDelivered(admin, orderNo);
+
+    // ── 손님: 반품을 신청한다
+    await page.goto(`/order/${orderNo}`);
+    await ready(page);
+    await page.getByRole('button', { name: /반품|교환/ }).first().click();
+    await page.getByRole('radio', { name: /단순 변심/ }).check();
+    await page.getByRole('button', { name: '신청하기' }).click();
+    await expect(page.getByText('반품 진행 중')).toHaveCount(1, { timeout: 20_000 });
+
+    // 신청 중에는 구매확정을 할 수 없다 — 돌려보낸 물건을 "이대로 받겠다" 고 할 수 없다
+    await expect(page.getByRole('button', { name: '구매확정' })).toHaveCount(0);
+
+    // ── 손님: 무른다
+    await page.getByRole('button', { name: '반품 신청 취소' }).click();
+    const [cancelled] = await Promise.all([
+      page.waitForResponse((r) => r.request().method() === 'DELETE' && r.url().includes(`/return`)),
+      page.getByRole('button', { name: '신청 취소', exact: true }).click(),
+    ]);
+    expect(cancelled.status(), await cancelled.text()).toBe(200);
+
+    // ── 제자리로: 배송완료로 돌아오고 구매확정이 다시 선다
+    await expect(page.getByText(/현재 상태.*배송완료/)).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole('button', { name: '구매확정' }),
+      '무른 뒤에도 확정을 못 하면 적립금이 묶인 채로 남는다',
+    ).toBeVisible();
+
+    // ── 다시 신청할 수 있다 — 무른 것이 길을 막지 않는다
+    await page.getByRole('button', { name: /반품|교환/ }).first().click();
+    await expect(page.getByRole('radio', { name: /단순 변심/ })).toBeVisible();
+  } finally {
+    /*
+     * 신청은 무른 상태로 남는다(열려 있는 것이 없다). 주문은 배송완료로 남겨 둔다 — 이 명세의 상품과
+     * 손님은 이 명세 것이고, 되돌릴 수 없는 전이라 명세마다 새 주문을 만드는 것이 이 파일의 규칙이다.
+     */
+    await admin.close();
+  }
+});

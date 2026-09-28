@@ -562,6 +562,16 @@ export const ko = {
   'ret.exchangeNone': '{name} 은(는) 바꿀 수 있는 옵션이 없습니다. 반품으로 신청해 주세요.',
   'ret.pickItems': '돌려보낼 상품을 골라 주세요.',
 
+  'retCancel.button': '{what} 신청 취소',
+  'retCancel.return': '반품',
+  'retCancel.exchange': '교환',
+  'retCancel.confirm': '{what} 신청을 취소할까요?',
+  'retCancel.note': '신청이 끝나고 주문은 신청 전 상태로 돌아갑니다. 다시 신청하려면 상품을 처음부터 골라야 합니다.',
+  'retCancel.yes': '신청 취소',
+  'retCancel.pending': '취소하는 중…',
+  'retCancel.back': '돌아가기',
+  'retCancel.failed': '신청을 취소하지 못했습니다.',
+
   'cancel.button': '주문 취소',
   'cancel.confirm': '주문을 취소할까요?',
   'cancel.note': '결제한 금액은 환불되고, 사용한 포인트와 쿠폰은 돌려받습니다. 되돌릴 수 없습니다.',
