@@ -23,7 +23,13 @@ const { GET } = await import('~/app/api/cron/expiry-notices/route');
 
 const NOW = new Date('2026-09-15T01:00:00Z');
 const inDays = (d: number) => new Date(NOW.getTime() + d * 86_400_000);
-const KIM = { email: 'kim@plain.test', name: '김손님', locale: 'ko' };
+/** 마케팅 수신에 동의해 둔 사람 — 소멸 안내는 그 동의가 있어야 나간다 */
+const KIM = {
+  email: 'kim@plain.test', name: '김손님', locale: 'ko',
+  marketingAgreedAt: new Date('2026-01-01T00:00:00Z'),
+};
+/** 수신을 꺼 둔 사람 */
+const OPTED_OUT = { ...KIM, marketingAgreedAt: null };
 
 const coupon = (id: string, userId: string, days: number, name = '가을 쿠폰') => ({
   id, userId, expiresAt: inDays(days), coupon: { name }, user: KIM,
@@ -137,5 +143,61 @@ describe('GET /api/cron/expiry-notices', () => {
     await call();
     expect(recordAudit.mock.calls[0]![0]).toMatchObject({ action: 'notices.expiry' });
     vi.unstubAllEnvs();
+  });
+});
+
+/**
+ * **꺼 둔 스위치가 지켜지는가.**
+ *
+ * 마이페이지에는 마케팅 수신 스위치가 있는데 끄든 켜든 아무것도 달라지지 않았다 — 판단 함수까지 만들어
+ * 두고 부르는 곳이 없었다. 꺼 둔 사람에게도 소멸 안내가 그대로 나갔고, 끈 것이 지켜지지 않으면 손님은
+ * 그 스위치를 다시 믿지 않는다.
+ *
+ * **알림함에는 남긴다.** 수신 거부는 메일을 그만 받겠다는 것이지, 자기 쿠폰이 언제 사라지는지 몰라도
+ * 좋다는 뜻이 아니다 — 다시 들어온 사람은 볼 수 있어야 한다.
+ */
+describe('마케팅 수신 거부', () => {
+  it('꺼 둔 사람에게는 쿠폰 소멸 메일을 보내지 않는다', async () => {
+    db.userCoupon.findMany.mockResolvedValue([
+      { ...coupon('uc-1', 'u-1', 3), user: OPTED_OUT },
+    ]);
+
+    await sendExpiryNotices(NOW);
+
+    expect(send, '수신을 껐는데 메일이 나갔다').not.toHaveBeenCalled();
+  });
+
+  it('그래도 알림함에는 남긴다 — 자기 쿠폰이 사라지는 것은 알아야 한다', async () => {
+    db.userCoupon.findMany.mockResolvedValue([
+      { ...coupon('uc-1', 'u-1', 3), user: OPTED_OUT },
+    ]);
+
+    await sendExpiryNotices(NOW);
+
+    expect(recordNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'u-1', kind: 'COUPON_EXPIRING' }),
+    );
+  });
+
+  it('켜 둔 사람에게는 그대로 간다', async () => {
+    db.userCoupon.findMany.mockResolvedValue([coupon('uc-1', 'u-1', 3)]);
+
+    await sendExpiryNotices(NOW);
+
+    expect(send).toHaveBeenCalledTimes(1);
+  });
+
+  it('적립금 소멸도 같다', async () => {
+    db.pointTransaction.findMany
+      .mockResolvedValueOnce([{ userId: 'u-1' }])
+      .mockResolvedValue([{ amount: 1000, createdAt: inDays(-300), expiresAt: inDays(3) }]);
+    db.user.findUnique.mockResolvedValue(OPTED_OUT);
+
+    await sendExpiryNotices(NOW);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(recordNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'POINTS_EXPIRING' }),
+    );
   });
 });

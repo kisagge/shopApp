@@ -17,6 +17,64 @@ export const MAIL_TEMPLATE_KIND = [
 ] as const;
 export type MailTemplateKind = (typeof MAIL_TEMPLATE_KIND)[number];
 
+/**
+ * 이 메일이 **마케팅인가, 거래 고지인가.**
+ *
+ * 마이페이지에는 마케팅 수신 스위치가 있는데 **끄든 켜든 아무것도 달라지지 않았다.** 동의 여부를 판단하는 함수
+ * (`marketingOptedIn`)까지 만들어 두고 부르는 곳이 없어서, 꺼 둔 사람에게도 쿠폰·적립금 소멸 안내가 그대로 나갔다.
+ * 끈 것이 지켜지지 않으면 손님은 그 스위치를 다시 믿지 않는다.
+ *
+ * **거래 고지는 끄지 않는다.** 주문·입금·취소·환불·반품 판정·문의 답변·계정 정지는 **손님이 한 일에 대한 답**이고,
+ * 안 보내면 손님이 자기 돈과 물건이 어떻게 됐는지 알 길이 없다. 수신 거부는 광고를 거부하는 것이지 거래를 거부하는
+ * 것이 아니다.
+ *
+ * **재입고 알림도 거래 고지다.** 그 옵션에 알려 달라고 직접 신청한 사람에게만 가고, 그 신청 자체가 동의다.
+ *
+ * 표로 둔 이유는 **메일 종류가 늘 때 고르게 만들기 위해서**다. 목록에서 빠지면 타입이 먼저 막는다.
+ */
+export type MailConsent = 'marketing' | 'transactional';
+
+export const MAIL_CONSENT: Readonly<Record<MailTemplateKind, MailConsent>> = {
+  ORDER_PAID: 'transactional',
+  ORDER_PENDING: 'transactional',
+  ORDER_DEPOSITED: 'transactional',
+  RESTOCK: 'transactional',
+  INQUIRY_ANSWERED: 'transactional',
+  EXCHANGE_SHIPPED: 'transactional',
+  ORDER_CANCELLED: 'transactional',
+  RETURN_APPROVED: 'transactional',
+  RETURN_REJECTED: 'transactional',
+  RETURN_WITHDRAWN: 'transactional',
+  REFUND_COMPLETED: 'transactional',
+  POINTS_GRANTED: 'transactional',
+  POINTS_DEDUCTED: 'transactional',
+  ACCOUNT_SUSPENDED: 'transactional',
+  ACCOUNT_RESTORED: 'transactional',
+  /*
+   * 소멸 안내 둘만 마케팅이다. 손님이 요청한 적 없는 발송이고, 내용도 "혜택이 사라지기 전에 쓰라" 는 권유다 —
+   * 쓸지 말지는 손님이 정할 일이고, 그 권유를 받을지도 손님이 정한다.
+   */
+  COUPON_EXPIRING: 'marketing',
+  POINTS_EXPIRING: 'marketing',
+};
+
+/** 이 메일을 보내려면 마케팅 수신 동의가 있어야 하는가 */
+export function needsMarketingConsent(kind: MailTemplateKind): boolean {
+  return MAIL_CONSENT[kind] === 'marketing';
+}
+
+/**
+ * 이 사람에게 이 메일을 보내도 되는가.
+ *
+ * 거래 고지는 동의와 무관하게 보낸다. 마케팅은 동의한 사람에게만.
+ */
+export function mayMail(
+  kind: MailTemplateKind,
+  consent: { readonly marketingAgreedAt: Date | null },
+): boolean {
+  return !needsMarketingConsent(kind) || consent.marketingAgreedAt !== null;
+}
+
 export const MAIL_TEMPLATE_FIELD = ['subject', 'heading', 'lead'] as const;
 export type MailTemplateField = (typeof MAIL_TEMPLATE_FIELD)[number];
 

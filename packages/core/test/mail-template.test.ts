@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   checkTemplateText, renderTemplate, MAIL_TEMPLATE_KIND, MAIL_TEMPLATE_FIELD, MAIL_TEMPLATE_PARAMS, MAIL_TEMPLATE_MAX,
-  MAIL_SAMPLE_PARAMS, isMailTemplateKind,
+  MAIL_SAMPLE_PARAMS, isMailTemplateKind, MAIL_CONSENT, mayMail, needsMarketingConsent,
 } from '../src';
 
 /** 메일 문구 템플릿 — 칸마다 쓸 수 있는 값과 상한 */
@@ -37,5 +37,43 @@ describe('표', () => {
     // 보안 메일은 고칠 수 없다
     expect(isMailTemplateKind('VERIFY_EMAIL')).toBe(false);
     expect(isMailTemplateKind('RESET_PASSWORD')).toBe(false);
+  });
+});
+
+/**
+ * 마케팅과 거래 고지의 경계.
+ *
+ * 마이페이지의 마케팅 수신 스위치가 **끄든 켜든 아무것도 바꾸지 않았다.** 동의를 판단하는 함수까지
+ * 있었는데 부르는 곳이 없었다. 경계를 여기서 못 박는다 — 잘못 그으면 두 가지로 틀린다: 광고를
+ * 거부한 사람에게 광고가 가거나, 거래 고지가 막혀 손님이 자기 돈과 물건이 어떻게 됐는지 모른다.
+ */
+describe('마케팅 수신 동의', () => {
+  it('모든 메일 종류가 둘 중 하나로 정해져 있다', () => {
+    // 표가 종류마다 키를 갖는다 — 새 메일이 생기면 타입이 먼저 막지만, 값도 확인해 둔다
+    for (const kind of MAIL_TEMPLATE_KIND) {
+      expect(['marketing', 'transactional'], kind).toContain(MAIL_CONSENT[kind]);
+    }
+  });
+
+  it('소멸 안내만 마케팅이다 — 손님이 요청한 적 없는 권유다', () => {
+    const marketing = MAIL_TEMPLATE_KIND.filter((k) => MAIL_CONSENT[k] === 'marketing');
+    expect([...marketing].sort()).toEqual(['COUPON_EXPIRING', 'POINTS_EXPIRING']);
+  });
+
+  it('거래 고지는 수신 거부로 막히지 않는다 — 안 보내면 무슨 일이 있었는지 알 길이 없다', () => {
+    const optedOut = { marketingAgreedAt: null };
+    for (const kind of MAIL_TEMPLATE_KIND) {
+      if (MAIL_CONSENT[kind] === 'marketing') continue;
+      expect(mayMail(kind, optedOut), kind).toBe(true);
+    }
+  });
+
+  it('재입고 알림도 거래 고지다 — 그 옵션에 알려 달라고 직접 신청한 사람에게만 간다', () => {
+    expect(needsMarketingConsent('RESTOCK')).toBe(false);
+  });
+
+  it('마케팅은 동의한 사람에게만 간다', () => {
+    expect(mayMail('COUPON_EXPIRING', { marketingAgreedAt: null })).toBe(false);
+    expect(mayMail('COUPON_EXPIRING', { marketingAgreedAt: new Date('2026-01-01') })).toBe(true);
   });
 });

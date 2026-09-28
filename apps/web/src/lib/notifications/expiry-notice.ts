@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  expiryNoticeUntil, kstDate, mailButton, mailLead, mailList, mailShell, pointsExpiringSoon,
+  expiryNoticeUntil, kstDate, mailButton, mailLead, mailList, mailShell, mayMail, pointsExpiringSoon,
   type MailMessage,
 } from '@shop/core';
 import { formatNumber, type Locale } from '@shop/i18n';
@@ -101,7 +101,8 @@ async function noticeCoupons(now: Date, until: Date): Promise<{ users: number; i
     select: {
       id: true, userId: true, expiresAt: true,
       coupon: { select: { name: true } },
-      user: { select: { email: true, name: true, locale: true } },
+      // 마케팅 수신 동의를 함께 읽는다 — 끈 사람에게는 메일을 보내지 않는다(core 의 mayMail)
+      user: { select: { email: true, name: true, locale: true, marketingAgreedAt: true } },
     },
   });
 
@@ -122,11 +123,14 @@ async function noticeCoupons(now: Date, until: Date): Promise<{ users: number; i
     await deliverNotice({
       tag: 'expiry:coupon',
       ref: userId,
-      mail: {
-        template: 'COUPON_EXPIRING',
-        locale,
-        build: (wording) => expiringCouponMail({ to: user.email, name: user.name, locale, coupons }, wording),
-      },
+      mail: mayMail('COUPON_EXPIRING', user)
+        ? {
+            template: 'COUPON_EXPIRING' as const,
+            locale,
+            build: (wording: MailWording) =>
+              expiringCouponMail({ to: user.email, name: user.name, locale, coupons }, wording),
+          }
+        : null,
       notification: {
         userId,
         kind: 'COUPON_EXPIRING',
@@ -158,7 +162,10 @@ async function noticePoints(now: Date, until: Date): Promise<{ users: number; am
         orderBy: { createdAt: 'asc' },
         select: { amount: true, createdAt: true, expiresAt: true },
       }),
-      prisma.user.findUnique({ where: { id: userId }, select: { email: true, name: true, locale: true } }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, name: true, locale: true, marketingAgreedAt: true },
+      }),
     ]);
 
     // 창 안의 적립은 이미 다 써서 사라질 것이 없어도 표시한다 — 안 그러면 매일 다시 계산한다
@@ -175,11 +182,14 @@ async function noticePoints(now: Date, until: Date): Promise<{ users: number; am
     await deliverNotice({
       tag: 'expiry:points',
       ref: userId,
-      mail: {
-        template: 'POINTS_EXPIRING',
-        locale,
-        build: (wording) => expiringPointsMail({ to: user.email, name: user.name, locale, amount: soon.amount, days: soon.days }, wording),
-      },
+      mail: mayMail('POINTS_EXPIRING', user)
+        ? {
+            template: 'POINTS_EXPIRING' as const,
+            locale,
+            build: (wording: MailWording) =>
+              expiringPointsMail({ to: user.email, name: user.name, locale, amount: soon.amount, days: soon.days }, wording),
+          }
+        : null,
       notification: {
         userId,
         kind: 'POINTS_EXPIRING',

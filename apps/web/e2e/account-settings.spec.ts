@@ -202,3 +202,53 @@ test('탈퇴하면 세션이 끊기고, 같은 열쇠로는 못 들어오며, �
   await ready(page);
   await expect(page.locator('#main')).toContainText('다시 온 손님');
 });
+
+/**
+ * **꺼 둔 스위치가 지켜지는가.**
+ *
+ * 마케팅 수신 스위치는 값을 계정에 적고 있었는데, 그 값을 **읽는 곳이 하나도 없었다.** 소멸 안내를
+ * 보내는 배치가 동의를 보지 않아, 꺼 둔 사람에게도 쿠폰·적립금 메일이 매일 그대로 나갔다.
+ *
+ * 메일이 나가는지는 배치를 돌려 봐야 아는 것이라 검사는 따로 있다(expiry-notice). 여기서는 화면 쪽을
+ * 본다 — **끈 것이 남는가.** 남지 않으면 배치가 아무리 잘 봐도 소용이 없다.
+ */
+test('마케팅 수신을 끄면 다시 들어와도 꺼져 있다', async ({ page }) => {
+  test.setTimeout(90_000);
+  const email = `e2e-marketing-${Date.now()}@plain.test`;
+  const password = 'quiet-harbor-42';
+
+  // 가입할 때 받겠다고 고른다 — 끄는 것을 보려면 켜져 있어야 한다
+  await page.goto('/signup');
+  await ready(page);
+  await page.getByLabel(/^이메일/).fill(email);
+  await page.getByLabel(/^이름/).fill('수신 검사');
+  await page.getByLabel(/^비밀번호\*/).fill(password);
+  await page.getByLabel(/^비밀번호 확인/).fill(password);
+  await page.getByLabel(/이용약관에 동의합니다/).check();
+  await page.getByLabel(/개인정보 수집/).check();
+  await page.getByLabel(/할인·혜택 소식/).check();
+  await page.getByRole('button', { name: '가입하기' }).click();
+  await expect(page.getByRole('link', { name: '마이페이지' })).toBeVisible();
+
+  const section = () => page.getByRole('region', { name: '혜택 소식 받기' });
+
+  await page.goto('/mypage');
+  await ready(page);
+  await expect(section().getByText('받는 중'), '가입에서 고른 수신 동의가 안 남았다').toBeVisible();
+
+  // ── 끈다. 저장을 기다린다 — 단추 글자만 보고 넘어가면 아직 안 적혔을 수 있다
+  const [saved] = await Promise.all([
+    page.waitForResponse((r) => r.request().method() === 'PATCH' && r.url().includes('/api/account/consent')),
+    section().getByRole('button', { name: '그만 받기', exact: true }).click(),
+  ]);
+  expect(saved.status(), await saved.text()).toBe(200);
+  await expect(section().getByText('받지 않음')).toBeVisible();
+
+  // 새로 그린 화면이 같은 말을 해야 한다 — 계정에 안 남았다면 여기서 "받는 중" 으로 돌아온다
+  await page.reload();
+  await ready(page);
+  await expect(
+    section().getByText('받지 않음'),
+    '껐는데 다시 들어오니 켜져 있다 — 계정에 안 남았다',
+  ).toBeVisible();
+});
