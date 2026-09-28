@@ -8,6 +8,7 @@ import {
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
 import { refundedSoFar } from './refund-ledger';
+import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
 export class CancelError extends Error {
   constructor(readonly code: string, message: string, readonly status = 409) {
@@ -275,7 +276,7 @@ export async function cancelOrder(
   } catch (error) {
     if (pgDone) {
       // 돈은 나갔는데 장부가 없다. 다시 누르면 같은 멱등 키가 나가 돈은 두 번 나가지 않고 장부만 채워진다
-      console.error('[cancel-order] 결제 취소 후 장부 반영 실패 — 다시 시도하거나 수동 대사 필요', { orderNo }, error);
+      await reportLedgerMismatch({ stage: 'order.cancel', orderNo, error });
     }
     throw error;
   }

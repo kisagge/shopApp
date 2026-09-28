@@ -27,6 +27,7 @@ const afterResponse = vi.hoisted(() => vi.fn<(w: () => Promise<void>) => any>((w
 vi.mock('~/lib/api/after-response', () => ({ afterResponse }));
 
 const { confirmPayment } = await import('~/lib/orders/confirm-payment');
+const { setErrorSinksForTest } = await import('~/lib/errors');
 
 const user = { id: 'u-1' };
 
@@ -212,15 +213,39 @@ describe('실패', () => {
     expect(tx.order.updateMany).not.toHaveBeenCalled();
   });
 
-  it('승인 후 DB 반영이 실패하면 대사할 수 있게 남긴다 — 돈은 이미 빠져나갔다', async () => {
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+  /**
+   * **"수동 대사 필요" 라고 적어 두고 그 대사를 할 자리가 없었다.**
+   *
+   * 예전에는 `console.error` 한 줄이 전부라, 손님은 문의를 넣고 운영자는 로그를 뒤져야 했다.
+   * 이제 오류 수집으로 보낸다 — 운영 화면에 뜨고 메일로도 한 번 알린다.
+   */
+  it('승인 후 DB 반영이 실패하면 장부 어긋남으로 알린다 — 돈은 이미 빠져나갔다', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const captured: { severity: string; routePath: string; path: string }[] = [];
+    setErrorSinksForTest([{
+      name: 'spy',
+      report: (report: { severity: string; routePath: string; path: string }) => {
+        captured.push(report);
+        return Promise.resolve();
+      },
+    }]);
+
     // 승인이 난 **뒤에** 무너진다 — 그 자리가 돈만 나가고 기록이 없는 자리다
     tx.payment.update.mockRejectedValueOnce(new Error('DB 다운'));
     await expect(
       confirmPayment({ orderNo: '20260831-1234567', paymentKey: 'pk_1', amount: 289_000 }, user, gateway()),
     ).rejects.toThrow('DB 다운');
-    expect(spy.mock.calls[0]![0]).toContain('수동 대사 필요');
-    spy.mockRestore();
+
+    expect(captured, '아무 데도 보고되지 않았다 — 로그 한 줄로는 아무도 모른다').toHaveLength(1);
+    expect(captured[0]!.routePath, '걸음끼리 묶이지 않는다').toBe('ledger:payment.confirm');
+    expect(captured[0]!.severity, '돈이 어긋난 것은 화면이 깨진 것보다 덜하지 않다').toBe('fatal');
+    // 운영자가 곧바로 열어 볼 자리를 적는다
+    expect(captured[0]!.path).toContain('20260831-1234567');
+    // 대사에 필요한 값(승인 키·금액)은 로그에 남는다 — "다시 눌러도 되는가" 를 그 값으로 판단한다
+    expect(logged.mock.calls.some((c) => String(c[0]).includes('장부 어긋남'))).toBe(true);
+
+    setErrorSinksForTest(null);
+    logged.mockRestore();
   });
 });
 

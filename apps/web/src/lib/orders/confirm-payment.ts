@@ -8,6 +8,7 @@ import {
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
 export interface ConfirmResult {
   readonly orderNo: string;
@@ -148,9 +149,12 @@ export async function confirmPayment(
   } catch (error) {
     // 승인은 났는데 DB 반영이 실패했다. 돈은 이미 빠져나갔으므로 반드시 남긴다.
     if (result !== undefined) {
-      console.error('[payment] 승인 후 DB 반영 실패 — 수동 대사 필요', {
-        orderNo: order.orderNo, paymentKey: result.paymentKey, amount: result.amount,
-      }, error);
+      await reportLedgerMismatch({
+        stage: 'payment.confirm',
+        orderNo: order.orderNo,
+        detail: { paymentKey: result.paymentKey, amount: result.amount },
+        error,
+      });
     }
     throw error;
   }

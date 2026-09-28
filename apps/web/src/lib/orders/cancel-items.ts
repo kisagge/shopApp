@@ -11,6 +11,7 @@ import { getShippingPolicy } from '~/lib/shipping-policy';
 import { recordServerEvent } from '~/lib/analytics/server';
 import { cancelOrder } from './cancel-order';
 import { refundedSoFar } from './refund-ledger';
+import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
 /**
  * 주문의 **일부 상품만** 취소하고 그만큼 돌려준다.
@@ -329,9 +330,12 @@ export async function cancelOrderItems(
        * 돈은 나갔는데 장부가 없다. 같은 줄로 다시 누르면 같은 멱등 키가 나가서 돈은 두 번
        * 나가지 않고 장부만 채워진다 — 그걸 할 수 있게 무엇이 나갔는지 남긴다.
        */
-      console.error('[cancel-items] 결제 취소 후 장부 반영 실패 — 다시 시도하거나 수동 대사 필요', {
-        orderNo, idempotencyKey, itemIds: wanted,
-      }, error);
+      await reportLedgerMismatch({
+        stage: 'order.cancelItems',
+        orderNo,
+        detail: { idempotencyKey, itemIds: wanted },
+        error,
+      });
     }
     throw error;
   }

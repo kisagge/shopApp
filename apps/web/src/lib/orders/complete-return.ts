@@ -13,6 +13,7 @@ import { policyOf } from './cancel-items';
 import { reclaimPurchaseReward, reclaimReviewReward } from './reclaim-reward';
 import { refundedSoFar } from './refund-ledger';
 import { ReturnError } from './return-request';
+import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
 /**
  * 반품 회수를 확인하고 돌려준다.
@@ -329,9 +330,12 @@ export async function completeReturn(
     }, { timeout: LOCK_TIMEOUT_MS, maxWait: LOCK_TIMEOUT_MS });
   } catch (error) {
     if (pgDone) {
-      console.error('[complete-return] 결제 취소 후 장부 반영 실패 — 다시 시도하거나 수동 대사 필요', {
-        orderNo, idempotencyKey,
-      }, error);
+      await reportLedgerMismatch({
+        stage: 'return.complete',
+        orderNo,
+        detail: { idempotencyKey },
+        error,
+      });
     }
     throw error;
   }

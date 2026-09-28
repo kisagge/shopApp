@@ -128,8 +128,17 @@ export function pruneSeen(
  * 화면 렌더 실패는 사용자가 아무것도 못 보는 상태라 fatal 로 본다.
  * API 한 건의 실패는 나머지 화면이 살아 있으므로 error 다.
  */
+/**
+ * 돈이 어긋난 것은 **화면이 깨진 것보다 덜하지 않다.**
+ *
+ * PG 왕복은 끝났는데 그 뒤 장부 반영이 실패하는 자리가 다섯 있다 — 승인·취소·부분취소·반품·환불.
+ * 그때는 손님 카드에서 돈이 빠졌거나 나갔는데 우리 기록에는 없다. 사람이 손으로 맞춰야 하는 일이고,
+ * 늦게 알수록 손님은 문의를 넣고 운영자는 로그를 뒤진다.
+ */
+export const LEDGER_ROUTE_TYPE = 'ledger';
+
 export function severityOf(routeType: string): ErrorSeverity {
-  return routeType === 'render' ? 'fatal' : 'error';
+  return routeType === 'render' || routeType === LEDGER_ROUTE_TYPE ? 'fatal' : 'error';
 }
 
 /**
