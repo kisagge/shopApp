@@ -115,6 +115,44 @@ describe('찜하기', () => {
     expect(screen.getByRole('button', { name: '울 코트 찜하기' })).toBeDefined();
   });
 
+  /**
+   * **까닭이 낭독기에만 들렸다.** 낙관적으로 칠한 하트를 실패 때 되돌리는데 이유는 sr-only 에만 있어서,
+   * 눈으로 보는 사람에게는 **하트가 깜빡이고 원래대로 돌아간 것**이 전부였다 — 로그인이 풀렸는지, 망이
+   * 끊겼는지, 다시 누르면 되는지 알 방법이 없다.
+   */
+  it('실패한 까닭을 눈에도 보이게 적는다', async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch).mockResolvedValue(
+      new Response(JSON.stringify({ message: '찜은 200개까지 담을 수 있습니다' }), { status: 409 }),
+    );
+    setup();
+
+    await user.click(screen.getByRole('button'));
+
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('200개까지');
+    expect(alert.className, 'sr-only 로 숨겨 두면 보고 있는 사람은 모른다').not.toContain('sr-only');
+  });
+
+  it('보내는 중에 다시 눌러도 한 번만 보낸다', async () => {
+    const user = userEvent.setup();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    vi.mocked(fetch).mockImplementation(async () => {
+      await held;
+      return new Response('{}', { status: 200 });
+    });
+    setup();
+
+    const button = screen.getByRole('button');
+    await user.click(button);
+    await user.click(button);
+
+    // 단추는 aria-disabled 만 걸린다(초점을 받아야 이유가 들린다) — 두 번 보내는 것은 핸들러가 막는다
+    expect(fetch).toHaveBeenCalledTimes(1);
+    release();
+  });
+
   it('네트워크가 끊겨도 되돌린다', async () => {
     const user = userEvent.setup();
     vi.mocked(fetch).mockRejectedValue(new Error('offline'));

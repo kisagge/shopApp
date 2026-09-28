@@ -105,7 +105,7 @@ export default async function AdminInquiriesPage({
                       )}
                     </h2>
                     <p className="flex items-center gap-2 text-[12px] text-[var(--fg-muted)]">
-                      {row.isPrivate && <span>🔒 비공개</span>}
+                      {row.isPrivate && <span><span aria-hidden="true">🔒</span> 비공개</span>}
                       <span>{row.authorName}</span>
                       <time dateTime={row.createdAt.toISOString()}>
                         {adminDateTime.format(row.createdAt)}

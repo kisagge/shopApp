@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { MIN_COMPARE } from '@shop/core';
 import { useCompare } from '~/stores/compare';
 import { useT } from '~/lib/i18n/client';
+import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { AppLink } from './app-link';
 
 /**
@@ -35,8 +37,21 @@ export function CompareTray() {
   const clear = useCompare((s) => s.clear);
   const pathname = usePathname();
   const t = useT();
+  /*
+   * 뺀 칩은 자기 단추와 함께 사라진다 — 챙기지 않으면 초점이 body 로 떨어져, 셋을 빼려면 문서 맨 앞에서
+   * 탭으로 세 번 내려와야 한다. 다 비우면 띠 자체가 사라지므로 갈 곳이 없다(emptyRef 를 쓰지 않는다).
+   */
+  const { listRef, rememberRemoval } = useRemovalFocus(items.length);
+  /** 무슨 일이 일어났는지 낭독기에 알린다 — 띠가 통째로 사라지면 눌렀는데 아무 일도 없던 것과 같다 */
+  const [announcement, setAnnouncement] = useState('');
 
-  if (items.length === 0) return null;
+  if (items.length === 0) {
+    /*
+     * 알림 자리는 띠가 사라진 뒤에도 남아야 한다. 띠와 함께 지우면 방금 채운 글을 낭독기가 놓친다
+     * (최근 본 상품이 같은 이유로 자리를 늘 둔다).
+     */
+    return <p role="status" className="sr-only">{announcement}</p>;
+  }
   if (BUYING.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
 
   const enough = items.length >= MIN_COMPARE;
@@ -49,6 +64,7 @@ export function CompareTray() {
         같은 높이의 빈 자리를 흐름 안에 둬서 밀어 올린다.
       */}
       <div aria-hidden="true" className="h-16 print:hidden" />
+      <p role="status" className="sr-only">{announcement}</p>
       <aside
       aria-label={t('compare.tray')}
       className="safe-b fixed inset-x-0 bottom-0 z-40 print:hidden border-t border-[var(--border)] bg-[var(--bg)]/95 backdrop-blur"
@@ -58,12 +74,17 @@ export function CompareTray() {
           {t('compare.count', { count: items.length })}
         </p>
 
-        <ul className="flex flex-1 flex-wrap items-center gap-1.5">
-          {items.map((item) => (
+        <ul ref={listRef as React.RefObject<HTMLUListElement>} className="flex flex-1 flex-wrap items-center gap-1.5">
+          {items.map((item, index) => (
             <li key={item.slug}>
               <button
                 type="button"
-                onClick={() => remove(item.slug)}
+                data-remove-row
+                onClick={() => {
+                  rememberRemoval(index);
+                  setAnnouncement(t('compare.removed', { name: item.name }));
+                  remove(item.slug);
+                }}
                 className="flex items-center gap-1 rounded-sm border border-[var(--border)] px-2 py-1 text-[11px] text-[var(--fg-secondary)] hover:bg-[var(--surface)]"
               >
                 {item.name}
@@ -76,7 +97,10 @@ export function CompareTray() {
 
         <button
           type="button"
-          onClick={clear}
+          onClick={() => {
+            setAnnouncement(t('compare.cleared'));
+            clear();
+          }}
           className="text-[11px] text-[var(--fg-muted)] underline underline-offset-2"
         >
           {t('compare.clear')}

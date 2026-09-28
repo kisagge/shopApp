@@ -64,6 +64,12 @@ test.describe('좁은 화면', () => {
     ['홈', '/'],
     ['카테고리', '/category/outer'],
     ['상품 상세', '/product/oversized-wool-coat'],
+    /*
+     * **비교표는 좁은 화면에서만 넘친다.** 넓은 화면에서 상품 둘로 열면 넘치지 않아, axe 의
+     * `scrollable-region-focusable`(넘치는 상자는 초점을 받아야 한다)이 한 번도 걸리지 않았다 —
+     * 그동안 이 표는 키보드로 옆 칸을 볼 수 없었다.
+     */
+    ['상품 비교', '/compare?slugs=oversized-wool-coat,single-chesterfield-coat'],
   ] as const) {
     test(`${name} 화면에 접근성 위반이 없다`, async ({ page }) => {
       await page.goto(path);

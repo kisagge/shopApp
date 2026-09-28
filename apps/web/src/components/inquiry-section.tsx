@@ -68,7 +68,7 @@ export function InquirySection({
                   </span>
                   {inquiry.isPrivate && (
                     <span className="text-[var(--fg-muted)]" aria-label={t('inq.privateLabel')}>
-                      🔒 {t('inq.private')}
+                      <span aria-hidden="true">🔒</span> {t('inq.private')}
                     </span>
                   )}
                   <span className="text-[var(--fg-secondary)]">{inquiry.authorName}</span>

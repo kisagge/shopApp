@@ -800,6 +800,8 @@ export const ja: Dictionary = {
   'compare.tray': '比較リスト',
   'compare.count': '比較リスト{count}件',
   'compare.removeOne': '比較リストから外す',
+  'compare.cleared': '比較リストを空にしました',
+  'compare.removed': '{name} を比較リストから外しました',
   'compare.clear': '空にする',
   'compare.go': '比べる',
   'compare.needMore': '{min}件以上選んでください',

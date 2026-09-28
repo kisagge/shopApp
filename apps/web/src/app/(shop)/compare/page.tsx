@@ -69,7 +69,17 @@ export default async function ComparePage({
         <p className="text-xs text-[var(--fg-muted)]">{t('compare.gone')}</p>
       )}
 
-      <div className="overflow-x-auto">
+      {/*
+        **키보드로도 옆 칸을 볼 수 있어야 한다.** 표가 화면보다 넓어 옆으로 밀리는데, 본문 칸에는 초점을
+        받을 것이 하나도 없어서(값이 전부 글자다) 좁은 화면에서는 마우스·손가락 없이 오른쪽 상품을 볼 방법이
+        없었다. 이 저장소의 관례대로 스크롤 상자 자체를 초점 받는 영역으로 만든다(운영 표 열일곱 곳·영수증).
+      */}
+      {/*
+        **`table-scroll` 을 쓰지 않는다.** 그 관례는 표를 `max-content` 로 펴는데, 이 상자는 세로 flex 안에
+        있어서 그대로 두면 상자가 표만큼 넓어지고 **화면 전체가 옆으로 밀렸다**(320px 에서 324px). 안에서
+        밀려야 할 것이 밖으로 새는 자리라, 여기서는 상자만 넘기고 표는 자리에 맞춘다.
+      */}
+      <div className="overflow-x-auto" tabIndex={0} role="region" aria-label={t('compare.heading')}>
         <table className="w-full border-collapse text-sm">
           <caption className="sr-only">
             {t('compare.lead', { count: products.length })}

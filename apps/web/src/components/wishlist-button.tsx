@@ -62,6 +62,8 @@ export function WishlistButton({
   const glyph = variant === 'floating' ? 'text-n-600' : 'text-[var(--fg-secondary)]';
 
   async function toggle() {
+    // 단추가 눌리는 것을 막지 않으므로(aria-disabled) 두 번 보내는 것은 여기서 막는다
+    if (pending) return;
     if (!loggedIn) {
       router.push(`/login?next=${encodeURIComponent(window.location.pathname)}`);
       return;
@@ -94,27 +96,39 @@ export function WishlistButton({
   }
 
   return (
-    <>
+    /*
+     * 실패 문구를 단추 **바로 아래**에 띄운다. 자리를 차지하지 않게 겹쳐 놓는다 — 이 단추는 상품 카드
+     * 사진 위에도 서기 때문에, 글이 끼어들면 격자가 한 줄씩 밀린다.
+     */
+    <span className="relative inline-flex">
       <button
         type="button"
         onClick={() => toggle()}
-        disabled={pending}
+        aria-disabled={pending}
         aria-label={
           wishlisted
             ? t('wish.remove', { name: productName })
             : t('wish.add', { name: productName })
         }
-        className={`flex items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] disabled:opacity-60 ${skin} ${box}`}
+        className={`flex items-center justify-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] aria-disabled:opacity-60 ${skin} ${box}`}
       >
         <span className={wishlisted ? 'text-accent' : glyph}>
           <HeartIcon filled={wishlisted} className={glyphSize} />
         </span>
       </button>
+      {/*
+        **실패가 낭독기에만 들렸다.** 낙관적으로 칠한 하트를 실패 때 되돌리는데, 이유는 sr-only 에만 있어서
+        눈으로 보는 사람에게는 **하트가 깜빡이고 원래대로 돌아간 것**이 전부였다 — 로그인이 풀렸는지, 망이
+        끊겼는지, 다시 누르면 되는지 알 방법이 없다. 쿠폰 받기가 이미 쓰는 짝이다: 성공은 조용히, 실패는 보이게.
+      */}
       {error && (
-        <span role="alert" className="sr-only">
+        <span
+          role="alert"
+          className="absolute top-full right-0 z-20 mt-1.5 w-max max-w-[15rem] rounded-sm bg-n-900 px-2.5 py-1.5 text-[11px] leading-snug text-n-0"
+        >
           {error}
         </span>
       )}
-    </>
+    </span>
   );
 }

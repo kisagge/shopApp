@@ -82,7 +82,16 @@ export default async function MyInquiriesPage({
                     )}
                   </h2>
                   <p className="flex items-center gap-2 text-[12px] text-[var(--fg-muted)]">
-                    {row.isPrivate && <span>🔒</span>}
+                    {/*
+                      **자물쇠 하나만 있으면 아무 말도 안 한다.** 그림은 텍스트 노드라 axe 에도 안 걸리는데,
+                      낭독기는 이모지 이름을 로케일에 따라 영어로 읽거나 아무 말도 안 한다. 그리고 번역도 안 된다.
+                      같은 뜻을 다른 두 화면은 이미 글자로 적고 있었다(inquiry-section · 운영 문의 목록).
+                    */}
+                    {row.isPrivate && (
+                      <span>
+                        <span aria-hidden="true">🔒</span> {t('inq.private')}
+                      </span>
+                    )}
                     <span className={row.answeredAt ? 'text-success' : undefined}>
                       {row.answeredAt ? t('support.answered') : t('support.waiting')}
                     </span>

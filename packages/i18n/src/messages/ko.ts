@@ -832,6 +832,8 @@ export const ko = {
   'compare.tray': '비교함',
   'compare.count': '비교함 {count}개',
   'compare.removeOne': '비교함에서 빼기',
+  'compare.cleared': '비교함을 비웠습니다',
+  'compare.removed': '{name} 을(를) 비교함에서 뺐습니다',
   'compare.clear': '비우기',
   'compare.go': '견주어 보기',
   'compare.needMore': '{min}개 이상 담아 주세요',

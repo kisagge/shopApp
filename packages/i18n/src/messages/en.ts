@@ -804,6 +804,8 @@ export const en: Dictionary = {
   'compare.tray': 'Compare list',
   'compare.count': '{count} selected',
   'compare.removeOne': 'Remove from compare list',
+  'compare.cleared': 'Compare list cleared',
+  'compare.removed': 'Removed {name} from the compare list',
   'compare.clear': 'Clear',
   'compare.go': 'Compare',
   'compare.needMore': 'Select at least {min}',
