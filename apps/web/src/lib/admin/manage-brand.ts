@@ -10,6 +10,7 @@ import {
   BRAND_ERROR_MESSAGE,
   type BrandErrorCode, type CreateBrandInput, type UpdateBrandInput,
 } from '@shop/contract';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 브랜드 관리.
@@ -120,7 +121,7 @@ export async function createBrand(actor: Actor, input: CreateBrandInput): Promis
     };
   } catch (error) {
     // 이름에도 유니크가 걸려 있다. 어느 칸이 문제인지 짚어 준다.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       throw new BrandError('NAME_TAKEN', 409);
     }
     throw error;
@@ -193,7 +194,7 @@ export async function updateBrand(
       slugIsGenerated: GENERATED_SLUG.test(after.slug),
     };
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       throw new BrandError('NAME_TAKEN', 409);
     }
     throw error;

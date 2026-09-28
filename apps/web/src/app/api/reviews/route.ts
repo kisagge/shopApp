@@ -11,6 +11,7 @@ import {
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
 import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /** 리뷰 작성. 산 사람만, 배송이 끝난 뒤, 주문 항목당 하나. 파는 사람의 계정은 쓰지 못한다(canWriteReview). */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -70,7 +71,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }
     // 유니크 제약이 동시 요청을 막은 경우
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { code: 'ALREADY_REVIEWED', message: '이미 리뷰를 쓴 주문입니다' },
         { status: 409 },

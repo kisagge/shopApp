@@ -14,6 +14,7 @@ import { quoteCartDetailed } from '~/lib/queries/cart';
 import { releaseAbandonedHolds } from './release-holds';
 import { afterResponse } from '~/lib/api/after-response';
 import { notifyLowStock } from '~/lib/notifications/low-stock';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 품절에 막혔을 때 한 번에 풀어 볼 주문 수.
@@ -169,7 +170,7 @@ export async function createOrder(
   try {
     return await createWithRetry();
   } catch (error) {
-    if (input.idempotencyKey && isIdempotencyConflict(error)) {
+    if (input.idempotencyKey && isUniqueViolation(error, 'idempotencyKey')) {
       const already = await findByIdempotencyKey(input.idempotencyKey, user.id);
       if (already) return already;
     }
@@ -375,16 +376,6 @@ async function findByIdempotencyKey(
     : { orderNo: order.orderNo, payable: order.payable, status: order.status };
 }
 
-function isIdempotencyConflict(error: unknown): boolean {
-  const e = error as { code?: string; meta?: { target?: unknown } };
-  if (e?.code !== 'P2002') return false;
-  const target = e.meta?.target;
-  // 주문번호 충돌 판정과 같은 함정을 피한다 — 배열에 String() 을 씌우면
-  // "[object Object]" 가 되어 무엇과도 맞지 않는다.
-  if (Array.isArray(target)) return target.includes('idempotencyKey');
-  return typeof target === 'string' && target.includes('idempotencyKey');
-}
-
 /** 저장된 배송지를 쓰거나, 새로 입력한 값을 쓴다 */
 async function resolveShipping(
   input: CreateOrderRequest,
@@ -463,19 +454,9 @@ async function withOrderNumberRetry<T>(run: (orderNo: string) => Promise<T>): Pr
     try {
       return await run(generateOrderNumber());
     } catch (error) {
-      if (attempt < ORDER_NO_RETRIES - 1 && isOrderNoConflict(error)) continue;
+      if (attempt < ORDER_NO_RETRIES - 1 && isUniqueViolation(error, 'orderNo')) continue;
       throw error;
     }
   }
   throw new Error('주문번호를 생성하지 못했습니다');
-}
-
-function isOrderNoConflict(error: unknown): boolean {
-  const e = error as { code?: string; meta?: { target?: unknown } };
-  if (e?.code !== 'P2002') return false;
-  const target = e.meta?.target;
-  // 문자열이 아닌 값에 String() 을 씌우면 "[object Object]" 가 되어
-  // 'orderNo' 를 절대 못 찾는다. 그러면 재시도가 조용히 실패한다.
-  if (Array.isArray(target)) return target.includes('orderNo');
-  return typeof target === 'string' && target.includes('orderNo');
 }

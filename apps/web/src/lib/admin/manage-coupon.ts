@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma, Prisma } from '@shop/db';
+import { prisma } from '@shop/db';
 import {
   assertPermission, couponStatus, canEditDiscount, normalizeCouponCode,
   validateCouponDefinition, isIssuable,
@@ -7,6 +7,7 @@ import {
 } from '@shop/core';
 import type { CreateCouponInput, UpdateCouponInput } from '@shop/contract';
 import { recordNotifications, type NoticeInput } from '~/lib/notifications/record';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 쿠폰 발행과 발급.
@@ -124,7 +125,7 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
     };
   } catch (error) {
     // 같은 코드가 이미 있다. 어느 칸이 문제인지 짚어 준다.
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       throw new CouponError('DUPLICATE_CODE', '이미 쓰고 있는 코드입니다.', 409, {
         code: '이미 쓰고 있는 코드입니다',
       });

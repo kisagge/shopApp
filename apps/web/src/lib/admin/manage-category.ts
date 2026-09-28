@@ -1,5 +1,5 @@
 import 'server-only';
-import { prisma, Prisma } from '@shop/db';
+import { prisma } from '@shop/db';
 import {
   canDeleteCategory, canManageCategory, categoryPlacementProblem, isSlugTaken, resequence,
   type Actor,
@@ -8,6 +8,7 @@ import {
   CATEGORY_ERROR_MESSAGE,
   type CategoryErrorCode, type CreateCategoryInput, type UpdateCategoryInput,
 } from '@shop/contract';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 카테고리 관리.
@@ -116,7 +117,7 @@ export async function createCategory(actor: Actor, input: CreateCategoryInput): 
       },
     });
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       throw new CategoryError('SLUG_TAKEN', 409);
     }
     throw error;

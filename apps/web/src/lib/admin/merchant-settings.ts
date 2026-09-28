@@ -7,6 +7,7 @@ import {
 import type {
   MerchantBusinessInput, MerchantCommissionInput, MerchantSettingsInput,
 } from '@shop/contract';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 가맹점 정보와 정산 계좌.
@@ -122,7 +123,7 @@ export async function updateMerchantBusiness(
      * 이름과 사업자등록번호는 유니크다. 같은 값이 이미 있으면 그렇게 말한다 —
      * "저장하지 못했습니다" 만 돌려주면 무엇을 고쳐야 할지 알 수 없다.
      */
-    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002') {
+    if (isUniqueViolation(error)) {
       throw new MerchantSettingsError('DUPLICATE', 409, '같은 이름이나 사업자등록번호가 이미 있습니다.');
     }
     throw error;

@@ -1,6 +1,7 @@
 import 'server-only';
-import { prisma, Prisma } from '@shop/db';
+import { prisma } from '@shop/db';
 import { mergeCartLines, type CartLineState } from '@shop/core';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /**
  * 로그인 사용자의 장바구니.
@@ -131,9 +132,7 @@ export async function replaceServerCart(
   try {
     await write();
   } catch (error) {
-    const conflict =
-      error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
-    if (!conflict) throw error;
+    if (!isUniqueViolation(error)) throw error;
     await write();
   }
 }

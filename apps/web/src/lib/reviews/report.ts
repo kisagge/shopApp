@@ -2,6 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { REVIEW_REPORT_ERROR, type ReviewReportErrorCode } from '@shop/core';
 import type { ReportReviewInput } from '@shop/contract';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 export class ReviewReportError extends Error {
   constructor(readonly code: ReviewReportErrorCode, readonly status = 400) {
@@ -81,14 +82,4 @@ export async function closeReportsAsRemoved(actorId: string, reviewId: string): 
   } catch {
     // 대기줄에 한 줄 남는 것뿐이다. 다음에 처리하면 된다.
   }
-}
-
-/** Prisma 의 유니크 제약 위반(P2002) */
-function isUniqueViolation(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: unknown }).code === 'P2002'
-  );
 }

@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import { assertPermission, checkPointAdjust, pointAdjustEntry, type Actor, type PointAdjustDirection } from '@shop/core';
 import type { AdjustPointsInput } from '@shop/contract';
 import { AccessError } from './manage-access';
+import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 export interface PointAdjustResult {
   readonly userId: string;
@@ -90,7 +91,7 @@ export async function adjustPoints(
       expiresAt: entry.expiresAt, replayed: false,
     };
   } catch (error) {
-    if (isAdjustKeyConflict(error)) {
+    if (isUniqueViolation(error, 'adjustKey')) {
       const again = await replayOf(userId, input);
       if (again) return again;
     }
@@ -117,11 +118,3 @@ async function replayOf(userId: string, input: AdjustPointsInput): Promise<Point
   };
 }
 
-function isAdjustKeyConflict(error: unknown): boolean {
-  const e = error as { code?: string; meta?: { target?: unknown } };
-  if (e?.code !== 'P2002') return false;
-  const target = e.meta?.target;
-  // 배열에 String() 을 씌우면 "[object Object]" 가 되어 무엇과도 맞지 않는다(create-order 와 같은 함정)
-  if (Array.isArray(target)) return target.includes('adjustKey');
-  return typeof target === 'string' && target.includes('adjustKey');
-}
