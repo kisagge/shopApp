@@ -59,7 +59,12 @@ const USERS: SeedUser[] = [
     email: SEED_ACCOUNT[key],
     name: `장바구니 손님 ${i + 1}`,
     role: 'CUSTOMER' as const,
-    phone: `010-0000-100${i + 1}`,
+    /*
+     * **열 번째부터 자릿수가 넘쳤다.** `100${i+1}` 은 i+1 이 두 자리가 되는 순간 `010-0000-10010`,
+     * 곧 열두 자리다 — 우리 계약(휴대폰 형식)이 거절하는 번호다. 주문은 주소록의 값을 그대로 베끼므로
+     * 아무도 모르다가, 배송지를 **고치려는 순간** 자기 번호가 틀렸다며 막힌다.
+     */
+    phone: `010-0000-${1000 + i + 1}`,
   })),
 ];
 
@@ -156,10 +161,11 @@ async function main(): Promise<void> {
     const id = `seedaddrcartcustomer000${i + 1}`;
     await prisma.address.upsert({
       where: { id },
-      update: {},
+      // 이미 만든 DB 에도 번호를 다시 얹는다 — 자릿수가 넘친 번호가 남아 있으면 배송지를 못 고친다
+      update: { phone: `010-0000-${1000 + i + 1}` },
       create: {
         id, userId: buyer.id, label: '집',
-        recipient: buyer.name, phone: `010-0000-100${i + 1}`,
+        recipient: buyer.name, phone: `010-0000-${1000 + i + 1}`,
         postalCode: '04766', address1: '서울 성동구 왕십리로 000',
         address2: `10${i + 1}동 1102호`, isDefault: true,
       },

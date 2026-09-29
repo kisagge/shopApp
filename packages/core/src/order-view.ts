@@ -3,6 +3,7 @@ import {
   awaitingDeposit, depositExpired, isPaidStatus,
   type PaymentMethodCode, type PaymentStatusCode,
 } from './payment';
+import { checkAddressEdit } from './address-edit';
 import { canCancelOwnReturn, canRequestReturn, isOpenReturn, type ReturnStatus } from './return-request';
 import { canConfirmPurchase } from './reward';
 
@@ -68,6 +69,13 @@ export interface OrderView {
   readonly canConfirmPurchase: boolean;
   /** 손님이 자기 반품·교환 신청을 무를 수 있는가 — 승인 전까지만이다 */
   readonly canCancelReturn: boolean;
+  /**
+   * 배송지를 고칠 수 있는가 — 출고 전까지만이다.
+   *
+   * 도서산간 여부가 달라지는 주소로 바꿀 수 있는지는 **새 주소를 봐야** 알 수 있어서 여기서 정하지
+   * 않는다. 단추는 세우고, 그 판단은 보낼 때 `checkAddressEdit` 이 한다.
+   */
+  readonly canEditAddress: boolean;
   /** 방금 확정해서 단추가 사라졌는가 — 결과는 이 화면이 남긴다 */
   readonly justConfirmed: boolean;
   readonly paymentFailed: boolean;
@@ -119,6 +127,15 @@ export function orderView(input: OrderViewInput): OrderView {
     openReturn,
     canConfirmPurchase: canConfirmPurchase({ status: input.status, hasOpenReturn: openReturn }),
     canCancelReturn: input.returnStatus !== null && canCancelOwnReturn(input.returnStatus),
+    canEditAddress:
+      checkAddressEdit({
+        status: input.status,
+        settled: pay !== null && isPaidStatus(pay.status),
+        awaitingDeposit: deposit !== null,
+        // 같은 권역으로 고치는 것은 언제든 된다 — 그것이 가장 흔한 경우다(상세주소 오타·받는 사람 변경)
+        wasRemote: false,
+        nowRemote: false,
+      }) === null,
     justConfirmed: input.confirmedJustNow && input.status === 'CONFIRMED',
     paymentFailed: input.paymentFailed,
   };

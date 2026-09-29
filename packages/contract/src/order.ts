@@ -110,3 +110,13 @@ export type OrderError = z.infer<typeof orderErrorSchema>;
 export const orderNoteSchema = z.object({
   body: z.string({ error: 'valid.required' }).trim().min(1, 'valid.required').max(ORDER_NOTE_MAX, 'valid.tooLongChars'),
 });
+
+/**
+ * 주문의 배송지 수정.
+ *
+ * 주문할 때와 같은 칸을 받는다(shippingAddressSchema) — 요청사항까지. 도서산간 여부는 **묻지 않는다**:
+ * 추가 배송비가 걸린 값이라 서버가 우편번호에서 정한다.
+ */
+export const updateOrderAddressSchema = shippingAddressSchema.extend({
+  deliveryMemo: z.string().trim().max(100, 'valid.tooLongChars').optional(),
+});

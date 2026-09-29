@@ -1,0 +1,183 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+/**
+ * 배송지 수정 — 서버 쪽.
+ *
+ * **주소와 금액이 한 번에 움직여야 한다.** 따로 쓰면 주소는 제주인데 배송비는 육지인 주문이 생기고,
+ * 그 어긋남은 정산에서야 드러난다.
+ */
+
+const db = vi.hoisted(() => ({
+  order: {
+    findFirst: vi.fn<(...a: any[]) => any>(),
+    updateMany: vi.fn<(...a: any[]) => any>(),
+  },
+}));
+vi.mock('@shop/db', () => ({ prisma: db }));
+
+const policy = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/shipping-policy', () => ({ getShippingPolicy: policy }));
+
+const { updateOrderAddress, AddressEditError } = await import('~/lib/orders/update-address');
+
+/** 제주는 도서산간이다 — 우편번호로 정해진다 */
+const JEJU = '63000';
+const SEOUL = '04524';
+
+const order = (over: Record<string, unknown> = {}) => ({
+  id: 'o-1',
+  orderNo: '20260901-0000001',
+  status: 'PAID',
+  shippingFee: 3_000,
+  payable: 103_000,
+  isRemoteArea: false,
+  payment: { method: 'CARD', status: 'DONE' },
+  ...over,
+});
+
+const input = (over: Record<string, unknown> = {}) => ({
+  recipient: '장부장',
+  phone: '010-1234-5678',
+  postalCode: SEOUL,
+  address1: '서울 중구 세종대로 110',
+  address2: '3층',
+  ...over,
+}) as any;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  db.order.findFirst.mockResolvedValue(order());
+  db.order.updateMany.mockResolvedValue({ count: 1 });
+  policy.mockResolvedValue({ baseFee: 3_000, freeThreshold: 50_000, remoteSurcharge: 3_000 });
+});
+
+describe('같은 권역 안에서 고치기', () => {
+  it('주소를 쓰고 금액은 건드리지 않는다', async () => {
+    const result = await updateOrderAddress('20260901-0000001', input({ address2: '4층' }), { userId: 'u-1' });
+
+    expect(result).toMatchObject({ shippingDelta: 0, shippingFee: 3_000, payable: 103_000, isRemoteArea: false });
+    const { data } = db.order.updateMany.mock.calls[0]![0];
+    expect(data).toMatchObject({ recipient: '장부장', address2: '4층', isRemoteArea: false });
+    expect(data.shippingFee, '금액이 움직일 이유가 없다').toBeUndefined();
+    expect(data.payable).toBeUndefined();
+  });
+
+  it('전화번호는 한 모양으로 정리해 둔다', async () => {
+    await updateOrderAddress('20260901-0000001', input({ phone: '010 1234 5678' }), { userId: 'u-1' });
+
+    expect(db.order.updateMany.mock.calls[0]![0].data.recipientPhone).toBe('010-1234-5678');
+  });
+
+  it('상세주소와 요청사항은 비울 수 있다 — 빈 칸은 null 로 남는다', async () => {
+    await updateOrderAddress('20260901-0000001', input({ address2: undefined }), { userId: 'u-1' });
+
+    const { data } = db.order.updateMany.mock.calls[0]![0];
+    expect(data.address2).toBeNull();
+    expect(data.deliveryMemo).toBeNull();
+  });
+
+  /** 주문번호만으로 고칠 수 있으면 남의 주문 주소를 바꿀 수 있다 */
+  it('손님이 부르면 자기 주문인지 함께 본다', async () => {
+    await updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' });
+
+    expect(db.order.findFirst.mock.calls[0]![0].where).toMatchObject({
+      orderNo: '20260901-0000001',
+      userId: 'u-1',
+    });
+  });
+
+  it('없는 주문이면 404 로 거절한다', async () => {
+    db.order.findFirst.mockResolvedValue(null);
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ORDER_NOT_FOUND', status: 404 });
+  });
+});
+
+describe('도서산간 여부가 바뀔 때', () => {
+  /** 아직 결제 전(가상계좌 발급 전)이라 금액이 굳지 않았다 */
+  const pending = { status: 'PENDING', payment: null };
+
+  it('제주로 바꾸면 추가 배송비만큼 는다', async () => {
+    db.order.findFirst.mockResolvedValue(order(pending));
+
+    const result = await updateOrderAddress('20260901-0000001', input({ postalCode: JEJU }), { userId: 'u-1' });
+
+    expect(result).toMatchObject({ shippingDelta: 3_000, shippingFee: 6_000, payable: 106_000, isRemoteArea: true });
+    expect(db.order.updateMany.mock.calls[0]![0].data).toMatchObject({
+      isRemoteArea: true,
+      shippingFee: { increment: 3_000 },
+      payable: { increment: 3_000 },
+    });
+  });
+
+  it('제주에서 육지로 나오면 그만큼 준다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ ...pending, isRemoteArea: true, shippingFee: 6_000, payable: 106_000 }));
+
+    const result = await updateOrderAddress('20260901-0000001', input({ postalCode: SEOUL }), { userId: 'u-1' });
+
+    expect(result).toMatchObject({ shippingDelta: -3_000, shippingFee: 3_000, payable: 103_000, isRemoteArea: false });
+    expect(db.order.updateMany.mock.calls[0]![0].data.payable).toEqual({ increment: -3_000 });
+  });
+
+  /**
+   * **도서산간 여부는 요청이 아니라 우편번호에서 정한다.** 받아 쓰면 제주 주소를 적고 `isRemoteArea:false`
+   * 를 실어 추가 배송비를 피할 수 있다.
+   */
+  it('요청이 뭐라고 하든 우편번호로 정한다', async () => {
+    db.order.findFirst.mockResolvedValue(order(pending));
+
+    await updateOrderAddress('20260901-0000001', input({ postalCode: JEJU, isRemoteArea: false }), { userId: 'u-1' });
+
+    expect(db.order.updateMany.mock.calls[0]![0].data.isRemoteArea).toBe(true);
+  });
+
+  it('결제가 끝난 주문은 막는다 — 차액을 주고받을 길이 없다', async () => {
+    await expect(updateOrderAddress('20260901-0000001', input({ postalCode: JEJU }), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ZONE_CHANGE_AFTER_PAYMENT', status: 409 });
+
+    expect(db.order.updateMany, '막았으면 아무것도 쓰지 않는다').not.toHaveBeenCalled();
+  });
+
+  it('입금 기다리는 주문은 계좌 금액이 정해져 있어 막는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      status: 'PENDING',
+      payment: { method: 'VIRTUAL_ACCOUNT', status: 'WAITING_FOR_DEPOSIT' },
+    }));
+
+    await expect(updateOrderAddress('20260901-0000001', input({ postalCode: JEJU }), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ZONE_CHANGE_ON_DEPOSIT' });
+  });
+
+  it('배송비가 바뀌어도 기본료와 무료 기준은 그대로다 — 움직이는 것은 추가 배송비뿐이다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ ...pending, shippingFee: 0, payable: 100_000 }));
+
+    const result = await updateOrderAddress('20260901-0000001', input({ postalCode: JEJU }), { userId: 'u-1' });
+
+    // 무료배송이던 주문이라도 도서산간 추가분만 붙는다 — 기본료 3,000 이 되살아나지 않는다
+    expect(result.shippingFee).toBe(3_000);
+  });
+});
+
+describe('이미 나간 주문', () => {
+  it.each(['SHIPPED', 'DELIVERED', 'CONFIRMED'])('%s 는 막는다', async (status) => {
+    db.order.findFirst.mockResolvedValue(order({ status }));
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toBeInstanceOf(AddressEditError);
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **읽고 쓰는 사이에 송장이 붙을 수 있다.** 운영자가 그 틈에 출고 처리를 하면 위의 판단은 이미 낡았다 —
+   * 읽은 상태를 조건에 실어, 달라져 있으면 한 줄도 바꾸지 않는다.
+   */
+  it('쓰는 순간 상태가 달라져 있으면 거절한다', async () => {
+    db.order.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ALREADY_SHIPPED' });
+
+    expect(db.order.updateMany.mock.calls[0]![0].where).toMatchObject({ id: 'o-1', status: 'PAID' });
+  });
+});

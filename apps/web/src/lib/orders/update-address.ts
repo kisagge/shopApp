@@ -1,0 +1,117 @@
+import 'server-only';
+import { prisma } from '@shop/db';
+import {
+  checkAddressEdit, isRemoteAreaPostalCode, normalizePhone, remoteSurchargeDelta,
+  isPaidStatus, awaitingDeposit,
+  type AddressEditBlock,
+} from '@shop/core';
+import type { updateOrderAddressSchema } from '@shop/contract';
+import type { z } from 'zod';
+import { getShippingPolicy } from '~/lib/shipping-policy';
+
+type UpdateOrderAddressInput = z.infer<typeof updateOrderAddressSchema>;
+
+/**
+ * 주문의 배송지를 고친다.
+ *
+ * **아무도 못 고쳤다.** 손님도 운영자도 창구가 없어서, 상세주소를 잘못 적거나 받는 사람을 바꾸고 싶으면
+ * 출고 전이라도 방법이 없었다 — 취소하고 다시 사거나(쿠폰·적립금이 다시 계산되고 재고가 잠깐 풀린다)
+ * 1:1 문의로 부탁해야 했고, 운영자도 화면에서 할 수 없어 결국 DB 를 직접 만졌다.
+ *
+ * **도서산간 여부가 바뀌면 배송비가 따라 움직인다.** 다만 돈이 굳기 전까지만이다 — 그 뒤의 차액은
+ * 추가 결제나 부분 환불이라 새 경로를 열어야 한다. 그 판단은 core 가 한다(checkAddressEdit).
+ */
+
+export class AddressEditError extends Error {
+  constructor(readonly code: AddressEditBlock | 'ORDER_NOT_FOUND', readonly status = 409) {
+    super(MESSAGE[code]);
+    this.name = 'AddressEditError';
+  }
+}
+
+const MESSAGE: Readonly<Record<AddressEditBlock | 'ORDER_NOT_FOUND', string>> = {
+  ORDER_NOT_FOUND: '주문을 찾을 수 없습니다.',
+  ALREADY_SHIPPED: '이미 보낸 주문입니다. 배송지는 출고 전까지만 고칠 수 있습니다.',
+  ORDER_CLOSED: '끝난 주문의 배송지는 고칠 수 없습니다.',
+  ZONE_CHANGE_AFTER_PAYMENT:
+    '결제가 끝난 뒤에는 도서산간 여부가 달라지는 주소로 바꿀 수 없습니다. 배송비가 달라져 차액을 주고받아야 합니다 — 취소하고 다시 주문해 주세요.',
+  ZONE_CHANGE_ON_DEPOSIT:
+    '입금할 계좌의 금액이 이미 정해져 있어, 도서산간 여부가 달라지는 주소로는 바꿀 수 없습니다. 취소하고 다시 주문해 주세요.',
+};
+
+export interface AddressEditResult {
+  readonly orderNo: string;
+  /** 달라진 배송비. 0 이면 금액은 그대로다 */
+  readonly shippingDelta: number;
+  readonly shippingFee: number;
+  readonly payable: number;
+  readonly isRemoteArea: boolean;
+}
+
+export async function updateOrderAddress(
+  orderNo: string,
+  input: UpdateOrderAddressInput,
+  /** 손님이 부르면 자기 것만 고치게 묶는다. 운영자 창구가 생기면 이 자리를 비운다 */
+  by: { readonly userId?: string },
+): Promise<AddressEditResult> {
+  const order = await prisma.order.findFirst({
+    // 손님이 고칠 때는 자기 것인지 함께 본다 — 주문번호만으로는 남의 주소를 바꿀 수 있다
+    where: { orderNo, ...(by.userId ? { userId: by.userId } : {}) },
+    select: {
+      id: true, orderNo: true, status: true, shippingFee: true, payable: true, isRemoteArea: true,
+      payment: { select: { method: true, status: true } },
+    },
+  });
+  if (!order) throw new AddressEditError('ORDER_NOT_FOUND', 404);
+
+  const nowRemote = isRemoteAreaPostalCode(input.postalCode);
+  const pay = order.payment;
+
+  const blocked = checkAddressEdit({
+    status: order.status,
+    settled: pay !== null && isPaidStatus(pay.status),
+    awaitingDeposit: pay !== null && awaitingDeposit(pay.method, pay.status),
+    wasRemote: order.isRemoteArea,
+    nowRemote,
+  });
+  if (blocked) throw new AddressEditError(blocked);
+
+  const policy = await getShippingPolicy();
+  const delta = remoteSurchargeDelta({
+    wasRemote: order.isRemoteArea,
+    nowRemote,
+    surcharge: policy.remoteSurcharge,
+  });
+
+  /*
+   * **주소와 금액을 한 번에 쓴다.** 따로 쓰면 주소만 바뀌고 배송비는 옛 권역인 주문이 생기고,
+   * 그 어긋남은 결제나 정산에서야 드러난다.
+   *
+   * 읽은 상태를 조건에 싣는다 — 그사이 출고됐으면(운영자가 송장을 붙였으면) 위 판단은 이미 낡았다.
+   */
+  const { count } = await prisma.order.updateMany({
+    where: { id: order.id, status: order.status },
+    data: {
+      recipient: input.recipient,
+      recipientPhone: normalizePhone(input.phone),
+      postalCode: input.postalCode,
+      address1: input.address1,
+      address2: input.address2 ?? null,
+      deliveryMemo: input.deliveryMemo ?? null,
+      // 요청이 아니라 우편번호에서 정한다 — 받아 쓰면 제주 주소로 추가 배송비를 피할 수 있다
+      isRemoteArea: nowRemote,
+      ...(delta === 0
+        ? {}
+        : { shippingFee: { increment: delta }, payable: { increment: delta } }),
+    },
+  });
+  if (count === 0) throw new AddressEditError('ALREADY_SHIPPED');
+
+  return {
+    orderNo: order.orderNo,
+    shippingDelta: delta,
+    shippingFee: order.shippingFee + delta,
+    payable: order.payable + delta,
+    isRemoteArea: nowRemote,
+  };
+}

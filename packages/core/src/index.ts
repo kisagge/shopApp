@@ -2,6 +2,7 @@ export * from './money';
 export * from './shipping';
 export * from './cart';
 export * from './coupon-pick';
+export * from './address-edit';
 export * from './order-check';
 export * from './order-state';
 export * from './order-view';

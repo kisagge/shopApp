@@ -36,13 +36,44 @@ export function AddressForm({
   submitLabel,
   remoteSurcharge,
   editing,
+  prefill,
+  extraFields,
+  submit,
 }: {
   onSaved: (address: SavedAddress) => void;
+  /**
+   * 어디에 저장하는가. 안 주면 **주소록**에 저장한다.
+   *
+   * 주문의 배송지를 고칠 때는 같은 칸을 받아 다른 창구로 보낸다 — 우편번호 검색·도서산간 안내·칸별
+   * 오류 표시를 한 벌 더 적지 않으려고 여기만 갈아 끼운다. 성공하면 null, 실패하면 무엇이 틀렸는지 준다.
+   */
+  submit?: (body: {
+    readonly recipient: string;
+    readonly phone: string;
+    readonly postalCode: string;
+    readonly address1: string;
+    readonly address2?: string;
+  }) => Promise<{ message?: string; fields?: Record<string, string> } | null>;
   /**
    * 고칠 배송지. 있으면 칸을 그 값으로 채우고 그 배송지를 고친다(PUT). 기본 여부는 여기서 바꾸지 않는다 — 목록의
    * "기본으로" 단추가 한다.
    */
   editing?: SavedAddress | undefined;
+  /**
+   * 칸을 미리 채울 값. **주소록의 것이 아닐 때 쓴다** — 주문에 적힌 배송지를 고치는 자리처럼.
+   *
+   * `editing` 으로 대신하면 주소록을 고치는 줄 알고 이름표 칸과 "이미 주문한 건은 바뀌지 않습니다"
+   * 안내까지 따라 나온다. 지금 고치는 것이 바로 그 주문인데 반대로 적힌 안내가 붙는다.
+   */
+  prefill?: {
+    readonly recipient: string;
+    readonly phone: string;
+    readonly postalCode: string;
+    readonly address1: string;
+    readonly address2: string | null;
+  } | undefined;
+  /** 폼 안에 함께 세울 칸(주문의 배송 요청사항 같은 것). 밖에 두면 Enter 로 저장되지 않는다 */
+  extraFields?: React.ReactNode;
   onCancel?: () => void;
   submitLabel?: string;
   /**
@@ -60,8 +91,9 @@ export function AddressForm({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [postalCode, setPostalCode] = useState(editing?.postalCode ?? '');
-  const [address1, setAddress1] = useState(editing?.address1 ?? '');
+  const start = editing ?? prefill;
+  const [postalCode, setPostalCode] = useState(start?.postalCode ?? '');
+  const [address1, setAddress1] = useState(start?.address1 ?? '');
 
   // 주소 검색 상태. searchable 이 false 면 스크립트를 못 불러온 것이라
   // 버튼을 감추고 손 입력만 남긴다.
@@ -157,6 +189,37 @@ export function AddressForm({
     };
 
     try {
+      if (submit) {
+        const failure = await submit({
+          recipient: body.recipient,
+          phone: body.phone,
+          postalCode: body.postalCode,
+          address1: body.address1,
+          ...(body.address2 ? { address2: body.address2 } : {}),
+        });
+        if (failure) {
+          setError(failure.message ?? t('addr.saveFailed'));
+          setFieldErrors(failure.fields ?? {});
+          return;
+        }
+        /*
+         * 저장한 값을 그대로 돌려준다. 부르는 쪽이 목록을 다시 읽어도 되지만, 방금 넣은 값을
+         * 화면에 곧바로 그릴 수 있어야 **저장됐는지** 를 눈으로 확인할 수 있다.
+         */
+        onSaved({
+          id: editing?.id ?? '',
+          label: editing?.label ?? null,
+          recipient: body.recipient,
+          phone: body.phone,
+          postalCode: body.postalCode,
+          address1: body.address1,
+          address2: body.address2 ?? null,
+          isRemoteArea: remoteAreaLabel(body.postalCode) !== null,
+          isDefault: editing?.isDefault ?? false,
+        });
+        return;
+      }
+
       const response = await fetch(editing ? `/api/addresses/${editing.id}` : '/api/addresses', {
         method: editing ? 'PUT' : 'POST',
         headers: { 'content-type': 'application/json' },
@@ -204,7 +267,7 @@ export function AddressForm({
           required
           maxLength={50}
           autoComplete="name"
-          defaultValue={editing?.recipient}
+          defaultValue={start?.recipient}
           error={fieldErrors['recipient']}
         />
         <Field
@@ -214,7 +277,7 @@ export function AddressForm({
           inputMode="tel"
           autoComplete="tel"
           placeholder="010-0000-0000"
-          defaultValue={editing?.phone}
+          defaultValue={start?.phone}
           error={fieldErrors['phone']}
         />
       </div>
@@ -306,22 +369,27 @@ export function AddressForm({
         ref={detailRef}
         maxLength={200}
         hint={t('addr.detailHint')}
-        defaultValue={editing?.address2 ?? undefined}
+        defaultValue={start?.address2 ?? undefined}
         error={fieldErrors['address2']}
       />
 
-      <Field
-        label={t('addr.label')}
-        name="label"
-        maxLength={20}
-        hint={t('addr.labelHint')}
-        defaultValue={editing?.label ?? undefined}
-      />
+      {/* 이름표("집"·"회사")와 아래 안내는 주소록의 것이다 — 주문 하나의 배송지를 고칠 때는 뜻이 없다 */}
+      {!submit && (
+        <Field
+          label={t('addr.label')}
+          name="label"
+          maxLength={20}
+          hint={t('addr.labelHint')}
+          defaultValue={editing?.label ?? undefined}
+        />
+      )}
 
-      {editing && (
+      {editing && !submit && (
         // 고친 주소로 이미 한 주문까지 바뀌는 줄 알면, 배송 중인 주문을 옮기려고 여기를 고친다
         <p className="text-[12px] text-[var(--fg-muted)]">{t('addr.pastOrdersNote')}</p>
       )}
+
+      {extraFields}
 
       <div className="mt-1 flex items-center gap-2">
         <Button type="submit" disabled={pending}>

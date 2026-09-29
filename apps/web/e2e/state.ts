@@ -58,6 +58,8 @@ export const STATE_FILE = {
   exchanger: 'test-results/.auth/exchange.json',
   /** 받은 주문을 스스로 구매확정한다 — purchase-confirm */
   purchaseConfirmer: 'test-results/.auth/purchase-confirm.json',
+  /** 출고 전 주문의 배송지를 고친다 — order-address */
+  orderAddressEditor: 'test-results/.auth/order-address.json',
   /** 운영진이 적립금을 손으로 지급·차감하는 손님 — point-adjust-admin */
   pointAdjustTarget: 'test-results/.auth/point-adjust.json',
   /** 배송지를 넣고 고치고 지운다 — address-edit */
@@ -118,6 +120,11 @@ export const RACE_PRODUCT = {
    * 옵션이 여럿이고 추가금이 없는(같은 값) 자사 브랜드 상품이다.
    */
   exchange: 'cotton-field-jacket',
+  /**
+   * 사서 배송지를 고친다 — order-address. 마지막에 주문을 되돌려 재고를 돌려주지만, 고치는 동안 재고를
+   * 물고 있으므로 옵션과 재고가 넉넉한 자사 브랜드 상품이어야 한다(가맹점 재고 알림을 흔들지 않는다).
+   */
+  orderAddress: 'cotton-cable-crewneck',
   /** 사서 받고 구매확정한다 — purchase-confirm. 재고 하나를 물고 돌려주지 않으므로 옵션과 재고가 넉넉한 자사 브랜드 상품이다 */
   purchaseConfirm: 'canvas-low-sneakers',
   /**

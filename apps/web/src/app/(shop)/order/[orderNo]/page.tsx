@@ -16,9 +16,11 @@ import { LateDepositNotice } from '~/components/late-deposit-notice';
 import { ReorderButton } from '~/components/reorder-button';
 import { ConfirmPurchaseButton } from '~/components/confirm-purchase-button';
 import { serverPaymentMode } from '~/lib/payments';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 import { orderNameOf } from '~/lib/checkout/pay-order';
 import { ReturnRequestForm } from '~/components/return-request-form';
 import { CancelReturnButton } from '~/components/cancel-return-button';
+import { OrderAddressEdit } from '~/components/order-address-edit';
 import { approvedReturnDestinations } from '~/lib/orders/return-address';
 import { getOrderForUser, getExchangeOptions, getDisplayedProductSlugs, type ExchangeOption } from '~/lib/queries/orders';
 import { NO_INDEX } from '~/lib/no-index';
@@ -44,11 +46,13 @@ export default async function OrderPage({
   // 돌아올 곳을 들고 간다 — 영수증 화면이 진작 그렇게 한다. 없으면 로그인한 뒤 첫 화면에 떨어진다
   if (!user) redirect(`/login?next=${encodeURIComponent(`/order/${orderNo}`)}`);
 
-  const [order, locale, t, query] = await Promise.all([
+  const [order, locale, t, query, shipping] = await Promise.all([
     getOrderForUser(orderNo, user.id),
     getLocale(),
     getT(),
     searchParams,
+    // 배송지를 고칠 때 도서산간 추가 배송비를 화면이 미리 말해 준다 — 결제 직전에 처음 보면 놀란다
+    getShippingPolicy(),
   ]);
   if (!order) notFound();
 
@@ -382,6 +386,25 @@ export default async function OrderPage({
             </>
           )}
         </p>
+        {/*
+          **고칠 길을 여기 둔다.** 출고 전까지만이다(core 의 checkAddressEdit) — 송장이 나간 뒤에는 물건이
+          이미 옛 주소로 가고 있어서, 주문에 적힌 주소만 바꾸면 화면과 현실이 갈린다. 없던 때에는 상세주소를
+          잘못 적으면 취소하고 다시 사거나 1:1 문의로 부탁해야 했고, 운영자도 화면에서 못 고쳐 DB 를 만졌다.
+        */}
+        {view.canEditAddress && (
+          <OrderAddressEdit
+            orderNo={order.orderNo}
+            remoteSurcharge={shipping.remoteSurcharge}
+            current={{
+              recipient: order.recipient,
+              phone: order.recipientPhone,
+              postalCode: order.postalCode,
+              address1: order.address1,
+              address2: order.address2,
+              memo: order.deliveryMemo,
+            }}
+          />
+        )}
       </section>
 
       {/*
