@@ -4,8 +4,8 @@ import { ForbiddenError, SettlementError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { closeSettlements, SettlementCloseError } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 const bodySchema = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) });
 
@@ -16,17 +16,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = bodySchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, bodySchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const result = await closeSettlements(actor, parsed.data.yearMonth);

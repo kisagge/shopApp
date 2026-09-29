@@ -3,8 +3,8 @@ import { getSessionUser } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 결제 승인. 결제창이 콜백한 paymentKey 를 받아 PG 에 승인을 요청한다. */
 export async function POST(
@@ -16,17 +16,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = confirmPaymentRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, confirmPaymentRequestSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
 

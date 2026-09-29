@@ -5,8 +5,8 @@ import { archiveProduct } from '~/lib/admin/archive-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 상품 보관·되돌리기. 매대·검색에서 빠지거나 돌아오므로 카탈로그 캐시를 턴다.
@@ -24,17 +24,8 @@ export async function PATCH(
   const limited = await enforceRateLimit('write', request, actor.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = archiveProductSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, archiveProductSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

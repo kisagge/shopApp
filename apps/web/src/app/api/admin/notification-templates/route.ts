@@ -4,8 +4,8 @@ import { updateNotificationTemplateSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { saveNotificationTemplate, TemplateError } from '~/lib/notifications/templates';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 알림 문구 템플릿 저장 · 되돌리기.
@@ -19,17 +19,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateNotificationTemplateSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateNotificationTemplateSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const { before, after } = await saveNotificationTemplate(actor, parsed.data);

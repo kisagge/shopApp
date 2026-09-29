@@ -5,8 +5,8 @@ import { getActor } from '@shop/auth/session';
 import { createBrand } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 자사 브랜드를 만든다. 가맹점 브랜드는 입점 승인이 만든다. */
 export async function POST(request: Request): Promise<NextResponse> {
@@ -22,15 +22,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createBrandSchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, createBrandSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const brand = await createBrand(actor, parsed.data);

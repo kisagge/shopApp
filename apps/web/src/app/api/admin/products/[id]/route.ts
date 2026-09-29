@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { updateProduct } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 상품 수정. 재고는 여기서 못 고친다 — /stock 으로 따로 간다. */
 export async function PATCH(
@@ -17,17 +17,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateProductSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateProductSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

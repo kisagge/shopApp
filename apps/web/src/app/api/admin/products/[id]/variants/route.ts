@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { createVariant } from '~/lib/admin/manage-product';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 옵션 추가 */
 export async function POST(
@@ -17,17 +17,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createVariantSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, createVariantSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

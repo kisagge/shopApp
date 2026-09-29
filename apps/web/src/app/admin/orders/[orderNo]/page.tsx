@@ -31,11 +31,14 @@ export const dynamic = 'force-dynamic';
 
 export default async function AdminOrderDetail({
   params,
+  searchParams,
 }: {
   params: Promise<{ orderNo: string }>;
+  /** 방금 무엇을 했는지 — 단추가 사라지는 동작이 결과를 여기에 싣는다(return-actions) */
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const actor = await requireAdmin('order:read');
-  const [t, { orderNo }] = await Promise.all([getT(), params]);
+  const [t, { orderNo }, query] = await Promise.all([getT(), params, searchParams]);
   // 메모는 주문과 나란히 읽는다. 볼 수 없는 주문이면 아래에서 404 로 끝나 메모는 쓰이지 않는다
   const [order, notes, shipping] = await Promise.all([
     getAdminOrder(actor, orderNo),
@@ -278,6 +281,15 @@ export default async function AdminOrderDetail({
               aria-labelledby="return-title"
               className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
             >
+              {/*
+                **누른 사람에게 끝났다고 말해 준다.** 확인을 기록하면 단추가 사라지므로, 그 단추가
+                들고 있던 말도 함께 사라진다 — 방금 한 일만 여기서 한 번 알린다(주소의 done).
+              */}
+              {query['done'] === 'received' && activeReturn.receivedAt && (
+                <p role="status" className="mb-4 rounded-sm bg-success-soft px-4 py-3 text-[13px] text-success">
+                  도착을 확인했습니다. 운영진이 환불을 진행합니다.
+                </p>
+              )}
               <div className="mb-4 flex items-baseline justify-between gap-4">
                 <h2 id="return-title" className="text-base font-semibold">
                   {t(RETURN_TYPE_KEY[activeReturn.type as ReturnType])} 신청

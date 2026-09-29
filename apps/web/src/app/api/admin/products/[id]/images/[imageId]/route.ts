@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { deleteProductImage, updateImageAlt } from '~/lib/admin/manage-images';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 const altSchema = z.object({
   alt: z.string().trim().min(1, 'valid.altTextRequired').max(200, 'valid.tooLongChars'),
@@ -22,17 +22,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = altSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, altSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id, imageId } = await params;
 

@@ -8,8 +8,8 @@ import { refundOrder, RefundError } from '~/lib/admin/refund-order';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { revalidateCatalog } from '~/lib/cache';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 const bodySchema = z.object({
   to: z.enum(ORDER_STATUS),
@@ -26,17 +26,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = bodySchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, bodySchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
 

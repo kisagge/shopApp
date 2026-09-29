@@ -7,8 +7,8 @@ import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrderItems, previewCancelItems, CancelItemsError } from '~/lib/orders/cancel-items';
 import { CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 일부 상품 취소·환불. 손님은 결제완료까지, 운영진은 출고 전까지.
@@ -25,17 +25,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = cancelItemsRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, cancelItemsRequestSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
   const { itemIds, reason, preview } = parsed.data;

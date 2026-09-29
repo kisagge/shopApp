@@ -7,8 +7,8 @@ import {
 } from '~/lib/admin/manage-collection';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 
 export async function PATCH(
@@ -25,15 +25,8 @@ export async function PATCH(
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateCollectionSchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, updateCollectionSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
   try {

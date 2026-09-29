@@ -7,8 +7,8 @@ import { bulkShipmentSchema, type BulkShipmentResult } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { findUnchangedShipments, registerShipmentAudited, ShipmentError } from '~/lib/admin/manage-shipment';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 송장 일괄 올리기.
@@ -42,17 +42,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const limited = await enforceRateLimit('shipmentBulk', request, actor.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = bulkShipmentSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, bulkShipmentSchema);
+  if (!parsed.ok) return parsed.response;
 
   const upload = readShipmentUpload(parseCsv(parsed.data.csv));
 

@@ -5,8 +5,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { NextResponse } from 'next/server';
 import { getQuoteViewer } from '~/lib/grade/effective';
 import { quoteCart } from '~/lib/queries/cart';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 장바구니 견적.
@@ -29,17 +28,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const limited = await enforceRateLimit('quote', request, sessionUser?.id ?? null);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = cartQuoteRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, cartQuoteRequestSchema);
+  if (!parsed.ok) return parsed.response;
 
   // 포인트 잔액은 세션이 아니라 DB 를 다시 본다. 세션 캐시가 5분이라 그동안
   // 다른 주문에서 쓴 포인트가 반영되지 않을 수 있다.

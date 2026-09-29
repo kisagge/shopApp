@@ -3,8 +3,8 @@ import { updateMerchantStatusSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateMerchantStatus } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 import { revalidateCatalog } from '~/lib/cache';
 
 /** 입점 승인·정지. 슈퍼관리자만. */
@@ -17,17 +17,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateMerchantStatusSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateMerchantStatusSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

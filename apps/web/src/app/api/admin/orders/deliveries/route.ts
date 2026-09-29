@@ -7,8 +7,8 @@ import { getActor } from '@shop/auth/session';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 배송완료 일괄 처리.
@@ -38,17 +38,8 @@ export async function POST(request: Request): Promise<NextResponse> {
   const limited = await enforceRateLimit('shipmentBulk', request, actor.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = bulkDeliverySchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, bulkDeliverySchema);
+  if (!parsed.ok) return parsed.response;
 
   const upload = readDeliveryUpload(parseCsv(parsed.data.csv));
 

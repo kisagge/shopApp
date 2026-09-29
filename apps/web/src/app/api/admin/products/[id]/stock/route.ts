@@ -3,8 +3,8 @@ import { updateStockSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateStockAudited } from '~/lib/admin/manage-product';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 재고 조정. 실사 결과를 덮어쓰는 동작이라 절대값을 받는다. */
 export async function PATCH(
@@ -16,17 +16,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateStockSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateStockSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

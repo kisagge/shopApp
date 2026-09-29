@@ -4,8 +4,8 @@ import { updateMailTemplateSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { saveMailTemplate, MailTemplateError } from '~/lib/mail/templates';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 메일 문구 템플릿 저장. 칸을 비우면(null) 그 칸은 기본 문구, 다 비우면 기본으로 되돌린다.
@@ -17,16 +17,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
   if (!actor) {
     return await unauthorized();
   }
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-  const parsed = updateMailTemplateSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateMailTemplateSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const { before, after } = await saveMailTemplate(actor, parsed.data);

@@ -5,8 +5,8 @@ import { adjustPoints } from '~/lib/admin/adjust-points';
 import { notifyPointsAdjusted } from '~/lib/account/notify-account';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 적립금 수동 지급·차감. 누가 누구에게 얼마를 왜 줬는지 감사 로그에 남긴다 — 포인트는 돈이다.
@@ -24,17 +24,8 @@ export async function POST(
   const limited = await enforceRateLimit('write', request, actor.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = adjustPointsSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, adjustPointsSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

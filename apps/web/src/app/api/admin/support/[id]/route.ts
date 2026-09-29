@@ -4,8 +4,8 @@ import { supportPostSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateSupportPost, deleteSupportPost } from '~/lib/admin/manage-support';
 import { revalidateSupport } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -30,17 +30,8 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
   if (denied) return denied;
   const actor = (await getActor(request.headers))!;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = supportPostSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, supportPostSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
   const post = await updateSupportPost(actor, id, parsed.data);

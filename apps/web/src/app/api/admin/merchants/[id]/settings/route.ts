@@ -6,8 +6,8 @@ import {
   MerchantSettingsError, updateMerchantBusiness, updateMerchantSettings,
 } from '~/lib/admin/merchant-settings';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 가맹점 연락처와 정산 계좌(PUT), 사업자 정보(PATCH).
@@ -27,17 +27,8 @@ export async function PUT(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = merchantSettingsSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, merchantSettingsSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 
@@ -67,17 +58,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = merchantBusinessSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, merchantBusinessSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

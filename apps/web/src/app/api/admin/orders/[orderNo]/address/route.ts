@@ -3,8 +3,8 @@ import { getActor } from '@shop/auth/session';
 import { updateOrderAddressSchema } from '@shop/contract';
 import { updateOrderAddressAsAdmin } from '~/lib/admin/manage-order-address';
 import { recordAudit } from '~/lib/audit';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
-import { validationFailed } from '~/lib/i18n/validation';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 운영진·가맹점이 주문의 배송지를 고친다.
@@ -24,17 +24,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateOrderAddressSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateOrderAddressSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
 

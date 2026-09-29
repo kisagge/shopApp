@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server';
 import { cartSyncSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { mergeServerCart } from '~/lib/cart/server-cart';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 로그인 직후 장바구니 병합.
@@ -17,17 +17,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = cartSyncSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, cartSyncSchema);
+  if (!parsed.ok) return parsed.response;
 
   return NextResponse.json({ items: await mergeServerCart(user.id, parsed.data.lines) });
 }

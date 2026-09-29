@@ -5,8 +5,8 @@ import { getActor } from '@shop/auth/session';
 import { updateBanner, deleteBanner } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 
 export async function PATCH(
@@ -23,17 +23,8 @@ export async function PATCH(
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateBannerSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateBannerSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

@@ -7,8 +7,8 @@ import {
 } from '~/lib/admin/manage-images';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, fileRequired, imageTooLarge, invalidForm, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, fileRequired, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
@@ -81,17 +81,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = reorderSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, reorderSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

@@ -7,8 +7,8 @@ import {
 } from '~/lib/admin/manage-collection';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -22,15 +22,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createCollectionSchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, createCollectionSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const collection = await createCollection(actor, parsed.data);
@@ -55,15 +48,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = reorderCollectionSchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, reorderCollectionSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const collections = await reorderCollections(actor, parsed.data.orderedIds);

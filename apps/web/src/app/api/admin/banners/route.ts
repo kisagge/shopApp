@@ -5,8 +5,8 @@ import { getActor } from '@shop/auth/session';
 import { createBanner, reorderBanners } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -20,17 +20,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createBannerSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, createBannerSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const banner = await createBanner(actor, parsed.data);
@@ -57,17 +48,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = reorderBannerSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, reorderBannerSchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const banners = await reorderBanners(actor, parsed.data.orderedIds);

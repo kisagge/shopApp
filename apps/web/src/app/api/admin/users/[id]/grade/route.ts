@@ -3,8 +3,8 @@ import { setGradeSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { setUserGrade } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 회원 등급 올려 주기.
@@ -23,17 +23,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = setGradeSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, setGradeSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

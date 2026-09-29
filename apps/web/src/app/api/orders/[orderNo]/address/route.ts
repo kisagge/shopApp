@@ -2,9 +2,9 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { updateOrderAddressSchema } from '@shop/contract';
 import { updateOrderAddress } from '~/lib/orders/update-address';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
 
 /**
  * 손님이 자기 주문의 배송지를 고친다.
@@ -27,17 +27,8 @@ export async function PATCH(
   const limited = await enforceRateLimit('write', request, user.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateOrderAddressSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateOrderAddressSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
 

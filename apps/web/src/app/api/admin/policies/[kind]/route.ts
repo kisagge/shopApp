@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { savePolicy } from '~/lib/policies/policy';
 import { recordAudit } from '~/lib/audit';
 import { revalidatePolicies } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 약관·개인정보처리방침 저장.
@@ -28,17 +28,8 @@ export async function PUT(
     return NextResponse.json({ code: 'NOT_FOUND', message: '없는 문서입니다.' }, { status: 404 });
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = policySchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, policySchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const { before, after } = await savePolicy(actor, parsedKind.data, parsed.data);

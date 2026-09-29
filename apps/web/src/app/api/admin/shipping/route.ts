@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { updateShippingPolicy } from '~/lib/admin/manage-shipping';
 import { recordAudit } from '~/lib/audit';
 import { revalidateShipping } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 배송비 정책 수정.
@@ -24,17 +24,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateShippingPolicySchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, updateShippingPolicySchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const { before, after } = await updateShippingPolicy(actor, parsed.data);

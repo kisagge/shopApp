@@ -4,8 +4,8 @@ import { supportPostSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { createSupportPost } from '~/lib/admin/manage-support';
 import { revalidateSupport } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -18,17 +18,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = supportPostSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, supportPostSchema);
+  if (!parsed.ok) return parsed.response;
 
   const post = await createSupportPost(actor, parsed.data);
   revalidateSupport();

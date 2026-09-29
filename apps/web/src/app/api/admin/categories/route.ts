@@ -5,8 +5,8 @@ import { getActor } from '@shop/auth/session';
 import { createCategory, reorderCategories } from '~/lib/admin/manage-category';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -22,15 +22,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createCategorySchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, createCategorySchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const tree = await createCategory(actor, parsed.data);
@@ -56,15 +49,8 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return await forbidden();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = reorderCategorySchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, reorderCategorySchema);
+  if (!parsed.ok) return parsed.response;
 
   try {
     const tree = await reorderCategories(actor, parsed.data.parentId, parsed.data.orderedIds);

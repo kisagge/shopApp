@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { updateBrand } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 이름과 주소를 고친다.
@@ -23,15 +23,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = updateBrandSchema.safeParse(body);
-  if (!parsed.success) return validationFailed(parsed.error);
+  const parsed = await readBody(request, updateBrandSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

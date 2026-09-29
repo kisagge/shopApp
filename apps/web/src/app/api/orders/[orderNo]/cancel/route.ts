@@ -6,8 +6,8 @@ import { notifyAfterSale } from '~/lib/orders/notify-after-sale';
 import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 주문 취소·환불. 고객은 출고 전까지, 운영진은 order:refund 권한으로. */
 export async function POST(
@@ -19,17 +19,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = cancelOrderRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, cancelOrderRequestSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
 

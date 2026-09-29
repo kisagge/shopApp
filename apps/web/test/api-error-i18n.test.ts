@@ -53,3 +53,39 @@ describe('라우트 오류 응답', () => {
     expect(users.length).toBeGreaterThan(30);
   });
 });
+
+/**
+ * 본문을 읽는 자리도 한 곳이다.
+ *
+ * **같은 열 줄이 마흔여덟 곳에 있었다** — 본문을 못 읽으면 400, 계약에 안 맞으면 어느 칸이 틀렸는지와
+ * 함께 400. 창구마다 다를 이유가 없는데 창구마다 적혀 있었고, 그래서 본문 크기 상한 같은 것을 걸 자리가
+ * 마흔여덟 곳이었다. `readBody(request, schema)` 가 그 열 줄을 대신한다.
+ *
+ * **조용히 버려야 하는 창구는 뺀다.** 오류 수집·CSP 신고·결제 웹훅은 형식이 이상해도 브라우저나
+ * 결제사에게 돌려줄 말이 없어 204·200 으로 끝낸다 — 400 을 돌려주는 것과 다른 이야기다.
+ */
+describe('본문 읽기', () => {
+  /** 이름과 이유를 함께 적는다 — 다음 사람이 여기에 한 줄 더 적기 전에 그 이유를 보게 */
+  const QUIET: Readonly<Record<string, string>> = {
+    'api/errors/route.ts': '브라우저가 보낸 오류다 — 형식이 이상하면 조용히 버린다(204)',
+    'api/csp-report/route.ts': '브라우저의 신고다 — 돌려줄 말이 없다(204)',
+    'api/webhooks/toss/route.ts': '결제사에게는 받았다고만 답한다 — 재시도를 부르지 않는다(200)',
+  };
+
+  it('본문 읽기를 손으로 적은 라우트가 없다', () => {
+    const offenders = files
+      .filter((f) => readFileSync(f, 'utf8').includes('body = await request.json();'))
+      .map((f) => f.replace(API, 'api'))
+      .filter((name) => !(name in QUIET));
+
+    expect(offenders, '~/lib/api/read-body 의 readBody 를 쓰세요').toEqual([]);
+  });
+
+  it('조용히 버리는 창구는 실제로 그 셋뿐이다 — 목록이 낡으면 예외가 예외가 아니게 된다', () => {
+    const quiet = Object.keys(QUIET).filter((name) =>
+      files.some((f) => f.replace(API, 'api') === name),
+    );
+
+    expect(quiet.sort()).toEqual(Object.keys(QUIET).sort());
+  });
+});

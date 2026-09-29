@@ -6,9 +6,9 @@ import { enforceRateLimit } from '~/lib/rate-limit';
 import { NextResponse } from 'next/server';
 import { revalidateCatalog } from '~/lib/cache';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
-import { validationFailed } from '~/lib/i18n/validation';
 import { getLocale } from '~/lib/i18n/server';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 주문 생성.
@@ -44,17 +44,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = createOrderRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, createOrderRequestSchema);
+  if (!parsed.ok) return parsed.response;
 
   /*
    * 포인트 잔액과 적립률을 DB 에서 다시 낸다.

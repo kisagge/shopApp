@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { cartSyncSchema } from '@shop/contract';
 import { getSessionUser } from '@shop/auth/session';
 import { getServerCart, replaceServerCart } from '~/lib/cart/server-cart';
-import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 서버에 저장된 장바구니를 읽는다. 비로그인이면 빈 목록이다. */
 export async function GET(request: Request): Promise<NextResponse> {
@@ -22,17 +21,8 @@ export async function PUT(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
   if (!user) return NextResponse.json({ saved: false });
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = cartSyncSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, cartSyncSchema);
+  if (!parsed.ok) return parsed.response;
 
   await replaceServerCart(user.id, parsed.data.lines);
   return NextResponse.json({ saved: true });

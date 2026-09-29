@@ -3,8 +3,8 @@ import { assignRoleSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { assignRole } from '~/lib/admin/manage-access';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 권한 부여. 슈퍼관리자만, 자기 자신은 제외. */
 export async function PATCH(
@@ -16,17 +16,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = assignRoleSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, assignRoleSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

@@ -4,8 +4,8 @@ import { ForbiddenError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { setErrorResolved } from '~/lib/queries/admin/errors';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 const schema = z.object({ resolved: z.boolean() });
 
@@ -24,17 +24,8 @@ export async function PATCH(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = schema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, schema);
+  if (!parsed.ok) return parsed.response;
 
   const { fingerprint } = await params;
 

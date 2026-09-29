@@ -4,8 +4,8 @@ import { getActor } from '@shop/auth/session';
 import { addOrderNote } from '~/lib/orders/order-notes';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 주문 내부 메모 남기기. 손님에게는 보이지 않는다 */
 export async function POST(
@@ -19,16 +19,8 @@ export async function POST(
   const limited = await enforceRateLimit('write', request, actor.id);
   if (limited) return limited;
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-  const parsed = orderNoteSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, orderNoteSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { orderNo } = await params;
   try {

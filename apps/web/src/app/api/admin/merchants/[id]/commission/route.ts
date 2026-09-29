@@ -3,8 +3,8 @@ import { merchantCommissionSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { updateMerchantCommission } from '~/lib/admin/merchant-settings';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 수수료율 변경 — **슈퍼관리자만**(merchant:approve).
@@ -21,17 +21,8 @@ export async function PUT(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = merchantCommissionSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, merchantCommissionSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
 

@@ -293,7 +293,6 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState('');
 
   async function receive() {
     setPending(true);
@@ -309,7 +308,12 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
         setError(result.message ?? '확인하지 못했습니다.');
         return;
       }
-      setStatus('도착을 확인했습니다. 운영진이 환불을 진행합니다.');
+      /*
+       * **단추가 사라지므로 결과는 주소에 싣는다.** 확인이 기록되면 화면을 다시 그리는데, 그때 이
+       * 단추 자리가 통째로 없어진다 — 여기 담아 둔 말도 함께 사라져서 누른 사람에게는 아무 일도
+       * 안 일어난 것처럼 보인다(낭독기 쪽은 특히). 손님 화면의 구매확정이 같은 이유로 그렇게 한다.
+       */
+      router.replace(`/admin/orders/${encodeURIComponent(orderNo)}?done=received`, { scroll: false });
       router.refresh();
     } catch {
       setError('네트워크 오류로 처리하지 못했습니다.');
@@ -328,7 +332,7 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
           {error}
         </p>
       )}
-      <p aria-live="polite" className="text-[12px] text-[var(--fg-muted)]">{status}</p>
+      {/* 끝났다는 말은 이 자리에 두지 않는다 — 확인이 기록되면 이 단추가 통째로 사라진다(화면이 알린다) */}
       <div>
         <Button type="button" size="md" onClick={() => void receive()} aria-disabled={pending}>
           {pending ? '확인하는 중…' : '물건 도착 확인'}

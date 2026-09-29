@@ -4,8 +4,8 @@ import { PLATFORM_RETURN_ADDRESS_ID } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { updateReturnAddress } from '~/lib/orders/return-address';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /**
  * 반품지 등록·수정. `owner` 는 가맹점 id, 또는 자사 상품을 받는 플랫폼 반품지면 `platform`.
@@ -23,17 +23,8 @@ export async function PUT(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-
-  const parsed = returnAddressInputSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, returnAddressInputSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { owner } = await params;
   const merchantId = owner === PLATFORM_RETURN_ADDRESS_ID ? null : owner;

@@ -3,8 +3,8 @@ import { settlementHoldSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { holdSettlement } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
-import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, unauthorized } from '~/lib/api/respond';
+import { readBody } from '~/lib/api/read-body';
 
 /** 지급 보류·해제. 슈퍼관리자만 — 지급을 멈추는 것도 지급의 일이다. */
 export async function POST(
@@ -16,16 +16,8 @@ export async function POST(
     return await unauthorized();
   }
 
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return await invalidJson();
-  }
-  const parsed = settlementHoldSchema.safeParse(body);
-  if (!parsed.success) {
-    return validationFailed(parsed.error);
-  }
+  const parsed = await readBody(request, settlementHoldSchema);
+  if (!parsed.ok) return parsed.response;
 
   const { id } = await params;
   try {
