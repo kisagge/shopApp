@@ -2,17 +2,12 @@ import { NextResponse } from 'next/server';
 import { canManageCategory } from '@shop/core';
 import { createCategorySchema, reorderCategorySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { createCategory, reorderCategories, CategoryError } from '~/lib/admin/manage-category';
+import { createCategory, reorderCategories } from '~/lib/admin/manage-category';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
-function fail(error: unknown): NextResponse | null {
-  return error instanceof CategoryError
-    ? NextResponse.json({ code: error.code, message: error.message }, { status: error.status })
-    : null;
-}
 
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -47,7 +42,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     revalidateCatalog();
     return NextResponse.json(tree, { status: 201 });
   } catch (error) {
-    return fail(error) ?? (() => { throw error; })();
+    return await apiError(error);
   }
 }
 
@@ -81,6 +76,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     revalidateCatalog();
     return NextResponse.json(tree);
   } catch (error) {
-    return fail(error) ?? (() => { throw error; })();
+    return await apiError(error);
   }
 }

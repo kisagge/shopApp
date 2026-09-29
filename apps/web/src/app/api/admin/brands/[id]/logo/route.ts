@@ -1,26 +1,11 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, ImageError, MAX_IMAGE_BYTES } from '@shop/core';
+import { ForbiddenError, MAX_IMAGE_BYTES } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { setBrandLogo, removeBrandLogo, BrandError } from '~/lib/admin/manage-brand';
-import { StorageError } from '~/lib/storage';
+import { setBrandLogo, removeBrandLogo } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
 
-async function fail(error: unknown): Promise<NextResponse | null> {
-  if (error instanceof ImageError) return await apiError(error);
-  if (error instanceof BrandError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-  }
-  if (error instanceof StorageError) {
-    // 설정 문제는 500 이 아니다. 고칠 수 있는 사람에게 무엇이 빠졌는지 알려 준다 — 상품 사진과 같다
-    return NextResponse.json(
-      { code: error.code, message: error.message },
-      { status: error.code === 'NOT_CONFIGURED' ? 503 : 502 },
-    );
-  }
-  return null;
-}
 
 /**
  * 브랜드 로고 올리기. multipart/form-data 로 파일 하나.
@@ -61,9 +46,7 @@ export async function POST(
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof ForbiddenError) return await forbidden();
-    const handled = await fail(error);
-    if (handled) return handled;
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -85,8 +68,6 @@ export async function DELETE(
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ForbiddenError) return await forbidden();
-    const handled = await fail(error);
-    if (handled) return handled;
-    throw error;
+    return await apiError(error);
   }
 }

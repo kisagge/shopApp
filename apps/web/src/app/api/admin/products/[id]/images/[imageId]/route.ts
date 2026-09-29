@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ImageError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { deleteProductImage, updateImageAlt } from '~/lib/admin/manage-images';
-import { ProductError } from '~/lib/admin/manage-product';
-import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
@@ -14,19 +11,6 @@ const altSchema = z.object({
   alt: z.string().trim().min(1, 'valid.altTextRequired').max(200, 'valid.tooLongChars'),
 });
 
-async function fail(error: unknown): Promise<NextResponse | null> {
-  if (error instanceof ImageError) return await apiError(error);
-  if (error instanceof ProductError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-  }
-  if (error instanceof StorageError) {
-    return NextResponse.json(
-      { code: error.code, message: error.message },
-      { status: error.code === 'NOT_CONFIGURED' ? 503 : 502 },
-    );
-  }
-  return null;
-}
 
 /** 대체 텍스트 수정 */
 export async function PATCH(
@@ -65,9 +49,7 @@ export async function PATCH(
     });
     return NextResponse.json(image);
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -97,8 +79,6 @@ export async function DELETE(
     });
     return NextResponse.json({ images: remaining });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }

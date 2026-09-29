@@ -1,22 +1,13 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, hasPermission } from '@shop/core';
+import { hasPermission } from '@shop/core';
 import { updateBannerSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateBanner, deleteBanner, BannerError } from '~/lib/admin/manage-banner';
+import { updateBanner, deleteBanner } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
-async function fail(error: unknown): Promise<NextResponse | null> {
-  if (error instanceof BannerError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-  }
-  if (error instanceof ForbiddenError) {
-    return await forbidden();
-  }
-  return null;
-}
 
 export async function PATCH(
   request: Request,
@@ -57,9 +48,7 @@ export async function PATCH(
     });
     return NextResponse.json(after);
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -87,8 +76,6 @@ export async function DELETE(
     });
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }

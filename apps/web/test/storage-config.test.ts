@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readS3Config } from '~/lib/storage';
+import { readS3Config, StorageError } from '~/lib/storage';
 
 // ProcessEnv 는 NODE_ENV 를 요구한다. 설정 읽기가 보는 것은 S3_* 뿐이다.
 const full: NodeJS.ProcessEnv = {
@@ -51,5 +51,26 @@ describe('스토리지 설정 읽기', () => {
 
   it('리전 기본값이 있다', () => {
     expect(readS3Config(full)?.region).toBe('ap-northeast-2');
+  });
+});
+
+/**
+ * **설정 문제는 500 이 아니다.** 열쇠가 없어서 못 올린 것과 저장소가 넘어진 것은 고칠 사람도, 다시
+ * 시도할지 여부도 다르다. 이 셈을 라우트 여섯 곳이 각자 하고 있었고, 새 업로드 창구를 만들 때마다
+ * 한 곳씩 더 복사됐다 — 오류가 스스로 알면 공통 응답이 그대로 옮겨 준다.
+ */
+describe('스토리지 오류의 상태 코드', () => {
+  it('설정이 없는 것은 503 — 아직 준비가 안 된 것이다', () => {
+    expect(new StorageError('NOT_CONFIGURED', '스토리지 설정이 없습니다').status).toBe(503);
+  });
+
+  it.each(['PUT_FAILED', 'DELETE_FAILED'] as const)('%s 는 502 — 밖이 넘어졌다', (code) => {
+    expect(new StorageError(code, '올리지 못했습니다').status).toBe(502);
+  });
+
+  it('코드와 문구를 그대로 지닌다 — 공통 응답이 이 셋을 읽는다', () => {
+    const error = new StorageError('PUT_FAILED', '올리지 못했습니다');
+    expect({ code: error.code, message: error.message, status: error.status })
+      .toEqual({ code: 'PUT_FAILED', message: '올리지 못했습니다', status: 502 });
   });
 });

@@ -10,7 +10,7 @@ import { readJsonWithImages } from '~/lib/images/read-body';
 import type { UploadedImage } from '~/lib/images/upload-files';
 import { StorageError } from '~/lib/storage';
 import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, failWith, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 문의 작성 — 상품 문의와 1:1 문의.
@@ -59,12 +59,10 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error) {
     if (uploaded.length > 0) await discardInquiryImages(uploaded.map((u) => u.key));
     if (error instanceof ImageError) return await apiError(error);
+    // 저장소가 넘어진 것은 이 사람 잘못이 아니다 — 적은 글을 잃지 않게 다음 수를 알려 준다
     if (error instanceof StorageError) {
-      return NextResponse.json({ code: error.code, message: '사진을 올리지 못했습니다. 사진 없이 다시 보내 주세요.' }, { status: 503 });
+      return await failWith(503, error.code, 'err.inquiry.imageUploadFailed');
     }
-    if (error instanceof InquiryError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    throw error;
+    return await apiError(error);
   }
 }

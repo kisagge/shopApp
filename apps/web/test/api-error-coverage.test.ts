@@ -13,6 +13,10 @@ import { join } from 'node:path';
  * **더 실을 것이 있는 말미는 그대로 둔다.** 결제 오류의 `retryable`, 메일 템플릿의
  * `problems`, 내려받기가 413 으로 내보내는 상한 초과 — 이런 것은 그 라우트만 아는
  * 사정이다. 이 검사가 막는 것은 **더 실을 것이 없는데도 손으로 적은 말미**다.
+ *
+ * **한 겹 미루는 것도 같은 일이다.** 아홉 라우트가 그 여섯 줄을 `fail(error)` 라는 헬퍼로 옮겨 두고
+ * `catch` 에서는 `fail` 을 부르기만 했다 — 검사는 `catch` 안만 봤으므로 전부 통과했고, 새 도메인
+ * 오류가 생길 때마다 그 헬퍼들도 함께 고쳐야 하는 사정은 그대로였다.
  */
 const API = join(process.cwd(), 'src', 'app', 'api');
 
@@ -46,6 +50,9 @@ const FORBIDDEN_BRANCH = new RegExp(
 
 const routes = walk(API);
 
+/** `catch` 밖으로 옮겨 둔 말미 — `fail(error)` 같은 헬퍼 */
+const HELPER = /(?:async )?function \w+\(error: unknown\)[^\n]*\{\n(.*?)\n\}\n/gs;
+
 describe('라우트 말미', () => {
   it('라우트를 실제로 읽었다 — 못 읽으면 아래가 전부 헛돈다', () => {
     expect(routes.length).toBeGreaterThan(50);
@@ -75,6 +82,36 @@ describe('라우트 말미', () => {
       offenders,
       `말미를 손으로 적었다:\n${offenders.join('\n')}\n` +
         'respond.ts 의 apiError(error) 로 끝내면 된다 — 도메인 오류가 하나 늘어도 라우트는 안 고친다.',
+    ).toEqual([]);
+  });
+
+  /**
+   * 헬퍼로 한 겹 미루면 위 검사는 `catch` 안에서 `instanceof` 를 못 보고 지나간다. 실제로 아홉 곳이
+   * 그렇게 통과하고 있었다 — 옮기는 일이 같으면 옮기는 자리도 같아야 한다.
+   */
+  it('말미를 헬퍼로 옮겨 놓은 라우트가 없다', () => {
+    const offenders = routes
+      .filter((route) =>
+        [...route.source.matchAll(HELPER)].some((m) => {
+          let rest = `${m[1]!}\n`.replace(/^ {2}/gm, '    ');
+          if (!rest.includes('instanceof')) return false;
+          for (const branch of [PLAIN_BRANCH, FORBIDDEN_BRANCH]) {
+            let hit = true;
+            while (hit) {
+              const next = rest.replace(branch, '');
+              hit = next !== rest;
+              rest = next;
+            }
+          }
+          return rest.trim() === 'return null;';
+        }),
+      )
+      .map((route) => route.name);
+
+    expect(
+      offenders,
+      `헬퍼 안에 말미를 적었다:\n${offenders.join('\n')}\n` +
+        'apiError(error) 가 같은 일을 한다 — 도메인 오류는 응답으로, 권한 오류는 403 으로, 모르는 것은 다시 던진다.',
     ).toEqual([]);
   });
 });

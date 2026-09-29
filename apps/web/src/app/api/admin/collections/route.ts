@@ -1,24 +1,15 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, hasPermission } from '@shop/core';
+import { hasPermission } from '@shop/core';
 import { createCollectionSchema, reorderCollectionSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import {
-  createCollection, reorderCollections, CollectionError,
+  createCollection, reorderCollections,
 } from '~/lib/admin/manage-collection';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
-async function fail(error: unknown): Promise<NextResponse | null> {
-  if (error instanceof CollectionError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-  }
-  if (error instanceof ForbiddenError) {
-    return await forbidden();
-  }
-  return null;
-}
 
 export async function POST(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -50,9 +41,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json(collection, { status: 201 });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -85,8 +74,6 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json({ collections });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }

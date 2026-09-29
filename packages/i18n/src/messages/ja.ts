@@ -850,6 +850,7 @@ export const ja: Dictionary = {
   'err.inquiry.notOwn': 'ご自身のお問い合わせのみ削除できます。',
   'err.inquiry.alreadyAnswered': 'すでに回答済みのお問い合わせです。',
   'err.inquiry.imagesSupportOnly': '写真は1:1のお問い合わせにのみ添付できます。',
+  'err.inquiry.imageUploadFailed': '写真をアップロードできませんでした。写真なしでもう一度お送りください。',
   'err.closure.blocked': '今は退会できません。',
   'err.closure.phraseMismatch': '確認の文言を正確に入力してください。「{phrase}」',
   'err.closure.alreadyClosed': 'すでに退会したアカウントです。',

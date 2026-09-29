@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import { ForbiddenError, ImageError, MAX_IMAGE_BYTES, hasPermission } from '@shop/core';
+import { MAX_IMAGE_BYTES, hasPermission } from '@shop/core';
 import { getActor } from '@shop/auth/session';
-import { setBannerImage, BannerError } from '~/lib/admin/manage-banner';
-import { StorageError } from '~/lib/storage';
+import { setBannerImage } from '~/lib/admin/manage-banner';
 import { recordAudit } from '~/lib/audit';
 import { revalidateBanners } from '~/lib/cache';
 import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
@@ -54,19 +53,6 @@ export async function POST(
     });
     return NextResponse.json(banner);
   } catch (error) {
-    if (error instanceof ImageError) return await apiError(error);
-    if (error instanceof BannerError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-    }
-    if (error instanceof StorageError) {
-      return NextResponse.json(
-        { code: error.code, message: error.message },
-        { status: error.code === 'NOT_CONFIGURED' ? 503 : 502 },
-      );
-    }
-    if (error instanceof ForbiddenError) {
-      return await forbidden();
-    }
-    throw error;
+    return await apiError(error);
   }
 }

@@ -2,17 +2,12 @@ import { NextResponse } from 'next/server';
 import { canManageCategory } from '@shop/core';
 import { updateCategorySchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { updateCategory, deleteCategory, CategoryError } from '~/lib/admin/manage-category';
+import { updateCategory, deleteCategory } from '~/lib/admin/manage-category';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, forbidden, invalidJson, unauthorized } from '~/lib/api/respond';
 
-function fail(error: unknown): NextResponse | null {
-  return error instanceof CategoryError
-    ? NextResponse.json({ code: error.code, message: error.message }, { status: error.status })
-    : null;
-}
 
 export async function PATCH(
   request: Request,
@@ -47,7 +42,7 @@ export async function PATCH(
     revalidateCatalog();
     return NextResponse.json(tree);
   } catch (error) {
-    return fail(error) ?? (() => { throw error; })();
+    return await apiError(error);
   }
 }
 
@@ -74,6 +69,6 @@ export async function DELETE(
     revalidateCatalog();
     return NextResponse.json(tree);
   } catch (error) {
-    return fail(error) ?? (() => { throw error; })();
+    return await apiError(error);
   }
 }

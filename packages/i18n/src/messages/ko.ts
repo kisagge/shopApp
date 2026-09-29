@@ -882,6 +882,7 @@ export const ko = {
   'err.inquiry.notOwn': '내가 쓴 문의만 지울 수 있습니다.',
   'err.inquiry.alreadyAnswered': '이미 답변이 달린 문의입니다.',
   'err.inquiry.imagesSupportOnly': '사진은 1:1 문의에만 올릴 수 있습니다.',
+  'err.inquiry.imageUploadFailed': '사진을 올리지 못했습니다. 사진 없이 다시 보내 주세요.',
   'err.closure.blocked': '지금은 탈퇴할 수 없습니다.',
   'err.closure.phraseMismatch': '확인 문구를 정확히 입력해 주세요. "{phrase}"',
   'err.closure.alreadyClosed': '이미 탈퇴한 계정입니다.',

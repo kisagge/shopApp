@@ -25,6 +25,16 @@ async function fail(status: number, code: string, key: MessageKey): Promise<Next
   return NextResponse.json({ code, message: (await getT())(key) }, { status });
 }
 
+/**
+ * 라우트만 아는 사정을 담은 말미.
+ *
+ * 아래의 정형 응답 중 어느 것도 맞지 않을 때 쓴다 — 오류가 아는 문구 대신 **그 자리의 문구**를
+ * 내보내야 할 때다(사진을 못 올렸으니 사진 없이 다시 보내 달라는 안내처럼). 문구는 여기서도 열쇠로
+ * 받는다: 손으로 적으면 그 라우트만 한국어로 남는다.
+ */
+export const failWith = (status: number, code: string, key: MessageKey): Promise<NextResponse> =>
+  fail(status, code, key);
+
 /** 로그인하지 않았다 */
 export const unauthorized = (): Promise<NextResponse> =>
   fail(401, 'UNAUTHORIZED', 'api.unauthorized');

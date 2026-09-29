@@ -854,6 +854,7 @@ export const en: Dictionary = {
   'err.inquiry.notOwn': 'You can only delete your own question.',
   'err.inquiry.alreadyAnswered': 'This question has already been answered.',
   'err.inquiry.imagesSupportOnly': 'Photos can only be attached to private enquiries.',
+  'err.inquiry.imageUploadFailed': "We couldn't upload the photo. Please send it again without photos.",
   'err.closure.blocked': 'Your account cannot be closed right now.',
   'err.closure.phraseMismatch': 'Please type the confirmation phrase exactly. "{phrase}"',
   'err.closure.alreadyClosed': 'This account is already closed.',

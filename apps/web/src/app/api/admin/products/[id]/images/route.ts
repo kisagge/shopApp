@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { ImageError, MAX_IMAGE_BYTES } from '@shop/core';
+import { MAX_IMAGE_BYTES } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import {
   addProductImage, reorderProductImages,
 } from '~/lib/admin/manage-images';
-import { ProductError } from '~/lib/admin/manage-product';
-import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
@@ -14,20 +12,6 @@ import { apiError, fileRequired, imageTooLarge, invalidForm, invalidJson, unauth
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
-async function fail(error: unknown): Promise<NextResponse | null> {
-  if (error instanceof ImageError) return await apiError(error);
-  if (error instanceof ProductError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
-  }
-  if (error instanceof StorageError) {
-    // 설정 문제는 500 이 아니다. 고칠 수 있는 사람에게 무엇이 빠졌는지 알려 준다.
-    return NextResponse.json(
-      { code: error.code, message: error.message },
-      { status: error.code === 'NOT_CONFIGURED' ? 503 : 502 },
-    );
-  }
-  return null;
-}
 
 /** 이미지 업로드. multipart/form-data 로 파일 하나를 받는다. */
 export async function POST(
@@ -83,9 +67,7 @@ export async function POST(
 
     return NextResponse.json(image, { status: 201 });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }
 
@@ -126,8 +108,6 @@ export async function PATCH(
     });
     return NextResponse.json({ images });
   } catch (error) {
-    const response = await fail(error);
-    if (response) return response;
-    throw error;
+    return await apiError(error);
   }
 }

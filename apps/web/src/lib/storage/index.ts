@@ -23,9 +23,19 @@ export interface StorageAdapter {
 }
 
 export class StorageError extends Error {
+  /**
+   * **설정 문제는 500 이 아니다.** 열쇠가 없어서 못 올린 것과 저장소가 넘어진 것은 고칠 사람도
+   * 다시 시도할지 여부도 다르다 — 앞의 것은 503(아직 준비가 안 됨), 뒤의 것은 502(밖이 넘어짐).
+   *
+   * 이 셈을 라우트 여섯 곳이 각자 하고 있었다. 도메인 오류의 모양(code·message·status)을 갖추면
+   * 공통 응답이 그대로 옮겨 준다.
+   */
+  readonly status: number;
+
   constructor(readonly code: 'NOT_CONFIGURED' | 'PUT_FAILED' | 'DELETE_FAILED', message: string) {
     super(message);
     this.name = 'StorageError';
+    this.status = code === 'NOT_CONFIGURED' ? 503 : 502;
   }
 }
 
