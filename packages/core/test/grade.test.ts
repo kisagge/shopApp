@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { won } from '../src/money';
 import {
   MEMBER_GRADE, GRADE_THRESHOLD, GRADE_REWARD_PERCENT,
-  gradeFor, nextGrade, gradeProgress, effectiveGrade,
+  gradeFor, nextGrade, gradeProgress, effectiveGrade, gradeFloorTakesEffect,
 } from '../src/grade';
 
 describe('등급 산정', () => {
@@ -102,5 +102,37 @@ describe('effectiveGrade — 진실이 둘이면 안 된다', () => {
   it('진행률이 음수가 되지 않는다', () => {
     const p = gradeProgress(won(50_000), 'GOLD');
     expect(p.percent).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/**
+ * 올려 준 등급이 실제로 뜻이 있는가.
+ *
+ * **여기서 적는 값은 바닥이지 답이 아니다.** 실제 등급은 구매액에서 계산한 것과 저장된 것 중 높은 쪽이라,
+ * 이미 구매로 더 높이 올라간 사람에게 낮은 값을 적어 두면 화면에는 아무 변화가 없다 — 운영자는 눌렀는데
+ * 아무 일도 안 일어난 것으로 본다.
+ */
+describe('등급을 올려 줄 수 있는 때', () => {
+  it('지금보다 높으면 뜻이 있다', () => {
+    expect(gradeFloorTakesEffect({ effective: 'SILVER', wanted: 'GOLD' })).toBe(true);
+    expect(gradeFloorTakesEffect({ effective: 'BASIC', wanted: 'VIP' })).toBe(true);
+  });
+
+  it('같으면 아무것도 안 바뀐다', () => {
+    expect(gradeFloorTakesEffect({ effective: 'GOLD', wanted: 'GOLD' })).toBe(false);
+  });
+
+  it('낮으면 화면이 그대로다 — 구매액이 말하는 등급이 이긴다', () => {
+    expect(gradeFloorTakesEffect({ effective: 'VIP', wanted: 'SILVER' })).toBe(false);
+  });
+
+  it('실제 등급 판정과 어긋나지 않는다', () => {
+    // 올려 줄 수 있다고 한 값은 실제로 적용돼야 한다
+    for (const effective of MEMBER_GRADE) {
+      for (const wanted of MEMBER_GRADE) {
+        if (!gradeFloorTakesEffect({ effective, wanted })) continue;
+        expect(effectiveGrade(won(0), wanted), `${effective} → ${wanted}`).toBe(wanted);
+      }
+    }
   });
 });

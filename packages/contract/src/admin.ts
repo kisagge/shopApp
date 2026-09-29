@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  MERCHANT_STATUS, merchantStatusNeedsReason, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
+  MEMBER_GRADE, MERCHANT_STATUS, merchantStatusNeedsReason, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
 } from '@shop/core';
 import { cuidSchema } from './common';
 
@@ -56,6 +56,7 @@ export const ADMIN_ERROR = [
   'MERCHANT_STATUS_NOT_ALLOWED',
   'CHANGED_MEANWHILE', 'CANNOT_SUSPEND_SELF', 'CANNOT_SUSPEND_STAFF', 'ALREADY_SUSPENDED', 'NOT_SUSPENDED',
   'POINTS_USER_CLOSED', 'INSUFFICIENT_POINTS',
+  'GRADE_NOT_HIGHER', 'GRADE_USER_CLOSED',
 ] as const;
 export type AdminErrorCode = (typeof ADMIN_ERROR)[number];
 
@@ -86,6 +87,14 @@ export const ADMIN_ERROR_MESSAGE: Readonly<Record<AdminErrorCode, string>> = {
   NOT_SUSPENDED: '정지되지 않은 계정입니다',
   POINTS_USER_CLOSED: '탈퇴한 계정의 포인트는 조정할 수 없습니다',
   INSUFFICIENT_POINTS: '차감할 포인트가 지금 잔액보다 많습니다',
+  /*
+   * 지금 실제 등급보다 낮거나 같은 값을 적으려 했다.
+   *
+   * 실제 등급은 구매액에서 계산한 것과 저장된 것 중 **높은 쪽**이라, 낮은 값을 적어 두면 화면에는
+   * 아무 변화가 없다 — 운영자는 눌렀는데 아무 일도 안 일어난 것으로 본다. 그럴 바에는 왜 안 되는지 말한다.
+   */
+  GRADE_NOT_HIGHER: '지금 등급보다 높은 등급만 올려 줄 수 있습니다',
+  GRADE_USER_CLOSED: '탈퇴한 계정의 등급은 조정할 수 없습니다',
 };
 
 /**
@@ -123,3 +132,22 @@ export const suspendUserSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('RESTORE') }),
 ]);
 export type SuspendUserInput = z.infer<typeof suspendUserSchema>;
+
+/**
+ * 회원 등급 조정.
+ *
+ * **올려 주는 창구다.** 실제 등급은 언제나 누적 구매액에서 계산되고(core 의 effectiveGrade), 여기서 적는
+ * 값은 그보다 **낮아질 수 없는 바닥**이다 — 제휴·보상·민원 무마로 올려 준 등급이 구매액 때문에 도로
+ * 내려가면 손님이 납득하지 못한다.
+ *
+ * **사유 없이 못 한다.** 등급에는 적립률이 붙어 있어 이건 곧 돈이고, 나중에 "왜 이 사람만 VIP 인가" 에
+ * 답할 수 있어야 한다. 정지와 같은 판단이다.
+ */
+export const setGradeSchema = z.object({
+  grade: z.enum(MEMBER_GRADE),
+  reason: z
+    .string({ error: 'valid.reasonRequired' })
+    .trim()
+    .min(1, 'valid.reasonRequired')
+    .max(300, 'valid.tooLongChars'),
+});

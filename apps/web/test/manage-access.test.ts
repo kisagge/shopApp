@@ -17,6 +17,8 @@ const db = vi.hoisted(() => {
     session: {
       deleteMany: vi.fn<(...a: any[]) => any>(),
     },
+    // 등급 조정은 지금 실제 등급을 보려고 누적 구매액을 읽는다
+    order: { aggregate: vi.fn<(...a: any[]) => any>() },
   };
   // $transaction(콜백) 은 같은 클라이언트를 넘겨준다 — 흉내도 그렇게 한다
   return { ...inner, $transaction: vi.fn((fn: any) => fn(inner)) };
@@ -33,7 +35,8 @@ vi.mock('~/lib/notifications/merchant-decision', () => ({ notifyMerchantDecision
 const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/merchant/apply', () => ({ activateApprovedMerchant: activate }));
 
-const { updateMerchantStatus, assignRole, suspendUser } = await import('~/lib/admin/manage-access');
+const { updateMerchantStatus, assignRole, suspendUser, setUserGrade } =
+  await import('~/lib/admin/manage-access');
 
 const superAdmin: Actor = { id: 'u-super', role: 'SUPER_ADMIN', merchantId: null };
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -532,5 +535,97 @@ describe('이용 정지', () => {
   it('사유 없는 정지는 계약에서 막는다', () => {
     expect(suspendUserSchema.safeParse({ action: 'SUSPEND', reason: '  ' }).success).toBe(false);
     expect(suspendUserSchema.safeParse({ action: 'SUSPEND' }).success).toBe(false);
+  });
+});
+
+/**
+ * 회원 등급 올려 주기.
+ *
+ * **쓰는 코드가 앱 전체에 하나도 없었다.** `User.grade` 는 스키마에 있고 core 의 주석은 그 존재 이유를
+ * "운영진이 수동으로 올려 주는 경우(제휴·보상)" 라고 적어 두었는데, 올려 줄 창구가 없어 DB 를 직접
+ * 만져야 했다 — 등급에는 적립률이 붙어 있으니 그건 곧 돈이고, 그렇게 하면 감사 로그도 안 남는다.
+ */
+describe('등급 올려 주기', () => {
+  const target = (over: Record<string, unknown> = {}) => ({
+    id: 'u-target', grade: 'BASIC', deletedAt: null, ...over,
+  });
+
+  beforeEach(() => {
+    db.user.findUnique.mockResolvedValue(target());
+    db.order.aggregate.mockResolvedValue({ _sum: { payable: 0 } });
+  });
+
+  it('올려 준다', async () => {
+    const result = await setUserGrade(admin, 'u-target', { grade: 'VIP', reason: '제휴 보상' });
+
+    expect(result).toMatchObject({ before: 'BASIC', after: 'VIP' });
+    expect(db.user.updateMany.mock.calls[0]![0].data).toEqual({ grade: 'VIP' });
+  });
+
+  it('읽은 등급을 조건에 싣는다 — 그사이 누가 올려 두었으면 이 판단은 낡았다', async () => {
+    await setUserGrade(admin, 'u-target', { grade: 'GOLD', reason: 'x' });
+
+    expect(db.user.updateMany.mock.calls[0]![0].where).toMatchObject({
+      id: 'u-target', grade: 'BASIC', deletedAt: null,
+    });
+  });
+
+  it('그사이 바뀌었으면 덮지 않는다', async () => {
+    db.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(setUserGrade(admin, 'u-target', { grade: 'GOLD', reason: 'x' })).rejects.toMatchObject({
+      code: 'CHANGED_MEANWHILE',
+    });
+  });
+
+  /**
+   * **구매로 이미 더 높이 올라간 사람**에게 낮은 값을 적으면 화면에는 아무 변화가 없다 —
+   * 실제 등급은 구매액과 저장된 값 중 높은 쪽이다. 눌렀는데 아무 일도 안 일어나느니 왜 안 되는지 말한다.
+   */
+  it('지금 실제 등급보다 낮으면 거절한다 — 저장된 값이 아니라 실제 등급과 견준다', async () => {
+    // 저장은 BASIC 인데 구매로 VIP 에 올라와 있다
+    db.order.aggregate.mockResolvedValue({ _sum: { payable: 10_000_000 } });
+
+    await expect(setUserGrade(admin, 'u-target', { grade: 'GOLD', reason: 'x' })).rejects.toMatchObject({
+      code: 'GRADE_NOT_HIGHER', status: 409,
+    });
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('같은 등급도 거절한다 — 아무것도 안 바뀐다', async () => {
+    db.user.findUnique.mockResolvedValue(target({ grade: 'GOLD' }));
+
+    await expect(setUserGrade(admin, 'u-target', { grade: 'GOLD', reason: 'x' })).rejects.toMatchObject({
+      code: 'GRADE_NOT_HIGHER',
+    });
+  });
+
+  it('탈퇴한 계정은 건드리지 않는다 — 되살아날 때 이유 모를 등급이 붙어 있으면 설명이 안 된다', async () => {
+    db.user.findUnique.mockResolvedValue(target({ deletedAt: new Date('2026-09-01') }));
+
+    await expect(setUserGrade(admin, 'u-target', { grade: 'VIP', reason: 'x' })).rejects.toMatchObject({
+      code: 'GRADE_USER_CLOSED',
+    });
+  });
+
+  it('없는 회원은 404', async () => {
+    db.user.findUnique.mockResolvedValue(null);
+
+    await expect(setUserGrade(admin, 'u-x', { grade: 'VIP', reason: 'x' })).rejects.toMatchObject({
+      code: 'USER_NOT_FOUND', status: 404,
+    });
+  });
+
+  it('가맹점은 못 한다 — 등급은 적립률이고 곧 돈이다', async () => {
+    await expect(setUserGrade(merchant, 'u-target', { grade: 'VIP', reason: 'x' })).rejects.toBeTruthy();
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('구매확정된 금액만 센다 — 주문하고 취소하기를 반복해 올릴 수 없다', async () => {
+    await setUserGrade(admin, 'u-target', { grade: 'VIP', reason: 'x' });
+
+    expect(db.order.aggregate.mock.calls[0]![0].where).toMatchObject({
+      userId: 'u-target', status: 'CONFIRMED',
+    });
   });
 });

@@ -61,6 +61,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'error.resolve': '오류 처리함',
   'error.reopen': '오류 다시 열기',
   'user.assignRole': '권한 부여',
+  'user.setGrade': '회원 등급 조정',
   'user.suspend': '이용 정지',
   'user.restore': '정지 해제',
   'settlement.close': '정산 확정',

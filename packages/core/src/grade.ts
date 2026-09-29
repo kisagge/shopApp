@@ -68,6 +68,25 @@ export function effectiveGrade(totalSpent: Won, storedGrade: MemberGrade): Membe
   return MEMBER_GRADE.indexOf(earned) >= MEMBER_GRADE.indexOf(storedGrade) ? earned : storedGrade;
 }
 
+/**
+ * 운영진이 올려 준 등급이 실제로 뜻이 있는가.
+ *
+ * **여기서 적는 값은 바닥이지 답이 아니다.** 실제 등급은 언제나 `effectiveGrade` 가 정하고, 그것은 구매액에서
+ * 계산한 등급과 저장된 등급 중 **높은 쪽**이다. 그래서 이미 구매로 더 높이 올라간 사람에게 낮은 등급을
+ * 적어 두면 화면에는 아무 변화가 없다 — 운영자는 눌렀는데 아무 일도 안 일어난 것으로 본다.
+ *
+ * 그래서 **지금 실제 등급보다 낮은 값은 거절한다.** 되돌리는 길은 바닥을 낮추는 것이 아니라(그건 이미
+ * 효과가 없다) 구매액이 말하는 등급으로 돌려놓는 것이다.
+ */
+export function gradeFloorTakesEffect(input: {
+  /** 지금 실제로 적용되는 등급(effectiveGrade 의 결과) */
+  readonly effective: MemberGrade;
+  /** 운영진이 적으려는 등급 */
+  readonly wanted: MemberGrade;
+}): boolean {
+  return MEMBER_GRADE.indexOf(input.wanted) > MEMBER_GRADE.indexOf(input.effective);
+}
+
 export interface GradeProgress {
   readonly current: MemberGrade;
   readonly next: MemberGrade | null;

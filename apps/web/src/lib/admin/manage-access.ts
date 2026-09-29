@@ -2,7 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, canAssignRole, canEditUser, canSuspendUser, canMoveMerchantTo,
-  type Actor, type UserRole,
+  effectiveGrade, gradeFloorTakesEffect, won,
+  type Actor, type MemberGrade, type UserRole,
 } from '@shop/core';
 import { activateApprovedMerchant } from '~/lib/merchant/apply';
 import { notifyMerchantDecision } from '~/lib/notifications/merchant-decision';
@@ -270,4 +271,55 @@ export async function suspendUser(
   });
   if (count === 0) throw new AccessError('CHANGED_MEANWHILE', 409);
   return { before, after: { suspendedAt: null, suspendedReason: null } };
+}
+
+/**
+ * 회원 등급을 올려 준다.
+ *
+ * **쓰는 코드가 앱 전체에 하나도 없었다.** `User.grade` 는 스키마에 있고 `effectiveGrade` 의 주석은 그
+ * 존재 이유를 "운영진이 수동으로 올려 주는 경우(제휴·보상)" 라고 적어 두었는데, 정작 올려 줄 창구가
+ * 없어서 DB 를 직접 만져야 했다. 등급에는 적립률이 붙어 있으니 **그건 곧 돈**이고, DB 로 하면 감사
+ * 로그도 안 남는다.
+ *
+ * **올려 주는 창구다.** 여기 적는 값은 바닥이지 답이 아니다 — 실제 등급은 언제나 구매액에서 계산한
+ * 것과 저장된 것 중 높은 쪽이다(core 의 effectiveGrade). 그래서 지금 실제 등급보다 낮은 값은 거절한다:
+ * 적어 봐야 화면에 아무 변화가 없고, 운영자는 눌렀는데 아무 일도 안 일어난 것으로 본다.
+ */
+export async function setUserGrade(
+  actor: Actor,
+  userId: string,
+  input: { readonly grade: MemberGrade; readonly reason: string },
+): Promise<{ before: MemberGrade; after: MemberGrade; effective: MemberGrade }> {
+  assertPermission(actor, 'user:write');
+
+  const target = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, grade: true, deletedAt: true },
+  });
+  if (!target) throw new AccessError('USER_NOT_FOUND', 404);
+  // 탈퇴한 계정은 들어올 길이 없다. 되살아날 때 이유 모를 등급이 붙어 있으면 그것도 설명이 안 된다
+  if (target.deletedAt !== null) throw new AccessError('GRADE_USER_CLOSED', 409);
+
+  /*
+   * **지금 실제 등급**과 견준다. 저장된 값이 아니라 — 구매로 이미 더 높이 올라간 사람에게
+   * 그보다 낮은 값을 적으면 아무 일도 일어나지 않는다.
+   */
+  const spent = await prisma.order.aggregate({
+    where: { userId, status: 'CONFIRMED' },
+    _sum: { payable: true },
+  });
+  const effective = effectiveGrade(won(spent._sum.payable ?? 0), target.grade);
+
+  if (!gradeFloorTakesEffect({ effective, wanted: input.grade })) {
+    throw new AccessError('GRADE_NOT_HIGHER', 409);
+  }
+
+  // 읽은 값을 조건에 싣는다 — 그사이 다른 사람이 올려 두었으면 이 판단은 이미 낡았다
+  const { count } = await prisma.user.updateMany({
+    where: { id: userId, grade: target.grade, deletedAt: null },
+    data: { grade: input.grade },
+  });
+  if (count === 0) throw new AccessError('CHANGED_MEANWHILE', 409);
+
+  return { before: target.grade, after: input.grade, effective: input.grade };
 }

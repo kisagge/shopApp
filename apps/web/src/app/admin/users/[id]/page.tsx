@@ -9,6 +9,7 @@ import { getAdminUserDetail } from '~/lib/queries/admin/users';
 import { GRADE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { SuspendForm } from '../suspend-form';
+import { GradeForm } from '../grade-form';
 import { suspendBlocked } from '../suspend-blocked';
 import { adminDate, adminTimestamp } from '~/lib/admin/date-format';
 
@@ -208,6 +209,27 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
                 ))}
               </dl>
             </section>
+
+            {canSuspend && (
+              <section aria-labelledby="user-grade" className={card}>
+                <h2 id="user-grade" className="text-[15px] font-semibold tracking-tight">회원 등급</h2>
+                {/*
+                  **쓰는 코드가 앱 전체에 하나도 없었다.** 스키마에는 칸이 있고 core 의 주석은 그 존재 이유를
+                  "운영진이 수동으로 올려 주는 경우(제휴·보상)" 라고 적어 두었는데, 올려 줄 창구가 없어 DB 를
+                  직접 만져야 했다 — 등급에는 적립률이 붙어 있으니 그건 곧 돈이고, 그렇게 하면 기록도 안 남는다.
+                */}
+                <p className="text-[12px] text-[var(--fg-secondary)]">
+                  지금 <span className="font-semibold text-[var(--fg)]">{t(GRADE_KEY[user.grade])}</span>
+                  {' · '}구매확정 누적 {formatWithUnit(won(user.totalSpent))}
+                </p>
+                <GradeForm
+                  userId={user.id}
+                  userName={user.name}
+                  current={user.grade}
+                  disabledReason={user.closedAt ? '탈퇴한 계정' : undefined}
+                />
+              </section>
+            )}
 
             {canSuspend && (
               <section aria-labelledby="user-suspension" className={card}>
