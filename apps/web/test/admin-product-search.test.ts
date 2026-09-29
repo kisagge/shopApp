@@ -32,9 +32,10 @@ beforeEach(() => {
  * 다음 사람이 어느 쪽에 붙일지 헷갈리는 자리가 됐다.
  */
 describe('운영 화면의 상품 검색', () => {
-  it('로그인하지 않았으면 막는다', async () => {
+  /** 다시 로그인하면 되는 일과 이 계정으로는 안 되는 일은 부르는 쪽이 갈라서 안내해야 한다 */
+  it('로그인하지 않았으면 401 — 권한이 없는 것과 다른 이야기다', async () => {
     getActor.mockResolvedValue(null);
-    expect((await call()).status).toBe(403);
+    expect((await call()).status).toBe(401);
   });
 
   it('고객은 막는다', async () => {

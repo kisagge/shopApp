@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@shop/db';
 import { getActor } from '@shop/auth/session';
 import { hasPermission } from '@shop/core';
-import { forbidden } from '~/lib/api/respond';
+import { forbidden, unauthorized } from '~/lib/api/respond';
 
 /**
  * 쿠폰을 줄 회원을 고를 때 쓰는 검색.
@@ -21,7 +21,12 @@ import { forbidden } from '~/lib/api/respond';
  */
 export async function GET(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
-  if (!actor || !hasPermission(actor, 'user:read')) {
+  // 로그인하지 않은 것과 권한이 없는 것은 다른 이야기다 — 둘을 한 가지로 뭉치면 부르는 쪽이
+  // 다시 로그인하라고 안내할지 못 하는 일이라고 말할지 고를 수 없다
+  if (!actor) {
+    return await unauthorized();
+  }
+  if (!hasPermission(actor, 'user:read')) {
     return await forbidden();
   }
 
