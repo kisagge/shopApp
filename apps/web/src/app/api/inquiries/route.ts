@@ -10,7 +10,7 @@ import { readJsonWithImages } from '~/lib/images/read-body';
 import type { UploadedImage } from '~/lib/images/upload-files';
 import { StorageError } from '~/lib/storage';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 /**
  * 문의 작성 — 상품 문의와 1:1 문의.
@@ -36,9 +36,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     ({ fields: body, files } = await readJsonWithImages(request, { max: MAX_IMAGES_PER_INQUIRY, tooMany: 'TOO_MANY_INQUIRY_IMAGES' }));
   } catch (error) {
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     return await invalidJson();
   }
 
@@ -60,9 +58,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     if (uploaded.length > 0) await discardInquiryImages(uploaded.map((u) => u.key));
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     if (error instanceof StorageError) {
       return NextResponse.json({ code: error.code, message: '사진을 올리지 못했습니다. 사진 없이 다시 보내 주세요.' }, { status: 503 });
     }

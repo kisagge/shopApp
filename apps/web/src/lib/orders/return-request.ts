@@ -23,7 +23,13 @@ import { destinationsFor } from './return-address';
  */
 
 export class ReturnError extends Error {
-  constructor(readonly code: string, message: string, readonly status = 409) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status = 409,
+    /** 문구가 사전 열쇠일 때 끼워 넣을 값 — 옵션 이름·사유처럼 자리마다 다른 것 */
+    readonly vars?: Readonly<Record<string, string | number>>,
+  ) {
     super(message);
     this.name = 'ReturnError';
   }
@@ -65,7 +71,7 @@ export async function requestReturn(
       },
     },
   });
-  if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!order) throw new ReturnError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
 
   const eligibility = checkReturnEligibility({
     status: order.status,
@@ -74,7 +80,7 @@ export async function requestReturn(
     now,
   });
   if (!eligibility.ok) {
-    throw new ReturnError(eligibility.code, eligibility.message);
+    throw new ReturnError(eligibility.code, eligibility.message, 409, eligibility.vars);
   }
 
   /*
@@ -86,12 +92,12 @@ export async function requestReturn(
   if (wanted) {
     const known = new Set(returnable.map((i) => i.id));
     if (wanted.some((id) => !known.has(id))) {
-      throw new ReturnError('ITEM_NOT_RETURNABLE', '돌려보낼 수 없는 상품이 섞여 있습니다.', 400);
+      throw new ReturnError('ITEM_NOT_RETURNABLE', 'err.return.itemNotReturnable', 400);
     }
   }
   const chosen = wanted ?? returnable.map((i) => i.id);
   if (chosen.length === 0) {
-    throw new ReturnError('NO_ITEMS', '돌려보낼 상품이 없습니다.', 400);
+    throw new ReturnError('NO_ITEMS', 'err.return.noItems', 400);
   }
 
   /*
@@ -110,7 +116,7 @@ export async function requestReturn(
       where: { id: order.id, status: order.status },
       data: { status: nextStatus },
     });
-    if (count === 0) throw new ReturnError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+    if (count === 0) throw new ReturnError('ALREADY_PROCESSED', 'err.order.alreadyProcessed');
 
     await tx.orderItem.updateMany({
       // 고른 줄만. 취소된 줄은 반품할 물건이 아니다
@@ -128,7 +134,7 @@ export async function requestReturn(
         data: { stock: { decrement: line.quantity } },
       });
       if (reserved === 0) {
-        throw new ReturnError('OUT_OF_STOCK', `${line.toOptionLabel} — ${EXCHANGE_OPTION_MESSAGE.OUT_OF_STOCK}`);
+        throw new ReturnError('OUT_OF_STOCK', EXCHANGE_OPTION_MESSAGE.OUT_OF_STOCK, 409, { option: line.toOptionLabel });
       }
     }
 
@@ -184,7 +190,7 @@ async function planExchange(
 ): Promise<ExchangeLinePlan[]> {
   const byItem = new Map(exchanges.map((e) => [e.itemId, e.variantId]));
   if (byItem.size !== exchanges.length || exchanges.some((e) => !chosen.includes(e.itemId)) || chosen.some((id) => !byItem.has(id))) {
-    throw new ReturnError('EXCHANGE_MISMATCH', '교환할 상품마다 바꿀 옵션을 하나씩 골라 주세요.', 400);
+    throw new ReturnError('EXCHANGE_MISMATCH', 'err.exchange.mismatch', 400);
   }
 
   const candidates = await prisma.productVariant.findMany({
@@ -195,12 +201,12 @@ async function planExchange(
   return chosen.map((itemId) => {
     const item = items.find((i) => i.id === itemId)!;
     const candidate = candidates.find((c) => c.id === byItem.get(itemId));
-    if (!candidate) throw new ReturnError('EXCHANGE_OPTION_NOT_FOUND', '바꿀 옵션을 찾을 수 없습니다.', 400);
+    if (!candidate) throw new ReturnError('EXCHANGE_OPTION_NOT_FOUND', 'err.exchange.optionNotFound', 400);
     const check = checkExchangeOption(
       { productId: item.variant.productId, variantId: item.variant.id, priceOverride: item.variant.priceOverride, quantity: item.quantity },
       { productId: candidate.productId, variantId: candidate.id, priceOverride: candidate.priceOverride, stock: candidate.stock, isActive: candidate.isActive },
     );
-    if (!check.ok) throw new ReturnError(check.code, `${candidate.label} — ${EXCHANGE_OPTION_MESSAGE[check.code]}`, 400);
+    if (!check.ok) throw new ReturnError(check.code, EXCHANGE_OPTION_MESSAGE[check.code], 400, { option: candidate.label });
     return {
       orderItemId: item.id,
       fromVariantId: item.variant.id,
@@ -221,7 +227,7 @@ async function planExchange(
  */
 export async function loadForResolve(orderNo: string, actor: Actor) {
   if (!hasPermission(actor, 'return:resolve')) {
-    throw new ReturnError('FORBIDDEN', '이 동작을 수행할 권한이 없습니다.', 403);
+    throw new ReturnError('FORBIDDEN', 'api.forbidden', 403);
   }
 
   const order = await prisma.order.findFirst({
@@ -244,10 +250,10 @@ export async function loadForResolve(orderNo: string, actor: Actor) {
     },
   });
   const mine = actor.merchantId ? order?.items.some((i) => i.merchantId === actor.merchantId) : true;
-  if (!order || !mine) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!order || !mine) throw new ReturnError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
 
   const request = order.returnRequests[0];
-  if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+  if (!request) throw new ReturnError('NO_REQUEST', 'err.return.noRequest', 404);
 
   // 옛 신청(줄 없음)은 반품접수인 줄 전부다
   const lines = order.items.filter((i) =>
@@ -424,15 +430,12 @@ export async function cancelOwnReturn(
       },
     },
   });
-  if (!order) throw new ReturnError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!order) throw new ReturnError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
 
   const request = order.returnRequests[0];
-  if (!request) throw new ReturnError('NO_REQUEST', '반품 신청이 없습니다.', 404);
+  if (!request) throw new ReturnError('NO_REQUEST', 'err.return.noRequest', 404);
   if (!canCancelOwnReturn(request.status)) {
-    throw new ReturnError(
-      'ALREADY_RESOLVED',
-      '이미 처리된 신청입니다. 승인된 뒤에는 고객센터로 문의해 주세요.',
-    );
+    throw new ReturnError('ALREADY_RESOLVED', 'err.return.alreadyResolved');
   }
 
   const nextOrderStatus = transition(order.status, statusBeforeReturn(order));

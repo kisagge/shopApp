@@ -5,12 +5,10 @@ import { setBrandLogo, removeBrandLogo, BrandError } from '~/lib/admin/manage-br
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
-import { fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
 
-function fail(error: unknown): NextResponse | null {
-  if (error instanceof ImageError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-  }
+async function fail(error: unknown): Promise<NextResponse | null> {
+  if (error instanceof ImageError) return await apiError(error);
   if (error instanceof BrandError) {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
   }
@@ -63,7 +61,7 @@ export async function POST(
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof ForbiddenError) return await forbidden();
-    const handled = fail(error);
+    const handled = await fail(error);
     if (handled) return handled;
     throw error;
   }
@@ -87,7 +85,7 @@ export async function DELETE(
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ForbiddenError) return await forbidden();
-    const handled = fail(error);
+    const handled = await fail(error);
     if (handled) return handled;
     throw error;
   }

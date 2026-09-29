@@ -126,7 +126,14 @@ export function canCancelOwnReturn(status: string): boolean {
 
 export type ReturnEligibility =
   | { readonly ok: true; readonly deadline: Date; readonly borneBy: ReturnShippingParty }
-  | { readonly ok: false; readonly code: string; readonly message: string };
+  | {
+      readonly ok: false;
+      readonly code: string;
+      /** 사전 열쇠다. 번역은 응답을 만드는 서버가 한다 — 위의 '이름표는 여기 없다' 와 같은 이유다 */
+      readonly message: string;
+      /** 문구에 끼워 넣을 값. 열쇠인 값(사유 이름)은 그쪽도 번역된다 */
+      readonly vars?: Readonly<Record<string, string | number>>;
+    };
 
 /**
  * 지금 이 주문을 반품·교환 신청할 수 있는가.
@@ -163,12 +170,12 @@ export function checkReturnEligibility(input: {
     return {
       ok: false,
       code: 'ALREADY_CONFIRMED',
-      message: '구매확정한 주문은 단순 변심으로 반품할 수 없습니다.',
+      message: 'err.return.confirmedChangeMind',
     };
   }
 
   if (status === 'RETURN_REQUESTED') {
-    return { ok: false, code: 'ALREADY_REQUESTED', message: '이미 접수된 신청이 있습니다.' };
+    return { ok: false, code: 'ALREADY_REQUESTED', message: 'err.return.alreadyRequested' };
   }
 
   // 출고 전이라면 반품이 아니라 취소다. 반송할 물건이 아직 없다.
@@ -176,12 +183,12 @@ export function checkReturnEligibility(input: {
     return {
       ok: false,
       code: 'NOT_SHIPPED',
-      message: '아직 출고 전입니다. 주문 취소로 진행해 주세요.',
+      message: 'err.return.beforeShipment',
     };
   }
 
   if (status !== 'SHIPPED' && status !== 'DELIVERED' && status !== 'CONFIRMED') {
-    return { ok: false, code: 'NOT_ELIGIBLE', message: '신청할 수 없는 주문입니다.' };
+    return { ok: false, code: 'NOT_ELIGIBLE', message: 'err.return.notEligible' };
   }
 
   /**
@@ -201,7 +208,9 @@ export function checkReturnEligibility(input: {
     return {
       ok: false,
       code: 'WINDOW_CLOSED',
-      message: `${RETURN_REASON_LABEL[reason]} 사유는 배송완료 후 ${returnWindowDays(reason)}일 이내에만 신청할 수 있습니다.`,
+      message: 'err.return.windowPassed',
+      // 사유 이름도 번역거리다 — 값에 열쇠를 실어 보낸다(api/respond 의 translateVars)
+      vars: { reason: `returnReason.${reason}`, days: returnWindowDays(reason) },
     };
   }
 

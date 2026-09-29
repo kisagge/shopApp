@@ -194,11 +194,18 @@ describe('취소할 수 없는 이유를 구분해서 알린다', () => {
     ).rejects.toMatchObject({ code: 'ALREADY_CANCELLED' });
   });
 
-  it('환불까지 끝난 주문도 마찬가지다', async () => {
+  /**
+   * **어느 상태였는지까지 말해 준다.** 문구는 사전 열쇠라 여기서는 한국어가 아니라 그 열쇠를 본다 —
+   * 상태 이름도 번역거리라 값에 열쇠를 실어 보낸다(api/respond 의 translateVars).
+   */
+  it('환불까지 끝난 주문도 마찬가지다 — 어느 상태인지 값으로 싣는다', async () => {
     db.order.findFirst.mockResolvedValue(order({ status: 'REFUNDED' }));
     const p = cancelOrder('20260831-1234567', customer, '중복 요청', gateway());
-    await expect(p).rejects.toMatchObject({ code: 'ALREADY_CANCELLED' });
-    await expect(p).rejects.toThrow(/환불완료/);
+    await expect(p).rejects.toMatchObject({
+      code: 'ALREADY_CANCELLED',
+      message: 'err.order.alreadyIn',
+      vars: { status: 'orderStatus.REFUNDED' },
+    });
   });
 
   it('구매확정된 주문은 운영진도 취소할 수 없다', async () => {

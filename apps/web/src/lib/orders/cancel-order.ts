@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  isCancellableByCustomer, transition, canRefundOrder, remainingRefund, ORDER_STATUS_LABEL,
+  isCancellableByCustomer, transition, canRefundOrder, remainingRefund,
   mustCloseVirtualAccount,
   type Actor, type OrderStatus, type PaymentGateway,
 } from '@shop/core';
@@ -11,7 +11,12 @@ import { refundedSoFar } from './refund-ledger';
 import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
 export class CancelError extends Error {
-  constructor(readonly code: string, message: string, readonly status = 409) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status = 409,
+    readonly vars?: Readonly<Record<string, string | number>>,
+  ) {
     super(message);
     this.name = 'CancelError';
   }
@@ -44,16 +49,14 @@ function assertCancellable(status: OrderStatus, isStaff: boolean): void {
   // 둘을 한 메시지로 뭉뚱그리면 "출고된 주문은 취소할 수 없습니다" 가
   // 이미 환불된 주문에도 뜬다.
   if (status === 'CANCELLED' || status === 'REFUNDED') {
-    throw new CancelError('ALREADY_CANCELLED', `이미 ${ORDER_STATUS_LABEL[status]}된 주문입니다.`);
+    // 상태 이름도 번역거리다 — 값에 열쇠를 실어 보낸다(api/respond 의 translateVars)
+    throw new CancelError('ALREADY_CANCELLED', 'err.order.alreadyIn', 409, { status: `orderStatus.${status}` });
   }
   if (status === 'CONFIRMED') {
-    throw new CancelError('ALREADY_CONFIRMED', '구매확정된 주문은 취소할 수 없습니다.');
+    throw new CancelError('ALREADY_CONFIRMED', 'err.order.alreadyConfirmed');
   }
   if (!isStaff && !isCancellableByCustomer(status)) {
-    throw new CancelError(
-      'NOT_CANCELLABLE',
-      '출고된 주문은 직접 취소할 수 없습니다. 반품 절차로 진행해 주세요.',
-    );
+    throw new CancelError('NOT_CANCELLABLE', 'err.order.notCancellable');
   }
 }
 
@@ -100,7 +103,7 @@ export async function cancelOrder(
   const isStaff = canRefundOrder(actor);
 
   const first = await loadOrder(prisma, orderNo, actor, isStaff);
-  if (!first) throw new CancelError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!first) throw new CancelError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
   // 잠그기 전에 한 번 본다 — 취소할 수 없는 주문으로 잠금을 쥐지 않는다
   assertCancellable(first.status, isStaff);
 
@@ -121,7 +124,7 @@ export async function cancelOrder(
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${first.id} FOR UPDATE`;
 
       const order = await loadOrder(tx, orderNo, actor, isStaff);
-      if (!order) throw new CancelError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+      if (!order) throw new CancelError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
       assertCancellable(order.status, isStaff);
       if (precondition !== undefined && !precondition({
         status: order.status,
@@ -129,7 +132,7 @@ export async function cancelOrder(
         paymentStatus: order.payment?.status ?? null,
         hasPaymentKey: Boolean(order.payment?.pgPaymentKey),
       })) {
-        throw new CancelError('PRECONDITION_FAILED', '그사이 주문이 바뀌어 취소하지 않았습니다.');
+        throw new CancelError('PRECONDITION_FAILED', 'err.order.changedMeanwhile');
       }
 
       // 상태머신이 허용하지 않는 전이는 여기서 막힌다
@@ -184,7 +187,7 @@ export async function cancelOrder(
         where: { id: order.id, status: order.status },
         data: { status: nextStatus, canceledAt: new Date() },
       });
-      if (count === 0) throw new CancelError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+      if (count === 0) throw new CancelError('ALREADY_PROCESSED', 'err.order.alreadyProcessed');
 
       const now = new Date();
       await tx.orderItem.updateMany({

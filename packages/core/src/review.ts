@@ -200,12 +200,12 @@ export const REVIEW_ERROR = [
 export type ReviewErrorCode = (typeof REVIEW_ERROR)[number];
 
 export const REVIEW_ERROR_MESSAGE: Readonly<Record<ReviewErrorCode, string>> = {
-  NOT_PURCHASED: '구매한 상품에만 리뷰를 쓸 수 있습니다',
-  NOT_DELIVERED: '배송이 완료된 뒤에 쓸 수 있습니다',
-  ALREADY_REVIEWED: '이미 리뷰를 쓴 주문입니다',
-  REVIEW_NOT_FOUND: '리뷰를 찾을 수 없습니다',
-  NOT_OWN_REVIEW: '자기 리뷰만 고칠 수 있습니다',
-  SELLER_CANNOT_REVIEW: '판매자 계정으로는 리뷰를 쓸 수 없습니다. 손님으로 사신 것이라면 개인 계정으로 써 주세요.',
+  NOT_PURCHASED: 'err.review.notPurchased',
+  NOT_DELIVERED: 'err.review.notDelivered',
+  ALREADY_REVIEWED: 'err.review.alreadyWritten',
+  REVIEW_NOT_FOUND: 'err.review.notFound',
+  NOT_OWN_REVIEW: 'err.review.notOwn',
+  SELLER_CANNOT_REVIEW: 'err.review.sellerCannotWrite',
 };
 
 /**

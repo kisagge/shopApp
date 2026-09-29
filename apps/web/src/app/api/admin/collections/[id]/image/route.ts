@@ -5,7 +5,7 @@ import { setCollectionImage, CollectionError } from '~/lib/admin/manage-collecti
 import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
-import { fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
 
 /** 기획전 배경 이미지 교체 */
 export async function POST(
@@ -54,9 +54,7 @@ export async function POST(
     });
     return NextResponse.json(collection);
   } catch (error) {
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     if (error instanceof CollectionError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }

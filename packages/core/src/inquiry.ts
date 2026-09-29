@@ -64,12 +64,13 @@ export function isAnswered(inquiry: { answeredAt: Date | null }): boolean {
  */
 
 export const INQUIRY_ERROR = {
-  PRODUCT_NOT_FOUND: '상품을 찾을 수 없습니다.',
-  INQUIRY_NOT_FOUND: '문의를 찾을 수 없습니다.',
+  PRODUCT_NOT_FOUND: 'err.product.notFound',
+  INQUIRY_NOT_FOUND: 'err.inquiry.notFound',
+  // 답하는 쪽은 운영·가맹점이다 — 한국어로 둔다
   NOT_ALLOWED: '이 문의에 답할 권한이 없습니다.',
-  NOT_OWN_INQUIRY: '내가 쓴 문의만 지울 수 있습니다.',
-  ALREADY_ANSWERED: '이미 답변이 달린 문의입니다.',
+  NOT_OWN_INQUIRY: 'err.inquiry.notOwn',
+  ALREADY_ANSWERED: 'err.inquiry.alreadyAnswered',
   /** 상품 문의는 공개 Q&A 라 사진을 받지 않는다 — 불량·오배송 사진은 1:1 문의로 */
-  IMAGES_SUPPORT_ONLY: '사진은 1:1 문의에만 올릴 수 있습니다.',
+  IMAGES_SUPPORT_ONLY: 'err.inquiry.imagesSupportOnly',
 } as const;
 export type InquiryErrorCode = keyof typeof INQUIRY_ERROR;

@@ -40,9 +40,7 @@ export async function PATCH(
     body = read.fields;
     files = read.files;
   } catch (error) {
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     return await invalidJson();
   }
 
@@ -68,9 +66,7 @@ export async function PATCH(
     // 고쳐지지 않았으면 올린 사진도 되돌린다
     if (uploaded.length > 0) await discardReviewImages(uploaded.map((u) => u.key));
 
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     if (error instanceof ReviewError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }

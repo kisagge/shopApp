@@ -8,6 +8,9 @@ import {
 } from '@shop/core';
 
 export class ClosureError extends Error {
+  /** 확인 문구는 사람이 그대로 따라 쳐야 하는 글자라 문구 안에 넣어 보여 준다 */
+  readonly vars = { phrase: CLOSURE_CONFIRM_PHRASE } as const;
+
   constructor(
     readonly code: ClosureErrorCode,
     readonly status = 400,

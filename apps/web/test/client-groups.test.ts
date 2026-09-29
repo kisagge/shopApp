@@ -2,7 +2,9 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { DICTIONARIES, messageKeys } from '@shop/i18n/all';
-import { clientMessageGroups, clientReachableFiles } from '../../../tooling/client-message-groups.mjs';
+import {
+  clientMessageGroups, clientReachableFiles, SERVER_ONLY_GROUPS,
+} from '../../../tooling/client-message-groups.mjs';
 import { CLIENT_MESSAGE_GROUPS } from '~/lib/i18n/client-groups.generated';
 
 /**
@@ -43,9 +45,34 @@ describe('브라우저로 내려보내는 사전 갈래', () => {
       if (literal) quoted.add(literal);
     }
     const kept = new Set(CLIENT_MESSAGE_GROUPS);
-    const dropped = keys.filter((k) => quoted.has(k) && !kept.has(k.slice(0, k.indexOf('.'))));
+    const dropped = keys.filter(
+      (k) =>
+        quoted.has(k) &&
+        !kept.has(k.slice(0, k.indexOf('.'))) &&
+        // 서버가 이미 바꿔서 보내는 갈래는 빼고 본다 — 아래 검사가 그 전제를 지킨다
+        !SERVER_ONLY_GROUPS.has(k.slice(0, k.indexOf('.'))),
+    );
 
     expect(dropped, '화면이 부르는 열쇠가 잘려 나갔다').toEqual([]);
+  });
+
+  /**
+   * **서버가 바꿔서 보내는 갈래는 브라우저로 따라가지 않는다.**
+   *
+   * `err.*` 는 도메인 오류의 문구다. 열쇠가 core·계약의 표에 적혀 있어서 화면 코드에서도 닿지만,
+   * 값으로 쓰지는 않는다 — 번역은 응답을 만드는 서버가 하고 화면은 문장을 받는다. 그 전제가
+   * 깨지는 순간(화면이 그 열쇠를 번역기에 넘기는 순간) 사람에게 `err.order.notFound` 가 그대로 보인다.
+   */
+  it('서버 전용 갈래를 화면이 번역하지 않는다', () => {
+    const { files } = clientReachableFiles(ROOT);
+    const offenders = files.filter((f: string) => {
+      const source = readFileSync(f, 'utf8');
+      return [...SERVER_ONLY_GROUPS].some((g) =>
+        new RegExp(`\\bt\\(\\s*['"\`]${g}\\.`).test(source),
+      );
+    });
+
+    expect(offenders, '이 갈래는 브라우저 사전에 없다 — 열쇠가 그대로 보인다').toEqual([]);
   });
 
   it('열쇠를 조립하는 두 자리의 갈래가 들어 있다', () => {

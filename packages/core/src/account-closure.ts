@@ -128,8 +128,8 @@ export function isClosedAccountEmail(email: string): boolean {
 export const CLOSURE_CONFIRM_PHRASE = '탈퇴합니다';
 
 export const CLOSURE_ERROR = {
-  BLOCKED: '지금은 탈퇴할 수 없습니다.',
-  PHRASE_MISMATCH: `확인 문구를 정확히 입력해 주세요. "${CLOSURE_CONFIRM_PHRASE}"`,
-  ALREADY_CLOSED: '이미 탈퇴한 계정입니다.',
+  BLOCKED: 'err.closure.blocked',
+  PHRASE_MISMATCH: 'err.closure.phraseMismatch',
+  ALREADY_CLOSED: 'err.closure.alreadyClosed',
 } as const;
 export type ClosureErrorCode = keyof typeof CLOSURE_ERROR;

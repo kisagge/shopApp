@@ -59,15 +59,15 @@ export async function confirmPurchase(
       returnRequests: { where: { status: { in: [...OPEN_RETURN_STATUS] } }, take: 1, select: { id: true } },
     },
   });
-  if (!order) throw new ConfirmPurchaseError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!order) throw new ConfirmPurchaseError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
   if (!canConfirmPurchase({ status: order.status, hasOpenReturn: order.returnRequests.length > 0 })) {
-    throw new ConfirmPurchaseError('NOT_CONFIRMABLE', '배송완료된 주문만 구매확정할 수 있습니다.', 409);
+    throw new ConfirmPurchaseError('NOT_CONFIRMABLE', 'err.order.notConfirmable', 409);
   }
 
   const granted = await prisma.$transaction((tx) =>
     confirmDeliveredOrder(tx, order, { actor: user.id, note: '손님이 구매확정', now }));
   if (granted === null) {
-    throw new ConfirmPurchaseError('NOT_CONFIRMABLE', '이미 처리된 주문입니다.', 409);
+    throw new ConfirmPurchaseError('NOT_CONFIRMABLE', 'err.order.alreadyProcessed', 409);
   }
   return { orderNo: order.orderNo, rewarded: granted.granted ? granted.amount : 0 };
 }

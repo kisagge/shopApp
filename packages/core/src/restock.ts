@@ -29,13 +29,13 @@ export type RestockEligibility =
  */
 export function checkRestockEligibility(v: VariantAvailability): RestockEligibility {
   if (!v.productSellable) {
-    return { ok: false, code: 'NOT_SELLABLE', message: '판매하지 않는 상품입니다.' };
+    return { ok: false, code: 'NOT_SELLABLE', message: 'err.restock.notSellable' };
   }
   if (!v.isActive) {
-    return { ok: false, code: 'VARIANT_INACTIVE', message: '판매하지 않는 옵션입니다.' };
+    return { ok: false, code: 'VARIANT_INACTIVE', message: 'err.restock.variantInactive' };
   }
   if (v.stock > 0) {
-    return { ok: false, code: 'IN_STOCK', message: '지금 구매할 수 있습니다.' };
+    return { ok: false, code: 'IN_STOCK', message: 'err.restock.inStock' };
   }
   return { ok: true };
 }

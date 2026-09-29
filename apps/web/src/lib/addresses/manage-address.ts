@@ -27,12 +27,10 @@ export interface SavedAddress {
 }
 
 export class AddressError extends Error {
+  readonly vars = { max: MAX_ADDRESSES } as const;
+
   constructor(readonly code: 'TOO_MANY' | 'NOT_FOUND', readonly status: number) {
-    super(
-      code === 'TOO_MANY'
-        ? `배송지는 ${MAX_ADDRESSES}개까지 저장할 수 있습니다`
-        : '배송지를 찾을 수 없습니다',
-    );
+    super(code === 'TOO_MANY' ? 'err.address.tooMany' : 'err.address.notFound');
     this.name = 'AddressError';
   }
 }

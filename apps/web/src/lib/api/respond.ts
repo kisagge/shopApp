@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import { ForbiddenError } from '@shop/core';
-import type { MessageKey } from '@shop/i18n';
+import type { MessageKey, Translator, Vars } from '@shop/i18n';
 import { getT } from '~/lib/i18n/server';
 
 /**
@@ -83,7 +83,7 @@ export async function apiError(error: unknown): Promise<NextResponse> {
   return NextResponse.json(
     {
       code: domain.code,
-      message: domain.message,
+      message: localize(await getT(), domain.message, domain.vars),
       // 어느 칸이 틀렸는지 아는 오류는 그것까지 넘긴다 — 폼이 그 칸에 표시한다
       ...(domain.fields ? { fields: domain.fields } : {}),
     },
@@ -91,11 +91,41 @@ export async function apiError(error: unknown): Promise<NextResponse> {
   );
 }
 
+/**
+ * 도메인 오류의 문구를 이 요청의 말로 바꾼다.
+ *
+ * **문구 자리에 사전 열쇠를 적는다.** 계약의 Zod 문구(`valid.*`)와 같은 방식이다 — 오류를 던지는 자리는
+ * 요청의 언어를 모르고(배치도 웹훅도 같은 함수를 부른다), 번역은 응답을 만드는 이 자리에서 한다.
+ *
+ * **열쇠가 아니면 그대로 내보낸다.** 운영 화면의 문구는 한국어로 두기로 했고(forbidden 의 주석), 아직
+ * 옮기지 않은 자리도 오늘 하던 대로 동작해야 한다 — 한 번에 다 옮기지 않아도 화면이 깨지지 않는다.
+ */
+function localize(t: Translator, message: string, vars: Vars | undefined): string {
+  if (!t.has(message)) return message;
+  return t(message as MessageKey, vars && translateVars(t, vars));
+}
+
+/**
+ * 끼워 넣을 값도 열쇠일 수 있다.
+ *
+ * "이미 {status}된 주문입니다" 의 `status` 는 주문 상태 이름이라 그것 자체가 번역거리다. 문구와 같은
+ * 규칙으로 본다 — 열쇠면 바꾸고, 아니면(상품명·옵션명처럼 DB 에서 온 글) 그대로 넣는다.
+ */
+function translateVars(t: Translator, vars: Vars): Vars {
+  const out: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(vars)) {
+    out[name] = typeof value === 'string' && t.has(value) ? t(value as MessageKey) : value;
+  }
+  return out;
+}
+
 interface DomainError {
   readonly code: string;
   readonly message: string;
   readonly status: number;
   readonly fields?: Readonly<Record<string, string>>;
+  /** 문구에 끼워 넣을 값. 문구가 열쇠일 때만 쓰인다 */
+  readonly vars?: Vars;
 }
 
 function asDomainError(error: unknown): DomainError | null {
@@ -108,6 +138,7 @@ function asDomainError(error: unknown): DomainError | null {
         message: error.message,
         status: e.status,
         ...(e.fields && Object.keys(e.fields).length > 0 ? { fields: e.fields } : {}),
+        ...(e.vars ? { vars: e.vars } : {}),
       }
     : null;
 }

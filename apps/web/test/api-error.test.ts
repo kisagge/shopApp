@@ -12,8 +12,23 @@ import { ForbiddenError, type Actor } from '@shop/core';
  * 한 자리로 모았으니 **여기서 한 번 확인한다** — 라우트마다 확인할 수 없던 것들이다.
  */
 
+/**
+ * 사전 한 벌을 흉내 낸다. **`has` 가 곧 "이것은 열쇠인가" 다** — 도메인 오류의 문구가 열쇠면
+ * 이 요청의 말로 바꾸고, 아니면(운영용 한국어) 그대로 내보낸다.
+ */
+const DICT: Record<string, string> = {
+  'err.order.notFound': '(ja) 注文が見つかりません',
+  'err.order.alreadyIn': '(ja) すでに{status}の注文です',
+  'orderStatus.CANCELLED': '(ja) キャンセル',
+  'err.address.tooMany': '(ja) 住所は{max}件まで',
+};
 vi.mock('~/lib/i18n/server', () => ({
-  getT: async () => (key: string) => `[${key}]`,
+  getT: async () =>
+    Object.assign(
+      (key: string, vars?: Record<string, string | number>) =>
+        (DICT[key] ?? key).replace(/\{(\w+)\}/g, (_m, name: string) => String(vars?.[name] ?? `{${name}}`)),
+      { has: (key: string) => key in DICT },
+    ),
 }));
 
 const { apiError } = await import('~/lib/api/respond');
@@ -54,6 +69,50 @@ describe('도메인 오류', () => {
     const res = await apiError(new OrderError('NOPE', '안 됩니다.', 400));
 
     expect(Object.keys(await res.json())).toEqual(['code', 'message']);
+  });
+});
+
+/**
+ * **일본어로 요청해도 한국어 문장이 나갔다.** 오류를 던지는 자리(lib·core)는 요청의 언어를 모른다 —
+ * 배치도 웹훅도 같은 함수를 부른다. 그래서 문구 자리에 사전 열쇠를 적고, 번역은 응답을 만드는 여기서 한다.
+ */
+describe('문구를 이 요청의 말로', () => {
+  it('문구가 열쇠면 바꾼다', async () => {
+    const res = await apiError(new OrderError('ORDER_NOT_FOUND', 'err.order.notFound', 404));
+
+    expect((await res.json()).message).toBe('(ja) 注文が見つかりません');
+  });
+
+  /** 옮기는 중에도 화면은 살아 있어야 한다 — 운영용 한국어 문구는 그대로 나간다 */
+  it('열쇠가 아니면 그대로 내보낸다', async () => {
+    const res = await apiError(new OrderError('NOT_APPROVED', '승인한 신청만 회수를 확인할 수 있습니다.'));
+
+    expect((await res.json()).message).toBe('승인한 신청만 회수를 확인할 수 있습니다.');
+  });
+
+  it('끼워 넣을 숫자를 함께 넘긴다', async () => {
+    const error = Object.assign(new OrderError('TOO_MANY', 'err.address.tooMany', 409), {
+      vars: { max: 10 },
+    });
+
+    expect((await (await apiError(error)).json()).message).toBe('(ja) 住所は10件まで');
+  });
+
+  /** "이미 {status}된 주문입니다" 의 상태 이름도 번역거리다 */
+  it('끼워 넣을 값이 열쇠면 그것도 바꾼다', async () => {
+    const error = Object.assign(new OrderError('ALREADY_CANCELLED', 'err.order.alreadyIn', 409), {
+      vars: { status: 'orderStatus.CANCELLED' },
+    });
+
+    expect((await (await apiError(error)).json()).message).toBe('(ja) すでに(ja) キャンセルの注文です');
+  });
+
+  it('열쇠가 아닌 값(상품명·옵션명)은 그대로 넣는다', async () => {
+    const error = Object.assign(new OrderError('X', 'err.order.alreadyIn', 409), {
+      vars: { status: '코트 / M' },
+    });
+
+    expect((await (await apiError(error)).json()).message).toBe('(ja) すでに코트 / Mの注文です');
   });
 });
 

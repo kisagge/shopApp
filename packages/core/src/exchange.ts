@@ -39,8 +39,8 @@ export function checkExchangeOption(original: ExchangeOriginal, candidate: Excha
 }
 
 export const EXCHANGE_OPTION_MESSAGE: Readonly<Record<Exclude<ExchangeOptionCheck, { ok: true }>['code'], string>> = {
-  DIFFERENT_PRODUCT: '같은 상품의 옵션으로만 바꿀 수 있습니다.',
-  PRICE_DIFFERS: '가격이 다른 옵션으로는 바꿀 수 없습니다. 반품 후 새로 주문해 주세요.',
-  INACTIVE: '판매하지 않는 옵션입니다.',
-  OUT_OF_STOCK: '바꿀 옵션의 재고가 모자랍니다.',
+  DIFFERENT_PRODUCT: 'err.exchange.differentProduct',
+  PRICE_DIFFERS: 'err.exchange.priceDiffers',
+  INACTIVE: 'err.exchange.inactive',
+  OUT_OF_STOCK: 'err.exchange.outOfStock',
 };

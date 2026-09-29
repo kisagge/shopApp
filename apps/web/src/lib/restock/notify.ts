@@ -21,7 +21,12 @@ import { recordNotifications, type NoticeInput } from '~/lib/notifications/recor
  */
 
 export class RestockError extends Error {
-  constructor(readonly code: string, message: string, readonly status = 409) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status = 409,
+    readonly vars?: Readonly<Record<string, string | number>>,
+  ) {
     super(message);
     this.name = 'RestockError';
   }
@@ -101,7 +106,7 @@ export async function subscribeRestock(userId: string, variantId: string): Promi
       },
     },
   });
-  if (!variant) throw new RestockError('NOT_FOUND', '옵션을 찾을 수 없습니다.', 404);
+  if (!variant) throw new RestockError('NOT_FOUND', 'err.restock.variantNotFound', 404);
 
   /*
    * 매대에 서 있는 상품인지는 core 가 정한다. 여기서 손으로 적어 두었더니
@@ -127,10 +132,7 @@ export async function subscribeRestock(userId: string, variantId: string): Promi
     where: { userId, notifiedAt: null },
   });
   if (count >= MAX_RESTOCK_SUBSCRIPTIONS) {
-    throw new RestockError(
-      'TOO_MANY',
-      `재입고 알림은 ${MAX_RESTOCK_SUBSCRIPTIONS}개까지 신청할 수 있습니다.`,
-    );
+    throw new RestockError('TOO_MANY', 'err.restock.tooMany', 409, { max: MAX_RESTOCK_SUBSCRIPTIONS });
   }
 
   /**

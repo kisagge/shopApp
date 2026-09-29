@@ -59,8 +59,8 @@ export async function confirmPayment(
           user: { select: { id: true, email: true, name: true } },
     },
   });
-  if (!order) throw new ConfirmError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
-  if (!order.payment) throw new ConfirmError('PAYMENT_NOT_FOUND', '결제 정보가 없습니다.', 404);
+  if (!order) throw new ConfirmError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
+  if (!order.payment) throw new ConfirmError('PAYMENT_NOT_FOUND', 'err.order.paymentNotFound', 404);
 
   // ── 멱등: 같은 결제로 이미 처리했으면 그대로 성공을 돌려준다
   if (order.payment.pgPaymentKey === input.paymentKey && order.payment.status !== 'READY') {
@@ -75,7 +75,7 @@ export async function confirmPayment(
 
   // 잠그기 전에 한 번 본다 — 이미 끝난 주문으로 잠금을 쥐지 않는다(진짜 판단은 잠근 뒤에)
   if (order.status !== 'PENDING') {
-    throw new ConfirmError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+    throw new ConfirmError('ALREADY_PROCESSED', 'err.order.alreadyProcessed');
   }
 
   // ── 금액은 주문에 저장된 값이 진실이다. 승인을 부르기 전에 본다
@@ -97,9 +97,9 @@ export async function confirmPayment(
       const locked = await tx.$queryRaw<{ status: string }[]>`
         SELECT status FROM orders WHERE id = ${order.id} FOR UPDATE
       `;
-      if (locked.length === 0) throw new ConfirmError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+      if (locked.length === 0) throw new ConfirmError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
       if (locked[0]!.status !== 'PENDING') {
-        throw new ConfirmError('ALREADY_PROCESSED', '이미 처리된 주문입니다.');
+        throw new ConfirmError('ALREADY_PROCESSED', 'err.order.alreadyProcessed');
       }
 
       result = await gateway.confirm({

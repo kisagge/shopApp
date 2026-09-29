@@ -8,16 +8,14 @@ import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 
 const altSchema = z.object({
   alt: z.string().trim().min(1, 'valid.altTextRequired').max(200, 'valid.tooLongChars'),
 });
 
-function fail(error: unknown): NextResponse | null {
-  if (error instanceof ImageError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-  }
+async function fail(error: unknown): Promise<NextResponse | null> {
+  if (error instanceof ImageError) return await apiError(error);
   if (error instanceof ProductError) {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
   }
@@ -67,7 +65,7 @@ export async function PATCH(
     });
     return NextResponse.json(image);
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }
@@ -99,7 +97,7 @@ export async function DELETE(
     });
     return NextResponse.json({ images: remaining });
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }

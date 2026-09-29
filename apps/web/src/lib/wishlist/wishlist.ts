@@ -30,12 +30,10 @@ export interface WishlistProduct {
 }
 
 export class WishlistError extends Error {
+  readonly vars = { max: MAX_WISHLIST_ITEMS } as const;
+
   constructor(readonly code: 'PRODUCT_NOT_FOUND' | 'TOO_MANY', readonly status: number) {
-    super(
-      code === 'TOO_MANY'
-        ? `찜은 ${MAX_WISHLIST_ITEMS}개까지 담을 수 있습니다`
-        : '상품을 찾을 수 없습니다',
-    );
+    super(code === 'TOO_MANY' ? 'err.wishlist.tooMany' : 'err.product.notFound');
     this.name = 'WishlistError';
   }
 }

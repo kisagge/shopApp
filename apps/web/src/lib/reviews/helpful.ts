@@ -28,13 +28,13 @@ async function loadVotable(reviewId: string, userId: string) {
     where: { id: reviewId, deletedAt: null },
     select: { id: true, userId: true },
   });
-  if (!review) throw new HelpfulError('REVIEW_NOT_FOUND', 404, '리뷰를 찾을 수 없습니다.');
+  if (!review) throw new HelpfulError('REVIEW_NOT_FOUND', 404, 'err.review.notFound');
   /*
    * 자기 글에는 누를 수 없다. 막지 않으면 도움순이 "스스로 누른 횟수" 순이
    * 되어, 정렬을 만든 뜻이 없어진다.
    */
   if (review.userId === userId) {
-    throw new HelpfulError('OWN_REVIEW', 403, '내가 쓴 리뷰에는 누를 수 없습니다.');
+    throw new HelpfulError('OWN_REVIEW', 403, 'err.review.ownHelpful');
   }
   return review;
 }

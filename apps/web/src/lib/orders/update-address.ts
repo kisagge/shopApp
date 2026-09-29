@@ -31,15 +31,14 @@ export class AddressEditError extends Error {
   }
 }
 
+/** 문구 자리에 사전 열쇠를 적는다 — 번역은 응답을 만드는 서버가 한다(api/respond) */
 const MESSAGE: Readonly<Record<AddressEditErrorCode, string>> = {
-  ORDER_NOT_FOUND: '주문을 찾을 수 없습니다.',
-  FORBIDDEN: '이 동작을 수행할 권한이 없습니다.',
-  ALREADY_SHIPPED: '이미 보낸 주문입니다. 배송지는 출고 전까지만 고칠 수 있습니다.',
-  ORDER_CLOSED: '끝난 주문의 배송지는 고칠 수 없습니다.',
-  ZONE_CHANGE_AFTER_PAYMENT:
-    '결제가 끝난 뒤에는 도서산간 여부가 달라지는 주소로 바꿀 수 없습니다. 배송비가 달라져 차액을 주고받아야 합니다 — 취소하고 다시 주문해 주세요.',
-  ZONE_CHANGE_ON_DEPOSIT:
-    '입금할 계좌의 금액이 이미 정해져 있어, 도서산간 여부가 달라지는 주소로는 바꿀 수 없습니다. 취소하고 다시 주문해 주세요.',
+  ORDER_NOT_FOUND: 'err.order.notFound',
+  FORBIDDEN: 'api.forbidden',
+  ALREADY_SHIPPED: 'err.addressEdit.alreadyShipped',
+  ORDER_CLOSED: 'err.addressEdit.orderClosed',
+  ZONE_CHANGE_AFTER_PAYMENT: 'err.addressEdit.zoneAfterPayment',
+  ZONE_CHANGE_ON_DEPOSIT: 'err.addressEdit.zoneOnDeposit',
 };
 
 /** 감사 로그에 남길 배송지 한 벌 */

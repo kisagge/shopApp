@@ -10,14 +10,12 @@ import { StorageError } from '~/lib/storage';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { fileRequired, imageTooLarge, invalidForm, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, fileRequired, imageTooLarge, invalidForm, invalidJson, unauthorized } from '~/lib/api/respond';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
 
-function fail(error: unknown): NextResponse | null {
-  if (error instanceof ImageError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-  }
+async function fail(error: unknown): Promise<NextResponse | null> {
+  if (error instanceof ImageError) return await apiError(error);
   if (error instanceof ProductError) {
     return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
   }
@@ -85,7 +83,7 @@ export async function POST(
 
     return NextResponse.json(image, { status: 201 });
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }
@@ -128,7 +126,7 @@ export async function PATCH(
     });
     return NextResponse.json({ images });
   } catch (error) {
-    const response = fail(error);
+    const response = await fail(error);
     if (response) return response;
     throw error;
   }

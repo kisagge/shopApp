@@ -90,12 +90,12 @@ export const ORDER_ERROR = [
 export type OrderErrorCode = (typeof ORDER_ERROR)[number];
 
 export const ORDER_ERROR_MESSAGE: Readonly<Record<OrderErrorCode, string>> = {
-  OUT_OF_STOCK: '재고가 부족한 상품이 있습니다',
-  PRICE_CHANGED: '가격이 변경되었습니다. 금액을 다시 확인해 주세요',
-  ADDRESS_NOT_FOUND: '배송지를 찾을 수 없습니다',
-  INSUFFICIENT_POINTS: '보유 포인트가 부족합니다',
-  COUPON_INVALID: '사용할 수 없는 쿠폰입니다',
-  EMPTY_ORDER: '주문할 수 있는 상품이 없습니다',
+  OUT_OF_STOCK: 'err.order.outOfStock',
+  PRICE_CHANGED: 'err.order.priceChanged',
+  ADDRESS_NOT_FOUND: 'err.address.notFound',
+  INSUFFICIENT_POINTS: 'err.order.insufficientPoints',
+  COUPON_INVALID: 'err.order.couponInvalid',
+  EMPTY_ORDER: 'err.order.empty',
 };
 
 export const orderErrorSchema = z.object({

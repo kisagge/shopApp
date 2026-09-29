@@ -58,20 +58,37 @@ export const IMAGE_ERROR = [
 export type ImageErrorCode = (typeof IMAGE_ERROR)[number];
 
 export const IMAGE_ERROR_MESSAGE: Readonly<Record<ImageErrorCode, string>> = {
-  UNSUPPORTED_TYPE: 'JPEG · PNG · WebP · AVIF 만 올릴 수 있습니다',
-  CONTENT_MISMATCH: '파일 내용이 이미지가 아닙니다',
-  TOO_LARGE: '이미지는 5MB 를 넘을 수 없습니다',
-  EMPTY_FILE: '빈 파일입니다',
-  TOO_MANY_IMAGES: `이미지는 상품당 ${MAX_IMAGES_PER_PRODUCT}장까지입니다`,
-  TOO_MANY_REVIEW_IMAGES: `사진은 리뷰당 ${MAX_IMAGES_PER_REVIEW}장까지입니다`,
-  TOO_MANY_INQUIRY_IMAGES: `사진은 문의당 ${MAX_IMAGES_PER_INQUIRY}장까지입니다`,
-  ALT_REQUIRED: '대체 텍스트를 입력해 주세요',
+  UNSUPPORTED_TYPE: 'err.image.unsupportedType',
+  CONTENT_MISMATCH: 'err.image.contentMismatch',
+  TOO_LARGE: 'err.image.tooLarge',
+  EMPTY_FILE: 'err.image.emptyFile',
+  TOO_MANY_IMAGES: 'err.image.tooManyProduct',
+  TOO_MANY_REVIEW_IMAGES: 'err.image.tooManyReview',
+  TOO_MANY_INQUIRY_IMAGES: 'err.image.tooManyInquiry',
+  ALT_REQUIRED: 'err.image.altRequired',
+};
+
+/** 상한을 말하는 문구에 끼워 넣을 값. 몇 장까지인지는 여기가 알고 있다 */
+const IMAGE_ERROR_VARS: Readonly<Partial<Record<ImageErrorCode, Readonly<Record<string, number>>>>> = {
+  TOO_MANY_IMAGES: { max: MAX_IMAGES_PER_PRODUCT },
+  TOO_MANY_REVIEW_IMAGES: { max: MAX_IMAGES_PER_REVIEW },
+  TOO_MANY_INQUIRY_IMAGES: { max: MAX_IMAGES_PER_INQUIRY },
 };
 
 export class ImageError extends Error {
+  readonly vars: Readonly<Record<string, number>> | undefined;
+  /**
+   * 도메인 오류의 모양(code·message·status)을 갖춘다.
+   *
+   * 없을 때는 라우트 열한 곳이 `instanceof ImageError` 로 가로채 손으로 응답을 만들었다 — 그래서
+   * 이 오류만 공통 응답을 지나가지 않았고, 문구를 세 언어로 옮길 때도 이 열한 곳이 남았다.
+   */
+  readonly status = 400;
+
   constructor(readonly code: ImageErrorCode) {
     super(IMAGE_ERROR_MESSAGE[code]);
     this.name = 'ImageError';
+    this.vars = IMAGE_ERROR_VARS[code];
   }
 }
 

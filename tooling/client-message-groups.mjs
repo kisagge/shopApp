@@ -88,6 +88,19 @@ export function clientReachableFiles(root) {
 }
 
 /**
+ * **서버가 이미 바꿔서 보내는 갈래.**
+ *
+ * `err.*` 는 도메인 오류의 문구다. 열쇠는 core·계약의 표에 적히는데(그래야 던지는 자리에서
+ * 무엇이 나갈지 보인다), 그 표는 화면 코드에서도 닿는 모듈에 있다 — 값으로 쓰지 않아도
+ * 따옴표에 걸려 갈래가 통째로 브라우저로 따라간다. 번역은 응답을 만드는 서버가 하고
+ * (api/respond 의 localize), 화면은 이미 사람이 읽을 수 있게 된 문장을 받는다.
+ *
+ * 이 예외가 위험하지 않은지는 검사가 지킨다 — 화면 코드가 이 갈래의 열쇠를 번역기에
+ * 넘기는 자리가 하나도 없어야 한다(client-groups 검사).
+ */
+const SERVER_ONLY_GROUPS = new Set(['err']);
+
+/**
  * 브라우저가 쓰는 사전 갈래.
  *
  * 셋을 모은다 — 따옴표째 적힌 열쇠의 갈래, 이름으로 조립하는 자리의 갈래
@@ -112,5 +125,8 @@ export function clientMessageGroups(root, allKeys) {
   if (source.includes('.category(')) groups.add('category');
   if (source.includes('translateIssue')) groups.add('valid');
 
+  for (const group of SERVER_ONLY_GROUPS) groups.delete(group);
   return [...groups].sort();
 }
+
+export { SERVER_ONLY_GROUPS };

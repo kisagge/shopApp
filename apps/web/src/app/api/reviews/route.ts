@@ -10,7 +10,7 @@ import {
 } from '~/lib/reviews/images';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
 import { isUniqueViolation } from '~/lib/db/unique-violation';
 
 /** 리뷰 작성. 산 사람만, 배송이 끝난 뒤, 주문 항목당 하나. 파는 사람의 계정은 쓰지 못한다(canWriteReview). */
@@ -31,9 +31,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     body = read.fields;
     files = read.files;
   } catch (error) {
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     return await invalidJson();
   }
 
@@ -64,9 +62,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // 리뷰가 만들어지지 않았으면 올린 사진도 되돌린다
     if (uploaded.length > 0) await discardReviewImages(uploaded.map((u) => u.key));
 
-    if (error instanceof ImageError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: 400 });
-    }
+    if (error instanceof ImageError) return await apiError(error);
     if (error instanceof ReviewError) {
       return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
     }

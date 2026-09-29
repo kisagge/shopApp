@@ -61,6 +61,22 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
     await expect(refusal).toContainText('도서산간');
     await expect(refusal, '다음 수를 알려 준다').toContainText('취소하고 다시 주문');
 
+    /*
+     * **같은 거절을 일본어로 물으면 일본어로 온다.** 오류 문구는 오래도록 한국어로 박혀 있었고,
+     * 화면은 서버가 준 message 를 그대로 보여 준다 — 일본어로 사던 사람이 막히는 순간에만 한국어를 봤다.
+     */
+    const inJapanese = await page.request.patch(`/api/orders/${orderNo}/address`, {
+      headers: { 'accept-language': 'ja' },
+      data: {
+        recipient: '장보영', phone: '010-1234-5678',
+        postalCode: JEJU, address1: '제주 제주시 첨단로 242',
+      },
+    });
+    expect(inJapanese.status()).toBe(409);
+    const body = (await inJapanese.json()) as { code: string; message: string };
+    expect(body.code).toBe('ZONE_CHANGE_AFTER_PAYMENT');
+    expect(body.message, `한국어가 그대로 나갔다: ${body.message}`).toMatch(/[ぁ-んァ-ン]/);
+
     // 막혔으면 주문은 그대로다 — 우편번호만 바뀌고 배송비는 옛 권역인 주문이 남으면 안 된다
     await page.reload();
     await ready(page);

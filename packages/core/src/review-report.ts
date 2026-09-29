@@ -93,9 +93,10 @@ export function moderationState(input: {
 }
 
 export const REVIEW_REPORT_ERROR = {
-  ALREADY_REPORTED: '이미 신고한 리뷰입니다.',
-  CANNOT_REPORT_OWN: '내가 쓴 리뷰는 신고할 수 없습니다.',
-  REPORT_TARGET_GONE: '이미 사라진 리뷰입니다.',
+  ALREADY_REPORTED: 'err.review.alreadyReported',
+  CANNOT_REPORT_OWN: 'err.review.cannotReportOwn',
+  REPORT_TARGET_GONE: 'err.review.reportTargetGone',
+  // 운영 화면에서만 나는 것이라 한국어로 둔다 — 신고를 내리는 자리다
   NOTHING_TO_DISMISS: '처리할 신고가 없습니다.',
 } as const;
 export type ReviewReportErrorCode = keyof typeof REVIEW_REPORT_ERROR;
