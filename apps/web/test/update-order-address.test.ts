@@ -31,6 +31,12 @@ const order = (over: Record<string, unknown> = {}) => ({
   shippingFee: 3_000,
   payable: 103_000,
   isRemoteArea: false,
+  recipient: '장보영',
+  recipientPhone: '010-0000-0000',
+  postalCode: SEOUL,
+  address1: '서울 성동구 왕십리로 1',
+  address2: '3층',
+  deliveryMemo: null,
   payment: { method: 'CARD', status: 'DONE' },
   ...over,
 });
@@ -84,6 +90,29 @@ describe('같은 권역 안에서 고치기', () => {
       orderNo: '20260901-0000001',
       userId: 'u-1',
     });
+  });
+
+  /** 송장 등록과 같은 범위다 — 남의 가맹점 주문 주소를 바꿀 수 없다 */
+  it('가맹점이 부르면 자기 상품이 담긴 주문인지 함께 본다', async () => {
+    await updateOrderAddress('20260901-0000001', input(), { merchantId: 'm-1' });
+
+    expect(db.order.findFirst.mock.calls[0]![0].where).toMatchObject({
+      items: { some: { merchantId: 'm-1' } },
+    });
+  });
+
+  it('운영진이 부르면 아무도 묶지 않는다 — 누구의 주문이든 연다', async () => {
+    await updateOrderAddress('20260901-0000001', input(), {});
+
+    expect(db.order.findFirst.mock.calls[0]![0].where).toEqual({ orderNo: '20260901-0000001' });
+  });
+
+  /** 주소만 남기면 "누가 여기로 보내라고 했는지" 를 물을 때 답할 수 없다 */
+  it('바꾸기 전과 뒤의 주소를 함께 돌려준다 — 감사 로그가 이 둘을 남긴다', async () => {
+    const result = await updateOrderAddress('20260901-0000001', input({ recipient: '장부장' }), { userId: 'u-1' });
+
+    expect(result.before).toMatchObject({ recipient: '장보영', address2: '3층', isRemoteArea: false });
+    expect(result.after).toMatchObject({ recipient: '장부장', phone: '010-1234-5678', isRemoteArea: false });
   });
 
   it('없는 주문이면 404 로 거절한다', async () => {

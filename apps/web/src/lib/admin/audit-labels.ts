@@ -44,6 +44,7 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'order.receiveReturn': '반품 회수 확인',
   'order.shipExchange': '교환 상품 발송',
   'order.ship': '송장 등록',
+  'order.address': '배송지 수정',
   'order.export': '주문 내려받기',
   'order.note.add': '주문 메모 남김',
   'order.note.delete': '주문 메모 삭제',

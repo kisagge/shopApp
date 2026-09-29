@@ -22,15 +22,18 @@ type UpdateOrderAddressInput = z.infer<typeof updateOrderAddressSchema>;
  * 추가 결제나 부분 환불이라 새 경로를 열어야 한다. 그 판단은 core 가 한다(checkAddressEdit).
  */
 
+type AddressEditErrorCode = AddressEditBlock | 'ORDER_NOT_FOUND' | 'FORBIDDEN';
+
 export class AddressEditError extends Error {
-  constructor(readonly code: AddressEditBlock | 'ORDER_NOT_FOUND', readonly status = 409) {
+  constructor(readonly code: AddressEditErrorCode, readonly status = 409) {
     super(MESSAGE[code]);
     this.name = 'AddressEditError';
   }
 }
 
-const MESSAGE: Readonly<Record<AddressEditBlock | 'ORDER_NOT_FOUND', string>> = {
+const MESSAGE: Readonly<Record<AddressEditErrorCode, string>> = {
   ORDER_NOT_FOUND: '주문을 찾을 수 없습니다.',
+  FORBIDDEN: '이 동작을 수행할 권한이 없습니다.',
   ALREADY_SHIPPED: '이미 보낸 주문입니다. 배송지는 출고 전까지만 고칠 수 있습니다.',
   ORDER_CLOSED: '끝난 주문의 배송지는 고칠 수 없습니다.',
   ZONE_CHANGE_AFTER_PAYMENT:
@@ -39,6 +42,17 @@ const MESSAGE: Readonly<Record<AddressEditBlock | 'ORDER_NOT_FOUND', string>> = 
     '입금할 계좌의 금액이 이미 정해져 있어, 도서산간 여부가 달라지는 주소로는 바꿀 수 없습니다. 취소하고 다시 주문해 주세요.',
 };
 
+/** 감사 로그에 남길 배송지 한 벌 */
+export interface AddressSnapshot {
+  readonly recipient: string;
+  readonly phone: string;
+  readonly postalCode: string;
+  readonly address1: string;
+  readonly address2: string | null;
+  readonly memo: string | null;
+  readonly isRemoteArea: boolean;
+}
+
 export interface AddressEditResult {
   readonly orderNo: string;
   /** 달라진 배송비. 0 이면 금액은 그대로다 */
@@ -46,19 +60,33 @@ export interface AddressEditResult {
   readonly shippingFee: number;
   readonly payable: number;
   readonly isRemoteArea: boolean;
+  /** 무엇을 무엇으로 바꿨는가 — 운영자가 고쳤을 때 감사 로그가 이 둘을 남긴다 */
+  readonly before: AddressSnapshot;
+  readonly after: AddressSnapshot;
 }
 
 export async function updateOrderAddress(
   orderNo: string,
   input: UpdateOrderAddressInput,
-  /** 손님이 부르면 자기 것만 고치게 묶는다. 운영자 창구가 생기면 이 자리를 비운다 */
-  by: { readonly userId?: string },
+  /**
+   * 누가 고치는가.
+   *
+   * 손님이 부르면 `userId` 로 자기 것만 고치게 묶는다 — 주문번호만으로 고칠 수 있으면 남의 주소를 바꿀 수
+   * 있다. 가맹점이 부르면 `merchantId` 로 자기 상품이 담긴 주문만 연다. 운영진은 둘 다 없이 부른다.
+   */
+  by: { readonly userId?: string; readonly merchantId?: string },
 ): Promise<AddressEditResult> {
   const order = await prisma.order.findFirst({
     // 손님이 고칠 때는 자기 것인지 함께 본다 — 주문번호만으로는 남의 주소를 바꿀 수 있다
-    where: { orderNo, ...(by.userId ? { userId: by.userId } : {}) },
+    where: {
+      orderNo,
+      ...(by.userId ? { userId: by.userId } : {}),
+      ...(by.merchantId ? { items: { some: { merchantId: by.merchantId } } } : {}),
+    },
     select: {
       id: true, orderNo: true, status: true, shippingFee: true, payable: true, isRemoteArea: true,
+      recipient: true, recipientPhone: true, postalCode: true, address1: true, address2: true,
+      deliveryMemo: true,
       payment: { select: { method: true, status: true } },
     },
   });
@@ -89,15 +117,25 @@ export async function updateOrderAddress(
    *
    * 읽은 상태를 조건에 싣는다 — 그사이 출고됐으면(운영자가 송장을 붙였으면) 위 판단은 이미 낡았다.
    */
+  const after: AddressSnapshot = {
+    recipient: input.recipient,
+    phone: normalizePhone(input.phone),
+    postalCode: input.postalCode,
+    address1: input.address1,
+    address2: input.address2 ?? null,
+    memo: input.deliveryMemo ?? null,
+    isRemoteArea: nowRemote,
+  };
+
   const { count } = await prisma.order.updateMany({
     where: { id: order.id, status: order.status },
     data: {
-      recipient: input.recipient,
-      recipientPhone: normalizePhone(input.phone),
-      postalCode: input.postalCode,
-      address1: input.address1,
-      address2: input.address2 ?? null,
-      deliveryMemo: input.deliveryMemo ?? null,
+      recipient: after.recipient,
+      recipientPhone: after.phone,
+      postalCode: after.postalCode,
+      address1: after.address1,
+      address2: after.address2,
+      deliveryMemo: after.memo,
       // 요청이 아니라 우편번호에서 정한다 — 받아 쓰면 제주 주소로 추가 배송비를 피할 수 있다
       isRemoteArea: nowRemote,
       ...(delta === 0
@@ -113,5 +151,15 @@ export async function updateOrderAddress(
     shippingFee: order.shippingFee + delta,
     payable: order.payable + delta,
     isRemoteArea: nowRemote,
+    before: {
+      recipient: order.recipient,
+      phone: order.recipientPhone,
+      postalCode: order.postalCode,
+      address1: order.address1,
+      address2: order.address2,
+      memo: order.deliveryMemo,
+      isRemoteArea: order.isRemoteArea,
+    },
+    after,
   };
 }

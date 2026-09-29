@@ -11,6 +11,7 @@ import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, undoOrd
  * - 주문 상세에서 그 자리로 열리고, 고치면 상세에 바뀐 주소가 보인다
  * - **도서산간으로 옮기려 하면 결제가 끝난 주문에서는 막히고**, 왜 안 되는지 화면에 남는다
  * - 막힌 뒤에도 주문의 주소는 그대로다 — 반쯤 바뀌어 있으면 안 된다
+ * - **운영자도 같은 폼으로 고치고**, 그 한 번이 감사 로그에 남는다
  *
  * 자기 손님(orderAddressEditor)과 자기 상품(RACE_PRODUCT.orderAddress)을 쓴다.
  */
@@ -20,7 +21,7 @@ test.use({ storageState: STATE_FILE.orderAddressEditor });
 /** 제주 — 도서산간이다(REMOTE_RANGES) */
 const JEJU = '63309';
 
-test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결제 뒤라 막힌다', async ({ page }) => {
+test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결제 뒤라 막힌다', async ({ page, browser }) => {
   test.setTimeout(120_000);
 
   const variant = await addProductToCart(page, RACE_PRODUCT.orderAddress);
@@ -65,6 +66,33 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
     await ready(page);
     await expect(page.getByText(`(${JEJU})`)).toHaveCount(0);
     await expect(page.getByText('101동 1001호')).toBeVisible();
+
+    // ── 운영자도 같은 폼으로 고친다. 전화를 받고도 할 수 있는 것이 없어 DB 를 직접 만지던 자리다
+    const admin = await browser.newContext({ storageState: STATE_FILE.admin });
+    try {
+      const adminPage = await admin.newPage();
+      await adminPage.goto(`/admin/orders/${orderNo}`);
+      await ready(adminPage);
+
+      await adminPage.getByRole('button', { name: '배송지 수정' }).click();
+      const adminForm = adminPage.getByRole('region', { name: `${orderNo} 배송지 수정` });
+      await adminForm.getByLabel(/받는 분/).fill('장부장');
+      await adminForm.getByRole('button', { name: '배송지 저장' }).click();
+      await expect(adminPage.getByRole('status').filter({ hasText: '배송지를 바꿨습니다' })).toBeVisible();
+
+      // 남의 주소를 대신 바꾼 일이라 누가 무엇을 무엇으로 바꿨는지 남는다
+      await adminPage.goto('/admin/audit');
+      await ready(adminPage);
+      const log = adminPage.getByRole('region', { name: '관리자 동작 기록' });
+      await expect(log.getByRole('cell', { name: '배송지 수정', exact: true }).first()).toBeVisible();
+    } finally {
+      await admin.close();
+    }
+
+    // 손님 화면에도 운영자가 고친 값이 그대로 보인다 — 두 창구가 같은 주문을 본다
+    await page.reload();
+    await ready(page);
+    await expect(page.getByText('장부장')).toBeVisible();
   } finally {
     await undoOrder(page, orderNo);
   }

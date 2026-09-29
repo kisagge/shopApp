@@ -42,8 +42,10 @@ export async function PATCH(
   const { orderNo } = await params;
 
   try {
-    const result = await updateOrderAddress(orderNo, parsed.data, { userId: user.id });
-    return NextResponse.json(result);
+    const { orderNo: no, shippingDelta, shippingFee, payable, isRemoteArea } =
+      await updateOrderAddress(orderNo, parsed.data, { userId: user.id });
+    // 바꾸기 전 주소(before)는 돌려주지 않는다 — 화면이 쓸 일이 없고, 감사 로그가 쓰는 값이다
+    return NextResponse.json({ orderNo: no, shippingDelta, shippingFee, payable, isRemoteArea });
   } catch (error) {
     return await apiError(error);
   }

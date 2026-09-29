@@ -5,6 +5,7 @@ import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
   PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf, carrierOf, formatTrackingNumber,
+  checkAddressEdit, awaitingDeposit,
   type OrderStatus, type ReturnType, type ReturnReason, type ReturnStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
@@ -18,6 +19,8 @@ import { getAdminOrder } from '~/lib/queries/admin/orders';
 import { OrderStatusActions } from '~/components/admin/order-status-actions';
 import { CancelItemsForm } from '~/components/cancel-items-form';
 import { OrderNotes } from '~/components/admin/order-notes';
+import { OrderAddressEdit } from '~/components/order-address-edit';
+import { getShippingPolicy } from '~/lib/shipping-policy';
 import { listOrderNotes } from '~/lib/orders/order-notes';
 import { getT } from '~/lib/i18n/server';
 import { adminTimestamp } from '~/lib/admin/date-format';
@@ -34,7 +37,12 @@ export default async function AdminOrderDetail({
   const actor = await requireAdmin('order:read');
   const [t, { orderNo }] = await Promise.all([getT(), params]);
   // 메모는 주문과 나란히 읽는다. 볼 수 없는 주문이면 아래에서 404 로 끝나 메모는 쓰이지 않는다
-  const [order, notes] = await Promise.all([getAdminOrder(actor, orderNo), listOrderNotes(actor, orderNo)]);
+  const [order, notes, shipping] = await Promise.all([
+    getAdminOrder(actor, orderNo),
+    listOrderNotes(actor, orderNo),
+    // 배송지를 고칠 때 도서산간 추가 배송비를 안내한다 — 한 줄짜리 표라 캐시에서 온다
+    getShippingPolicy(),
+  ]);
   if (!order) notFound();
 
   /**
@@ -54,6 +62,23 @@ export default async function AdminOrderDetail({
    */
   const canFulfill =
     hasPermission(actor, 'order:fulfill') && canRegisterShipment(order.status);
+
+  /*
+   * **배송지 수정.** 고쳐 달라는 전화를 받고도 할 수 있는 것이 없어 DB 를 직접 만졌다. 언제까지 되는지는
+   * 손님 쪽과 같은 규칙을 쓴다(core 의 checkAddressEdit) — 운영자라고 이미 나간 주문의 주소를 바꿀 수
+   * 있으면, 화면에는 새 주소가 보이는데 물건은 옛 주소로 간다. 서버가 같은 조건으로 다시 막는다.
+   */
+  const canEditAddress =
+    hasPermission(actor, 'order:fulfill') &&
+    checkAddressEdit({
+      status: order.status,
+      settled: order.payment !== null && isPaidStatus(order.payment.status),
+      awaitingDeposit:
+        order.payment !== null && awaitingDeposit(order.payment.method, order.payment.status),
+      // 같은 권역 안의 수정은 언제든 된다. 권역이 바뀌는 주소인지는 저장할 때 서버가 본다
+      wasRemote: false,
+      nowRemote: false,
+    }) === null;
 
   const activeReturn = order.returnRequests[0] ?? null;
 
@@ -218,6 +243,22 @@ export default async function AdminOrderDetail({
                 />
                 {order.deliveryMemo && <Row label="요청사항" value={order.deliveryMemo} />}
               </dl>
+
+              {canEditAddress && (
+                <OrderAddressEdit
+                  orderNo={order.orderNo}
+                  endpoint={`/api/admin/orders/${order.orderNo}/address`}
+                  remoteSurcharge={shipping.remoteSurcharge}
+                  current={{
+                    recipient: order.recipient,
+                    phone: order.recipientPhone,
+                    postalCode: order.postalCode,
+                    address1: order.address1,
+                    address2: order.address2,
+                    memo: order.deliveryMemo,
+                  }}
+                />
+              )}
 
               {/*
                 송장 등록을 배송 정보 바로 아래에 둔다. 주소를 확인하고

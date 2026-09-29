@@ -23,9 +23,17 @@ export function OrderAddressEdit({
   orderNo,
   remoteSurcharge,
   current,
+  endpoint,
 }: {
   orderNo: string;
   remoteSurcharge: number;
+  /**
+   * 어느 창구로 보내는가. 기본은 손님 것이다.
+   *
+   * 운영 화면도 **같은 폼을 쓴다** — 규칙(언제까지·권역이 바뀌면 얼마)이 한 벌이라 화면도 한 벌이어야
+   * 두 쪽이 다른 말을 하지 않는다. 운영 쪽 창구는 감사 로그를 남긴다는 것만 다르다.
+   */
+  endpoint?: string;
   current: {
     recipient: string;
     phone: string;
@@ -90,7 +98,7 @@ export function OrderAddressEdit({
           </div>
         }
         submit={async (body) => {
-          const res = await fetch(`/api/orders/${orderNo}/address`, {
+          const res = await fetch(endpoint ?? `/api/orders/${orderNo}/address`, {
             method: 'PATCH',
             headers: { 'content-type': 'application/json' },
             body: JSON.stringify({ ...body, ...(memo ? { deliveryMemo: memo } : {}) }),

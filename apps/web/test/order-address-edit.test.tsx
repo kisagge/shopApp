@@ -106,6 +106,31 @@ describe('저장', () => {
     });
   });
 
+  /**
+   * 운영 화면도 같은 폼을 쓴다 — 규칙이 한 벌이라 화면도 한 벌이어야 두 쪽이 다른 말을 하지 않는다.
+   * 다른 것은 보내는 곳뿐이고, 그쪽 창구가 감사 로그를 남긴다.
+   */
+  it('보낼 창구를 주면 그쪽으로 보낸다 — 운영 화면이 쓰는 길이다', async () => {
+    fetchMock.mockResolvedValue(Response.json({ shippingDelta: 0 }));
+    const user = userEvent.setup();
+    render(
+      <OrderAddressEdit
+        orderNo="20260901-0000001"
+        remoteSurcharge={3000}
+        current={CURRENT}
+        endpoint="/api/admin/orders/20260901-0000001/address"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: '배송지 수정' }));
+    await user.click(
+      within(screen.getByRole('region', { name: '20260901-0000001 배송지 수정' }))
+        .getByRole('button', { name: '배송지 저장' }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]![0]).toBe('/api/admin/orders/20260901-0000001/address');
+  });
+
   it('저장하면 닫히고, 바뀐 주소를 다시 읽는다', async () => {
     fetchMock.mockResolvedValue(Response.json({ shippingDelta: 0 }));
     const user = setup();
