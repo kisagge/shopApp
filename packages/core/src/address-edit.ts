@@ -27,7 +27,15 @@ export type AddressEditBlock =
   | 'ZONE_CHANGE_ON_DEPOSIT';
 
 /** 배송지를 아직 고칠 수 있는 주문 상태 — 출고 전이고 끝나지 않았다 */
-const EDITABLE_STATUS: readonly OrderStatus[] = ['PENDING', 'PAID', 'PREPARING'];
+/**
+ * 배송지를 아직 고칠 수 있는 주문 상태 — 출고 전이고 끝나지 않았다.
+ *
+ * **내보내는 이유는 세는 곳이 따로 있기 때문이다.** 목록은 줄마다 판단하지만(showsAddressChanged),
+ * 일괄 올리기 경고는 "이 조건에 몇 건" 을 DB 에 물어야 한다 — 그 조건을 손으로 적으면 두 곳이 갈리고,
+ * 갈린 날에는 표시는 없는데 거절만 나거나 그 반대가 된다.
+ */
+export const ADDRESS_EDITABLE_STATUS: readonly OrderStatus[] = ['PENDING', 'PAID', 'PREPARING'];
+const EDITABLE_STATUS = ADDRESS_EDITABLE_STATUS;
 
 export function checkAddressEdit(input: {
   readonly status: OrderStatus;

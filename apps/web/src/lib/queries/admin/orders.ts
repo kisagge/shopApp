@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged,
+  won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged, ADDRESS_EDITABLE_STATUS,
   type Actor, type Won, type OrderStatus,
   offsetOf,
 } from '@shop/core';
@@ -97,7 +97,7 @@ export async function getAdminOrders(
     page?: number;
     take?: number;
   } = {},
-): Promise<Paged<AdminOrderRow>> {
+): Promise<Paged<AdminOrderRow> & { readonly addressChanged: number }> {
   assertAdminQuery(actor, 'order:read');
   const scope = scopeOf(actor);
   const take = Math.min(query.take ?? PAGE_SIZE, MAX_PAGE_SIZE);
@@ -123,7 +123,20 @@ export async function getAdminOrders(
       },
     });
 
-  const [first, total] = await Promise.all([readAt(page), prisma.order.count({ where })]);
+  /*
+   * **일괄 올리기가 올리기 전에 알아야 한다.** 배송지가 바뀐 주문은 CSV 로 등록되지 않는데(거절한다),
+   * 올려 보고 나서야 알면 그 사람은 이미 라벨을 다 찍어 놓았다. 지금 조건 안에 몇 건인지 함께 센다.
+   *
+   * 조건은 core 의 목록을 그대로 쓴다(ADDRESS_EDITABLE_STATUS) — 줄마다 판단하는 쪽과 여기가
+   * 갈리면, 표시는 없는데 거절만 나거나 그 반대가 된다.
+   */
+  const [first, total, addressChanged] = await Promise.all([
+    readAt(page),
+    prisma.order.count({ where }),
+    prisma.order.count({
+      where: { ...where, addressChangedAt: { not: null }, status: { in: [...ADDRESS_EDITABLE_STATUS] } },
+    }),
+  ]);
   // 즐겨찾기에 담아 둔 쪽은 주문이 보관되면 사라진다 — 빈 표 대신 마지막 쪽을 준다
   const rows = await clampToLastPage(first, { page, pageSize: take, total }, readAt);
 
@@ -139,6 +152,7 @@ export async function getAdminOrders(
       addressChanged: showsAddressChanged(o),
     })),
     total,
+    addressChanged,
   };
 }
 

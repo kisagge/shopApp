@@ -24,9 +24,17 @@ export interface OrderExportFilter {
 export function OrderBulkActions({
   filter,
   canFulfill,
+  addressChanged,
 }: {
   filter: OrderExportFilter;
   canFulfill: boolean;
+  /**
+   * 지금 조건 안에서 배송지가 바뀐 주문 수.
+   *
+   * **올려 보고 나서야 알면 늦다.** 그 주문은 일괄로 등록되지 않는데(창구가 거절한다), 그때는 이미
+   * 라벨을 다 찍어 놓았다 — 올리기 전에 몇 건인지 말해 준다.
+   */
+  addressChanged: number;
 }) {
   /*
    * **접어 둔다.** 펼친 채로 두었더니 좁은 화면에서 이 덩이가 473px 을 차지해, 첫 주문 줄이 919px 지점으로
@@ -53,7 +61,7 @@ export function OrderBulkActions({
       </summary>
       <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:gap-10">
         <ExportOrders filter={filter} />
-        {canFulfill && <UploadShipments />}
+        {canFulfill && <UploadShipments addressChanged={addressChanged} />}
         {canFulfill && <UploadDeliveries />}
       </div>
     </details>
@@ -140,10 +148,12 @@ interface UploadResult {
  * 다른 것은 **무엇을 부르고 결과를 뭐라고 말하는가**뿐이라 그것만 받는다.
  */
 function CsvUpload<T extends UploadResult>({
-  title, hint, endpoint, submitLabel, pendingLabel, fileLabel, failureLabel, summarize, changed,
+  title, hint, warning, endpoint, submitLabel, pendingLabel, fileLabel, failureLabel, summarize, changed,
 }: {
   readonly title: string;
   readonly hint: string;
+  /** 올리기 전에 알아야 하는 것. 없으면 그리지 않는다 — 늘 붙어 있으면 아무도 안 읽는다 */
+  readonly warning?: string | undefined;
   readonly endpoint: string;
   readonly submitLabel: string;
   readonly pendingLabel: string;
@@ -208,6 +218,11 @@ function CsvUpload<T extends UploadResult>({
     <form ref={formRef} onSubmit={(e) => void onSubmit(e)} className="flex min-w-0 flex-1 flex-col gap-2">
       <h3 className="text-[13px] font-medium text-[var(--fg-secondary)]">{title}</h3>
       <p id={hintId} className="text-[12px] text-[var(--fg-muted)]">{hint}</p>
+      {warning !== undefined && (
+        <p className="rounded-sm bg-accent-soft px-3 py-2 text-[12px] leading-relaxed text-accent-hover">
+          {warning}
+        </p>
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex flex-col gap-1.5">
           <label htmlFor={inputId} className="text-xs font-medium text-[var(--fg-secondary)]">
@@ -275,11 +290,22 @@ function CsvUpload<T extends UploadResult>({
 
 const count = (n: number) => n.toLocaleString('ko-KR');
 
-function UploadShipments() {
+function UploadShipments({ addressChanged }: { addressChanged: number }) {
   return (
     <CsvUpload<BulkShipmentResult>
       title="송장 일괄 등록"
       hint="내려받은 파일의 택배사·송장번호 칸을 채워 올리세요. 송장이 빈 줄은 건너뜁니다. 배송준비 상태로 걸러 받으면 이미 보낸 주문이 섞이지 않습니다."
+      /*
+       * **올리기 전에 말해 준다.** 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번 더 묻지만, 일괄에는
+       * 그 자리가 없어 창구가 그 줄을 거절한다 — 올려 보고 나서야 알면 라벨은 이미 다 찍혀 있다.
+       */
+      {...(addressChanged > 0
+        ? {
+            warning:
+              `이 조건에 배송지가 바뀐 주문 ${count(addressChanged)}건이 있습니다. ` +
+              '일괄로는 등록되지 않습니다 — 목록에서 "배송지 변경" 이 붙은 주문을 열어 주소를 확인한 뒤 등록해 주세요.',
+          }
+        : {})}
       endpoint="/api/admin/orders/shipments"
       submitLabel="송장 올리기"
       pendingLabel="올리는 중…"

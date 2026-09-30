@@ -184,6 +184,7 @@ export default async function AdminOrdersPage({
         <OrderBulkActions
           filter={searchError ? { status: filter } : { status: filter, q, from, to }}
           canFulfill={hasPermission(actor, 'order:fulfill')}
+          addressChanged={result.addressChanged}
         />
 
         {lateDeposit && (

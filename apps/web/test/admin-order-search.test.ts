@@ -109,6 +109,33 @@ describe('배송지가 바뀐 주문', () => {
     ...over,
   });
 
+  /**
+   * **올려 보고 나서야 알면 늦다.** 그 주문은 일괄로 등록되지 않는데, 그때는 이미 라벨을 다 찍어 놓았다 —
+   * 지금 조건 안에 몇 건인지 함께 세어 올리기 전에 말해 준다.
+   */
+  it('지금 조건 안에서 배송지가 바뀐 주문을 함께 센다', async () => {
+    db.order.count.mockResolvedValueOnce(9).mockResolvedValueOnce(2);
+
+    const result = await getAdminOrders(admin, { status: 'PREPARING' });
+
+    expect(result.total).toBe(9);
+    expect(result.addressChanged).toBe(2);
+
+    // 세는 조건은 목록과 같은 조건 + 출고 전 + 바뀐 적 있음
+    const counted = db.order.count.mock.calls[1]![0].where;
+    expect(counted).toMatchObject({
+      status: { in: ['PENDING', 'PAID', 'PREPARING'] },
+      addressChangedAt: { not: null },
+    });
+  });
+
+  /** 목록의 조건을 그대로 물려받아야 한다 — 다른 조건으로 세면 화면의 수와 맞지 않는다 */
+  it('목록의 조건을 그대로 쓴다', async () => {
+    await getAdminOrders(admin, { q: '8842713' });
+
+    expect(db.order.count.mock.calls[1]![0].where).toMatchObject({ orderNo: { contains: '8842713' } });
+  });
+
   it('바뀐 시각을 함께 읽는다 — 이력을 문구로 뒤지지 않는다', async () => {
     await getAdminOrders(admin, {});
 

@@ -121,6 +121,15 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       await expect(adminPage.getByRole('row', { name: new RegExp(orderNo) }))
         .toContainText('배송지 변경');
 
+      /*
+       * 일괄 올리기도 **올리기 전에** 말해 준다 — 올려 보고 나서야 알면 라벨은 이미 찍혀 있다.
+       * 도구는 접혀 있다(좁은 화면에서 목록이 밀린다) — 눈에 보이는지까지 보려면 펼쳐야 한다.
+       */
+      const tools = adminPage.getByRole('group', { name: '내려받기 · 일괄 처리' });
+      await tools.getByRole('heading', { name: '내려받기 · 일괄 처리' }).click();
+      await expect(tools.getByText(/일괄로는 등록되지 않습니다/)).toBeVisible();
+      await expect(tools, '몇 건인지 말해 준다').toContainText('배송지가 바뀐 주문 1건');
+
       await adminPage.goto(`/admin/orders/${orderNo}`);
       await ready(adminPage);
 

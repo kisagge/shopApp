@@ -25,7 +25,7 @@ const csvFile = (text: string) => new File([text], 'orders.csv', { type: 'text/c
 
 describe('구조', () => {
   it('제목이 붙은 영역이고, 파일 입력에 라벨과 설명이 있다', () => {
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
     expect(screen.getByRole('group', { name: '내려받기 · 일괄 처리' })).toBeDefined();
 
     const input = screen.getByLabelText('송장 CSV 파일');
@@ -35,7 +35,7 @@ describe('구조', () => {
 
   it('송장 권한이 없으면 올리기는 그리지 않는다', () => {
     // 눌러 보고 403 을 받느니 없는 편이 낫다
-    render(<OrderBulkActions filter={{}} canFulfill={false} />);
+    render(<OrderBulkActions filter={{}} canFulfill={false} addressChanged={0} />);
     expect(screen.getByRole('button', { name: 'CSV 내려받기' })).toBeDefined();
     expect(screen.queryByLabelText('송장 CSV 파일')).toBeNull();
     expect(screen.queryByLabelText('배송완료 CSV 파일')).toBeNull();
@@ -46,7 +46,7 @@ describe('구조', () => {
    * 배송완료인지 알 수 없고, 잘못 올리면 되돌리기 어려운 일이 일어난다.
    */
   it('파일 칸 둘이 서로 다른 이름을 갖는다', () => {
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     expect(screen.getByLabelText('송장 CSV 파일')).toBeDefined();
     expect(screen.getByLabelText('배송완료 CSV 파일')).toBeDefined();
@@ -59,7 +59,7 @@ describe('내려받기', () => {
       status: 200,
       headers: { 'content-disposition': 'attachment; filename="orders-202609011230.csv"' },
     }));
-    render(<OrderBulkActions filter={{ status: 'PREPARING', q: '김', from: undefined }} canFulfill />);
+    render(<OrderBulkActions filter={{ status: 'PREPARING', q: '김', from: undefined }} canFulfill addressChanged={0} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
 
@@ -75,10 +75,48 @@ describe('내려받기', () => {
 
   it('한도를 넘으면 서버의 말을 그대로 보여 준다', async () => {
     fetchMock.mockResolvedValue(json(413, { message: '기간이나 상태로 좁혀 주세요.' }));
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.click(screen.getByRole('button', { name: 'CSV 내려받기' }));
     expect((await screen.findByRole('alert')).textContent).toContain('좁혀');
+  });
+});
+
+/**
+ * 올리기 전의 경고.
+ *
+ * **올려 보고 나서야 알면 늦다.** 배송지가 바뀐 주문은 일괄로 등록되지 않는데(창구가 그 줄을 거절한다),
+ * 그때는 이미 라벨을 다 찍어 놓았다 — 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번 더 묻지만
+ * 일괄에는 그 자리가 없다.
+ */
+describe('배송지가 바뀐 주문이 섞여 있으면', () => {
+  it('몇 건인지와 무엇을 해야 하는지 올리기 전에 말한다', () => {
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={3} />);
+
+    const panel = screen.getByRole('group', { name: '내려받기 · 일괄 처리' });
+    expect(panel).toHaveTextContent('배송지가 바뀐 주문 3건');
+    expect(panel, '일괄로는 안 된다는 것과 어디로 가야 하는지').toHaveTextContent('일괄로는 등록되지 않습니다');
+    expect(panel).toHaveTextContent('배송지 변경');
+  });
+
+  /** 늘 붙어 있으면 아무도 읽지 않는다 */
+  it('없으면 아무 말도 하지 않는다', () => {
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
+
+    expect(screen.queryByText(/일괄로는 등록되지 않습니다/)).toBeNull();
+  });
+
+  /** 송장을 올릴 수 없는 사람에게는 그 경고도 할 말이 없다 */
+  it('송장 권한이 없으면 그 자리가 아예 없다', () => {
+    render(<OrderBulkActions filter={{}} canFulfill={false} addressChanged={3} />);
+
+    expect(screen.queryByText(/일괄로는 등록되지 않습니다/)).toBeNull();
+  });
+
+  it('배송완료 일괄 처리에는 붙지 않는다 — 그쪽은 주소를 쓰지 않는다', () => {
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={3} />);
+
+    expect(screen.getAllByText(/일괄로는 등록되지 않습니다/)).toHaveLength(1);
   });
 });
 
@@ -90,7 +128,7 @@ describe('송장 올리기', () => {
       unchanged: 4,
       failures: [{ orderNo: '20260901-0000009', lines: [5], code: 'NOT_SHIPPABLE', message: '취소 주문에는 송장을 등록할 수 없습니다.' }],
     }));
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.upload(screen.getByLabelText('송장 CSV 파일'), csvFile('주문번호,택배사,송장번호\r\n'));
     await userEvent.click(screen.getByRole('button', { name: '송장 올리기' }));
@@ -108,7 +146,7 @@ describe('송장 올리기', () => {
   });
 
   it('파일을 고르지 않으면 부르지 않는다', async () => {
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
     await userEvent.click(screen.getByRole('button', { name: '송장 올리기' }));
 
     expect((await screen.findByRole('alert')).textContent).toContain('파일을 골라');
@@ -117,7 +155,7 @@ describe('송장 올리기', () => {
 
   it('머리칸이 없다는 거절을 보여 주고 목록은 건드리지 않는다', async () => {
     fetchMock.mockResolvedValue(json(400, { message: '필요한 머리칸이 없습니다: 택배사' }));
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.upload(screen.getByLabelText('송장 CSV 파일'), csvFile('a,b\r\n'));
     await userEvent.click(screen.getByRole('button', { name: '송장 올리기' }));
@@ -136,7 +174,7 @@ describe('송장 올리기', () => {
 describe('배송완료 일괄 처리', () => {
   it('고른 파일을 글자로 보내고, 결과를 소리로 알린다', async () => {
     fetchMock.mockResolvedValue(json(200, { delivered: 2, merged: 1, failures: [] }));
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.upload(
       screen.getByLabelText('배송완료 CSV 파일'),
@@ -163,7 +201,7 @@ describe('배송완료 일괄 처리', () => {
       merged: 0,
       failures: [{ orderNo: '20260915-0000002', lines: [3], code: 'INVALID_TRANSITION', message: '취소된 주문입니다.' }],
     }));
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.upload(screen.getByLabelText('배송완료 CSV 파일'), csvFile('주문번호\r\n20260915-0000001\r\n'));
     await userEvent.click(screen.getByRole('button', { name: '배송완료 처리' }));
@@ -174,7 +212,7 @@ describe('배송완료 일괄 처리', () => {
   });
 
   it('파일을 고르지 않고 누르면 그 자리에서 말한다', async () => {
-    render(<OrderBulkActions filter={{}} canFulfill />);
+    render(<OrderBulkActions filter={{}} canFulfill addressChanged={0} />);
 
     await userEvent.click(screen.getByRole('button', { name: '배송완료 처리' }));
 
