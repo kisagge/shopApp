@@ -402,6 +402,22 @@ export async function shipToDelivered(
 }
 
 /**
+ * 검사가 만든 주문을 **운영진으로** 되돌린다.
+ *
+ * 손님은 출고 전까지만 스스로 취소한다(core 의 isCancellableByCustomer — PENDING·PAID). 배송 준비로
+ * 옮겨 놓고 끝나는 명세는 손님 창구로 되돌릴 수 없어, 재고가 묶인 채 남는다.
+ */
+export async function undoOrderAsAdmin(
+  admin: import('@playwright/test').BrowserContext,
+  orderNo: string,
+): Promise<void> {
+  const res = await admin.request.post(`/api/admin/orders/${orderNo}/status`, {
+    data: { to: 'CANCELLED', note: '검사가 만든 주문을 되돌립니다' },
+  });
+  expect(res.ok(), `주문 ${orderNo} 을 되돌리지 못했다 (${res.status()}) ${await res.text()}`).toBe(true);
+}
+
+/**
  * 검사가 만든 주문을 되돌린다.
  *
  * 열 개 명세가 같은 두 줄을 적고 있었다. **되돌리기가 실패해도 조용하면 안 된다** — 재고가

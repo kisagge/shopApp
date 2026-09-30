@@ -1,5 +1,7 @@
 import { test, expect } from '@playwright/test';
-import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, undoOrder } from './state';
+import {
+  STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, undoOrderAsAdmin,
+} from './state';
 
 /**
  * 출고 전 주문의 배송지를 손님이 고친다.
@@ -14,6 +16,7 @@ import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, undoOrd
  * - **운영자도 같은 폼으로 고치고**, 그 한 번이 감사 로그에 남는다
  * - 손님이 고친 것도 **처리 이력**에 남고, 출고 전이라면 **목록에서도** 눈에 띈다 — 피킹 목록을
  *   이미 뽑은 사람은 주문을 열어 볼 이유가 없다
+ * - **송장을 붙이려 하면 한 번 더 묻는다** — 그 둘을 지나쳐 왔다면 거기가 마지막 문이다
  *
  * 자기 손님(orderAddressEditor)과 자기 상품(RACE_PRODUCT.orderAddress)을 쓴다.
  */
@@ -30,6 +33,12 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
   expect(variant, '담을 수 있는 옵션이 없다').not.toBeNull();
 
   const orderNo = await payWithCard(page);
+
+  /*
+   * 어드민 창구를 처음부터 쥔다. **배송 준비로 옮겨 놓고 끝나므로** 손님은 스스로 취소할 수 없다
+   * (core 의 isCancellableByCustomer) — 되돌리기는 운영진 창구로 나간다.
+   */
+  const admin = await browser.newContext({ storageState: STATE_FILE.admin });
 
   try {
     await page.goto(`/order/${orderNo}`);
@@ -86,8 +95,7 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
     await expect(page.getByText('101동 1001호')).toBeVisible();
 
     // ── 운영자도 같은 폼으로 고친다. 전화를 받고도 할 수 있는 것이 없어 DB 를 직접 만지던 자리다
-    const admin = await browser.newContext({ storageState: STATE_FILE.admin });
-    try {
+    {
       const adminPage = await admin.newPage();
       await adminPage.goto(`/admin/orders/${orderNo}`);
       await ready(adminPage);
@@ -122,6 +130,28 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       await adminForm.getByRole('button', { name: '배송지 저장' }).click();
       await expect(adminPage.getByRole('status').filter({ hasText: '배송지를 바꿨습니다' })).toBeVisible();
 
+      /*
+       * **마지막 문.** 누르면 물건이 그 주소로 떠난다 — 목록의 표시와 위의 안내를 지나쳐 왔다면 여기서
+       * 멈춘다. 여기서는 확인까지만 보고 등록하지는 않는다(등록하면 오배송을 실제로 만든다).
+       *
+       * 송장 칸은 배송 준비부터 선다(core 의 canRegisterShipment) — 결제완료에서 배송중으로 가는
+       * 길은 없다. 그 한 걸음을 먼저 옮긴다.
+       */
+      const moved = await adminPage.request.post(`/api/admin/orders/${orderNo}/status`, {
+        data: { to: 'PREPARING' },
+      });
+      expect(moved.ok(), `배송 준비로 옮기지 못했다 (${moved.status()})`).toBe(true);
+      await adminPage.goto(`/admin/orders/${orderNo}`);
+      await ready(adminPage);
+
+      await adminPage.getByLabel(/송장번호/).fill('123456789012');
+      await adminPage.getByRole('button', { name: '송장 등록하고 배송 시작' }).click();
+      const ask = adminPage.getByRole('group', { name: '배송지가 바뀐 주문입니다' });
+      await expect(ask).toBeVisible();
+      await expect(ask, '무엇을 붙이려는지 되읽어 준다').toContainText('1234-5678-9012');
+      await ask.getByRole('button', { name: '취소' }).click();
+      await expect(adminPage.getByRole('button', { name: '송장 등록하고 배송 시작' })).toBeVisible();
+
       // 남의 주소를 대신 바꾼 일이라 누가 무엇을 무엇으로 바꿨는지 남는다
       await adminPage.goto('/admin/audit');
       await ready(adminPage);
@@ -133,8 +163,6 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       await ready(adminPage);
       await expect(adminPage.getByRole('table', { name: '주문 상태 변경 이력' }))
         .toContainText('배송지 변경 (운영) — 받는 분');
-    } finally {
-      await admin.close();
     }
 
     // 손님 화면에도 운영자가 고친 값이 그대로 보인다 — 두 창구가 같은 주문을 본다
@@ -142,6 +170,7 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
     await ready(page);
     await expect(page.getByText('장부장')).toBeVisible();
   } finally {
-    await undoOrder(page, orderNo);
+    await undoOrderAsAdmin(admin, orderNo);
+    await admin.close();
   }
 });

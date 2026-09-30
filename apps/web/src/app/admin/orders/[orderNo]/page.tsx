@@ -278,7 +278,13 @@ export default async function AdminOrderDetail({
               {canFulfill && (
                 <div className="mt-5 border-t border-[var(--border)] pt-5">
                   <h3 className="mb-3 text-[13px] font-semibold text-[var(--fg)]">송장</h3>
-                  <ShipmentForm orderNo={order.orderNo} current={order.shipment} />
+                  <ShipmentForm
+                    orderNo={order.orderNo}
+                    current={order.shipment}
+                    {...(showsAddressChanged(order)
+                      ? { addressChangedAt: adminTimestamp.format(order.addressChangedAt!) }
+                      : {})}
+                  />
                 </div>
               )}
             </section>
