@@ -7,11 +7,20 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
  * 그 어긋남은 정산에서야 드러난다.
  */
 
+/**
+ * 고친 것과 그 기록은 한 트랜잭션에 묶여 있다 — 잠근 뒤 다시 읽어도 같은 값을 보게 둔다.
+ */
+const tx = vi.hoisted(() => ({
+  order: { updateMany: vi.fn<(...a: any[]) => any>() },
+  orderStatusLog: { create: vi.fn<(...a: any[]) => any>() },
+}));
 const db = vi.hoisted(() => ({
   order: {
     findFirst: vi.fn<(...a: any[]) => any>(),
-    updateMany: vi.fn<(...a: any[]) => any>(),
+    updateMany: tx.order.updateMany,
   },
+  orderStatusLog: tx.orderStatusLog,
+  $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -52,6 +61,7 @@ const input = (over: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  db.$transaction.mockImplementation((run: (t: typeof tx) => unknown) => run(tx));
   db.order.findFirst.mockResolvedValue(order());
   db.order.updateMany.mockResolvedValue({ count: 1 });
   policy.mockResolvedValue({ baseFee: 3_000, freeThreshold: 50_000, remoteSurcharge: 3_000 });
@@ -208,5 +218,88 @@ describe('이미 나간 주문', () => {
       .rejects.toMatchObject({ code: 'ALREADY_SHIPPED' });
 
     expect(db.order.updateMany.mock.calls[0]![0].where).toMatchObject({ id: 'o-1', status: 'PAID' });
+  });
+});
+
+/**
+ * 처리 이력에 남는 한 줄.
+ *
+ * **출고 직전에 주소가 바뀌면 운영자는 알 길이 없었다.** 화면에는 새 주소가 보이지만, 피킹 목록을
+ * 이미 뽑았거나 송장을 붙이려던 사람에게는 그 사실이 어디에도 나타나지 않는다.
+ */
+describe('처리 이력', () => {
+  const noteOf = () => db.orderStatusLog.create.mock.calls[0]![0].data.note as string;
+
+  /** 주문에 지금 적힌 그대로. 여기서 한 칸만 바꿔 넣으면 그 칸만 이력에 남아야 한다 */
+  const same = {
+    recipient: '장보영',
+    phone: '010-0000-0000',
+    postalCode: SEOUL,
+    address1: '서울 성동구 왕십리로 1',
+    address2: '3층',
+  };
+
+  it('누가 고쳤고 무엇이 바뀌었는지 남는다', async () => {
+    await updateOrderAddress('20260901-0000001', input({ ...same, address2: '102호' }), { userId: 'u-1' });
+
+    expect(noteOf()).toBe('배송지 변경 (손님) — 상세주소');
+    expect(db.orderStatusLog.create.mock.calls[0]![0].data).toMatchObject({
+      orderId: 'o-1',
+      // 상태가 바뀌는 일이 아니다 — 그래서 from 과 to 가 같다(반품 회수 확인과 같은 방식)
+      from: 'PAID',
+      to: 'PAID',
+      actor: 'u-1',
+    });
+  });
+
+  it('운영이 고치면 그 사람으로 남는다', async () => {
+    await updateOrderAddress('20260901-0000001', input({ ...same, recipient: '장부장' }), { actorId: 'u-admin' });
+
+    expect(noteOf()).toBe('배송지 변경 (운영) — 받는 분');
+    expect(db.orderStatusLog.create.mock.calls[0]![0].data.actor).toBe('u-admin');
+  });
+
+  it('가맹점이 고친 것도 구분한다 — 그다음 할 일이 다르다', async () => {
+    await updateOrderAddress('20260901-0000001', input({ ...same, recipient: '장부장' }), { actorId: 'u-m', merchantId: 'm-1' });
+
+    expect(noteOf()).toBe('배송지 변경 (가맹점) — 받는 분');
+  });
+
+  it('배송비가 움직였으면 그 금액까지 적는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PENDING', payment: null }));
+
+    await updateOrderAddress('20260901-0000001', input({ ...same, postalCode: JEJU, address1: '제주 제주시 첨단로 242' }), { userId: 'u-1' });
+
+    expect(noteOf()).toBe('배송지 변경 (손님) — 우편번호·주소 · 배송비 +3,000원');
+  });
+
+  it('줄어든 쪽도 부호로 적는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      status: 'PENDING', payment: null, isRemoteArea: true, postalCode: JEJU,
+      shippingFee: 6_000, payable: 106_000,
+    }));
+
+    await updateOrderAddress('20260901-0000001', input(same), { userId: 'u-1' });
+
+    expect(noteOf()).toContain('배송비 -3,000원');
+  });
+
+  /** 이력이 길어지면 정작 달라진 줄을 못 찾는다 */
+  it('같은 값을 다시 저장한 것은 남기지 않는다', async () => {
+    await updateOrderAddress('20260901-0000001', input(same), { userId: 'u-1' });
+
+    expect(db.order.updateMany, '쓰기는 그대로 한다').toHaveBeenCalled();
+    expect(db.orderStatusLog.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **바뀐 주소는 남았는데 바뀌었다는 사실은 없는 주문**이 생기면, 출고 직전에는 그것이 가장 위험한
+   * 조합이다. 한 트랜잭션에 묶여 있으므로 기록이 실패하면 주소도 되돌아간다.
+   */
+  it('기록이 실패하면 주소도 되돌아간다', async () => {
+    db.orderStatusLog.create.mockRejectedValue(new Error('로그를 못 썼다'));
+
+    await expect(updateOrderAddress('20260901-0000001', input({ ...same, address2: '102호' }), { userId: 'u-1' }))
+      .rejects.toThrow('로그를 못 썼다');
   });
 });

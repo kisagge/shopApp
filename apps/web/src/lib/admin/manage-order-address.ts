@@ -29,5 +29,9 @@ export async function updateOrderAddressAsAdmin(
   const scope = merchantScope(actor);
   if (scope === undefined) throw new AddressEditError('FORBIDDEN', 403);
 
-  return await updateOrderAddress(orderNo, input, scope ? { merchantId: scope } : {});
+  // 처리 이력에 누가 고쳤는지 남는다 — 남의 주소를 대신 바꾸는 일이다
+  return await updateOrderAddress(orderNo, input, {
+    actorId: actor.id,
+    ...(scope ? { merchantId: scope } : {}),
+  });
 }

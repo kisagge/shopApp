@@ -73,3 +73,35 @@ export function remoteSurchargeDelta(input: {
   if (input.wasRemote === input.nowRemote) return 0;
   return input.nowRemote ? input.surcharge : -input.surcharge;
 }
+
+/** 주문에 적힌 배송지 한 벌. 고치기 전과 뒤를 견줄 때 쓴다 */
+export interface OrderAddressFields {
+  readonly recipient: string;
+  readonly phone: string;
+  readonly postalCode: string;
+  readonly address1: string;
+  readonly address2: string | null;
+  readonly memo: string | null;
+}
+
+export const ADDRESS_FIELD = [
+  'recipient', 'phone', 'postalCode', 'address1', 'address2', 'memo',
+] as const;
+export type AddressField = (typeof ADDRESS_FIELD)[number];
+
+/**
+ * 무엇이 바뀌었는가.
+ *
+ * **출고 직전에 주소가 바뀌면 운영자는 알 길이 없었다.** 화면에는 새 주소가 보이지만, 피킹 목록을
+ * 이미 뽑았거나 송장을 붙이려던 사람에게는 그 사실이 어디에도 나타나지 않는다 — 처리 이력에 한 줄이
+ * 남아야 "언제 무엇이 바뀌었는지" 를 그 자리에서 볼 수 있다.
+ *
+ * **바뀐 칸만 고른다.** 주소 한 벌을 그대로 적으면 이력이 길어져서 정작 달라진 것을 못 찾고,
+ * 바뀐 것이 없으면 빈 목록이다 — 같은 값을 다시 저장한 것은 이력에 남길 일이 아니다.
+ */
+export function changedAddressFields(
+  before: OrderAddressFields,
+  after: OrderAddressFields,
+): readonly AddressField[] {
+  return ADDRESS_FIELD.filter((field) => (before[field] ?? '') !== (after[field] ?? ''));
+}

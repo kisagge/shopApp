@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkAddressEdit, remoteSurchargeDelta } from '../src/address-edit';
+import { changedAddressFields, checkAddressEdit, remoteSurchargeDelta } from '../src/address-edit';
 import type { OrderStatus } from '../src/order-state';
 
 /**
@@ -110,5 +110,48 @@ describe('바뀌는 배송비', () => {
 
   it('추가 배송비가 0인 정책이면 권역이 바뀌어도 0이다', () => {
     expect(remoteSurchargeDelta({ wasRemote: false, nowRemote: true, surcharge: 0 })).toBe(0);
+  });
+});
+
+/**
+ * **출고 직전에 주소가 바뀌면 운영자는 알 길이 없었다.** 화면에는 새 주소가 보이지만, 피킹 목록을
+ * 이미 뽑았거나 송장을 붙이려던 사람에게는 그 사실이 어디에도 나타나지 않는다 — 처리 이력에 남길
+ * 한 줄을 만들려면 먼저 무엇이 달라졌는지 골라야 한다.
+ */
+describe('무엇이 바뀌었는가', () => {
+  const addr = {
+    recipient: '장보영',
+    phone: '010-1234-5678',
+    postalCode: '04766',
+    address1: '서울 성동구 왕십리로 1',
+    address2: '101호',
+    memo: null,
+  };
+
+  it('같은 값을 다시 저장한 것은 빈 목록이다 — 이력에 남길 일이 아니다', () => {
+    expect(changedAddressFields(addr, { ...addr })).toEqual([]);
+  });
+
+  it('바뀐 칸만 고른다', () => {
+    expect(changedAddressFields(addr, { ...addr, address2: '102호' })).toEqual(['address2']);
+  });
+
+  it('여러 칸이 바뀌면 적힌 차례대로 준다 — 이력의 줄이 매번 같은 순서로 읽힌다', () => {
+    expect(changedAddressFields(addr, { ...addr, recipient: '장부장', postalCode: '63309' }))
+      .toEqual(['recipient', 'postalCode']);
+  });
+
+  /** 비어 있던 칸을 채우는 것도 바뀐 것이다 — 상세주소를 빠뜨렸다가 적는 것이 가장 흔한 수정이다 */
+  it('없던 값이 생긴 것도 바뀐 것으로 본다', () => {
+    expect(changedAddressFields({ ...addr, address2: null }, addr)).toEqual(['address2']);
+  });
+
+  it('비운 것도 바뀐 것으로 본다', () => {
+    expect(changedAddressFields(addr, { ...addr, memo: null, address2: null })).toEqual(['address2']);
+  });
+
+  /** null 과 빈 글자는 사람에게 같은 것이다 — 그 차이로 이력에 줄을 남기지 않는다 */
+  it('빈 글자와 없음은 같게 본다', () => {
+    expect(changedAddressFields({ ...addr, memo: null }, { ...addr, memo: '' })).toEqual([]);
   });
 });

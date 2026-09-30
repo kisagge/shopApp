@@ -63,10 +63,11 @@ beforeEach(() => {
 describe('PATCH /api/admin/orders/[orderNo]/address', () => {
   it('운영진은 손님을 묶지 않고 고친다 — 누구의 주문이든 연다', async () => {
     expect((await call()).status).toBe(200);
+    // 처리 이력에 찍히는 사람이 함께 간다 — 남의 주소를 대신 바꾸는 일이다
     expect(lib.updateOrderAddress).toHaveBeenCalledWith(
       '20260901-0000001',
       expect.objectContaining({ recipient: '장부장' }),
-      {},
+      { actorId: 'u-admin' },
     );
   });
 
@@ -75,7 +76,7 @@ describe('PATCH /api/admin/orders/[orderNo]/address', () => {
     getActor.mockResolvedValue(merchant);
 
     expect((await call()).status).toBe(200);
-    expect(lib.updateOrderAddress.mock.calls[0]![2]).toEqual({ merchantId: 'm-1' });
+    expect(lib.updateOrderAddress.mock.calls[0]![2]).toEqual({ actorId: 'u-m', merchantId: 'm-1' });
   });
 
   it('출고 권한이 없으면 403 — 고치지 않는다', async () => {
