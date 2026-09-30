@@ -46,3 +46,26 @@ export const getShippingPolicy = cache(async (): Promise<ShippingPolicy> => {
     return DEFAULT_SHIPPING;
   }
 });
+
+/**
+ * 고치는 화면이 읽는 정책. **캐시를 지나지 않는다.**
+ *
+ * **자기가 방금 쓴 값을 보여 줘야 한다.** 매대는 조금 늦어도 되지만(그래서 캐시가 있다), 고치는 폼이
+ * 늦으면 운영자는 저장이 안 된 줄 알고 다시 쓰거나, 옛 값을 그대로 다시 저장한다.
+ *
+ * 캐시를 터는 것만으로는 부족하다. 읽기가 진행 중일 때 저장이 끼어들면, 그 읽기가 **턴 뒤에** 옛 값을
+ * 캐시에 넣는다 — 그 뒤로는 수명(300초)이 다할 때까지 옛 값이 나온다. 손님 화면이 정책을 읽는 자리가
+ * 늘어난 뒤로 그 틈이 실제로 벌어졌고(검사가 한 번 잡았다), 고치는 화면은 그 틈을 견딜 이유가 없다.
+ */
+export async function getShippingPolicyFresh(): Promise<ShippingPolicy> {
+  try {
+    const row = await prisma.shippingPolicy.findUnique({
+      where: { id: 'default' },
+      select: { baseFee: true, freeThreshold: true, remoteSurcharge: true },
+    });
+    return row ? shippingPolicyFrom(row) : DEFAULT_SHIPPING;
+  } catch (error) {
+    console.error('[shipping] 정책을 못 읽어 기본값으로 간다', error);
+    return DEFAULT_SHIPPING;
+  }
+}

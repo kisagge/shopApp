@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import {
   hasPermission, merchantScope, isCarrierCode, normalizeTrackingNumber,
   isTrackingNumberLike, carrierOf, canRegisterShipment, ORDER_STATUS_LABEL,
+  showsAddressChanged,
   type Actor,
 } from '@shop/core';
 import { transitionOrder, TransitionError } from './transition-order';
@@ -215,4 +216,35 @@ export async function findUnchangedShipments(
       })
       .map((e) => e.orderNo),
   );
+}
+
+/**
+ * 배송지가 바뀌어 **사람이 한 번 봐야 하는** 주문번호.
+ *
+ * **CSV 로 수백 건을 올릴 때가 오히려 위험하다.** 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번 더
+ * 묻지만(ShipmentForm), 일괄에는 그 자리가 없다 — 내려받아 라벨을 찍은 뒤에 손님이 주소를 고쳤으면,
+ * 아무도 모르는 채로 수십 건이 옛 주소로 떠난다.
+ *
+ * **규칙이 갈리는 것이 아니라 확인하는 창구가 다르다.** 한 건 등록에서 막지 않는 이유는 그 화면에
+ * 주소를 보고 확인하는 사람이 있기 때문이다. 여기서 막고 그 화면으로 보낸다 — 물건은 아직 떠나지
+ * 않았으므로 되돌릴 수 있는 거절이다.
+ *
+ * 가맹점 범위를 건다 — findUnchangedShipments 와 같은 이유다.
+ */
+export async function findAddressChanged(
+  entries: readonly { orderNo: string }[],
+  actor: Actor,
+): Promise<Set<string>> {
+  const scope = merchantScope(actor);
+  if (scope === undefined || entries.length === 0) return new Set();
+
+  const orders = await prisma.order.findMany({
+    where: {
+      orderNo: { in: entries.map((e) => e.orderNo) },
+      ...(scope ? { items: { some: { merchantId: scope } } } : {}),
+    },
+    select: { orderNo: true, status: true, addressChangedAt: true },
+  });
+
+  return new Set(orders.filter((o) => showsAddressChanged(o)).map((o) => o.orderNo));
 }

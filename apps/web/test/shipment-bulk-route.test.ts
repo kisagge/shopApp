@@ -17,9 +17,10 @@ vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 
 const registerShipmentAudited = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const findUnchangedShipments = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const findAddressChanged = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/manage-shipment', async (importOriginal) => {
   const actual = await importOriginal<typeof import('~/lib/admin/manage-shipment')>();
-  return { ...actual, registerShipmentAudited, findUnchangedShipments };
+  return { ...actual, registerShipmentAudited, findUnchangedShipments, findAddressChanged };
 });
 
 const { ShipmentError } = await import('~/lib/admin/manage-shipment');
@@ -45,6 +46,7 @@ beforeEach(() => {
   enforceRateLimit.mockResolvedValue(null);
   registerShipmentAudited.mockResolvedValue({});
   findUnchangedShipments.mockResolvedValue(new Set());
+  findAddressChanged.mockResolvedValue(new Set());
 });
 
 describe('등록', () => {
@@ -151,5 +153,59 @@ describe('막는 것', () => {
 
   it('빈 파일은 검증에서 걸린다', async () => {
     expect((await post({ csv: '' })).status).toBe(400);
+  });
+});
+
+/**
+ * 배송지가 바뀐 주문.
+ *
+ * **CSV 로 수백 건을 올릴 때가 오히려 위험하다.** 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번 더
+ * 묻지만(ShipmentForm), 일괄에는 그 자리가 없다 — 내려받아 라벨을 찍은 뒤에 손님이 주소를 고쳤으면
+ * 아무도 모르는 채로 수십 건이 옛 주소로 떠난다.
+ */
+describe('배송지가 바뀐 주문', () => {
+  it('등록하지 않고 줄 번호와 사유로 돌려준다', async () => {
+    findAddressChanged.mockResolvedValue(new Set(['20260901-0000002']));
+
+    const response = await upload([
+      ['20260901-0000001', '코트', 'CJ대한통운', '123456789012'],
+      ['20260901-0000002', '니트', 'CJ대한통운', '223456789012'],
+    ]);
+
+    const body = await response.json();
+    expect(body.registered, '나머지는 들어간다').toBe(1);
+    expect(registerShipmentAudited).toHaveBeenCalledTimes(1);
+    expect(registerShipmentAudited.mock.calls[0]![0]).toBe('20260901-0000001');
+
+    expect(body.failures).toEqual([
+      expect.objectContaining({
+        orderNo: '20260901-0000002',
+        code: 'ADDRESS_CHANGED',
+        lines: [3],
+      }),
+    ]);
+    expect(body.failures[0].message, '어디로 가서 무엇을 하라고 적는다').toContain('주문 화면');
+  });
+
+  /** 범위와 상태는 그 함수가 본다 — 여기서는 물어보기만 한다 */
+  it('올린 주문번호를 그대로 물어본다', async () => {
+    await upload([['20260901-0000001', '코트', 'CJ대한통운', '123456789012']]);
+
+    expect(findAddressChanged.mock.calls[0]![0]).toEqual([
+      expect.objectContaining({ orderNo: '20260901-0000001' }),
+    ]);
+    expect(findAddressChanged.mock.calls[0]![1]).toBe(admin);
+  });
+
+  /** 이미 같은 송장이 붙은 줄은 애초에 등록하지 않는다 — 두 번 세지 않는다 */
+  it('이미 같은 송장이 붙은 줄이면 실패로도 세지 않는다', async () => {
+    findUnchangedShipments.mockResolvedValue(new Set(['20260901-0000001']));
+    findAddressChanged.mockResolvedValue(new Set(['20260901-0000001']));
+
+    const body = await (await upload([['20260901-0000001', '코트', 'CJ대한통운', '123456789012']])).json();
+
+    expect(body.unchanged).toBe(1);
+    expect(body.failures).toEqual([]);
+    expect(registerShipmentAudited).not.toHaveBeenCalled();
   });
 });

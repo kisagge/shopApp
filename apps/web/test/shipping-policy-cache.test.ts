@@ -32,7 +32,7 @@ vi.mock('~/lib/cache', () => ({
   TTL: { shipping: 300 },
 }));
 
-const { getShippingPolicy } = await import('~/lib/shipping-policy');
+const { getShippingPolicy, getShippingPolicyFresh } = await import('~/lib/shipping-policy');
 
 const ROW = { baseFee: 3000, freeThreshold: 50_000, remoteSurcharge: 3000 };
 
@@ -82,5 +82,52 @@ describe('배송 정책 읽기', () => {
 
     // 캐시가 감싼 함수 자체는 삼키지 않는다 — 삼키면 그 바닥값이 저장된다
     await expect(caught.inner!()).rejects.toThrow('DB 가 안 열린다');
+  });
+});
+
+/**
+ * 고치는 화면은 캐시를 지나지 않는다.
+ *
+ * **자기가 방금 쓴 값을 보여 줘야 한다.** 매대는 조금 늦어도 되지만, 고치는 폼이 늦으면 운영자는 저장이
+ * 안 된 줄 알고 다시 쓰거나 옛 값을 그대로 다시 저장한다.
+ *
+ * 캐시를 터는 것만으로는 부족하다. 읽기가 진행 중일 때 저장이 끼어들면 그 읽기가 **턴 뒤에** 옛 값을
+ * 캐시에 넣고, 그 뒤로는 수명(300초)이 다할 때까지 옛 값이 나온다 — 검사가 실제로 한 번 잡았다.
+ */
+describe('고치는 화면이 읽는 정책', () => {
+  it('부를 때마다 표를 다시 읽는다', async () => {
+    await getShippingPolicyFresh();
+    await getShippingPolicyFresh();
+
+    expect(db.shippingPolicy.findUnique).toHaveBeenCalledTimes(2);
+  });
+
+  it('캐시를 지나지 않는다 — 태그를 달지 않고 바로 읽는다', async () => {
+    caught.options = null;
+    await getShippingPolicyFresh();
+
+    expect(caught.options, '캐시를 씌우면 방금 쓴 값이 안 보일 수 있다').toBeNull();
+  });
+
+  it('같은 세 칸만 읽는다 — 두 경로가 다른 모양을 주면 화면이 갈린다', async () => {
+    await getShippingPolicyFresh();
+
+    expect(db.shippingPolicy.findUnique.mock.calls[0]![0].select).toEqual({
+      baseFee: true, freeThreshold: true, remoteSurcharge: true,
+    });
+  });
+
+  it('줄이 없으면 바닥값으로 간다', async () => {
+    db.shippingPolicy.findUnique.mockResolvedValue(null);
+
+    expect(await getShippingPolicyFresh()).toEqual(DEFAULT_SHIPPING);
+  });
+
+  it('못 읽어도 화면은 선다 — 고칠 사람을 막지 않는다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.shippingPolicy.findUnique.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+    expect(await getShippingPolicyFresh()).toEqual(DEFAULT_SHIPPING);
+    expect(error).toHaveBeenCalled();
   });
 });

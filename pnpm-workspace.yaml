@@ -19,3 +19,8 @@ overrides:
   # 두 권고 모두 3.1.6 에서만 나고 3.1.7 이후에 고쳐졌다. ajv 가 ^3.0.1 을 받으므로 범위 안이다 —
   # 4.x 로 올리면 ajv 가 못 받는다(Prisma CLI 가 그 ajv 를 쓴다).
   fast-uri: '^3.1.8'
+  # 재귀·확장이 폭발하는 DoS 셋(GHSA-q2hr·qhr7·6j4f). 두 갈래가 함께 깔려 있다 — 옛 minimatch(3.x)가 1.x,
+  # eslint 쪽 minimatch(10.x)가 5.x 를 받는다. 갈래마다 고쳐진 가장 낮은 버전으로 올린다: 한쪽으로 몰면
+  # minimatch 가 못 받는다.
+  brace-expansion@1: '^1.1.21'
+  brace-expansion@>=4: '^5.0.12'

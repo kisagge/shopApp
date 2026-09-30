@@ -18,7 +18,9 @@ vi.mock('~/lib/admin/transition-order', () => ({
   TransitionError: FakeTransitionError,
 }));
 
-const { registerShipment, findUnchangedShipments, ShipmentError } = await import('~/lib/admin/manage-shipment');
+const {
+  registerShipment, findUnchangedShipments, findAddressChanged, ShipmentError,
+} = await import('~/lib/admin/manage-shipment');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -251,6 +253,47 @@ describe('이미 같은 송장인 주문 (일괄 올리기)', () => {
   it('소속 없는 가맹점 계정은 아무것도 비교하지 않는다', async () => {
     const orphan: Actor = { id: 'u-x', role: 'MERCHANT', merchantId: null };
     expect((await findUnchangedShipments(entries, orphan)).size).toBe(0);
+    expect(db.order.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 배송지가 바뀌어 사람이 한 번 봐야 하는 주문.
+ *
+ * **CSV 로 수백 건을 올릴 때가 오히려 위험하다.** 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번 더
+ * 묻지만, 일괄에는 그 자리가 없다 — 라벨을 찍은 뒤에 주소가 바뀌었으면 아무도 모르는 채로 떠난다.
+ */
+describe('배송지가 바뀐 주문 고르기', () => {
+  const entries = [{ orderNo: 'A' }, { orderNo: 'B' }, { orderNo: 'C' }];
+  const changedAt = new Date('2026-09-30T04:00:00Z');
+
+  beforeEach(() => {
+    db.order.findMany.mockResolvedValue([
+      { orderNo: 'A', status: 'PREPARING', addressChangedAt: changedAt },
+      { orderNo: 'B', status: 'PREPARING', addressChangedAt: null },
+      // 이미 나간 주문은 고르지 않는다 — 송장 오타를 고치러 온 것이고, 표시할 값이 없다
+      { orderNo: 'C', status: 'SHIPPED', addressChangedAt: changedAt },
+    ]);
+  });
+
+  it('출고 전에 바뀐 주문만 고른다', async () => {
+    expect([...(await findAddressChanged(entries, admin))]).toEqual(['A']);
+  });
+
+  /** 범위를 안 걸면 남의 주문번호를 넣어 보는 것으로 "주소가 바뀌었다" 가 새어 나간다 */
+  it('가맹점은 자기 주문 안에서만 본다', async () => {
+    await findAddressChanged(entries, merchant);
+    expect(db.order.findMany.mock.calls[0]![0].where.items).toEqual({ some: { merchantId: 'm-a' } });
+  });
+
+  it('소속 없는 가맹점 계정은 아무것도 보지 않는다', async () => {
+    const orphan: Actor = { id: 'u-x', role: 'MERCHANT', merchantId: null };
+    expect((await findAddressChanged(entries, orphan)).size).toBe(0);
+    expect(db.order.findMany).not.toHaveBeenCalled();
+  });
+
+  it('올린 줄이 없으면 묻지 않는다', async () => {
+    expect((await findAddressChanged([], admin)).size).toBe(0);
     expect(db.order.findMany).not.toHaveBeenCalled();
   });
 });

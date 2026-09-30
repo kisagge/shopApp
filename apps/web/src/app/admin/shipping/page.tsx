@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { format } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getShippingPolicy } from '~/lib/shipping-policy';
+import { getShippingPolicyFresh } from '~/lib/shipping-policy';
 import { ShippingPolicyForm } from './shipping-form';
 import { getReturnAddress } from '~/lib/orders/return-address';
 import { ReturnAddressForm } from '~/components/admin/return-address-form';
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function AdminShippingPage() {
   const actor = await requireAdmin('shipping:write');
   const [policy, returnAddress, policyEdit, returnEdit] = await Promise.all([
-    getShippingPolicy(), getReturnAddress(null), getShippingPolicyEdit(actor), getReturnAddressEdit(actor, null),
+    getShippingPolicyFresh(), getReturnAddress(null), getShippingPolicyEdit(actor), getReturnAddressEdit(actor, null),
   ]);
 
   return (

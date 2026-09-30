@@ -5,7 +5,9 @@ import {
 } from '@shop/core';
 import { bulkShipmentSchema, type BulkShipmentResult } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
-import { findUnchangedShipments, registerShipmentAudited, ShipmentError } from '~/lib/admin/manage-shipment';
+import {
+  findAddressChanged, findUnchangedShipments, registerShipmentAudited, ShipmentError,
+} from '~/lib/admin/manage-shipment';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { forbidden, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
@@ -79,7 +81,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   }));
 
   let registered = 0;
-  const unchanged = await findUnchangedShipments(upload.entries, actor);
+  /*
+   * 둘을 한 번에 읽는다 — 이미 같은 송장이 붙은 주문과, 배송지가 바뀌어 사람이 봐야 하는 주문.
+   * 서로의 답을 쓰지 않으므로 줄줄이 기다릴 이유가 없다.
+   */
+  const [unchanged, addressChanged] = await Promise.all([
+    findUnchangedShipments(upload.entries, actor),
+    findAddressChanged(upload.entries, actor),
+  ]);
 
   /*
    * **하나씩 차례로 한다.** 동시에 던지면 빠르지만, 같은 주문이 섞였을 때(위에서 묶지만
@@ -88,6 +97,23 @@ export async function POST(request: Request): Promise<NextResponse> {
    */
   for (const entry of upload.entries) {
     if (unchanged.has(entry.orderNo)) continue;
+
+    /*
+     * **배송지가 바뀐 주문은 여기서 등록하지 않는다.** 한 건씩 붙일 때는 화면이 주소를 보여 주고 한 번
+     * 더 묻지만, 일괄에는 그 자리가 없다 — 라벨을 찍은 뒤에 주소가 바뀌었으면 아무도 모르는 채로
+     * 옛 주소로 떠난다. 물건이 아직 떠나지 않았으므로 되돌릴 수 있는 거절이고, 그 주문 화면에는
+     * 확인하고 등록하는 길이 있다.
+     */
+    if (addressChanged.has(entry.orderNo)) {
+      failures.push({
+        orderNo: entry.orderNo,
+        lines: [entry.line],
+        code: 'ADDRESS_CHANGED',
+        message: '배송지가 바뀐 주문입니다. 주문 화면에서 주소를 확인한 뒤 등록해 주세요.',
+      });
+      continue;
+    }
+
     try {
       await registerShipmentAudited(
         entry.orderNo,

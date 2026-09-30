@@ -16,7 +16,7 @@ import {
  * - **운영자도 같은 폼으로 고치고**, 그 한 번이 감사 로그에 남는다
  * - 손님이 고친 것도 **처리 이력**에 남고, 출고 전이라면 **목록에서도** 눈에 띈다 — 피킹 목록을
  *   이미 뽑은 사람은 주문을 열어 볼 이유가 없다
- * - **송장을 붙이려 하면 한 번 더 묻는다** — 그 둘을 지나쳐 왔다면 거기가 마지막 문이다
+ * - **송장을 붙이려 하면 한 번 더 묻고**, CSV 일괄에서는 그 줄만 거절한다 — 일괄에는 물어볼 자리가 없다
  *
  * 자기 손님(orderAddressEditor)과 자기 상품(RACE_PRODUCT.orderAddress)을 쓴다.
  */
@@ -151,6 +151,24 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       await expect(ask, '무엇을 붙이려는지 되읽어 준다').toContainText('1234-5678-9012');
       await ask.getByRole('button', { name: '취소' }).click();
       await expect(adminPage.getByRole('button', { name: '송장 등록하고 배송 시작' })).toBeVisible();
+
+      /*
+       * **일괄에는 물어볼 자리가 없다.** CSV 로 수백 건을 올릴 때가 오히려 위험한데 — 내려받아 라벨을
+       * 찍은 뒤에 주소가 바뀌었으면 아무도 모르는 채로 떠난다. 그 줄만 거절하고 사유를 돌려준다.
+       */
+      const bulk = await adminPage.request.post('/api/admin/orders/shipments', {
+        data: {
+          csv: `주문번호,상품,택배사,송장번호\r\n${orderNo},코튼 케이블 크루넥,CJ대한통운,123456789012\r\n`,
+        },
+      });
+      expect(bulk.ok(), `일괄 창구가 막혔다 (${bulk.status()})`).toBe(true);
+      const bulkResult = (await bulk.json()) as {
+        registered: number;
+        failures: { orderNo: string | null; code: string; message: string }[];
+      };
+      expect(bulkResult.registered, '등록하지 않았다').toBe(0);
+      expect(bulkResult.failures[0]).toMatchObject({ orderNo, code: 'ADDRESS_CHANGED' });
+      expect(bulkResult.failures[0]!.message, '어디로 가서 무엇을 하라고 적는다').toContain('주문 화면');
 
       // 남의 주소를 대신 바꾼 일이라 누가 무엇을 무엇으로 바꿨는지 남는다
       await adminPage.goto('/admin/audit');
