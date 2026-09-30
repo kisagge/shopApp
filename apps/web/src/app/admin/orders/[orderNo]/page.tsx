@@ -5,7 +5,7 @@ import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
   PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf,
-  checkAddressEdit, awaitingDeposit,
+  checkAddressEdit, awaitingDeposit, showsAddressChanged,
   type OrderStatus,
 } from '@shop/core';
 import { ShipmentForm } from './shipment-form';
@@ -235,6 +235,16 @@ export default async function AdminOrderDetail({
               className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
             >
               <h2 id="ship-title" className="mb-4 text-base font-semibold">배송 정보</h2>
+              {/*
+                **바뀐 주소인지 먼저 말한다.** 처리 이력을 뒤지지 않고도 알아야 하는 자리다 — 피킹 목록을
+                이미 뽑았거나 송장을 붙이려던 사람에게는 이 한 줄이 곧 다시 보라는 말이다. 나간 뒤에는
+                띄우지 않는다: 할 수 있는 일이 달라지고, 기록은 아래 처리 이력이 갖고 있다.
+              */}
+              {showsAddressChanged(order) && (
+                <p className="mb-4 rounded-sm bg-accent-soft px-3.5 py-2.5 text-[13px] leading-relaxed text-accent-hover">
+                  이 주문의 배송지는 {adminTimestamp.format(order.addressChangedAt!)} 에 바뀌었습니다. 보내기 전에 다시 확인해 주세요.
+                </p>
+              )}
               <dl className="flex flex-col">
                 <Row label="받는 분" value={order.recipient} />
                 <Row label="연락처" value={order.recipientPhone} />

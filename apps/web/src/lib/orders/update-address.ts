@@ -141,6 +141,8 @@ export async function updateOrderAddress(
     isRemoteArea: order.isRemoteArea,
   };
   const changed = changedAddressFields(before, after);
+  // 같은 값을 다시 저장한 것은 표시할 일이 아니다 — 이력에 줄을 남기는 조건과 같다
+  const worthTelling = changed.length > 0 || delta !== 0;
 
   /*
    * **고친 것과 그 기록을 한 트랜잭션에 묶는다.** 기록이 따로 떨어지면, 바뀐 주소는 남았는데 바뀌었다는
@@ -158,6 +160,11 @@ export async function updateOrderAddress(
         deliveryMemo: after.memo,
         // 요청이 아니라 우편번호에서 정한다 — 받아 쓰면 제주 주소로 추가 배송비를 피할 수 있다
         isRemoteArea: nowRemote,
+        /*
+         * **목록에서 눈에 띄게 한다.** 처리 이력의 줄은 주문을 열어야 보이는데, 출고 준비를 하던
+         * 사람은 열어 볼 이유가 없다. 이력을 문구로 뒤지지 않도록 주문 행이 직접 안다.
+         */
+        ...(worthTelling ? { addressChangedAt: new Date() } : {}),
         ...(delta === 0
           ? {}
           : { shippingFee: { increment: delta }, payable: { increment: delta } }),
@@ -172,7 +179,7 @@ export async function updateOrderAddress(
      *
      * 같은 값을 다시 저장한 것은 남기지 않는다. 이력이 길어지면 정작 달라진 줄을 못 찾는다.
      */
-    if (changed.length > 0 || delta !== 0) {
+    if (worthTelling) {
       await tx.orderStatusLog.create({
         data: {
           orderId: order.id,

@@ -94,3 +94,51 @@ describe('가맹점 범위', () => {
     expect(db.order.count).toHaveBeenCalledWith({ where: whereOf() });
   });
 });
+
+/**
+ * 목록의 "배송지 변경".
+ *
+ * **처리 이력의 줄은 주문을 열어야 보인다.** 피킹 목록을 이미 뽑았거나 송장을 붙이려던 사람은 열어 볼
+ * 이유가 없어서, 주소가 바뀐 줄 모르고 옛 주소로 보낸다. 판단은 core 가 하고(showsAddressChanged)
+ * 목록은 그 값을 실어 준다 — 화면이 날짜를 받아 스스로 재면 목록과 상세가 다른 기준으로 표시한다.
+ */
+describe('배송지가 바뀐 주문', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: 'o-1', orderNo: '20260930-0000001', status: 'PREPARING', placedAt: new Date(), payable: 100_000,
+    addressChangedAt: null, user: { name: '장보영' }, items: [{ productName: '코트', subtotal: 100_000 }],
+    ...over,
+  });
+
+  it('바뀐 시각을 함께 읽는다 — 이력을 문구로 뒤지지 않는다', async () => {
+    await getAdminOrders(admin, {});
+
+    expect(db.order.findMany.mock.calls[0]![0].select.addressChangedAt).toBe(true);
+  });
+
+  it('출고 전에 바뀐 주문은 그렇다고 실어 준다', async () => {
+    db.order.findMany.mockResolvedValue([row({ addressChangedAt: new Date('2026-09-30T04:00:00Z') })]);
+    db.order.count.mockResolvedValue(1);
+
+    const { rows } = await getAdminOrders(admin, {});
+    expect(rows[0]!.addressChanged).toBe(true);
+  });
+
+  it('고친 적이 없으면 세우지 않는다', async () => {
+    db.order.findMany.mockResolvedValue([row()]);
+    db.order.count.mockResolvedValue(1);
+
+    const { rows } = await getAdminOrders(admin, {});
+    expect(rows[0]!.addressChanged).toBe(false);
+  });
+
+  /** 나간 뒤에는 표시가 남아도 할 일이 없다 — 손을 써야 하는 주문이 그 사이에 묻힌다 */
+  it('이미 나간 주문은 바뀌었어도 세우지 않는다', async () => {
+    db.order.findMany.mockResolvedValue([
+      row({ status: 'SHIPPED', addressChangedAt: new Date('2026-09-30T04:00:00Z') }),
+    ]);
+    db.order.count.mockResolvedValue(1);
+
+    const { rows } = await getAdminOrders(admin, {});
+    expect(rows[0]!.addressChanged).toBe(false);
+  });
+});

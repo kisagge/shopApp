@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  won, readOrderSearch, readDateRange, actorLabel,
+  won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged,
   type Actor, type Won, type OrderStatus,
   offsetOf,
 } from '@shop/core';
@@ -21,6 +21,13 @@ export interface AdminOrderRow {
   readonly buyerName: string;
   readonly itemCount: number;
   readonly firstItemName: string;
+  /**
+   * 아직 나가지 않았는데 배송지가 바뀐 주문. 목록에서 다시 보라고 말해 주는 값이다.
+   *
+   * 판단은 core 가 한다(showsAddressChanged) — 화면이 날짜를 받아 스스로 재면, 목록과 상세가
+   * 서로 다른 기준으로 표시하게 된다.
+   */
+  readonly addressChanged: boolean;
 }
 
 export interface AdminOrderFilter {
@@ -106,6 +113,7 @@ export async function getAdminOrders(
       skip: offsetOf(at, take),
       select: {
         id: true, orderNo: true, status: true, placedAt: true, payable: true,
+        addressChangedAt: true,
         user: { select: { name: true } },
         items: {
           // 가맹점에게는 자기 줄만 보여 준다
@@ -128,6 +136,7 @@ export async function getAdminOrders(
       buyerName: maskName(o.user.name),
       itemCount: o.items.length,
       firstItemName: o.items[0]?.productName ?? '(상품 없음)',
+      addressChanged: showsAddressChanged(o),
     })),
     total,
   };
@@ -149,6 +158,8 @@ export async function getAdminOrder(actor: Actor, orderNo: string) {
       pointsUsed: true, shippingFee: true, payable: true, rewardPoints: true,
       recipient: true, recipientPhone: true, postalCode: true,
       address1: true, address2: true, deliveryMemo: true,
+      // 출고 전에 바뀐 주소인지 — 상세도 목록과 같은 기준으로 말한다(core 의 showsAddressChanged)
+      addressChangedAt: true,
       user: { select: { name: true, email: true, grade: true } },
       payment: {
         select: {

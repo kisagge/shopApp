@@ -74,6 +74,23 @@ export function remoteSurchargeDelta(input: {
   return input.nowRemote ? input.surcharge : -input.surcharge;
 }
 
+/**
+ * 이 주문을 "배송지 변경" 으로 표시할 것인가.
+ *
+ * **처리 이력의 줄은 주문을 열어야 보인다.** 피킹 목록을 이미 뽑았거나 송장을 붙이려던 사람은 열어 볼
+ * 이유가 없다 — 목록에서 눈에 띄어야 다시 본다.
+ *
+ * **아직 나가지 않은 주문만 표시한다.** 고칠 수 있는 상태와 같은 목록이다(EDITABLE_STATUS): 운영자가
+ * 손을 쓸 수 있는 구간이 곧 알려 줄 값이 있는 구간이고, 나간 뒤에는 표시가 남아도 할 일이 없다.
+ * 나간 뒤의 기록은 처리 이력이 갖고 있다.
+ */
+export function showsAddressChanged(input: {
+  readonly status: OrderStatus;
+  readonly addressChangedAt: Date | null;
+}): boolean {
+  return input.addressChangedAt !== null && EDITABLE_STATUS.includes(input.status);
+}
+
 /** 주문에 적힌 배송지 한 벌. 고치기 전과 뒤를 견줄 때 쓴다 */
 export interface OrderAddressFields {
   readonly recipient: string;

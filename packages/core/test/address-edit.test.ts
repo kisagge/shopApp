@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { changedAddressFields, checkAddressEdit, remoteSurchargeDelta } from '../src/address-edit';
+import {
+  changedAddressFields, checkAddressEdit, remoteSurchargeDelta, showsAddressChanged,
+} from '../src/address-edit';
 import type { OrderStatus } from '../src/order-state';
 
 /**
@@ -153,5 +155,42 @@ describe('무엇이 바뀌었는가', () => {
   /** null 과 빈 글자는 사람에게 같은 것이다 — 그 차이로 이력에 줄을 남기지 않는다 */
   it('빈 글자와 없음은 같게 본다', () => {
     expect(changedAddressFields({ ...addr, memo: null }, { ...addr, memo: '' })).toEqual([]);
+  });
+});
+
+/**
+ * 목록에서 "배송지 변경" 을 세울 것인가.
+ *
+ * **처리 이력의 줄은 주문을 열어야 보인다.** 피킹 목록을 이미 뽑았거나 송장을 붙이려던 사람은 열어 볼
+ * 이유가 없어서, 주소가 바뀐 줄 모르고 옛 주소로 보낸다.
+ */
+describe('배송지 변경 표시', () => {
+  const at = new Date('2026-09-30T04:00:00Z');
+
+  it('고친 적이 없으면 세우지 않는다', () => {
+    expect(showsAddressChanged({ status: 'PAID', addressChangedAt: null })).toBe(false);
+  });
+
+  it.each<OrderStatus>(['PENDING', 'PAID', 'PREPARING'])('%s 는 세운다 — 아직 손을 쓸 수 있다', (status) => {
+    expect(showsAddressChanged({ status, addressChangedAt: at })).toBe(true);
+  });
+
+  /**
+   * 나간 뒤에는 표시가 남아도 할 일이 없다 — 그 기록은 처리 이력이 갖고 있다. 목록에 계속 남으면
+   * 정작 손을 써야 하는 주문이 그 사이에 묻힌다.
+   */
+  it.each<OrderStatus>(['SHIPPED', 'DELIVERED', 'CONFIRMED', 'CANCELLED', 'REFUNDED'])(
+    '%s 는 세우지 않는다',
+    (status) => {
+      expect(showsAddressChanged({ status, addressChangedAt: at })).toBe(false);
+    },
+  );
+
+  /** 고칠 수 있는 구간과 같은 목록이다 — 두 곳이 갈리면 "고칠 수 있는데 표시는 없는" 주문이 생긴다 */
+  it('고칠 수 있는 주문이면 반드시 표시할 수 있다', () => {
+    for (const status of ['PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'CANCELLED'] as const) {
+      const editable = checkAddressEdit(input({ status, settled: false, awaitingDeposit: false })) === null;
+      expect(showsAddressChanged({ status, addressChangedAt: at })).toBe(editable);
+    }
   });
 });

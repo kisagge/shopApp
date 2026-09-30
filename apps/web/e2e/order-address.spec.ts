@@ -12,7 +12,8 @@ import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready, payWithCard, undoOrd
  * - **도서산간으로 옮기려 하면 결제가 끝난 주문에서는 막히고**, 왜 안 되는지 화면에 남는다
  * - 막힌 뒤에도 주문의 주소는 그대로다 — 반쯤 바뀌어 있으면 안 된다
  * - **운영자도 같은 폼으로 고치고**, 그 한 번이 감사 로그에 남는다
- * - 손님이 고친 것도 **처리 이력**에 남는다 — 출고 직전이라면 운영자가 알아야 하는 일이다
+ * - 손님이 고친 것도 **처리 이력**에 남고, 출고 전이라면 **목록에서도** 눈에 띈다 — 피킹 목록을
+ *   이미 뽑은 사람은 주문을 열어 볼 이유가 없다
  *
  * 자기 손님(orderAddressEditor)과 자기 상품(RACE_PRODUCT.orderAddress)을 쓴다.
  */
@@ -98,6 +99,22 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       const history = adminPage.getByRole('table', { name: '주문 상태 변경 이력' });
       await expect(history).toContainText('배송지 변경 (손님)');
       await expect(history, '무엇이 바뀌었는지까지 적는다').toContainText('상세주소');
+
+      // 이력을 뒤지지 않고도 알아야 하는 자리다 — 배송 정보 위에 한 줄
+      await expect(adminPage.getByRole('region', { name: '배송 정보' }))
+        .toContainText('배송지는');
+
+      /*
+       * **목록에서 눈에 띈다.** 출고 준비를 하던 사람은 주문을 열어 볼 이유가 없어서, 이력에만 남으면
+       * 옛 주소로 보내고 나서야 안다.
+       */
+      await adminPage.goto('/admin/orders?q=' + orderNo);
+      await ready(adminPage);
+      await expect(adminPage.getByRole('row', { name: new RegExp(orderNo) }))
+        .toContainText('배송지 변경');
+
+      await adminPage.goto(`/admin/orders/${orderNo}`);
+      await ready(adminPage);
 
       await adminPage.getByRole('button', { name: '배송지 수정' }).click();
       const adminForm = adminPage.getByRole('region', { name: `${orderNo} 배송지 수정` });

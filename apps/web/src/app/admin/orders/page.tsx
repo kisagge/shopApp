@@ -261,7 +261,14 @@ export default async function AdminOrdersPage({
                         {o.placedAt.toLocaleDateString('ko-KR')}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <Badge tone="neutral">{ORDER_STATUS_LABEL[o.status]}</Badge>
+                        <div className="flex flex-col items-center gap-1">
+                          <Badge tone="neutral">{ORDER_STATUS_LABEL[o.status]}</Badge>
+                          {/*
+                            **출고 직전에 주소가 바뀐 주문.** 처리 이력에 줄은 남지만 그것은 주문을 열어야
+                            보이고, 피킹 목록을 이미 뽑은 사람은 열어 볼 이유가 없다 — 여기서 다시 보라고 말한다.
+                          */}
+                          {o.addressChanged && <Badge tone="danger">배송지 변경</Badge>}
+                        </div>
                       </td>
                     </tr>
                   ))}
