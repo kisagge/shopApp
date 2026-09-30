@@ -27,6 +27,9 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const policy = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/shipping-policy', () => ({ getShippingPolicy: policy }));
 
+const notifyAddressChanged = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/console-work', () => ({ notifyAddressChanged }));
+
 const { updateOrderAddress, AddressEditError } = await import('~/lib/orders/update-address');
 
 /** 제주는 도서산간이다 — 우편번호로 정해진다 */
@@ -64,6 +67,8 @@ beforeEach(() => {
   db.$transaction.mockImplementation((run: (t: typeof tx) => unknown) => run(tx));
   db.order.findFirst.mockResolvedValue(order());
   db.order.updateMany.mockResolvedValue({ count: 1 });
+  // clearAllMocks 는 부른 횟수만 지운다 — 앞 검사가 심어 둔 거절이 남아 뒤엣것을 넘어뜨린다
+  db.orderStatusLog.create.mockResolvedValue({});
   policy.mockResolvedValue({ baseFee: 3_000, freeThreshold: 50_000, remoteSurcharge: 3_000 });
 });
 
@@ -301,5 +306,69 @@ describe('처리 이력', () => {
 
     await expect(updateOrderAddress('20260901-0000001', input({ ...same, address2: '102호' }), { userId: 'u-1' }))
       .rejects.toThrow('로그를 못 썼다');
+  });
+});
+
+/**
+ * 알림까지 미는 때.
+ *
+ * **목록의 표시·상세의 안내·송장 등록의 확인은 셋 다 열어 봐야 보인다.** 피킹을 시작한 사람은 목록을
+ * 다시 열 이유가 없어서 그 셋을 모두 지나친다 — 그 한 번만 알림으로 민다.
+ */
+describe('알림', () => {
+  it('배송 준비 중에 바뀌면 내보내는 사람에게 알린다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PREPARING' }));
+
+    await updateOrderAddress('20260901-0000001', input({ address2: '102호' }), { userId: 'u-1' });
+
+    expect(notifyAddressChanged).toHaveBeenCalledWith({
+      orderNo: '20260901-0000001',
+      // 고친 사람은 그 목록에서 빠진다 — 방금 자기가 한 일이다
+      changedBy: 'u-1',
+    });
+  });
+
+  it('운영이 고쳤으면 그 사람을 싣는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PREPARING' }));
+
+    await updateOrderAddress('20260901-0000001', input({ address2: '102호' }), { actorId: 'u-admin' });
+
+    expect(notifyAddressChanged.mock.calls[0]![0].changedBy).toBe('u-admin');
+  });
+
+  /** 주문한 지 1분 만에 상세주소를 고치는 것이 가장 흔한 수정이다 — 그것마다 울리면 위험한 한 번이 묻힌다 */
+  it('결제완료에서는 알리지 않는다 — 아직 아무도 물건을 만지지 않았다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PAID' }));
+
+    await updateOrderAddress('20260901-0000001', input({ address2: '102호' }), { userId: 'u-1' });
+
+    expect(notifyAddressChanged).not.toHaveBeenCalled();
+  });
+
+  it('입금대기에서도 알리지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PENDING', payment: null }));
+
+    await updateOrderAddress('20260901-0000001', input({ address2: '102호' }), { userId: 'u-1' });
+
+    expect(notifyAddressChanged).not.toHaveBeenCalled();
+  });
+
+  it('같은 값을 다시 저장한 것은 알리지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'PREPARING' }));
+
+    await updateOrderAddress('20260901-0000001', input({
+      recipient: '장보영', phone: '010-0000-0000', postalCode: SEOUL,
+      address1: '서울 성동구 왕십리로 1', address2: '3층',
+    }), { userId: 'u-1' });
+
+    expect(notifyAddressChanged).not.toHaveBeenCalled();
+  });
+
+  /** 막힌 요청은 아무것도 바꾸지 않았다 */
+  it('막혔으면 알리지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'SHIPPED' }));
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' })).rejects.toBeTruthy();
+    expect(notifyAddressChanged).not.toHaveBeenCalled();
   });
 });

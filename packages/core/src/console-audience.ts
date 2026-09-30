@@ -20,6 +20,20 @@ export function returnAudience(lineMerchantIds: readonly (string | null)[]): Ret
 }
 
 /**
+ * 물건을 내보내는 사람 — 줄마다 그 판매처, 자사 줄이 있으면 운영진.
+ *
+ * **반품과 다르다.** 반품은 여러 가맹점이 섞이면 운영진이 처리하지만(returnAudience), 출고는 가맹점마다
+ * 자기 줄을 내보낸다 — 섞였다고 남의 몫이 되지 않는다. 그래서 가맹점 전부가 듣고, 자사 줄이 있을 때만
+ * 운영진이 더해진다.
+ */
+export function shipmentAudience(lineMerchantIds: readonly (string | null)[]): ReturnAudience {
+  return {
+    merchantIds: [...new Set(lineMerchantIds.filter((m): m is string => m !== null))].sort(),
+    operators: lineMerchantIds.some((m) => m === null),
+  };
+}
+
+/**
  * 상품 문의 — 판매처가 있으면 그 가맹점이, 자사 상품이면 운영진이 답한다(authz canAnswerInquiry 와 같다).
  */
 export function inquiryAudience(productMerchantId: string | null): ReturnAudience {

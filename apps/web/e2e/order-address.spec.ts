@@ -17,6 +17,7 @@ import {
  * - 손님이 고친 것도 **처리 이력**에 남고, 출고 전이라면 **목록에서도** 눈에 띈다 — 피킹 목록을
  *   이미 뽑은 사람은 주문을 열어 볼 이유가 없다
  * - **송장을 붙이려 하면 한 번 더 묻고**, CSV 일괄에서는 그 줄만 거절한다 — 일괄에는 물어볼 자리가 없다
+ * - **출고 준비 중에 바뀌면 운영 알림함까지 간다** — 앞의 것들은 셋 다 열어 봐야 보인다
  *
  * 자기 손님(orderAddressEditor)과 자기 상품(RACE_PRODUCT.orderAddress)을 쓴다.
  */
@@ -178,6 +179,24 @@ test('출고 전 배송지를 고치고, 도서산간으로 옮기는 것은 결
       expect(bulkResult.registered, '등록하지 않았다').toBe(0);
       expect(bulkResult.failures[0]).toMatchObject({ orderNo, code: 'ADDRESS_CHANGED' });
       expect(bulkResult.failures[0]!.message, '어디로 가서 무엇을 하라고 적는다').toContain('주문 화면');
+
+      /*
+       * **가장 위험한 경우.** 출고 준비를 시작한 뒤에 손님이 주소를 고치면, 피킹 목록을 뽑은 사람은
+       * 목록도 상세도 다시 열 이유가 없다 — 알림함은 열어 보지 않아도 뱃지가 뜨는 유일한 자리다.
+       */
+      const late = await page.request.patch(`/api/orders/${orderNo}/address`, {
+        data: {
+          recipient: '장부장', phone: '010-1234-5678',
+          postalCode: '04766', address1: '서울 성동구 왕십리로 1', address2: '9층 급하게 변경',
+        },
+      });
+      expect(late.ok(), `출고 준비 중에는 고칠 수 있어야 한다 (${late.status()})`).toBe(true);
+
+      await adminPage.goto('/admin/notifications');
+      await ready(adminPage);
+      await expect(
+        adminPage.getByText(new RegExp(`주문 ${orderNo} 의 배송지가 바뀌었습니다`)).first(),
+      ).toBeVisible();
 
       // 남의 주소를 대신 바꾼 일이라 누가 무엇을 무엇으로 바꿨는지 남는다
       await adminPage.goto('/admin/audit');

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   changedAddressFields, checkAddressEdit, remoteSurchargeDelta, showsAddressChanged,
+  tellsAddressChange,
 } from '../src/address-edit';
 import type { OrderStatus } from '../src/order-state';
 
@@ -191,6 +192,39 @@ describe('배송지 변경 표시', () => {
     for (const status of ['PENDING', 'PAID', 'PREPARING', 'SHIPPED', 'CANCELLED'] as const) {
       const editable = checkAddressEdit(input({ status, settled: false, awaitingDeposit: false })) === null;
       expect(showsAddressChanged({ status, addressChangedAt: at })).toBe(editable);
+    }
+  });
+});
+
+/**
+ * 알림까지 밀 것인가.
+ *
+ * **목록의 표시·상세의 안내·송장 등록의 확인은 셋 다 열어 봐야 보인다.** 피킹을 시작한 사람은 목록을
+ * 다시 열 이유가 없어서 그 셋을 모두 지나친다 — 알림함은 열어 보지 않아도 뱃지가 뜨는 유일한 자리다.
+ */
+describe('알림까지 미는 때', () => {
+  it('배송 준비 중이면 민다 — 라벨을 찍었을 수 있다', () => {
+    expect(tellsAddressChange('PREPARING')).toBe(true);
+  });
+
+  /**
+   * 주문한 지 1분 만에 상세주소를 고치는 것이 가장 흔한 수정이다. 그것마다 울리면 정작 위험한 한 번이
+   * 그 사이에 묻힌다 — 아직 아무도 물건을 만지지 않은 상태에서는 목록의 표시로 충분하다.
+   */
+  it.each<OrderStatus>(['PENDING', 'PAID'])('%s 는 밀지 않는다 — 아직 아무도 물건을 만지지 않았다', (status) => {
+    expect(tellsAddressChange(status)).toBe(false);
+  });
+
+  it.each<OrderStatus>(['SHIPPED', 'DELIVERED', 'CANCELLED'])('%s 는 밀지 않는다', (status) => {
+    expect(tellsAddressChange(status)).toBe(false);
+  });
+
+  /** 표시하지 않는 주문을 알리지는 않는다 — 알림을 누르고 들어가 아무 표시도 못 보면 무슨 일인지 모른다 */
+  it('미는 주문은 반드시 표시도 한다', () => {
+    for (const status of ['PENDING', 'PAID', 'PREPARING', 'SHIPPED'] as const) {
+      if (tellsAddressChange(status)) {
+        expect(showsAddressChanged({ status, addressChangedAt: new Date() })).toBe(true);
+      }
     }
   });
 });

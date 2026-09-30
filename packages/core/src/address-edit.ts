@@ -99,6 +99,20 @@ export function showsAddressChanged(input: {
   return input.addressChangedAt !== null && EDITABLE_STATUS.includes(input.status);
 }
 
+/**
+ * 바뀐 것을 **알림으로까지** 밀 것인가.
+ *
+ * **출고 준비를 시작한 뒤에만 민다.** 입금대기·결제완료는 아직 아무도 물건을 만지지 않은 상태라,
+ * 목록의 표시로 충분하다 — 주문한 지 1분 만에 상세주소를 고치는 것이 가장 흔한 수정이고, 그것마다
+ * 알림이 울리면 정작 위험한 한 번이 그 사이에 묻힌다.
+ *
+ * 배송 준비는 다르다. 피킹 목록을 뽑았거나 라벨을 찍었을 수 있고, 그 사람은 목록을 다시 열 이유가
+ * 없다 — 알림함은 열어 보지 않아도 뱃지가 뜨는 유일한 자리다.
+ */
+export function tellsAddressChange(status: OrderStatus): boolean {
+  return status === 'PREPARING';
+}
+
 /** 주문에 적힌 배송지 한 벌. 고치기 전과 뒤를 견줄 때 쓴다 */
 export interface OrderAddressFields {
   readonly recipient: string;

@@ -2,12 +2,13 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   checkAddressEdit, isRemoteAreaPostalCode, normalizePhone, remoteSurchargeDelta,
-  isPaidStatus, awaitingDeposit, changedAddressFields, format, won,
+  isPaidStatus, awaitingDeposit, changedAddressFields, format, won, tellsAddressChange,
   type AddressEditBlock, type AddressField,
 } from '@shop/core';
 import type { updateOrderAddressSchema } from '@shop/contract';
 import type { z } from 'zod';
 import { getShippingPolicy } from '~/lib/shipping-policy';
+import { notifyAddressChanged } from '~/lib/notifications/console-work';
 
 type UpdateOrderAddressInput = z.infer<typeof updateOrderAddressSchema>;
 
@@ -191,6 +192,18 @@ export async function updateOrderAddress(
       });
     }
   });
+
+  /*
+   * **알림은 출고 준비부터.** 입금대기·결제완료는 아직 아무도 물건을 만지지 않았고, 주문한 지 1분 만에
+   * 상세주소를 고치는 것이 가장 흔한 수정이다 — 그것마다 울리면 정작 위험한 한 번이 그 사이에 묻힌다.
+   * 판단은 core 가 한다(tellsAddressChange). 알림이 실패해도 고친 것은 이미 끝났다.
+   */
+  if (worthTelling && tellsAddressChange(order.status)) {
+    await notifyAddressChanged({
+      orderNo: order.orderNo,
+      changedBy: by.userId ?? by.actorId ?? 'system',
+    });
+  }
 
   return {
     orderNo: order.orderNo,

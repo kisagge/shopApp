@@ -15,7 +15,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied } =
+const { notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied, notifyAddressChanged } =
   await import('~/lib/notifications/console-work');
 
 const where = () => db.user.findMany.mock.calls[0]![0].where as { suspendedAt: null; OR: Record<string, unknown>[] };
@@ -113,5 +113,76 @@ describe('입점 신청', () => {
     db.user.findMany.mockResolvedValue([]);
     await notifyMerchantApplied({ merchantName: '새 가게' });
     expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 출고 준비 중인 주문의 배송지가 바뀌었다.
+ *
+ * **셋을 두었는데 셋 다 열어 봐야 보였다** — 목록의 표시, 상세의 안내, 송장 등록의 확인. 피킹을 시작한
+ * 사람은 목록을 다시 열 이유가 없고, 라벨을 이미 찍었다면 그 셋을 모두 지나친다.
+ */
+describe('배송지 변경', () => {
+  it('그 주문을 내보내는 가맹점이 듣는다', async () => {
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: 'm-a' }, { merchantId: 'm-a' }]);
+
+    await notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-cust' });
+
+    expect(where().OR).toEqual([
+      expect.objectContaining({ role: 'MERCHANT', merchantId: { in: ['m-a'] } }),
+    ]);
+    expect(written()).toEqual([
+      expect.objectContaining({
+        userId: 'u-1',
+        kind: 'ORDER_ADDRESS_CHANGED',
+        linkPath: '/admin/orders/20260930-0000001',
+      }),
+      expect.objectContaining({ userId: 'u-2' }),
+    ]);
+  });
+
+  /** 출고는 가맹점마다 자기 줄을 내보낸다 — 섞였다고 남의 몫이 되지 않는다(반품과 다르다) */
+  it('여러 가맹점이 섞이면 전부 듣는다', async () => {
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: 'm-b' }, { merchantId: 'm-a' }]);
+
+    await notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-cust' });
+
+    expect(where().OR[0]).toMatchObject({ merchantId: { in: ['m-a', 'm-b'] } });
+    expect(where().OR, '자사 줄이 없으면 운영진은 빠진다').toHaveLength(1);
+  });
+
+  it('자사 줄이 있으면 출고 권한이 있는 운영진도 듣는다', async () => {
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: null }]);
+
+    await notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-cust' });
+
+    expect(where().OR).toEqual([expect.objectContaining({ role: { in: expect.any(Array) } })]);
+  });
+
+  /** 방금 자기가 한 일이다 */
+  it('고친 사람에게는 보내지 않는다', async () => {
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: null }]);
+    db.user.findMany.mockResolvedValue([{ id: 'u-1' }, { id: 'u-admin' }]);
+
+    await notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-admin' });
+
+    expect(written().map((n) => n['userId'])).toEqual(['u-1']);
+  });
+
+  /** 취소된 줄의 판매처는 그 물건을 내보내지 않는다 */
+  it('취소된 줄은 세지 않는다', async () => {
+    db.orderItem.findMany.mockResolvedValue([{ merchantId: 'm-a' }]);
+
+    await notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-cust' });
+
+    expect(db.orderItem.findMany.mock.calls[0]![0].where).toMatchObject({ canceledAt: null });
+  });
+
+  it('못 만들어도 던지지 않는다 — 주소는 이미 바뀌었다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.orderItem.findMany.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+    await expect(notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-1' })).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalled();
   });
 });

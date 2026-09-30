@@ -1,6 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
-import { inquiryAudience, operatorRolesWith, returnAudience, type Permission, type ReturnAudience } from '@shop/core';
+import {
+  inquiryAudience, operatorRolesWith, returnAudience, shipmentAudience,
+  type Permission, type ReturnAudience,
+} from '@shop/core';
 import { recordNotifications, type NoticeInput } from './record';
 
 /**
@@ -98,5 +101,41 @@ export async function notifyMerchantApplied(input: { merchantName: string }): Pr
     })));
   } catch (error) {
     console.error('[notification] 입점 신청 알림을 못 만들었다', error);
+  }
+}
+
+/**
+ * 출고 준비 중인 주문의 배송지가 바뀌었다 — **물건을 내보내는 사람에게.**
+ *
+ * **셋을 두었는데 셋 다 열어 봐야 보였다** — 목록의 표시, 상세의 안내, 송장 등록의 확인. 피킹을 시작한
+ * 사람은 목록을 다시 열 이유가 없고, 라벨을 이미 찍었다면 그 셋을 모두 지나친다.
+ *
+ * 받는 사람은 그 주문을 내보내는 쪽이다 — 줄마다 그 판매처, 자사 줄이 있으면 운영진(core
+ * shipmentAudience). **고친 사람에게는 보내지 않는다**: 방금 자기가 한 일이다.
+ */
+export async function notifyAddressChanged(input: {
+  readonly orderNo: string;
+  readonly changedBy: string;
+}): Promise<void> {
+  try {
+    const lines = await prisma.orderItem.findMany({
+      where: { order: { orderNo: input.orderNo }, canceledAt: null },
+      select: { merchantId: true },
+    });
+    const userIds = await recipients(shipmentAudience(lines.map((l) => l.merchantId)), 'order:fulfill');
+
+    await recordNotifications(
+      userIds
+        .filter((userId) => userId !== input.changedBy)
+        .map((userId): NoticeInput => ({
+          userId,
+          kind: 'ORDER_ADDRESS_CHANGED',
+          params: { orderNo: input.orderNo },
+          // 누르면 바뀐 주소와 송장 칸이 함께 있는 자리로 간다
+          linkPath: `/admin/orders/${encodeURIComponent(input.orderNo)}`,
+        })),
+    );
+  } catch (error) {
+    console.error('[notification] 배송지 변경 알림을 못 만들었다', { orderNo: input.orderNo }, error);
   }
 }

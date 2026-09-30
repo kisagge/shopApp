@@ -130,6 +130,14 @@ export const NOTIFICATION_KIND = [
   'LATE_DEPOSIT_REFUNDED',
   /** 돌려줄 입금이 생겼다 — 환불할 수 있는 운영진에게. 대시보드를 열어야만 보였다 */
   'LATE_DEPOSIT_FOUND',
+  /**
+   * 출고 준비 중인 주문의 배송지가 바뀌었다 — 물건을 내보내는 사람에게.
+   *
+   * **셋을 두었는데 셋 다 열어 봐야 보였다** — 목록의 표시, 상세의 안내, 송장 등록의 확인. 피킹을
+   * 시작한 사람은 목록을 다시 열 이유가 없고, 라벨을 이미 찍었다면 그 셋을 모두 지나친다. 알림함은
+   * 열어 보지 않아도 뱃지가 뜨는 유일한 자리다.
+   */
+  'ORDER_ADDRESS_CHANGED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
@@ -157,6 +165,8 @@ export const CONSOLE_NOTIFICATION_KIND = [
   'SUPPORT_INQUIRY_RECEIVED',
   'MERCHANT_APPLIED',
   'LATE_DEPOSIT_FOUND',
+  // 물건을 내보내는 자리에서 들을 말이다 — 손님으로 온 자리에 뜰 것이 아니다
+  'ORDER_ADDRESS_CHANGED',
 ] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>

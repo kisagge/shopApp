@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { returnAudience, inquiryAudience, operatorRolesWith, canResolveReturnOf, CONSOLE_NOTIFICATION_KIND } from '../src';
+import {
+  returnAudience, inquiryAudience, shipmentAudience, operatorRolesWith, canResolveReturnOf,
+  CONSOLE_NOTIFICATION_KIND,
+} from '../src';
 
 /**
  * 처리할 일을 누가 듣는가.
@@ -53,7 +56,7 @@ describe('권한을 가진 운영 역할', () => {
 
 describe('알림함', () => {
   it('처리할 일은 운영 알림함에 뜬다', () => {
-    for (const kind of ['RETURN_REQUESTED', 'INQUIRY_RECEIVED', 'SUPPORT_INQUIRY_RECEIVED', 'MERCHANT_APPLIED', 'LATE_DEPOSIT_FOUND'] as const) {
+    for (const kind of ['RETURN_REQUESTED', 'INQUIRY_RECEIVED', 'SUPPORT_INQUIRY_RECEIVED', 'MERCHANT_APPLIED', 'LATE_DEPOSIT_FOUND', 'ORDER_ADDRESS_CHANGED'] as const) {
       expect(CONSOLE_NOTIFICATION_KIND).toContain(kind);
     }
   });
@@ -61,5 +64,38 @@ describe('알림함', () => {
   it('취소 뒤 입금의 두 소식은 돈을 보낸 손님의 알림함에 뜬다', () => {
     expect(CONSOLE_NOTIFICATION_KIND).not.toContain('LATE_DEPOSIT_RECEIVED');
     expect(CONSOLE_NOTIFICATION_KIND).not.toContain('LATE_DEPOSIT_REFUNDED');
+  });
+});
+
+/**
+ * 물건을 내보내는 사람.
+ *
+ * **반품과 다르다.** 반품은 여러 가맹점이 섞이면 운영진이 처리하지만, 출고는 가맹점마다 자기 줄을
+ * 내보낸다 — 섞였다고 남의 몫이 되지 않는다.
+ */
+describe('출고하는 사람', () => {
+  it('가맹점 줄이면 그 가맹점이 듣는다', () => {
+    expect(shipmentAudience(['m-a'])).toEqual({ merchantIds: ['m-a'], operators: false });
+  });
+
+  it('섞이면 가맹점 전부가 듣는다 — 각자 자기 줄을 내보낸다', () => {
+    expect(shipmentAudience(['m-b', 'm-a', 'm-a'])).toEqual({
+      merchantIds: ['m-a', 'm-b'],
+      operators: false,
+    });
+  });
+
+  it('자사 줄이 있으면 운영진이 더해진다 — 그 줄을 내보내는 것은 운영진이다', () => {
+    expect(shipmentAudience(['m-a', null])).toEqual({ merchantIds: ['m-a'], operators: true });
+  });
+
+  it('자사 줄만이면 운영진만 듣는다', () => {
+    expect(shipmentAudience([null, null])).toEqual({ merchantIds: [], operators: true });
+  });
+
+  /** 반품은 섞이면 운영진 몫이다 — 두 규칙을 한 함수로 쓰면 한쪽이 틀린다 */
+  it('반품과 규칙이 다르다', () => {
+    expect(shipmentAudience(['m-a', 'm-b']).operators).toBe(false);
+    expect(returnAudience(['m-a', 'm-b']).operators).toBe(true);
   });
 });
