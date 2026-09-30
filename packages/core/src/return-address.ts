@@ -86,3 +86,38 @@ export function missingReturnAddresses(destinations: readonly ReturnDestination[
 export function showsReturnAddress(request: { readonly status: string; readonly receivedAt: Date | null }): boolean {
   return request.status === 'APPROVED' && request.receivedAt === null;
 }
+
+/**
+ * 반품지가 실제로 달라졌는가.
+ *
+ * **같은 값을 다시 저장한 것은 알릴 일이 아니다.** 반품지 화면은 저장해도 폼이 남아 있어(이 화면의 일이
+ * 그 주소다) 같은 값을 두 번 누르기 쉽다 — 그때마다 손님에게 "보낼 곳이 바뀌었습니다" 가 가면, 정작
+ * 바뀐 날의 알림을 아무도 믿지 않게 된다.
+ *
+ * **처음 등록한 것도 알리지 않는다.** 반품지가 없으면 승인할 수 없으므로(missingReturnAddresses),
+ * 그 전에 이 주소로 보내라고 안내받은 사람은 없다.
+ */
+export function returnAddressChanged(before: ReturnAddress | null, after: ReturnAddress): boolean {
+  if (before === null) return false;
+  return (['recipient', 'phone', 'postalCode', 'address1', 'address2'] as const)
+    .some((field) => (before[field] ?? '') !== (after[field] ?? ''));
+}
+
+/**
+ * 이 신청에 담긴 줄.
+ *
+ * **옛 신청은 줄을 고르지 않았다.** 줄별 반품이 생기기 전의 신청은 `itemIds` 가 비어 있고, 그때는
+ * 반품접수인 줄 전부가 신청한 줄이다 — 취소된 줄은 돈이 이미 돌아갔으므로 뺀다.
+ *
+ * 이 규칙을 세 곳이 각자 적고 있었다(손님 화면의 보낼 곳, 운영의 처리, 그리고 반품지가 바뀐 것을
+ * 누구에게 알릴지). 한 곳만 고치면 세 화면이 서로 다른 줄을 두고 이야기한다.
+ */
+export function linesOfRequest<T extends { readonly id: string; readonly status: string; readonly canceledAt: Date | null }>(
+  items: readonly T[],
+  request: { readonly itemIds: readonly string[] },
+): T[] {
+  return items.filter((i) =>
+    request.itemIds.length > 0
+      ? request.itemIds.includes(i.id)
+      : i.status === 'RETURN_REQUESTED' && i.canceledAt === null);
+}

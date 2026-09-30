@@ -138,6 +138,14 @@ export const NOTIFICATION_KIND = [
    * 열어 보지 않아도 뱃지가 뜨는 유일한 자리다.
    */
   'ORDER_ADDRESS_CHANGED',
+  /**
+   * 보낼 반품지가 바뀌었다 — **그 주소로 보내라고 안내받은 손님에게.**
+   *
+   * 승인하면 주문 화면에 "이 주소로 보내 주세요" 가 뜨고 사람은 그것을 상자에 적는다. 그 뒤에 반품지가
+   * 바뀌면 화면의 주소는 조용히 바뀌는데, 이미 적어 둔 사람에게는 아무 말도 가지 않았다 — 물건은 옛
+   * 창고로 가고 아무도 그것을 기다리지 않는다.
+   */
+  'RETURN_ADDRESS_CHANGED',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 

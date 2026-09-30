@@ -19,10 +19,18 @@ const FIELD_ORDER: readonly FieldName[] = ['recipient', 'phone', 'postalCode', '
 export function ReturnAddressForm({
   owner,
   initial,
+  awaiting,
 }: {
   /** 가맹점 id, 또는 플랫폼 반품지면 'platform' */
   owner: string;
   initial: ReturnAddress | null;
+  /**
+   * 지금 이 주소로 보내라고 안내받은 신청 수.
+   *
+   * **손님은 이 주소를 상자에 적었다.** 바꾸면 화면의 주소는 조용히 바뀌지만 이미 적어 둔 사람에게는
+   * 아무 말도 가지 않는다 — 바꾸기 전에 몇 사람이 걸려 있는지 알아야 한다.
+   */
+  awaiting: number;
 }) {
   const router = useRouter();
   const [values, setValues] = useState<Record<FieldName, string>>({
@@ -106,6 +114,17 @@ export function ReturnAddressForm({
 
   return (
     <form onSubmit={submit} noValidate className="flex flex-col gap-4">
+      {/*
+        **손님은 이 주소를 상자에 적었다.** 바꾸면 화면의 주소는 조용히 바뀌지만, 이미 적어 둔 사람에게는
+        아무 말도 가지 않았다 — 물건은 옛 창고로 가고 아무도 그것을 기다리지 않는다. 그래서 바꾸기 전에
+        몇 사람이 걸려 있는지 말해 주고, 바꾸면 그 사람들에게 알린다.
+      */}
+      {awaiting > 0 && (
+        <p className="rounded-sm bg-accent-soft px-3.5 py-2.5 text-[12px] leading-relaxed text-accent-hover">
+          지금 이 주소로 보내라고 안내받은 반품 신청이 {awaiting.toLocaleString('ko-KR')}건 있습니다.
+          주소를 바꾸면 그 손님들에게 바뀌었다고 알립니다 — 이미 보낸 물건은 옛 주소로 도착합니다.
+        </p>
+      )}
       <Field
         ref={recipientRef}
         label="받는 분"

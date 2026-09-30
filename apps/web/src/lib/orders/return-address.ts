@@ -1,11 +1,12 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canEditReturnAddress, ForbiddenError, normalizeReturnAddress, PLATFORM_RETURN_ADDRESS_ID, returnDestinations,
-  showsReturnAddress,
+  canEditReturnAddress, ForbiddenError, linesOfRequest, normalizeReturnAddress,
+  PLATFORM_RETURN_ADDRESS_ID, returnAddressChanged, returnDestinations, showsReturnAddress,
   type Actor, type Permission, type ReturnAddress, type ReturnDestination,
 } from '@shop/core';
 import type { ReturnAddressInput } from '@shop/contract';
+import { notifyReturnAddressChanged } from '~/lib/notifications/console-work';
 
 const ADDRESS_SELECT = {
   merchantId: true, recipient: true, phone: true, postalCode: true, address1: true, address2: true,
@@ -70,9 +71,7 @@ export async function approvedReturnDestinations(
   request: { readonly status: string; readonly receivedAt: Date | null; readonly itemIds: readonly string[] },
 ): Promise<ReturnDestination[]> {
   if (!showsReturnAddress(request)) return [];
-  const lines = items.filter((i) =>
-    request.itemIds.length > 0 ? request.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED' && i.canceledAt === null);
-  return await destinationsFor(lines);
+  return await destinationsFor(linesOfRequest(items, request));
 }
 
 export class ReturnAddressError extends Error {
@@ -102,7 +101,14 @@ export async function updateReturnAddress(
   }
 
   const data = { ...normalizeReturnAddress(input), updatedById: actor.id };
-  const before = await getReturnAddress(merchantId);
+  /*
+   * **쓰기 전에 명단을 잡는다.** 지금 이 주소로 보내라고 안내받고 있는 사람들이다 — 쓴 뒤에 세면 같은
+   * 명단이 나오지만, 잡는 시점이 뜻을 갖는 자리라 순서를 분명히 둔다.
+   */
+  const [before, affected] = await Promise.all([
+    getReturnAddress(merchantId),
+    awaitingReturnsFor(merchantId),
+  ]);
   const row = merchantId === null
     ? await prisma.returnAddress.upsert({
         where: { id: PLATFORM_RETURN_ADDRESS_ID },
@@ -116,5 +122,44 @@ export async function updateReturnAddress(
         create: { merchantId, ...data },
         select: ADDRESS_SELECT,
       });
-  return { before, after: toAddress(row) };
+  const after = toAddress(row);
+
+  /*
+   * **아직 보내지 않은 사람만 구할 수 있다.** 이미 상자에 옛 주소를 적어 보낸 사람에게는 그 주소를 아는
+   * 사람이 받아 줘야 하고, 그것은 운영의 일이다. 알림이 실패해도 주소는 이미 바뀌었다.
+   */
+  if (returnAddressChanged(before, after)) await notifyReturnAddressChanged(affected);
+
+  return { before, after };
+}
+
+/**
+ * 이 반품지로 **보내라고 안내받은** 신청.
+ *
+ * 승인했고 아직 도착하지 않은 신청 중, 그 줄의 판매처가 이 반품지인 것(core showsReturnAddress·
+ * linesOfRequest 와 같은 규칙). 바꾸기 전에 몇 건인지 말해 주고, 바꾼 뒤에는 그 손님들에게 알린다.
+ *
+ * **줄을 JS 에서 고른다.** 옛 신청은 `itemIds` 가 비어 있어 "반품접수인 줄 전부" 를 뜻하는데, 그 규칙을
+ * SQL 로 옮겨 적으면 손님 화면과 갈린다. 승인·회수 대기는 처리할 일의 목록이라 줄 수가 적다.
+ */
+export async function awaitingReturnsFor(
+  merchantId: string | null,
+): Promise<{ orderNo: string; userId: string }[]> {
+  const requests = await prisma.returnRequest.findMany({
+    where: { status: 'APPROVED', receivedAt: null },
+    select: {
+      itemIds: true,
+      order: {
+        select: {
+          orderNo: true,
+          userId: true,
+          items: { select: { id: true, status: true, canceledAt: true, merchantId: true } },
+        },
+      },
+    },
+  });
+
+  return requests
+    .filter((r) => linesOfRequest(r.order.items, r).some((line) => line.merchantId === merchantId))
+    .map((r) => ({ orderNo: r.order.orderNo, userId: r.order.userId }));
 }

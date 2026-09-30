@@ -1323,4 +1323,5 @@ export const ja: Dictionary = {
   'notif.LATE_DEPOSIT_REFUNDED': 'ご注文 {orderNo} にご入金いただいた {amount}ウォンを返金しました',
   'notif.LATE_DEPOSIT_FOUND': 'キャンセル済みの注文 {orderNo} に {amount}ウォンが入金されました — 返金が必要です',
   'notif.ORDER_ADDRESS_CHANGED': 'ご注文 {orderNo} のお届け先が変わりました — 発送前にご確認ください',
+  'notif.RETURN_ADDRESS_CHANGED': '返品 {orderNo} の送り先が変わりました — まだ発送前の場合は新しい住所をご確認ください',
 };

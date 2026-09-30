@@ -1327,4 +1327,5 @@ export const en: Dictionary = {
   'notif.LATE_DEPOSIT_REFUNDED': 'We returned the {amount} KRW you sent for order {orderNo}',
   'notif.LATE_DEPOSIT_FOUND': '{amount} KRW arrived for cancelled order {orderNo} — refund needed',
   'notif.ORDER_ADDRESS_CHANGED': 'The address for order {orderNo} changed — please check it before sending',
+  'notif.RETURN_ADDRESS_CHANGED': 'The return address for {orderNo} changed — if you have not sent it yet, please check the new address',
 };

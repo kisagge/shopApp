@@ -17,6 +17,9 @@ vi.mock('~/lib/audit', () => ({ recordAudit }));
 const db = vi.hoisted(() => ({
   merchant: { findUnique: vi.fn<(...a: any[]) => any>() },
   returnAddress: { findUnique: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>() },
+  // 바꾸기 전에 "이 주소로 보내라고 안내받은" 신청을 센다
+  returnRequest: { findMany: vi.fn<(...a: any[]) => any>() },
+  notification: { createMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -45,6 +48,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   getActor.mockResolvedValue(admin);
   db.merchant.findUnique.mockResolvedValue({ id: 'm-a' });
+  db.returnRequest.findMany.mockResolvedValue([]);
+  db.notification.createMany.mockResolvedValue({ count: 0 });
   db.returnAddress.findUnique.mockResolvedValue(null);
   db.returnAddress.upsert.mockImplementation(async ({ update, create }: any) => ({
     merchantId: create?.merchantId ?? null, ...(update ?? create),
@@ -113,5 +118,81 @@ describe('PUT /api/admin/return-addresses/[owner]', () => {
       before: { recipient: '옛 담당' },
       after: { recipient: '스튜디오눈 반품담당' },
     });
+  });
+});
+
+/**
+ * 반품지가 바뀌면, 그 주소로 보내라고 안내받은 손님에게 말해 준다.
+ *
+ * **손님은 이 주소를 상자에 적었다.** 승인하면 주문 화면에 "이 주소로 보내 주세요" 가 뜨고 사람은 그것을
+ * 적는다 — 그 뒤에 주소를 바꾸면 화면은 조용히 바뀌지만 이미 적어 둔 사람에게는 아무 말도 가지 않았다.
+ * 물건은 옛 창고로 가고 아무도 그것을 기다리지 않는다.
+ */
+describe('반품지가 바뀌면', () => {
+  /** 승인했고 아직 도착하지 않은 신청 — 그 줄이 이 판매처의 것 */
+  const awaiting = (merchantId: string | null) => [{
+    itemIds: ['i-1'],
+    order: {
+      orderNo: '20260930-0000001',
+      userId: 'u-cust',
+      items: [{ id: 'i-1', status: 'RETURN_REQUESTED', canceledAt: null, merchantId }],
+    },
+  }];
+
+  const written = () => db.notification.createMany.mock.calls[0]?.[0].data as Record<string, unknown>[] | undefined;
+
+  it('안내받은 손님에게 알린다', async () => {
+    db.returnRequest.findMany.mockResolvedValue(awaiting('m-a'));
+    db.returnAddress.findUnique.mockResolvedValue({
+      merchantId: 'm-a', recipient: '반품담당', phone: '010-0000-0101',
+      postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: '1층',
+    });
+
+    const res = await call('m-a', { ...input, address1: '서울 성동구 성수이로 99' });
+
+    expect(res.status).toBe(200);
+    expect(written()).toEqual([
+      expect.objectContaining({
+        userId: 'u-cust',
+        kind: 'RETURN_ADDRESS_CHANGED',
+        linkPath: '/order/20260930-0000001',
+      }),
+    ]);
+  });
+
+  /** 다른 판매처로 보내는 사람에게는 이 주소가 아무 상관이 없다 */
+  it('다른 판매처로 보내는 신청은 세지 않는다', async () => {
+    db.returnRequest.findMany.mockResolvedValue(awaiting('m-b'));
+    db.returnAddress.findUnique.mockResolvedValue({
+      merchantId: 'm-a', recipient: '반품담당', phone: '010-0000-0101',
+      postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: '1층',
+    });
+
+    await call('m-a', { ...input, address1: '서울 성동구 성수이로 99' });
+
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  /** 저장해도 폼이 남아 있어 같은 값을 두 번 누르기 쉽다 — 그때마다 알리면 아무도 믿지 않는다 */
+  it('같은 값을 다시 저장한 것은 알리지 않는다', async () => {
+    db.returnRequest.findMany.mockResolvedValue(awaiting('m-a'));
+    // 저장 규칙대로 다듬은 뒤의 값이 지금 값과 같다 — 전화번호는 하이픈이 붙어 저장된다
+    db.returnAddress.findUnique.mockResolvedValue({
+      merchantId: 'm-a', ...input, phone: '010-0000-0101',
+    });
+
+    await call('m-a', input);
+
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  /** 반품지가 없으면 승인할 수 없다 — 그 전에 이 주소로 보내라고 안내받은 사람은 없다 */
+  it('처음 등록한 것은 알리지 않는다', async () => {
+    db.returnRequest.findMany.mockResolvedValue(awaiting('m-a'));
+    db.returnAddress.findUnique.mockResolvedValue(null);
+
+    await call('m-a', input);
+
+    expect(db.notification.createMany).not.toHaveBeenCalled();
   });
 });

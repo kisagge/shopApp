@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { canEditReturnAddress } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getMerchantReturnAddress } from '~/lib/orders/return-address';
+import { awaitingReturnsFor, getMerchantReturnAddress } from '~/lib/orders/return-address';
 import { ReturnAddressForm } from '~/components/admin/return-address-form';
 import { LastEdited } from '~/components/admin/last-edited';
 import { getReturnAddressEdit } from '~/lib/queries/admin/last-edit';
@@ -22,7 +22,12 @@ export default async function MerchantReturnAddressPage({ params }: { params: Pr
   const { id } = await params;
   if (!canEditReturnAddress(actor, id)) notFound();
 
-  const [merchant, edit] = await Promise.all([getMerchantReturnAddress(id), getReturnAddressEdit(actor, id)]);
+  const [merchant, edit, awaiting] = await Promise.all([
+    getMerchantReturnAddress(id),
+    getReturnAddressEdit(actor, id),
+    // 바꾸기 전에 몇 사람이 이 주소로 보내라고 안내받았는지 말해 준다
+    awaitingReturnsFor(id),
+  ]);
   if (!merchant) notFound();
   const { address } = merchant;
 
@@ -59,7 +64,7 @@ export default async function MerchantReturnAddressPage({ params }: { params: Pr
               </p>
             )}
           </div>
-          <ReturnAddressForm owner={id} initial={address} />
+          <ReturnAddressForm owner={id} initial={address} awaiting={awaiting.length} />
         </section>
       </div>
     </>

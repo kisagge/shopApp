@@ -139,3 +139,30 @@ export async function notifyAddressChanged(input: {
     console.error('[notification] 배송지 변경 알림을 못 만들었다', { orderNo: input.orderNo }, error);
   }
 }
+
+/**
+ * 반품지가 바뀌었다 — **그 주소로 보내라고 안내받은 손님에게.**
+ *
+ * 승인하면 주문 화면에 "이 주소로 보내 주세요" 가 뜨고 사람은 그것을 상자에 적는다. 그 뒤에 반품지가
+ * 바뀌면 화면의 주소는 조용히 바뀌는데, 이미 적어 둔 사람에게는 아무 말도 가지 않았다 — 물건은 옛
+ * 창고로 가고 아무도 그것을 기다리지 않는다.
+ *
+ * **아직 보내지 않은 사람만 구할 수 있다.** 그래서 문구가 "아직 보내지 않으셨다면" 으로 시작한다 —
+ * 이미 보낸 사람에게는 옛 주소를 아는 사람이 받아 줘야 하고, 그것은 운영의 일이다.
+ */
+export async function notifyReturnAddressChanged(
+  affected: readonly { readonly orderNo: string; readonly userId: string }[],
+): Promise<void> {
+  if (affected.length === 0) return;
+  try {
+    await recordNotifications(affected.map((one): NoticeInput => ({
+      userId: one.userId,
+      kind: 'RETURN_ADDRESS_CHANGED',
+      params: { orderNo: one.orderNo },
+      // 누르면 바뀐 주소가 적힌 자리로 간다(주문 화면의 "보내실 곳")
+      linkPath: `/order/${encodeURIComponent(one.orderNo)}`,
+    })));
+  } catch (error) {
+    console.error('[notification] 반품지 변경 알림을 못 만들었다', { count: affected.length }, error);
+  }
+}

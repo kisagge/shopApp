@@ -5,7 +5,7 @@ import {
   checkExchangeOption, EXCHANGE_OPTION_MESSAGE,
   RETURN_REASON_LABEL, RETURN_TYPE_LABEL,
   type Actor, type OrderStatus, type ReturnReason, type ReturnType,
-  statusBeforeReturn, missingReturnAddresses, canCancelOwnReturn,
+  statusBeforeReturn, missingReturnAddresses, canCancelOwnReturn, linesOfRequest,
 } from '@shop/core';
 import { destinationsFor } from './return-address';
 
@@ -255,9 +255,8 @@ export async function loadForResolve(orderNo: string, actor: Actor) {
   const request = order.returnRequests[0];
   if (!request) throw new ReturnError('NO_REQUEST', 'err.return.noRequest', 404);
 
-  // 옛 신청(줄 없음)은 반품접수인 줄 전부다
-  const lines = order.items.filter((i) =>
-    request.itemIds.length > 0 ? request.itemIds.includes(i.id) : i.status === 'RETURN_REQUESTED' && !i.canceledAt);
+  // 옛 신청(줄 없음)은 반품접수인 줄 전부다 — 그 규칙은 core 가 갖고 있다
+  const lines = linesOfRequest(order.items, request);
   if (!canResolveReturnOf(actor, lines.map((l) => l.merchantId))) {
     throw new ReturnError(
       'MIXED_MERCHANTS',

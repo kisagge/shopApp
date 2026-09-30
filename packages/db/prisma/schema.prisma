@@ -1871,6 +1871,8 @@ enum NotificationKind {
   LATE_DEPOSIT_FOUND
   /// 출고 준비 중인 주문의 배송지가 바뀌었다 — 물건을 내보내는 사람의 운영 알림함에 뜬다
   ORDER_ADDRESS_CHANGED
+  /// 보낼 반품지가 바뀌었다 — 그 주소로 보내라고 안내받은 손님에게 간다
+  RETURN_ADDRESS_CHANGED
 }
 
 model Notification {

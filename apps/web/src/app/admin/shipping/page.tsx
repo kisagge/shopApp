@@ -7,15 +7,19 @@ import { getReturnAddress } from '~/lib/orders/return-address';
 import { ReturnAddressForm } from '~/components/admin/return-address-form';
 import { LastEdited } from '~/components/admin/last-edited';
 import { getReturnAddressEdit, getShippingPolicyEdit } from '~/lib/queries/admin/last-edit';
+import { awaitingReturnsFor } from '~/lib/orders/return-address';
 
 export const metadata: Metadata = { title: '배송비' };
 export const dynamic = 'force-dynamic';
 
 export default async function AdminShippingPage() {
   const actor = await requireAdmin('shipping:write');
-  const [policy, returnAddress, policyEdit, returnEdit] = await Promise.all([
+  const [policy, returnAddress, policyEdit, returnEdit, awaiting] = await Promise.all([
     getShippingPolicyFresh(), getReturnAddress(null), getShippingPolicyEdit(actor), getReturnAddressEdit(actor, null),
+    // 바꾸기 전에 몇 사람이 이 주소로 보내라고 안내받았는지 말해 준다
+    awaitingReturnsFor(null),
   ]);
+  const awaitingReturns = awaiting.length;
 
   return (
     <>
@@ -81,7 +85,7 @@ export default async function AdminShippingPage() {
               </p>
             )}
           </div>
-          <ReturnAddressForm owner="platform" initial={returnAddress} />
+          <ReturnAddressForm owner="platform" initial={returnAddress} awaiting={awaitingReturns} />
         </section>
       </div>
     </>

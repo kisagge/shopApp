@@ -81,6 +81,22 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     await expect(receive).toBeVisible({ timeout: 20_000 });
 
     /*
+     * **반품지를 고치려는 사람에게 몇 사람이 걸려 있는지 보인다.** 손님은 지금 이 주소를 상자에 적는
+     * 중이고, 주소를 바꾸면 이미 적어 둔 사람에게는 아무 말도 가지 않았다 — 물건은 옛 창고로 간다.
+     * 고치지는 않는다(다른 명세가 시드 주소를 본다) — 경고가 서는 것까지 본다.
+     */
+    await mp.goto('/admin/merchants');
+    await ready(mp);
+    await mp.getByRole('row').filter({ has: mp.getByRole('link', { name: /반품지/ }) })
+      .getByRole('link', { name: /반품지/ }).click();
+    await mp.waitForURL(/\/admin\/merchants\/[^/]+\/return-address$/);
+    await ready(mp);
+    await expect(mp.getByText(/안내받은 반품 신청이 \d+건/)).toBeVisible();
+
+    await mp.goto(`/admin/orders/${orderNo}`);
+    await ready(mp);
+
+    /*
      * ── 손님: 승인했으면 **어디로 보낼지**가 주문 화면에 뜬다. 주소 없이 "상품을 보내 주세요" 만 오면 손님은 받은
      * 상자의 출고지로 보내거나 고객센터에 묻는다. 물건을 받는 곳은 이 가맹점 창고다.
      *
