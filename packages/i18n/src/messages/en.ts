@@ -467,6 +467,7 @@ export const en: Dictionary = {
   'order.returnTo': 'Where to send it',
   'order.returnToNote': 'Please send the items to the address below. We continue once they arrive.',
   'order.returnToSplit': 'These items ship back to different sellers, so please send separate boxes — put only the items listed under each address.',
+  'order.returnToChanged': 'This address changed after we told you. If you already wrote it down, please compare it with the address below — if you already sent it, let support know.',
   'order.returnToItems': 'Items to send',
   'order.returnToRecipient': 'Recipient',
   'order.returnToPhone': 'Phone',

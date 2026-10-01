@@ -463,6 +463,7 @@ export const ja: Dictionary = {
   'order.returnTo': '送り先',
   'order.returnToNote': '下記の住所へお送りください。到着を確認しだい次の手続きに進みます。',
   'order.returnToSplit': '販売元が異なるため、箱を分けてお送りください。各住所に記載の商品だけを入れてください。',
+  'order.returnToChanged': 'ご案内後に変わった住所です。箱に書き写された場合は下の住所とお見比べください — すでに発送された場合はカスタマーサポートへお知らせください。',
   'order.returnToItems': '送る商品',
   'order.returnToRecipient': 'お届け先',
   'order.returnToPhone': '連絡先',

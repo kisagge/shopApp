@@ -14,6 +14,11 @@ const address = (recipient: string): ReturnAddress => ({
   recipient, phone: '010-0000-0101', postalCode: '04799', address1: '서울 성동구 성수이로 00', address2: '1층',
 });
 
+/** 반품지 한 줄 — 언제 고쳤는지까지. 승인 뒤에 고친 주소는 손님이 적어 둔 것과 다르다 */
+const found = (recipient: string, updatedAt = new Date('2026-09-01T00:00:00Z')) => ({
+  address: address(recipient), updatedAt,
+});
+
 describe('normalizeReturnAddress', () => {
   it('연락처를 한 모양으로 맞추고 앞뒤 공백을 턴다', () => {
     expect(normalizeReturnAddress({
@@ -46,10 +51,10 @@ describe('returnDestinations', () => {
   ];
 
   it('판매처별로 묶는다 — 상자를 나눠 보내야 하기 때문이다', () => {
-    const found = returnDestinations(lines, (id) => address(id ?? '자사'));
-    expect(found).toHaveLength(2);
-    expect(found[0]).toMatchObject({ merchantId: 'm-a', itemIds: ['i-1', 'i-3'] });
-    expect(found[1]).toMatchObject({ merchantId: null, itemIds: ['i-2'] });
+    const grouped = returnDestinations(lines, (id) => found(id ?? '자사'));
+    expect(grouped).toHaveLength(2);
+    expect(grouped[0]).toMatchObject({ merchantId: 'm-a', itemIds: ['i-1', 'i-3'] });
+    expect(grouped[1]).toMatchObject({ merchantId: null, itemIds: ['i-2'] });
   });
 
   it('자사 상품 줄은 플랫폼 반품지를 받는다 — 가맹점 id 가 null 로 온다', () => {
@@ -62,9 +67,48 @@ describe('returnDestinations', () => {
   });
 
   it('반품지가 없는 판매처를 짚어 준다 — 그 신청은 승인할 수 없다', () => {
-    const found = returnDestinations(lines, (id) => (id === 'm-a' ? address('스튜디오눈') : null));
-    expect(missingReturnAddresses(found)).toEqual([null]);
-    expect(missingReturnAddresses(returnDestinations(lines, () => address('어디든')))).toEqual([]);
+    const grouped = returnDestinations(lines, (id) => (id === 'm-a' ? found('스튜디오눈') : null));
+    expect(missingReturnAddresses(grouped)).toEqual([null]);
+    expect(missingReturnAddresses(returnDestinations(lines, () => found('어디든')))).toEqual([]);
+  });
+
+  /**
+   * **알림을 누르고 들어오면 주소 한 벌이 있을 뿐이다.** 상자에 적어 둔 것이 옛 것인지 이것이 새 것인지
+   * 알 수 없어서, 알림은 "뭔가 바뀌었다" 까지만 전한다 — 바뀐 자리를 짚어 줘야 한다.
+   */
+  it('승인한 뒤에 고친 주소를 짚어 준다', () => {
+    const approvedAt = new Date('2026-09-10T00:00:00Z');
+    const grouped = returnDestinations(
+      lines,
+      (id) => found(id ?? '자사', id === 'm-a' ? new Date('2026-09-11T00:00:00Z') : approvedAt),
+      approvedAt,
+    );
+
+    expect(grouped[0]!.changedSinceApproval, '승인 다음 날 고쳤다').toBe(true);
+    expect(grouped[1]!.changedSinceApproval, '승인과 같은 시각이면 그때 본 주소다').toBe(false);
+  });
+
+  it('승인 전에 고친 주소는 손님이 본 그 주소다', () => {
+    const grouped = returnDestinations(
+      lines,
+      () => found('스튜디오눈', new Date('2026-09-01T00:00:00Z')),
+      new Date('2026-09-10T00:00:00Z'),
+    );
+
+    expect(grouped.every((d) => !d.changedSinceApproval)).toBe(true);
+  });
+
+  /** 승인 시각을 모르면 짚지 않는다 — 옛 신청(승인한 사람이 안 남은 것)에도 붙으면 거짓말이 된다 */
+  it('승인 시각이 없으면 짚지 않는다', () => {
+    const grouped = returnDestinations(lines, () => found('스튜디오눈', new Date('2026-12-01T00:00:00Z')), null);
+
+    expect(grouped.every((d) => !d.changedSinceApproval)).toBe(true);
+  });
+
+  it('반품지가 없으면 짚을 것도 없다', () => {
+    const grouped = returnDestinations(lines, () => null, new Date('2026-09-10T00:00:00Z'));
+
+    expect(grouped.every((d) => !d.changedSinceApproval)).toBe(true);
   });
 });
 

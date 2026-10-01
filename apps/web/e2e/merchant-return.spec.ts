@@ -93,6 +93,25 @@ test('가맹점이 승인하고 도착을 확인하면, 운영진이 그 기록�
     await ready(mp);
     await expect(mp.getByText(/안내받은 반품 신청이 \d+건/)).toBeVisible();
 
+    /*
+     * **알림을 누르고 들어오면 주소 한 벌이 있을 뿐이다.** 상자에 적어 둔 것이 옛 것인지 이것이 새
+     * 것인지 알 수 없어서, 알림은 "뭔가 바뀌었다" 까지만 전한다 — 상세주소만 고쳐 보고 손님 화면이
+     * 그 자리를 짚는지 본다. 다른 명세가 시드 주소를 보므로 곧바로 되돌린다.
+     */
+    const detail = mp.getByLabel('상세주소');
+    const seeded = (await detail.inputValue()) || '';
+    await detail.fill('물류창고 2층 (검사)');
+    await mp.getByRole('button', { name: /반품지 (수정|등록)/ }).click();
+    await expect(mp.getByRole('status')).toHaveText(/반품지를 저장했습니다/, { timeout: 20_000 });
+
+    await page.goto(`/order/${orderNo}`);
+    await ready(page);
+    await expect(page.getByRole('region', { name: '보내실 곳' })).toContainText('안내드린 뒤에 바뀐 주소입니다');
+
+    await detail.fill(seeded);
+    await mp.getByRole('button', { name: /반품지 (수정|등록)/ }).click();
+    await expect(mp.getByRole('status')).toHaveText(/반품지를 저장했습니다/, { timeout: 20_000 });
+
     await mp.goto(`/admin/orders/${orderNo}`);
     await ready(mp);
 

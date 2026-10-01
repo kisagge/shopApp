@@ -60,6 +60,8 @@ export async function getOrderForUser(orderNo: string, userId: string) {
         select: {
           type: true, reason: true, detail: true, status: true,
           shippingBorneBy: true, rejectReason: true, requestedAt: true, itemIds: true,
+          // 승인한 시각 — 그 뒤에 반품지가 바뀌었으면 손님이 적어 둔 주소와 다르다
+          resolvedAt: true,
           // 승인했고 아직 안 왔으면 손님에게 보낼 곳을 알려 준다(core showsReturnAddress)
           receivedAt: true,
           exchangeLines: { select: { orderItemId: true, fromOptionLabel: true, toOptionLabel: true, quantity: true } },

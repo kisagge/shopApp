@@ -12,6 +12,9 @@ const ADDRESS_SELECT = {
   merchantId: true, recipient: true, phone: true, postalCode: true, address1: true, address2: true,
 } as const;
 
+/** 보낼 곳을 그릴 때는 **언제 고쳤는지**까지 읽는다 — 승인 뒤에 바뀐 주소를 짚어 주려면 그 시각이 필요하다 */
+const DESTINATION_SELECT = { ...ADDRESS_SELECT, updatedAt: true } as const;
+
 type Row = { merchantId: string | null } & ReturnAddress;
 
 const toAddress = (r: Row): ReturnAddress => ({
@@ -44,6 +47,8 @@ export async function getMerchantReturnAddress(
  */
 export async function destinationsFor(
   lines: readonly { readonly id: string; readonly merchantId: string | null }[],
+  /** 승인한 시각. 그 뒤에 고친 주소는 손님이 상자에 적어 둔 것과 다르다 */
+  approvedAt?: Date | null,
 ): Promise<ReturnDestination[]> {
   if (lines.length === 0) return [];
   const merchantIds = [...new Set(lines.map((l) => l.merchantId).filter((id): id is string => id !== null))];
@@ -55,10 +60,12 @@ export async function destinationsFor(
         ...(needsPlatform ? [{ id: PLATFORM_RETURN_ADDRESS_ID }] : []),
       ],
     },
-    select: ADDRESS_SELECT,
+    select: DESTINATION_SELECT,
   });
-  const byMerchant = new Map(rows.map((r) => [r.merchantId, toAddress(r)]));
-  return returnDestinations(lines, (id) => byMerchant.get(id) ?? null);
+  const byMerchant = new Map(
+    rows.map((r) => [r.merchantId, { address: toAddress(r), updatedAt: r.updatedAt }]),
+  );
+  return returnDestinations(lines, (id) => byMerchant.get(id) ?? null, approvedAt);
 }
 
 /**
@@ -68,10 +75,16 @@ export async function destinationsFor(
  */
 export async function approvedReturnDestinations(
   items: readonly { readonly id: string; readonly status: string; readonly canceledAt: Date | null; readonly merchantId: string | null }[],
-  request: { readonly status: string; readonly receivedAt: Date | null; readonly itemIds: readonly string[] },
+  request: {
+    readonly status: string;
+    readonly receivedAt: Date | null;
+    readonly itemIds: readonly string[];
+    /** 승인한 시각 — 그 뒤에 반품지가 바뀌었는지 짚어 주려면 필요하다 */
+    readonly resolvedAt?: Date | null;
+  },
 ): Promise<ReturnDestination[]> {
   if (!showsReturnAddress(request)) return [];
-  return await destinationsFor(linesOfRequest(items, request));
+  return await destinationsFor(linesOfRequest(items, request), request.resolvedAt ?? null);
 }
 
 export class ReturnAddressError extends Error {

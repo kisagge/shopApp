@@ -485,6 +485,7 @@ export const ko = {
   'order.returnTo': '보내실 곳',
   'order.returnToNote': '아래 주소로 보내 주세요. 도착을 확인하면 다음 처리로 넘어갑니다.',
   'order.returnToSplit': '판매처가 달라 상자를 나눠 보내 주셔야 합니다. 주소마다 적힌 상품만 담아 주세요.',
+  'order.returnToChanged': '안내드린 뒤에 바뀐 주소입니다. 상자에 적어 두셨다면 아래 주소와 견주어 주세요 — 이미 보내셨다면 고객센터로 알려 주세요.',
   'order.returnToItems': '보낼 상품',
   'order.returnToRecipient': '받는 분',
   'order.returnToPhone': '연락처',

@@ -198,6 +198,16 @@ export async function ReturnPanel({
                 key={destination.merchantId ?? 'platform'}
                 className="rounded-sm bg-[var(--surface-1)] p-3.5 text-[13px] leading-relaxed"
               >
+                {/*
+                  **알림을 누르고 들어오면 주소 한 벌이 있을 뿐이다.** 상자에 적어 둔 것이 옛 것인지
+                  이것이 새 것인지 알 수 없어서, 알림은 "뭔가 바뀌었다" 까지만 전한다 — 바뀐 자리를
+                  짚어 줘야 사람이 적어 둔 것과 견줄 수 있다.
+                */}
+                {destination.changedSinceApproval && (
+                  <p className="mb-2 rounded-sm bg-accent-soft px-2.5 py-2 text-[12px] leading-relaxed text-accent-hover">
+                    {t('order.returnToChanged')}
+                  </p>
+                )}
                 <address className="not-italic">
                   <span className="block font-medium">
                     {t('order.returnToRecipient')} {address.recipient}

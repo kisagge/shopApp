@@ -47,6 +47,16 @@ export interface ReturnDestination {
   readonly merchantId: string | null;
   readonly address: ReturnAddress | null;
   readonly itemIds: readonly string[];
+  /**
+   * **안내받은 뒤에 바뀐 주소인가.**
+   *
+   * 반품지가 바뀌면 손님에게 알림이 간다("새 주소를 확인해 주세요"). 그런데 그 알림을 누르고 들어오면
+   * 주소 한 벌이 있을 뿐이라, 상자에 적어 둔 것이 옛 것인지 이것이 새 것인지 알 수 없다 — 두 주소를
+   * 나란히 두고 견주지 못하면 알림은 "뭔가 바뀌었다" 까지만 전한다.
+   *
+   * 승인한 시각보다 주소를 고친 시각이 늦으면 그렇다.
+   */
+  readonly changedSinceApproval: boolean;
 }
 
 /**
@@ -57,7 +67,9 @@ export interface ReturnDestination {
  */
 export function returnDestinations(
   lines: readonly { readonly id: string; readonly merchantId: string | null }[],
-  addressOf: (merchantId: string | null) => ReturnAddress | null,
+  addressOf: (merchantId: string | null) => { readonly address: ReturnAddress; readonly updatedAt: Date } | null,
+  /** 승인한 시각. 그 뒤에 고친 주소라면 손님이 적어 둔 것과 다르다 */
+  approvedAt?: Date | null,
 ): ReturnDestination[] {
   const groups = new Map<string | null, string[]>();
   for (const line of lines) {
@@ -65,7 +77,18 @@ export function returnDestinations(
     if (ids) ids.push(line.id);
     else groups.set(line.merchantId, [line.id]);
   }
-  return [...groups].map(([merchantId, itemIds]) => ({ merchantId, address: addressOf(merchantId), itemIds }));
+  return [...groups].map(([merchantId, itemIds]) => {
+    const found = addressOf(merchantId);
+    return {
+      merchantId,
+      address: found?.address ?? null,
+      itemIds,
+      changedSinceApproval:
+        found !== null &&
+        approvedAt != null &&
+        found.updatedAt.getTime() > approvedAt.getTime(),
+    };
+  });
 }
 
 /**
