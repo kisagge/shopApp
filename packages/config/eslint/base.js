@@ -20,6 +20,8 @@ export const baseConfig = tseslint.config(
     ignores: [
       '**/dist/**',
       '**/.next/**',
+      // 문지기가 쓰는 빌드 폴더 — 개발 서버의 .next 와 다투지 않게 따로 둔다(tooling/ci-local.sh)
+      '**/.next-ci/**',
       '**/src/generated/**', // Prisma 가 만든 코드는 우리가 고치지 않는다
       '**/node_modules/**',
       '**/*.mjs',

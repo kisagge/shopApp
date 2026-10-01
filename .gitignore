@@ -4,6 +4,8 @@ node_modules/
 
 # 빌드 산출물
 .next/
+# 문지기가 쓰는 빌드 폴더 — 개발 서버의 .next 와 다투지 않게 따로 둔다(tooling/ci-local.sh)
+.next-ci/
 out/
 dist/
 build/

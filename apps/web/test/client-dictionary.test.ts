@@ -28,7 +28,8 @@ import { join, dirname, resolve } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '../../..');
 const WEB = join(ROOT, 'apps/web');
-const CHUNKS = join(WEB, '.next/static/chunks');
+// 문지기는 자기 폴더에서 빌드한다 — 개발 서버와 `.next` 를 두고 다투지 않게(next.config.ts 의 distDir)
+const CHUNKS = join(WEB, process.env['NEXT_DIST_DIR'] ?? '.next', 'static/chunks');
 
 /** 사전 한 벌 분량의 글자가 있으면 그 사전이 들어 있는 것이다. */
 const SIGN = {

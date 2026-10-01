@@ -78,6 +78,18 @@ const SECURITY_HEADERS = [
 ];
 
 const config: NextConfig = {
+  /**
+   * 빌드 산출물을 둘 곳.
+   *
+   * **문지기와 개발 서버가 같은 `.next` 를 두고 다퉜다.** ci-local.sh 는 시작과 끝에 그 폴더를 지우는데
+   * (일회용 DB 로 빌드한 결과가 남으면 다음 검사가 그 캐시를 쓴다), 작업하며 띄워 둔 `next dev` 는 그
+   * 폴더에 계속 쓴다 — `rm` 이 "Directory not empty" 로 반쯤 실패하고, 반쯤 지워진 자리에서 빌드가
+   * 글꼴 모듈을 못 찾아 통째로 졌다. 43분을 쓰고서야 그 이유였다.
+   *
+   * 문지기는 자기 폴더에서 빌드한다(NEXT_DIST_DIR). 비어 있으면 평소 그대로라 배포는 바뀌지 않는다.
+   */
+  distDir: process.env['NEXT_DIST_DIR'] ?? '.next',
+
   // Next 는 Promise 를 요구한다. 안에서 기다릴 것은 없다.
   headers: () => Promise.resolve([{ source: '/:path*', headers: SECURITY_HEADERS }]),
 

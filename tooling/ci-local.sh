@@ -56,8 +56,15 @@ export DATABASE_URL="postgresql://shop:shop@localhost:5432/$DB_NAME"
 export BETTER_AUTH_SECRET="ci-only-secret-not-used-anywhere-else-0000"
 export BETTER_AUTH_URL="http://localhost:3100"
 
+# **개발 서버와 같은 폴더를 쓰지 않는다.**
+#
+# 아래에서 빌드 산출물을 지우는데, 작업하며 띄워 둔 `next dev` 는 `.next` 에 계속 쓴다 — `rm` 이
+# "Directory not empty" 로 반쯤 실패하고, 반쯤 지워진 자리에서 빌드가 글꼴 모듈을 못 찾아 졌다.
+# 이 스크립트는 자기 폴더에서 빌드한다(next.config.ts 의 distDir 이 이 변수를 읽는다).
+export NEXT_DIST_DIR=.next-ci
+
 echo "▸ CI 에 없는 것을 지운다 (생성물 · 빌드 산출물 · 캐시)"
-rm -rf packages/db/src/generated apps/web/.next .turbo
+rm -rf packages/db/src/generated "apps/web/$NEXT_DIST_DIR" .turbo
 
 cleanup() {
   docker exec "$CONTAINER" psql -U shop -d postgres -c "drop database if exists $DB_NAME;" >/dev/null 2>&1 || true
@@ -73,7 +80,7 @@ cleanup() {
   # 멀쩡해서 원인을 한참 찾았다.
   #
   # DB 를 지우는 것과 같은 이유다 — 이 스크립트가 만든 것은 이 스크립트가 치운다.
-  rm -rf apps/web/.next
+  rm -rf "apps/web/$NEXT_DIST_DIR"
 }
 trap cleanup EXIT
 
