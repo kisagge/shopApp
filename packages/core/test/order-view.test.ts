@@ -21,6 +21,7 @@ const input = (over: Partial<OrderViewInput> = {}): OrderViewInput => ({
   liveItemCount: 2,
   deliveredAt: null,
   returnStatus: null,
+  awaitingExchangeReship: false,
   now: NOW,
   paymentFailed: false,
   confirmedJustNow: false,

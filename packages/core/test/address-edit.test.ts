@@ -16,6 +16,7 @@ const input = (over: Partial<Parameters<typeof checkAddressEdit>[0]> = {}) => ({
   status: 'PAID' as OrderStatus,
   settled: true,
   awaitingDeposit: false,
+  awaitingExchangeReship: false,
   wasRemote: false,
   nowRemote: false,
   ...over,
@@ -88,6 +89,52 @@ describe('권역이 달라질 때', () => {
   it('출고 뒤에는 권역이 그대로여도 막는다', () => {
     expect(checkAddressEdit(input({ status: 'SHIPPED', wasRemote: true, nowRemote: true })))
       .toBe('ALREADY_SHIPPED');
+  });
+});
+
+/**
+ * 교환 상품을 받을 주소.
+ *
+ * **아무도 고칠 수 없었다.** 교환이 도는 동안 주문은 반품접수에 머무는데, 그 상태의 수정은 "끝난 주문"
+ * 으로 묶여 거절됐다 — 주문하고 이사한 사람은 새 물건을 옛 주소로 받고, 운영자도 도울 길이 없었다.
+ * 그 주문은 끝난 것이 아니라 **아직 보낼 물건이 남아 있다.**
+ */
+describe('교환 상품을 기다리는 중', () => {
+  const awaiting = (over: Record<string, unknown> = {}) =>
+    input({ status: 'RETURN_REQUESTED', awaitingExchangeReship: true, ...over });
+
+  it('같은 권역 안에서는 고칠 수 있다 — 이사한 사람이 옛 주소로 받지 않게', () => {
+    expect(checkAddressEdit(awaiting())).toBeNull();
+  });
+
+  /**
+   * 권역이 달라지면 배송비가 움직이는데 그 주문의 돈은 오래전에 끝났고, 교환의 반송·재발송 비용은 이미
+   * 사유에 따라 정해져 있다.
+   */
+  it('권역이 달라지는 주소는 막는다 — 그 주문의 돈은 오래전에 끝났다', () => {
+    expect(checkAddressEdit(awaiting({ nowRemote: true }))).toBe('ZONE_CHANGE_ON_EXCHANGE');
+    expect(checkAddressEdit(awaiting({ wasRemote: true, nowRemote: false }))).toBe('ZONE_CHANGE_ON_EXCHANGE');
+  });
+
+  /** 반품(교환이 아닌)은 돌려보내기만 한다 — 우리가 보낼 물건이 없으므로 주소를 고칠 일도 없다 */
+  it('교환을 기다리는 것이 아니면 여전히 끝난 주문이다', () => {
+    expect(checkAddressEdit(input({ status: 'RETURN_REQUESTED' }))).toBe('ORDER_CLOSED');
+  });
+
+  /** 새 물건이 이미 나갔으면 늦었다 — 송장이 붙은 뒤에는 그 주소로 가고 있다 */
+  it('새 물건을 보낸 뒤에는 막는다', () => {
+    expect(checkAddressEdit(input({ status: 'RETURN_REQUESTED', awaitingExchangeReship: false })))
+      .toBe('ORDER_CLOSED');
+  });
+
+  /** 이미 나간 주문이 먼저다 — 교환을 기다린다고 배송중인 주문의 주소가 열리지는 않는다 */
+  it.each<OrderStatus>(['SHIPPED', 'DELIVERED', 'CONFIRMED'])('%s 에서는 교환이어도 막는다', (status) => {
+    expect(checkAddressEdit(awaiting({ status }))).toBe('ALREADY_SHIPPED');
+  });
+
+  /** 반품완료·환불완료는 보낼 물건이 없다 */
+  it.each<OrderStatus>(['RETURNED', 'REFUNDED', 'CANCELLED'])('%s 에서는 막는다', (status) => {
+    expect(checkAddressEdit(awaiting({ status }))).toBe('ORDER_CLOSED');
   });
 });
 

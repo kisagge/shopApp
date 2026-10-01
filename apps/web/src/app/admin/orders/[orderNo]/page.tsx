@@ -53,6 +53,9 @@ export default async function AdminOrderDetail({
    * 흔하고, 고칠 방법이 없으면 고객이 남의 택배를 조회하게 된다.
    * 취소·환불된 주문에는 의미가 없으므로 감춘다.
    */
+
+  const activeReturn = order.returnRequests[0] ?? null;
+
   /*
    * **어떤 상태에 붙일 수 있는지는 core 가 정한다.**
    *
@@ -76,12 +79,16 @@ export default async function AdminOrderDetail({
       settled: order.payment !== null && isPaidStatus(order.payment.status),
       awaitingDeposit:
         order.payment !== null && awaitingDeposit(order.payment.method, order.payment.status),
+      // 교환의 새 물건을 아직 안 보냈으면 그 주문의 주소도 고칠 수 있다
+      awaitingExchangeReship:
+        activeReturn !== null &&
+        activeReturn.type === 'EXCHANGE' &&
+        activeReturn.status === 'APPROVED' &&
+        activeReturn.reshipTrackingNumber === null,
       // 같은 권역 안의 수정은 언제든 된다. 권역이 바뀌는 주소인지는 저장할 때 서버가 본다
       wasRemote: false,
       nowRemote: false,
     }) === null;
-
-  const activeReturn = order.returnRequests[0] ?? null;
 
   /*
    * 일부 상품 취소. 돈이 나가는 동작이라 환불 권한이 있어야 하고(가맹점은 없다), 출고 전

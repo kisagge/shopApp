@@ -61,6 +61,30 @@ test('다른 옵션으로 교환 신청하면 그 재고가 잡히고, 운영이
     const ship = ap.getByRole('form', { name: '교환 상품 발송' });
     await expect(ship).toBeVisible({ timeout: 20_000 });
     await expect(section.getByRole('button', { name: /환불/ }), '교환에 환불 단추가 떴다').toHaveCount(0);
+
+    /*
+     * **교환 상품을 받을 주소를 고칠 수 있다.** 교환이 도는 동안 주문은 반품접수에 머무는데, 그 상태의
+     * 수정이 "끝난 주문" 으로 묶여 거절되던 자리다 — 주문하고 이사한 사람은 새 물건을 옛 주소로 받았다.
+     * 같은 권역 안에서만 된다: 권역이 달라지면 배송비가 움직이는데 그 주문의 돈은 오래전에 끝났다.
+     */
+    await page.reload();
+    await ready(page);
+    await page.getByRole('button', { name: '배송지 수정' }).click();
+    const addressForm = page.getByRole('region', { name: `${orderNo} 배송지 수정` });
+    await addressForm.getByLabel(/상세 주소/).fill('교환품은 3층으로');
+    await addressForm.getByRole('button', { name: '배송지 저장' }).click();
+    await expect(page.getByRole('status').filter({ hasText: '배송지를 바꿨습니다' })).toBeVisible();
+    await expect(page.getByText('교환품은 3층으로')).toBeVisible();
+
+    const otherZone = await page.request.patch(`/api/orders/${orderNo}/address`, {
+      data: {
+        recipient: '장보영', phone: '010-1234-5678',
+        postalCode: '63309', address1: '제주 제주시 첨단로 242',
+      },
+    });
+    expect(otherZone.status(), '권역이 달라지는 주소가 통과했다').toBe(409);
+    expect((await otherZone.json()).code).toBe('ZONE_CHANGE_ON_EXCHANGE');
+
     await ship.getByLabel('택배사').selectOption('HANJIN');
     await ship.getByLabel(/교환 송장번호/).fill('5555-6666-7777');
     await ship.getByRole('button', { name: '회수 확인 · 교환 상품 발송' }).click();

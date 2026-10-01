@@ -40,6 +40,7 @@ const MESSAGE: Readonly<Record<AddressEditErrorCode, string>> = {
   ORDER_CLOSED: 'err.addressEdit.orderClosed',
   ZONE_CHANGE_AFTER_PAYMENT: 'err.addressEdit.zoneAfterPayment',
   ZONE_CHANGE_ON_DEPOSIT: 'err.addressEdit.zoneOnDeposit',
+  ZONE_CHANGE_ON_EXCHANGE: 'err.addressEdit.zoneOnExchange',
 };
 
 /** 감사 로그에 남길 배송지 한 벌 */
@@ -93,6 +94,15 @@ export async function updateOrderAddress(
       recipient: true, recipientPhone: true, postalCode: true, address1: true, address2: true,
       deliveryMemo: true,
       payment: { select: { method: true, status: true } },
+      /*
+       * **교환은 아직 보낼 물건이 남아 있다.** 승인됐고 새 물건을 안 보낸 신청이 있으면, 반품접수에
+       * 머무는 그 주문의 주소도 고칠 수 있어야 한다 — 그러지 않으면 이사한 사람은 옛 주소로 받는다.
+       */
+      returnRequests: {
+        orderBy: { requestedAt: 'desc' },
+        take: 1,
+        select: { type: true, status: true, reshipTrackingNumber: true },
+      },
     },
   });
   if (!order) throw new AddressEditError('ORDER_NOT_FOUND', 404);
@@ -100,10 +110,16 @@ export async function updateOrderAddress(
   const nowRemote = isRemoteAreaPostalCode(input.postalCode);
   const pay = order.payment;
 
+  const openReturn = order.returnRequests[0];
   const blocked = checkAddressEdit({
     status: order.status,
     settled: pay !== null && isPaidStatus(pay.status),
     awaitingDeposit: pay !== null && awaitingDeposit(pay.method, pay.status),
+    awaitingExchangeReship:
+      openReturn !== undefined &&
+      openReturn.type === 'EXCHANGE' &&
+      openReturn.status === 'APPROVED' &&
+      openReturn.reshipTrackingNumber === null,
     wasRemote: order.isRemoteArea,
     nowRemote,
   });

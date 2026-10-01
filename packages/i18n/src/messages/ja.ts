@@ -830,6 +830,7 @@ export const ja: Dictionary = {
   'err.addressEdit.orderClosed': '終了したご注文のお届け先は変更できません。',
   'err.addressEdit.zoneAfterPayment': 'お支払い後は、離島・山間部の判定が変わる住所には変更できません。送料が変わり差額のやりとりが必要になります——キャンセルのうえ、あらためてご注文ください。',
   'err.addressEdit.zoneOnDeposit': 'お振込金額がすでに決まっているため、離島・山間部の判定が変わる住所には変更できません。キャンセルのうえ、あらためてご注文ください。',
+  'err.addressEdit.zoneOnExchange': '交換品をお待ちの間は、離島・山間部の判定が変わる住所には変更できません。同じ区分の中では変更できます — 別の区分でお受け取りの場合はカスタマーサポートへお問い合わせください。',
   'err.wishlist.tooMany': 'お気に入りは{max}件まで登録できます。',
   'err.restock.variantNotFound': 'オプションが見つかりません。',
   'err.restock.tooMany': '再入荷通知は{max}件まで登録できます。',

@@ -862,6 +862,7 @@ export const ko = {
   'err.addressEdit.orderClosed': '끝난 주문의 배송지는 고칠 수 없습니다.',
   'err.addressEdit.zoneAfterPayment': '결제가 끝난 뒤에는 도서산간 여부가 달라지는 주소로 바꿀 수 없습니다. 배송비가 달라져 차액을 주고받아야 합니다 — 취소하고 다시 주문해 주세요.',
   'err.addressEdit.zoneOnDeposit': '입금할 계좌의 금액이 이미 정해져 있어, 도서산간 여부가 달라지는 주소로는 바꿀 수 없습니다. 취소하고 다시 주문해 주세요.',
+  'err.addressEdit.zoneOnExchange': '교환 상품을 기다리는 중에는 도서산간 여부가 달라지는 주소로 바꿀 수 없습니다. 같은 권역 안에서는 고칠 수 있습니다 — 다른 권역으로 받으셔야 하면 고객센터로 문의해 주세요.',
   'err.wishlist.tooMany': '찜은 {max}개까지 담을 수 있습니다.',
   'err.restock.variantNotFound': '옵션을 찾을 수 없습니다.',
   'err.restock.tooMany': '재입고 알림은 {max}개까지 신청할 수 있습니다.',

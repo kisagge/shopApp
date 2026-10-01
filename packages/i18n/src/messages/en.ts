@@ -834,6 +834,7 @@ export const en: Dictionary = {
   'err.addressEdit.orderClosed': 'The address of a closed order cannot be changed.',
   'err.addressEdit.zoneAfterPayment': 'After payment you cannot switch to an address in a different remote-area zone: the shipping fee would change and the difference would have to be settled. Please cancel and order again.',
   'err.addressEdit.zoneOnDeposit': 'The amount to deposit is already fixed, so you cannot switch to an address in a different remote-area zone. Please cancel and order again.',
+  'err.addressEdit.zoneOnExchange': 'While you are waiting for the replacement you cannot switch to an address in a different remote-area zone. You can still edit within the same zone — if you need it sent elsewhere, please contact support.',
   'err.wishlist.tooMany': 'You can save up to {max} items.',
   'err.restock.variantNotFound': "We couldn't find that option.",
   'err.restock.tooMany': 'You can have up to {max} restock alerts.',

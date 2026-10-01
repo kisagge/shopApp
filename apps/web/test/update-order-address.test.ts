@@ -50,6 +50,8 @@ const order = (over: Record<string, unknown> = {}) => ({
   address2: '3층',
   deliveryMemo: null,
   payment: { method: 'CARD', status: 'DONE' },
+  // 걸린 반품·교환 신청. 교환의 새 물건을 기다리는 중이면 그 주문의 주소도 고칠 수 있다
+  returnRequests: [],
   ...over,
 });
 
@@ -370,5 +372,58 @@ describe('알림', () => {
 
     await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' })).rejects.toBeTruthy();
     expect(notifyAddressChanged).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 교환 상품을 받을 주소.
+ *
+ * **아무도 고칠 수 없었다.** 교환이 도는 동안 주문은 반품접수에 머무는데, 그 상태의 수정은 "끝난 주문"
+ * 으로 묶여 거절됐다 — 주문하고 이사한 사람은 새 물건을 옛 주소로 받았다.
+ */
+describe('교환 상품을 기다리는 중', () => {
+  const exchanging = (over: Record<string, unknown> = {}) => order({
+    status: 'RETURN_REQUESTED',
+    returnRequests: [{ type: 'EXCHANGE', status: 'APPROVED', reshipTrackingNumber: null, ...over }],
+  });
+
+  it('같은 권역 안에서는 고친다', async () => {
+    db.order.findFirst.mockResolvedValue(exchanging());
+
+    const result = await updateOrderAddress('20260901-0000001', input({ address2: '102호' }), { userId: 'u-1' });
+
+    expect(result.shippingDelta, '돈은 움직이지 않는다').toBe(0);
+    expect(db.order.updateMany.mock.calls[0]![0].data.address2).toBe('102호');
+  });
+
+  it('권역이 달라지는 주소는 막는다', async () => {
+    db.order.findFirst.mockResolvedValue(exchanging());
+
+    await expect(updateOrderAddress('20260901-0000001', input({ postalCode: JEJU }), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ZONE_CHANGE_ON_EXCHANGE', status: 409 });
+    expect(db.order.updateMany).not.toHaveBeenCalled();
+  });
+
+  /** 반품(교환이 아닌)은 우리가 보낼 물건이 없다 */
+  it('반품 신청이면 열지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(exchanging({ type: 'RETURN' }));
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ORDER_CLOSED' });
+  });
+
+  it('아직 승인되지 않은 교환이면 열지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(exchanging({ status: 'REQUESTED' }));
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ORDER_CLOSED' });
+  });
+
+  /** 송장이 붙은 뒤에는 그 주소로 가고 있다 */
+  it('새 물건을 보낸 뒤에는 열지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(exchanging({ reshipTrackingNumber: '123456789012' }));
+
+    await expect(updateOrderAddress('20260901-0000001', input(), { userId: 'u-1' }))
+      .rejects.toMatchObject({ code: 'ORDER_CLOSED' });
   });
 });

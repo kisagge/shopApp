@@ -36,6 +36,13 @@ export interface OrderViewInput {
   readonly deliveredAt: Date | null;
   /** 가장 최근 반품·교환 신청의 상태. 없으면 null */
   readonly returnStatus: ReturnStatus | null;
+  /**
+   * 승인된 교환의 **새 물건을 아직 안 보냈는가.**
+   *
+   * 교환이 도는 동안에도 받을 주소를 고칠 수 있어야 한다 — 그 주문은 끝난 것이 아니라 아직 보낼 물건이
+   * 남아 있다(checkAddressEdit 의 주석).
+   */
+  readonly awaitingExchangeReship: boolean;
   readonly now: Date;
   /** 결제 화면에서 실패해 넘어왔는가(`?payment=failed`) */
   readonly paymentFailed: boolean;
@@ -132,6 +139,7 @@ export function orderView(input: OrderViewInput): OrderView {
         status: input.status,
         settled: pay !== null && isPaidStatus(pay.status),
         awaitingDeposit: deposit !== null,
+        awaitingExchangeReship: input.awaitingExchangeReship,
         // 같은 권역으로 고치는 것은 언제든 된다 — 그것이 가장 흔한 경우다(상세주소 오타·받는 사람 변경)
         wasRemote: false,
         nowRemote: false,

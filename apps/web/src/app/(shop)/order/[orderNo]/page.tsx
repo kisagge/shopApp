@@ -74,6 +74,14 @@ export default async function OrderPage({
     deliveredAt: order.deliveredAt,
     // 상태는 String 칸이라 모양을 좁혀 넘긴다 — 아래 화면들도 같은 자리에서 같은 좁힘을 한다
     returnStatus: (activeReturn?.status as ReturnStatus | undefined) ?? null,
+    /*
+     * 교환의 새 물건을 아직 안 보냈으면 받을 주소를 고칠 수 있다 — 그 주문은 끝난 것이 아니라 아직
+     * 보낼 물건이 남아 있다. 이사한 사람이 옛 주소로 받는 일을 막는 자리다.
+     */
+    awaitingExchangeReship:
+      activeReturn?.type === 'EXCHANGE' &&
+      activeReturn.status === 'APPROVED' &&
+      activeReturn.reshipTrackingNumber === null,
     now: new Date(),
     /** 결제 화면에서 실패해 넘어왔는가. 갓 접수된 주문과 구분해야 한다 */
     paymentFailed: query['payment'] === 'failed',

@@ -23,10 +23,11 @@ export type AddressEditBlock =
   | 'ORDER_CLOSED'
   /** 결제가 끝난 뒤에 권역이 바뀐다 — 차액을 주고받을 길이 없다 */
   | 'ZONE_CHANGE_AFTER_PAYMENT'
+  /** 교환 상품을 기다리는 중에 권역이 바뀐다 — 그 주문의 돈은 오래전에 끝났다 */
+  | 'ZONE_CHANGE_ON_EXCHANGE'
   /** 발급된 가상계좌 금액은 고정이다 */
   | 'ZONE_CHANGE_ON_DEPOSIT';
 
-/** 배송지를 아직 고칠 수 있는 주문 상태 — 출고 전이고 끝나지 않았다 */
 /**
  * 배송지를 아직 고칠 수 있는 주문 상태 — 출고 전이고 끝나지 않았다.
  *
@@ -43,6 +44,14 @@ export function checkAddressEdit(input: {
   readonly settled: boolean;
   /** 가상계좌를 발급받아 입금을 기다리는 중인가 */
   readonly awaitingDeposit: boolean;
+  /**
+   * 승인된 교환의 **새 물건을 기다리는 중인가.**
+   *
+   * **교환 상품을 받을 주소를 아무도 고칠 수 없었다.** 교환이 도는 동안 주문은 반품접수에 머무는데,
+   * 그 상태의 수정은 "끝난 주문" 으로 묶여 거절됐다 — 주문하고 이사한 사람은 새 물건을 옛 주소로
+   * 받고, 운영자도 도울 길이 없었다. 그 주문은 끝난 것이 아니라 **아직 보낼 물건이 남아 있다.**
+   */
+  readonly awaitingExchangeReship: boolean;
   /** 지금 주소의 도서산간 여부 */
   readonly wasRemote: boolean;
   /** 새 주소의 도서산간 여부 */
@@ -51,6 +60,15 @@ export function checkAddressEdit(input: {
   if (input.status === 'SHIPPED' || input.status === 'DELIVERED' || input.status === 'CONFIRMED') {
     return 'ALREADY_SHIPPED';
   }
+
+  /*
+   * **교환은 아직 보낼 물건이 남아 있다.** 같은 권역 안의 수정만 받는다 — 권역이 달라지면 배송비가
+   * 움직이는데 그 주문의 돈은 오래전에 끝났고, 교환의 반송·재발송 비용은 이미 사유에 따라 정해져 있다.
+   */
+  if (input.awaitingExchangeReship && input.status === 'RETURN_REQUESTED') {
+    return input.wasRemote === input.nowRemote ? null : 'ZONE_CHANGE_ON_EXCHANGE';
+  }
+
   if (!EDITABLE_STATUS.includes(input.status)) return 'ORDER_CLOSED';
 
   // 권역이 그대로면 돈이 움직이지 않는다. 언제든 고칠 수 있다.
