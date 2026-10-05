@@ -74,7 +74,9 @@ export default async function AdminProductDetailPage({
             <ProductForm
               mode="edit"
               productId={product.id}
-              brands={options.brands.map((b) => ({ id: b.id, label: b.name }))}
+              brands={options.brands.map((b) => ({
+                id: b.id, label: b.name, merchantId: b.merchantId, canSell: b.canSell,
+              }))}
               categories={options.categories}
               initial={{
                 slug: product.slug,

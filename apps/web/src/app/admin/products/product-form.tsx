@@ -1,17 +1,33 @@
 'use client';
 
 import { useId, useState } from 'react';
+import Link from 'next/link';
+import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 // 계약을 거치면 Zod 가 딸려 온다. 이 값들은 core 의 것을 계약이 다시 내보낼 뿐이다.
 import { PRODUCT_STATUS, PRODUCT_STATUS_LABEL } from '@shop/core'
 import type { ProductStatusInput } from '@shop/contract';
-import { MERCHANT_SELECTABLE_STATUS } from '@shop/core';
+import { MERCHANT_SELECTABLE_STATUS, isSaleBound } from '@shop/core';
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 import { discountRateOf, won } from '@shop/core';
 
 export interface ProductFormOption {
   readonly id: string;
   readonly label: string;
+}
+
+/**
+ * 고를 수 있는 브랜드 — 그리고 **그 브랜드 상품을 팔 수 있는가.**
+ *
+ * 반품지가 없는 판매처의 상품은 매대에 올릴 수 없다(서버 assertReturnAddress). 고를 수 있게 두면
+ * 폼을 다 채워 저장한 뒤에야 안 된다는 것을 알게 된다 — 그래서 여기서도 감춘다.
+ */
+export interface BrandOption extends ProductFormOption {
+  /** 자사 브랜드면 null. 반품지를 등록하러 갈 곳이 갈린다 */
+  readonly merchantId?: string | null;
+  /** 돌려받을 곳이 있는가. 안 주면 막지 않는다 — 막는 것은 서버의 일이고 여기는 안내다 */
+  readonly canSell?: boolean;
 }
 
 export interface ProductFormValues {
@@ -28,7 +44,7 @@ export interface ProductFormValues {
 interface Props {
   readonly mode: 'create' | 'edit';
   readonly productId?: string;
-  readonly brands: readonly ProductFormOption[];
+  readonly brands: readonly BrandOption[];
   readonly categories: readonly ProductFormOption[];
   readonly initial: ProductFormValues;
   /**
@@ -74,6 +90,19 @@ export function ProductForm({
     sale !== null && Number.isInteger(list) && Number.isInteger(sale) && sale > 0 && sale <= list
       ? discountRateOf(won(list), won(sale))
       : 0;
+
+  /*
+   * **고른 브랜드에 돌려받을 곳이 있는가.**
+   *
+   * 없으면 매대로 가는 상태(검수 대기·판매중·품절)를 내놓지 않는다 — 지금 값은 남긴다. 이미 팔고 있는
+   * 상품(반품지가 생기기 전에 올라간 것)의 설명을 고치러 온 사람에게서 그 상태를 빼앗으면, 저장하는
+   * 순간 조용히 다른 상태가 된다.
+   */
+  const brand = brands.find((b) => b.id === values.brandId);
+  const canSell = brand?.canSell ?? true;
+  const statuses = (canPublish ? PRODUCT_STATUS : MERCHANT_SELECTABLE_STATUS).filter(
+    (s) => canSell || !isSaleBound(s) || s === initial.status,
+  );
 
   function set<K extends keyof ProductFormValues>(key: K, value: ProductFormValues[K]) {
     setValues((v) => ({ ...v, [key]: value }));
@@ -300,17 +329,32 @@ export function ProductForm({
             id={statusId}
             value={values.status}
             onChange={(e) => set('status', e.target.value as ProductStatusInput)}
-            aria-describedby={canPublish ? undefined : `${statusId}-hint`}
+            aria-describedby={canPublish && canSell ? undefined : `${statusId}-hint`}
             className="h-12 w-full rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm text-[var(--fg)] sm:w-56"
           >
-            {(canPublish ? PRODUCT_STATUS : MERCHANT_SELECTABLE_STATUS).map((s) => (
+            {statuses.map((s) => (
               <option key={s} value={s}>{PRODUCT_STATUS_LABEL[s]}</option>
             ))}
           </select>
-          {!canPublish && (
+          {(!canPublish || !canSell) && (
             <p id={`${statusId}-hint`} className="text-[11px] text-[var(--fg-muted)]">
-              매대에 올리는 것은 운영진이 확인한 뒤에 됩니다. 준비가 되면 &lsquo;검수
-              대기&rsquo;로 저장해 주세요.
+              {!canSell ? (
+                <>
+                  이 브랜드의 반품지가 없어 매대에 올릴 수 없습니다. 팔린 물건이 돌아올 곳을 먼저{' '}
+                  <Link
+                    href={returnAddressPath(brand?.merchantId ?? null) as Route}
+                    className="text-[var(--fg)] underline underline-offset-2"
+                  >
+                    등록해 주세요
+                  </Link>
+                  .
+                </>
+              ) : (
+                <>
+                  매대에 올리는 것은 운영진이 확인한 뒤에 됩니다. 준비가 되면 &lsquo;검수
+                  대기&rsquo;로 저장해 주세요.
+                </>
+              )}
             </p>
           )}
         </div>

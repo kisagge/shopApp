@@ -39,7 +39,9 @@ export default async function NewProductPage() {
           ) : (
             <ProductForm
               mode="create"
-              brands={options.brands.map((b) => ({ id: b.id, label: b.name }))}
+              brands={options.brands.map((b) => ({
+                id: b.id, label: b.name, merchantId: b.merchantId, canSell: b.canSell,
+              }))}
               categories={options.categories}
               initial={{
                 slug: '', name: '', description: '',

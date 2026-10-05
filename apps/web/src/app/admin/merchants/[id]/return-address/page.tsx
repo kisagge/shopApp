@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * 한 가맹점의 반품지.
  *
  * 가맹점은 자기 것만 연다 — 남의 가맹점 id 를 치면 없는 화면으로 답한다(있는지조차 새지 않게). 반품지가 없으면 이 가맹점
- * 상품의 반품을 승인할 수 없다는 것을 먼저 말한다 — 등록하러 온 이유다.
+ * 상품을 매대에 올릴 수도, 이미 팔린 물건의 반품을 승인할 수도 없다는 것을 먼저 말한다 — 등록하러 온 이유다.
  */
 export default async function MerchantReturnAddressPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireAdmin('merchant:read');
@@ -60,7 +60,8 @@ export default async function MerchantReturnAddressPage({ params }: { params: Pr
             {edit && <LastEdited at={edit.at.toISOString()} by={edit.by} />}
             {!address && (
               <p className="mt-1 rounded-sm bg-[var(--accent-soft)] px-3.5 py-2.5 text-[12px] leading-relaxed text-accent">
-                아직 등록하지 않았습니다. 등록하기 전에는 이 가맹점 상품의 반품·교환을 승인할 수 없습니다.
+                아직 등록하지 않았습니다. 등록하기 전에는 이 가맹점 상품을 매대에 올릴 수 없고,
+                이미 팔린 물건의 반품·교환도 승인할 수 없습니다.
               </p>
             )}
           </div>

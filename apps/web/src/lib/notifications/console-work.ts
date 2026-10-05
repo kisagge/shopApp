@@ -5,6 +5,7 @@ import {
   type Permission, type ReturnAudience,
 } from '@shop/core';
 import { markNoticesDone, recordNotifications, type NoticeInput } from './record';
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 
 /**
  * 처리할 일을 운영 알림함에 알린다 — 반품·교환 신청, 상품 문의, 고객센터 문의, 입점 신청.
@@ -194,8 +195,8 @@ export async function notifyReturnAddressMissing(input: {
           userId,
           kind: 'RETURN_ADDRESS_MISSING',
           params: { orderNo: input.orderNo },
-          // 누르면 그 반품지를 등록하는 자리로 간다 — 자사 상품은 배송비 화면에 있다
-          linkPath: owner === null ? '/admin/shipping' : `/admin/merchants/${encodeURIComponent(owner)}/return-address`,
+          // 누르면 그 반품지를 등록하는 자리로 간다 — 상품 폼의 안내와 같은 주소를 쓴다
+          linkPath: returnAddressPath(owner),
         });
       }
     }

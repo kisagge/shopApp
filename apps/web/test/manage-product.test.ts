@@ -16,6 +16,8 @@ const db = vi.hoisted(() => ({
     upsert: vi.fn<(...a: any[]) => any>(),
     deleteMany: vi.fn<(...a: any[]) => any>(),
   },
+  // 돌려받을 곳이 있어야 팔 수 있다 — 매대로 가는 길목마다 묻는다
+  returnAddress: { findMany: vi.fn<(...a: any[]) => any>() },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -75,6 +77,8 @@ const existing = {
 beforeEach(() => {
   vi.clearAllMocks();
   db.brand.findUnique.mockResolvedValue({ merchantId: 'm-a', name: 'MOOR' });
+  // 기본값은 "등록돼 있다" — 반품지가 없는 경우는 그 검사에서 따로 비운다
+  db.returnAddress.findMany.mockResolvedValue([{ merchantId: 'm-a' }]);
   db.brand.findUniqueOrThrow.mockResolvedValue({ name: 'MOOR' });
   db.category.findUnique.mockResolvedValue({ id: 'c-1' });
   db.product.findUnique.mockResolvedValue(null);
@@ -312,7 +316,7 @@ describe('옵션 추가', () => {
 
 describe('폼 선택지', () => {
   beforeEach(() => {
-    db.brand.findMany.mockResolvedValue([{ id: 'b-a', name: 'MOOR' }]);
+    db.brand.findMany.mockResolvedValue([{ id: 'b-a', name: 'MOOR', merchantId: 'm-a' }]);
     db.category.findMany.mockResolvedValue([
       { id: 'c-1', name: '코트', parent: { name: '아우터' } },
       { id: 'c-2', name: '가방', parent: null },
@@ -458,6 +462,7 @@ describe('게시 검수 처리', () => {
   beforeEach(() => {
     db.product.findFirst.mockResolvedValue({
       id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: null,
+      brand: { merchantId: 'm-a' },
     });
     db.product.update.mockResolvedValue({
       id: 'p-1', name: '오트 코트', status: 'ACTIVE', publishRejection: null,
@@ -483,6 +488,7 @@ describe('게시 검수 처리', () => {
     // 덮어쓰면 "신상품" 판정이 되살아난다
     db.product.findFirst.mockResolvedValue({
       id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: new Date('2026-01-01'),
+      brand: { merchantId: 'm-a' },
     });
 
     await reviewProduct(admin, 'p-1', { approve: true });
@@ -564,5 +570,118 @@ describe('게시 검수 처리', () => {
     await updateProduct(merchantA, 'p-1', patch({ status: 'PENDING_REVIEW' }));
 
     expect(db.product.update.mock.calls[0]![0].data.publishRejection).toBeNull();
+  });
+});
+
+/**
+ * **돌려받을 곳이 있어야 판다.**
+ *
+ * 반품지가 없는 판매처의 상품도 매대에 올라갔다. 팔리고 나서 손님이 반품을 신청하면 그제서야 드러나는데
+ * (승인을 누르려다 막힌다), 그때는 물건이 이미 손님 집에 있고 신청은 대기열에 갇힌다 — 애초에 못 팔게 한다.
+ */
+describe('반품지 없이는 매대로 못 간다', () => {
+  const noAddress = () => db.returnAddress.findMany.mockResolvedValue([]);
+
+  it('반품지가 없으면 매대 상태로 등록할 수 없다', async () => {
+    noAddress();
+
+    await expect(createProduct(admin, input)).rejects.toMatchObject({
+      code: 'RETURN_ADDRESS_REQUIRED', status: 409,
+    });
+    expect(db.product.create).not.toHaveBeenCalled();
+  });
+
+  it('작성 중으로는 등록할 수 있다 — 아무도 살 수 없는 상태다', async () => {
+    noAddress();
+
+    await createProduct(admin, createProductSchema.parse({ ...input, status: 'DRAFT' }));
+
+    expect(db.product.create).toHaveBeenCalled();
+  });
+
+  /** 검수 요청에서 막는 것이 요점이다 — 막히는 사람과 고칠 수 있는 사람이 같아야 한다 */
+  it('검수 요청도 막는다 — 승인만 하면 곧바로 매대다', async () => {
+    noAddress();
+    db.product.findFirst.mockResolvedValue({ ...existing, status: 'DRAFT', publishedAt: null });
+
+    await expect(
+      updateProduct(merchantA, 'p-1', patch({ status: 'PENDING_REVIEW' })),
+    ).rejects.toMatchObject({ code: 'RETURN_ADDRESS_REQUIRED' });
+  });
+
+  it('이미 팔고 있는 상품은 고칠 수 있다 — 이 규칙이 막으려던 일이 아니다', async () => {
+    noAddress();
+
+    await updateProduct(merchantA, 'p-1', patch({ name: '오트 코트 2' }));
+
+    expect(db.product.update).toHaveBeenCalled();
+  });
+
+  it('내리는 것도 막지 않는다', async () => {
+    noAddress();
+
+    await updateProduct(merchantA, 'p-1', patch({ status: 'HIDDEN' }));
+
+    expect(db.product.update).toHaveBeenCalled();
+  });
+
+  /** 옮겨 간 가게로 물건이 돌아온다 — 떠나온 가게의 반품지는 상관이 없다 */
+  it('브랜드를 옮기면 옮겨 갈 판매처의 반품지를 본다', async () => {
+    db.product.findFirst.mockResolvedValue({ ...existing, status: 'HIDDEN' });
+    db.brand.findUnique.mockResolvedValue({ merchantId: 'm-b', name: 'STUDIO NOON' });
+    db.returnAddress.findMany.mockResolvedValue([{ merchantId: 'm-a' }]);
+
+    await expect(
+      updateProduct(admin, 'p-1', patch({ brandId: 'clh1abc2300000000000000009', status: 'ACTIVE' })),
+    ).rejects.toMatchObject({ code: 'RETURN_ADDRESS_REQUIRED' });
+  });
+
+  /**
+   * **이 규칙이 생기기 전에 줄을 선 상품**은 검수 요청의 문을 지나지 않았다. 그것까지 그냥 올리면
+   * 규칙이 새 상품에만 적용되는 셈이다.
+   */
+  it('검수 승인 직전에 한 번 더 묻는다', async () => {
+    noAddress();
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: null,
+      brand: { merchantId: 'm-a' },
+    });
+
+    await expect(reviewProduct(admin, 'p-1', { approve: true, reason: null })).rejects.toMatchObject({
+      code: 'RETURN_ADDRESS_REQUIRED',
+    });
+    expect(db.product.update).not.toHaveBeenCalled();
+  });
+
+  it('반려는 묻지 않는다 — 매대로 가는 길이 아니다', async () => {
+    noAddress();
+    db.product.findFirst.mockResolvedValue({
+      id: 'p-1', name: '오트 코트', status: 'PENDING_REVIEW', publishedAt: null,
+      brand: { merchantId: 'm-a' },
+    });
+    db.product.update.mockResolvedValue({ id: 'p-1', name: '오트 코트', status: 'DRAFT', publishRejection: '사진이 흐립니다' });
+
+    await reviewProduct(admin, 'p-1', { approve: false, reason: '사진이 흐립니다' });
+
+    expect(db.product.update).toHaveBeenCalled();
+  });
+
+  it('폼은 브랜드마다 팔 수 있는지를 함께 준다 — 고를 수 없는 것을 감추려면 알아야 한다', async () => {
+    db.brand.findMany.mockResolvedValue([
+      { id: 'b-a', name: 'MOOR', merchantId: 'm-a' },
+      { id: 'b-b', name: 'STUDIO NOON', merchantId: 'm-b' },
+      { id: 'b-own', name: 'PLAIN', merchantId: null },
+    ]);
+    db.category.findMany.mockResolvedValue([]);
+    // 자사(플랫폼) 반품지는 merchantId 가 null 인 줄이다
+    db.returnAddress.findMany.mockResolvedValue([{ merchantId: 'm-a' }, { merchantId: null }]);
+
+    const options = await getProductFormOptions(admin);
+
+    expect(options.brands).toEqual([
+      { id: 'b-a', name: 'MOOR', merchantId: 'm-a', canSell: true },
+      { id: 'b-b', name: 'STUDIO NOON', merchantId: 'm-b', canSell: false },
+      { id: 'b-own', name: 'PLAIN', merchantId: null, canSell: true },
+    ]);
   });
 });

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   needsPublishPermission, isVisibleStatus, isAwaitingReview, isOnDisplay,
+  isSaleBound, needsReturnAddressFor, SALE_BOUND_STATUS,
   PRODUCT_STATUS, PRODUCT_STATUS_LABEL, VISIBLE_STATUS, MERCHANT_SELECTABLE_STATUS,
 } from '../src/product-publish';
 import { permissionsOf } from '../src/authz';
@@ -101,6 +102,64 @@ describe('게시 권한이 필요한 때', () => {
      * 사진 교체 때마다 운영진을 기다려야 한다 — 검수가 아니라 발목이다.
      */
     expect(needsPublishPermission({ to: 'ACTIVE', ...PUBLISHED })).toBe(false);
+  });
+});
+
+/**
+ * **돌려받을 곳이 없으면 팔 수 없다.**
+ *
+ * 반품지가 없는 판매처의 상품도 매대에 올라갔다. 팔리고 나서 손님이 반품을 신청하면 그제서야 드러나는데
+ * (승인을 누르려다 막힌다), 그때는 물건이 이미 손님 집에 있고 신청은 대기열에 갇힌다.
+ */
+describe('팔 쪽으로 가는 상태', () => {
+  it('검수 대기도 팔 쪽이다 — 승인만 하면 곧바로 매대다', () => {
+    /*
+     * 여기가 이 묶음의 요점이다. 매대에 서는 순간에만 막으면 막히는 사람(운영진)과 고칠 수 있는
+     * 사람(그 가맹점)이 갈린다 — 줄을 설 때 막으면 둘이 같은 사람이다.
+     */
+    expect(isSaleBound('PENDING_REVIEW')).toBe(true);
+    expect([...SALE_BOUND_STATUS].sort()).toEqual(['ACTIVE', 'PENDING_REVIEW', 'SOLD_OUT']);
+  });
+
+  it('작성 중과 숨김은 아니다 — 아무도 살 수 없고 아무것도 돌아오지 않는다', () => {
+    expect(isSaleBound('DRAFT')).toBe(false);
+    expect(isSaleBound('HIDDEN')).toBe(false);
+  });
+
+  /** 매대에 보이는 상태는 전부 팔 쪽이어야 한다 — 하나라도 빠지면 그 길로 반품지 없이 올라간다 */
+  it('매대에 보이는 상태는 모두 팔 쪽이다', () => {
+    for (const status of VISIBLE_STATUS) {
+      expect(isSaleBound(status), status).toBe(true);
+    }
+  });
+});
+
+describe('반품지가 필요한 변경', () => {
+  it('올라가는 길목에서 묻는다', () => {
+    expect(needsReturnAddressFor({ from: 'DRAFT', to: 'PENDING_REVIEW' })).toBe(true);
+    expect(needsReturnAddressFor({ from: 'HIDDEN', to: 'ACTIVE' })).toBe(true);
+  });
+
+  /**
+   * **이미 팔고 있는 상품의 설명 한 줄까지 막을 일은 아니다.**
+   *
+   * "지금 반품지가 있는가" 로 두면 이 규칙이 생기기 전에 올라간 상품을 가진 가맹점은 아무것도 고치지
+   * 못하게 된다 — 그건 이 규칙이 막으려던 일이 아니다.
+   */
+  it('이미 팔 쪽에 있는 상품은 묻지 않는다', () => {
+    expect(needsReturnAddressFor({ from: 'ACTIVE', to: 'ACTIVE' })).toBe(false);
+    expect(needsReturnAddressFor({ from: 'ACTIVE', to: 'SOLD_OUT' })).toBe(false);
+    expect(needsReturnAddressFor({ from: 'PENDING_REVIEW', to: 'ACTIVE' })).toBe(false);
+  });
+
+  it('내리는 것은 막지 않는다 — 돌려받을 곳이 없어도 내릴 수는 있어야 한다', () => {
+    expect(needsReturnAddressFor({ from: 'ACTIVE', to: 'HIDDEN' })).toBe(false);
+    expect(needsReturnAddressFor({ from: 'PENDING_REVIEW', to: 'DRAFT' })).toBe(false);
+  });
+
+  it('상태를 안 보내는 수정은 상태 변경이 아니다', () => {
+    // 폼이 이름만 고쳐 보내는 경우다. 묻지 않는다
+    expect(needsReturnAddressFor({ from: 'DRAFT', to: undefined })).toBe(false);
   });
 });
 

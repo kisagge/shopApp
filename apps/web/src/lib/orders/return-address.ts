@@ -31,6 +31,35 @@ export async function getReturnAddress(merchantId: string | null): Promise<Retur
   return row ? toAddress(row) : null;
 }
 
+/**
+ * **돌려받을 곳이 있는 판매처만** 골라 준다 — 한 번에 묻는다(판매처마다 읽지 않게).
+ *
+ * 상품을 매대에 올릴 수 있는지 묻는 자리가 쓴다. `null` 은 자사 상품(플랫폼 반품지)이다.
+ */
+export async function ownersWithReturnAddress(
+  owners: readonly (string | null)[],
+): Promise<Set<string | null>> {
+  const merchantIds = [...new Set(owners.filter((o): o is string => o !== null))];
+  const needsPlatform = owners.includes(null);
+  if (merchantIds.length === 0 && !needsPlatform) return new Set();
+
+  const rows = await prisma.returnAddress.findMany({
+    where: {
+      OR: [
+        ...(merchantIds.length ? [{ merchantId: { in: merchantIds } }] : []),
+        ...(needsPlatform ? [{ id: PLATFORM_RETURN_ADDRESS_ID }] : []),
+      ],
+    },
+    select: { merchantId: true },
+  });
+  return new Set(rows.map((r) => r.merchantId));
+}
+
+/** 이 판매처에 돌려받을 곳이 있는가. `merchantId` 가 null 이면 자사 상품(플랫폼 반품지) */
+export async function hasReturnAddress(merchantId: string | null): Promise<boolean> {
+  return (await ownersWithReturnAddress([merchantId])).has(merchantId);
+}
+
 /** 반품지 화면 — 가맹점 이름과 그 반품지. 없는 가맹점이면 null */
 export async function getMerchantReturnAddress(
   merchantId: string,

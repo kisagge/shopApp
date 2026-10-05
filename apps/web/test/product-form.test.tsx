@@ -209,3 +209,95 @@ describe('반려 사유', () => {
     expect(screen.queryByRole('heading', { name: '게시가 반려되었습니다' })).toBeNull();
   });
 });
+
+/**
+ * **돌려받을 곳이 없는 브랜드.**
+ *
+ * 반품지가 없는 판매처의 상품은 매대에 올릴 수 없다(서버 assertReturnAddress). 고를 수 있게 두면 폼을
+ * 다 채워 저장한 뒤에야 안 된다는 것을 알게 되고, 그때 화면은 "반품지를 등록해 주세요" 라고만 말한다 —
+ * 어디서 등록하는지는 말해 주지 않는다.
+ */
+describe('반품지가 없는 브랜드', () => {
+  const sellable = [
+    { id: 'b-a', label: 'MOOR', merchantId: 'm-a', canSell: true },
+    { id: 'b-b', label: 'STUDIO NOON', merchantId: 'm-b', canSell: false },
+    { id: 'b-own', label: 'PLAIN', merchantId: null, canSell: false },
+  ];
+  const statusValues = () =>
+    Array.from(screen.getByLabelText('판매 상태').querySelectorAll('option')).map((o) => o.value);
+
+  it('매대로 가는 상태를 내놓지 않는다 — 검수 대기도 아니다', () => {
+    setup('create', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-b', status: 'DRAFT' as const },
+    });
+
+    expect(statusValues()).toEqual(['DRAFT', 'HIDDEN']);
+  });
+
+  it('어디서 등록하는지까지 말해 준다', () => {
+    setup('create', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-b', status: 'DRAFT' as const },
+    });
+
+    expect(screen.getByText(/반품지가 없어 매대에 올릴 수 없습니다/)).toBeDefined();
+    expect(screen.getByRole('link', { name: '등록해 주세요' }).getAttribute('href'))
+      .toBe('/admin/merchants/m-b/return-address');
+  });
+
+  /** 자사 상품을 받는 플랫폼 반품지는 가게 전체의 약속이라 배송 정책과 같은 자리에 있다 */
+  it('자사 브랜드면 배송비 화면으로 보낸다', () => {
+    setup('create', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-own', status: 'DRAFT' as const },
+    });
+
+    expect(screen.getByRole('link', { name: '등록해 주세요' }).getAttribute('href'))
+      .toBe('/admin/shipping');
+  });
+
+  it('안내는 상태 선택과 이어져 있다 — 낭독기가 까닭을 함께 읽는다', () => {
+    setup('create', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-b', status: 'DRAFT' as const },
+    });
+
+    const select = screen.getByLabelText('판매 상태');
+    const hintId = select.getAttribute('aria-describedby');
+    expect(hintId).toBeTruthy();
+    expect(document.getElementById(hintId!)?.textContent).toContain('반품지');
+  });
+
+  /**
+   * **지금 값은 남긴다.** 이 규칙이 생기기 전에 올라간 상품을 고치러 온 사람에게서 그 상태를 빼앗으면,
+   * 설명 한 줄을 고치고 저장하는 순간 상품이 조용히 매대에서 내려간다.
+   */
+  it('이미 팔고 있는 상품의 상태는 남겨 둔다', () => {
+    setup('edit', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-b', status: 'ACTIVE' as const },
+    });
+
+    expect(statusValues()).toContain('ACTIVE');
+    expect(statusValues()).not.toContain('PENDING_REVIEW');
+  });
+
+  it('반품지가 있는 브랜드로 바꾸면 다시 고를 수 있다', async () => {
+    setup('create', {
+      brands: sellable,
+      initial: { ...initial, brandId: 'b-b', status: 'DRAFT' as const },
+    });
+
+    await userEvent.selectOptions(screen.getByLabelText(/브랜드/), 'b-a');
+
+    await waitFor(() => expect(statusValues()).toContain('ACTIVE'));
+    expect(screen.queryByText(/반품지가 없어/)).toBeNull();
+  });
+
+  it('팔 수 있는지 안 알려 주면 막지 않는다 — 막는 것은 서버의 일이다', () => {
+    setup('create', { initial: { ...initial, status: 'DRAFT' as const } });
+
+    expect(statusValues()).toContain('ACTIVE');
+  });
+});

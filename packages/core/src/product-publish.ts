@@ -67,6 +67,37 @@ export function isOnDisplay(input: {
 }
 
 /**
+ * **팔 쪽으로 간 상태** — 매대에 보이거나, 매대로 가려고 줄을 선 것.
+ *
+ * 검수 대기를 여기 넣은 이유가 있다. 검수는 **운영진이 승인만 하면 곧바로 매대에 서는 자리**라,
+ * 그때 막으면 막히는 사람(운영진)과 고칠 수 있는 사람(그 가맹점)이 갈린다 — 운영진은 기다리는 수밖에
+ * 없고, 가맹점은 왜 승인이 안 나는지 모른다. 줄을 설 때 막으면 둘이 같은 사람이다.
+ */
+export const SALE_BOUND_STATUS: readonly ProductStatus[] = ['PENDING_REVIEW', ...VISIBLE_STATUS];
+
+export function isSaleBound(status: ProductStatus): boolean {
+  return SALE_BOUND_STATUS.includes(status);
+}
+
+/**
+ * **돌려받을 곳이 없으면 팔 수 없다.**
+ *
+ * 반품지가 없는 판매처의 상품도 매대에 올라갔다. 팔리고 나서 손님이 반품을 신청하면 그제서야 드러나는데
+ * (승인을 누르려다 막힌다), 그때는 이미 늦다 — 물건은 손님 집에 있고 신청은 대기열에 갇힌다. 애초에
+ * 돌려받을 곳이 있을 때만 팔 수 있게 한다.
+ *
+ * **올라가는 길목에서만 묻는다.** "지금 반품지가 있는가" 로 두면 반품지가 없는 옛 가맹점은 이미 팔고
+ * 있는 상품의 설명 한 줄도 못 고치게 된다 — 그건 이 규칙이 막으려던 일이 아니다.
+ */
+export function needsReturnAddressFor(input: {
+  readonly from: ProductStatus;
+  readonly to: ProductStatus | undefined;
+}): boolean {
+  if (input.to === undefined) return false;
+  return isSaleBound(input.to) && !isSaleBound(input.from);
+}
+
+/**
  * 이 상태 변경에 게시 권한이 필요한가.
  *
  * **최초 게시만 검수를 받는다.** 한 번 통과한 상품을 가맹점이 잠시 내렸다가
@@ -108,4 +139,6 @@ export const PUBLISH_ERROR = {
   PUBLISH_NOT_ALLOWED: '상품을 매대에 올리는 것은 운영진이 확인한 뒤에 됩니다. 검수를 요청해 주세요.',
   NOT_AWAITING_REVIEW: '검수를 기다리는 상품이 아닙니다.',
   REJECT_REASON_REQUIRED: '반려 사유를 적어 주세요.',
+  RETURN_ADDRESS_REQUIRED:
+    '반품지를 먼저 등록해 주세요. 돌려받을 곳이 없으면 매대에 올릴 수 없습니다 — 팔린 뒤에 반품 신청이 들어와도 승인할 수 없습니다.',
 } as const;

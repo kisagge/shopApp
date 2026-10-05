@@ -2,12 +2,13 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   canManageProduct, merchantScope, becameAvailable, leftLowStock, hasPermission,
-  needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
+  needsPublishPermission, isVisibleStatus, needsReturnAddressFor, PUBLISH_PERMISSION,
   type Actor, type ProductStatus,
   searchTextFor, sellingPriceOf, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
 import { clearLowStockDone } from '~/lib/notifications/low-stock';
+import { hasReturnAddress, ownersWithReturnAddress } from '~/lib/orders/return-address';
 import { notifyProductReviewed } from '~/lib/notifications/product-review';
 import { recordAudit } from '~/lib/audit';
 import {
@@ -67,7 +68,10 @@ export class ProductError extends Error {
  * **권한만 보면 안 된다.** 가맹점은 product:write 를 갖고 있지만 남의 브랜드는
  * 건드릴 수 없다. core 의 canManageProduct 가 두 층을 함께 본다.
  */
-async function assertBrandAllowed(actor: Actor, brandId: string): Promise<{ name: string }> {
+async function assertBrandAllowed(
+  actor: Actor,
+  brandId: string,
+): Promise<{ name: string; merchantId: string | null }> {
   const brand = await prisma.brand.findUnique({
     where: { id: brandId },
     // 이름도 함께 가져온다 — searchText 를 만들 때 필요하다
@@ -77,7 +81,8 @@ async function assertBrandAllowed(actor: Actor, brandId: string): Promise<{ name
   if (!canManageProduct(actor, { merchantId: brand.merchantId })) {
     throw new ProductError('BRAND_NOT_ALLOWED', 403);
   }
-  return { name: brand.name };
+  // 판매처도 함께 돌려준다 — 돌려받을 곳(반품지)이 있는지 묻는 자리가 쓴다
+  return { name: brand.name, merchantId: brand.merchantId };
 }
 
 /**
@@ -101,6 +106,24 @@ function assertCanPublish(
   }
 }
 
+/**
+ * **돌려받을 곳이 있어야 팔 수 있다.**
+ *
+ * 반품지가 없는 판매처의 상품도 매대에 올라갔다. 팔리고 나서 손님이 반품을 신청하면 그제서야 드러나는데
+ * (승인을 누르려다 막힌다), 그때는 물건이 이미 손님 집에 있고 신청은 대기열에 갇힌다.
+ *
+ * **올라가는 길목에서만 묻는다**(core needsReturnAddressFor) — 이미 팔고 있는 상품의 설명을 고치는 일까지
+ * 막으면 그건 이 규칙이 막으려던 일이 아니다.
+ */
+async function assertReturnAddress(
+  merchantId: string | null,
+  move: { from: ProductStatus; to: ProductStatus | undefined },
+): Promise<void> {
+  if (!needsReturnAddressFor(move)) return;
+  if (await hasReturnAddress(merchantId)) return;
+  throw new ProductError('RETURN_ADDRESS_REQUIRED', 409);
+}
+
 export async function createProduct(actor: Actor, input: CreateProductInput) {
   const brand = await assertBrandAllowed(actor, input.brandId);
 
@@ -113,6 +136,8 @@ export async function createProduct(actor: Actor, input: CreateProductInput) {
 
   // 새 상품은 게시된 적이 없다. 곧바로 매대 상태로 만들려면 권한이 필요하다.
   assertCanPublish(actor, input.status, null);
+  // 그리고 돌려받을 곳이 있어야 한다 — 새 상품은 아무 데도 올라가 있지 않은 자리에서 출발한다
+  await assertReturnAddress(brand.merchantId, { from: 'DRAFT', to: input.status });
 
   return prisma.product.create({
     data: {
@@ -175,8 +200,12 @@ export async function updateProduct(
   // 브랜드를 옮기는 경우 **옮겨 갈 브랜드도** 확인해야 한다.
   // 그러지 않으면 자기 브랜드 상품을 남의 브랜드로 밀어 넣을 수 있다.
   let brandName: string | null = null;
+  /** 브랜드를 옮기는 중이면 옮겨 갈 판매처. 그러지 않으면 지금 판매처다 */
+  let owner: string | null = before.brand.merchantId;
   if (input.brandId && input.brandId !== before.brandId) {
-    brandName = (await assertBrandAllowed(actor, input.brandId)).name;
+    const moving = await assertBrandAllowed(actor, input.brandId);
+    brandName = moving.name;
+    owner = moving.merchantId;
   }
 
   // 이름이나 브랜드가 바뀌면 검색 문자열을 다시 만든다.
@@ -198,6 +227,8 @@ export async function updateProduct(
   }
 
   assertCanPublish(actor, input.status, before.publishedAt);
+  // 옮겨 가는 중이면 **옮겨 갈** 판매처의 반품지를 본다 — 거기로 돌아올 물건이다
+  await assertReturnAddress(owner, { from: before.status, to: input.status });
 
   // 같은 이유로 여기서도 "DRAFT 가 아니면" 이 아니라 "매대에 보이면" 이다
   const goingPublic = input.status !== undefined && isVisibleStatus(input.status);
@@ -381,7 +412,8 @@ export async function getProductFormOptions(actor: Actor) {
     prisma.brand.findMany({
       where: scope ? { merchantId: scope } : {},
       orderBy: { name: 'asc' },
-      select: { id: true, name: true },
+      // 판매처까지 — 그 판매처에 반품지가 있어야 이 브랜드 상품을 매대에 올릴 수 있다
+      select: { id: true, name: true, merchantId: true },
     }),
     prisma.category.findMany({
       // 상품은 말단 카테고리에만 붙인다. 상위에 붙이면 목록 필터가 어긋난다.
@@ -396,8 +428,19 @@ export async function getProductFormOptions(actor: Actor) {
     }),
   ]);
 
+  /*
+   * **고를 수 없는 것은 감춘다.** 반품지가 없는 브랜드를 고르면 폼이 매대 상태를 내놓지 않는다 — 서버도
+   * 같은 검사를 하지만(assertReturnAddress), 눌러 본 뒤에야 안 된다는 것을 아는 것은 안내가 아니다.
+   */
+  const withAddress = await ownersWithReturnAddress(brands.map((b) => b.merchantId));
+
   return {
-    brands,
+    brands: brands.map((b) => ({
+      id: b.id,
+      name: b.name,
+      merchantId: b.merchantId,
+      canSell: withAddress.has(b.merchantId),
+    })),
     categories: categories.map((c) => ({
       id: c.id,
       label: c.parent ? `${c.parent.name} > ${c.name}` : c.name,
@@ -451,7 +494,8 @@ export async function reviewProduct(
 
   const before = await prisma.product.findFirst({
     where: { id: productId, deletedAt: null },
-    select: { id: true, name: true, status: true, publishedAt: true },
+    // 판매처까지 읽는다 — 돌려받을 곳이 있는지 물어야 한다
+    select: { id: true, name: true, status: true, publishedAt: true, brand: { select: { merchantId: true } } },
   });
   if (!before) throw new ProductError('PRODUCT_NOT_FOUND', 404);
 
@@ -461,6 +505,18 @@ export async function reviewProduct(
   const reason = input.reason?.trim() ?? '';
   if (!input.approve && reason.length === 0) {
     throw new ProductError('REJECT_REASON_REQUIRED', 400);
+  }
+
+  /*
+   * **승인은 곧 매대다 — 여기서 한 번 더 묻는다.**
+   *
+   * 검수를 요청할 때 이미 막는데(가맹점이 스스로 고칠 수 있는 자리다), 이 규칙이 생기기 전에 줄을 선
+   * 상품들은 그 문을 지나지 않았다. 그것까지 그냥 올리면 규칙이 새 상품에만 적용되는 셈이 된다.
+   *
+   * 반려는 묻지 않는다 — 매대로 가는 길이 아니다.
+   */
+  if (input.approve) {
+    await assertReturnAddress(before.brand.merchantId, { from: 'DRAFT', to: 'ACTIVE' });
   }
 
   const after = await prisma.product.update({
