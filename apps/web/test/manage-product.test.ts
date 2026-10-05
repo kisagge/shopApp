@@ -27,6 +27,10 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const notifyProductReviewed = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/notifications/product-review', () => ({ notifyProductReviewed }));
 
+/* 재고 부족 알림을 닫는 일도 같다 — 여기서 볼 것은 **언제 부르는가** 다(닫을 수 있는지는 그쪽이 본다) */
+const clearLowStockDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockDone }));
+
 const {
   createProduct, updateProduct, updateStock, createVariant, getProductFormOptions,
   reviewProduct,
@@ -230,6 +234,39 @@ describe('재고 조정', () => {
     await expect(
       updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 12, expectedStock: 5 }] }),
     ).rejects.toMatchObject({ code: 'STOCK_CHANGED', status: 409 });
+  });
+
+  /**
+   * **채웠으니 "재고가 부족하다" 는 끝난 일이다.**
+   *
+   * 기준 위로 올라온 옵션이 있을 때만 묻는다 — 10을 8로 고치는 평범한 수정에는 애초에 닫을 알림이 없고,
+   * 그때마다 묻는 것은 재고 화면을 쓸 때마다 조회가 두 번 더 도는 일이다.
+   */
+  it('기준 위로 채우면 그 가게의 재고 알림을 닫으러 간다', async () => {
+    db.productVariant.findMany.mockResolvedValue([
+      { id: 'v-1', sku: 'A-1', stock: 3 },
+      { id: 'v-2', sku: 'A-2', stock: 5 },
+    ]);
+
+    await updateStock(merchantA, 'p-1', { variants });
+
+    expect(clearLowStockDone).toHaveBeenCalledWith('m-a');
+  });
+
+  it('기준 아래에서 조금 채운 것은 묻지 않는다 — 여전히 할 일이다', async () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 1 }]);
+
+    await updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 4 }] });
+
+    expect(clearLowStockDone).not.toHaveBeenCalled();
+  });
+
+  it('줄이는 수정에는 닫을 알림이 없다', async () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 30 }]);
+
+    await updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 20 }] });
+
+    expect(clearLowStockDone).not.toHaveBeenCalled();
   });
 
   it('남의 상품 옵션 id 를 끼워 넣으면 통째로 거절한다', async () => {

@@ -14,6 +14,10 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/* 답한 뒤 "문의가 들어왔다" 를 닫는 일. 여기서 볼 것은 **무엇에 대해 부르는가** 다 */
+const clearInquiryReceived = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/console-work', () => ({ clearInquiryReceived }));
+
 const { createInquiry, answerInquiry, deleteInquiry } = await import('~/lib/inquiry/write');
 const { getProductInquiries } = await import('~/lib/queries/inquiries');
 
@@ -105,7 +109,10 @@ describe('답변', () => {
 
 describe('삭제', () => {
   beforeEach(() => {
-    db.inquiry.findFirst.mockResolvedValue({ id: 'q-1', authorId: 'u-c' });
+    db.inquiry.findFirst.mockResolvedValue({
+      id: 'q-1', authorId: 'u-c', answeredAt: null,
+      product: { brand: { merchantId: 'm-a' } },
+    });
   });
 
   it('본인이 지우면 행을 없앤다', async () => {
@@ -228,5 +235,56 @@ describe('고객센터로 들어온 문의 — 상품이 없다', () => {
       expect(answered.productName).toBeNull();
       expect(answered.productSlug).toBeNull();
     });
+  });
+});
+
+/**
+ * 답했으니(또는 없어졌으니) **"문의가 들어왔다" 는 끝난 일이다.**
+ *
+ * 운영 알림함은 쌓이는 만큼 비워지지 않았다 — 답변을 달아도 그 알림은 안 읽음으로 남았다. 어느 대기줄의
+ * 일인지를 함께 넘긴다: 상품 문의는 그 판매처의 줄, 고객센터 문의는 운영진의 줄이다.
+ */
+describe('답하면 문의 알림을 닫으러 간다', () => {
+  it('상품 문의는 그 상품의 판매처로 넘긴다', async () => {
+    await answerInquiry(merchantA, 'q-1', { answer: '있습니다' });
+
+    expect(clearInquiryReceived).toHaveBeenCalledWith({ product: { merchantId: 'm-a' } });
+  });
+
+  /** 상품이 없으면 소속도 없다 — 고객센터 줄은 운영진의 것이다 */
+  it('고객센터 문의는 상품 없음으로 넘긴다', async () => {
+    db.inquiry.findFirst.mockResolvedValue(inquiryRow({ product: null }));
+
+    await answerInquiry(admin, 'q-1', { answer: '오늘 출고됩니다' });
+
+    expect(clearInquiryReceived).toHaveBeenCalledWith({ product: null });
+  });
+
+  it('답하지 못하고 막히면 닫지 않는다', async () => {
+    await expect(answerInquiry(merchantB, 'q-1', { answer: '있습니다' })).rejects.toThrow();
+
+    expect(clearInquiryReceived).not.toHaveBeenCalled();
+  });
+
+  /** 답을 기다리던 문의를 무르면 그 줄에서 빠진다 — 알림만 남으면 할 일이 아닌 것이 할 일로 보인다 */
+  it('지워진 문의도 할 일이 아니다', async () => {
+    db.inquiry.findFirst.mockResolvedValue({
+      id: 'q-1', authorId: 'u-c', answeredAt: null, product: { brand: { merchantId: 'm-a' } },
+    });
+
+    await deleteInquiry(customer, 'q-1');
+
+    expect(clearInquiryReceived).toHaveBeenCalledWith({ product: { merchantId: 'm-a' } });
+  });
+
+  it('답이 달려 있던 문의를 지우는 것은 셀 일이 아니다 — 그때 이미 닫혔다', async () => {
+    db.inquiry.findFirst.mockResolvedValue({
+      id: 'q-1', authorId: 'u-c', answeredAt: new Date('2026-10-01'),
+      product: { brand: { merchantId: 'm-a' } },
+    });
+
+    await deleteInquiry(customer, 'q-1');
+
+    expect(clearInquiryReceived).not.toHaveBeenCalled();
   });
 });

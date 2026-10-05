@@ -7,6 +7,7 @@ import {
 } from '@shop/core';
 import { activateApprovedMerchant } from '~/lib/merchant/apply';
 import { notifyMerchantDecision } from '~/lib/notifications/merchant-decision';
+import { clearMerchantApplied } from '~/lib/notifications/console-work';
 import {
   ADMIN_ERROR_MESSAGE,
   type AdminErrorCode,
@@ -131,6 +132,12 @@ export async function updateMerchantStatus(
     status: after.status,
     reason: input.reason,
   });
+
+  /*
+   * **심사했으니 "입점 신청이 들어왔다" 는 끝난 일이다.** 대기줄이 비었을 때만 닫는다 — 신청이 둘인데
+   * 하나만 심사하고 닫으면 남은 신청이 알림함에서 사라진다(clearMerchantApplied 가 본다).
+   */
+  await clearMerchantApplied();
 
   return { before, after };
 }

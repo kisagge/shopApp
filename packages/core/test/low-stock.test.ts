@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NOTIFICATION_KIND, CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND,
-  LOW_STOCK_THRESHOLD, crossedLowStock, stockLevel, STOCK_LEVEL_RANGE,
+  LOW_STOCK_THRESHOLD, crossedLowStock, leftLowStock, stockLevel, STOCK_LEVEL_RANGE,
 } from '../src/notification';
 
 /**
@@ -42,6 +42,39 @@ describe('기준을 넘는 순간', () => {
      */
     expect(crossedLowStock(LOW_STOCK_THRESHOLD + 1, LOW_STOCK_THRESHOLD)).toBe(true);
     expect(crossedLowStock(LOW_STOCK_THRESHOLD, LOW_STOCK_THRESHOLD - 1)).toBe(false);
+  });
+});
+
+/**
+ * 다시 채운 순간.
+ *
+ * **알림함은 쌓이는 만큼 비워지지 않았다.** 재고를 채운 뒤에도 "재고가 부족합니다" 가 안 읽음으로 남으면
+ * 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "그동안 몇 번 일이 있었나" 가 된다.
+ */
+describe('기준 위로 돌아오는 순간', () => {
+  it('기준을 넘어 올라오면 끝난 일이다', () => {
+    expect(leftLowStock(5, 6), '5→6 은 돌아온 것이다').toBe(true);
+    expect(leftLowStock(0, 30), '품절에서 채운 것도 그렇다').toBe(true);
+  });
+
+  it('기준 아래에서 움직이면 아직 할 일이다', () => {
+    // 2→4 는 채운 것이지만 여전히 임박이다. 닫으면 뱃지가 거짓이 된다
+    expect(leftLowStock(2, 4)).toBe(false);
+  });
+
+  it('기준 위에서 움직이면 닫을 알림이 없다', () => {
+    expect(leftLowStock(20, 8), '애초에 알림이 간 적이 없다').toBe(false);
+  });
+
+  it('줄어드는 것은 돌아오는 것이 아니다', () => {
+    expect(leftLowStock(8, 3)).toBe(false);
+  });
+
+  /** 내려갈 때 알리고 올라올 때 닫는다 — 두 경계가 어긋나면 알림과 뱃지가 서로 다른 말을 한다 */
+  it('알리는 경계와 닫는 경계가 같은 값에서 갈린다', () => {
+    expect(crossedLowStock(LOW_STOCK_THRESHOLD + 1, LOW_STOCK_THRESHOLD)).toBe(true);
+    expect(leftLowStock(LOW_STOCK_THRESHOLD, LOW_STOCK_THRESHOLD + 1)).toBe(true);
+    expect(leftLowStock(LOW_STOCK_THRESHOLD, LOW_STOCK_THRESHOLD)).toBe(false);
   });
 });
 

@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { assertPermission, type Actor } from '@shop/core';
-import { notifyLateDepositRefunded } from '~/lib/notifications/late-deposit';
+import { clearLateDepositFound, notifyLateDepositRefunded } from '~/lib/notifications/late-deposit';
 
 /**
  * 취소한 주문에 들어온 입금 — 사람이 돌려준 뒤 "처리함" 으로 닫는다.
@@ -54,5 +54,7 @@ export async function resolveLateDeposit(
   const amount = payment.lateDepositAmount ?? 0;
   // 돈을 보낸 사람이 끝났다는 것을 듣는다 — 계좌를 알려 준 뒤 기다리고 있다
   await notifyLateDepositRefunded({ orderNo, userId: order.userId, amount });
+  // 돌려줬으니 "환불 필요" 는 끝난 일이다 — 한 주문의 입금 하나에 대한 알림이라 주문번호로 닫는다
+  await clearLateDepositFound(orderNo);
   return { orderNo, amount, resolvedAt: now };
 }

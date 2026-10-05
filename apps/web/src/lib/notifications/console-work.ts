@@ -222,3 +222,100 @@ export async function clearReturnAddressMissing(merchantId: string | null): Prom
     console.error('[notification] 반품지 미등록 알림을 닫지 못했다', { merchantId }, error);
   }
 }
+
+/**
+ * **처리했으니 "처리할 일" 은 끝난 일이다** — 반품 신청, 문의, 입점 신청.
+ *
+ * 운영 알림함은 쌓이는 만큼 비워지지 않았다. 반품을 승인해도 "반품 신청이 들어왔습니다" 는, 답변을 달아도
+ * "문의가 들어왔습니다" 는 안 읽음으로 남았다 — 그러면 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "그동안 몇
+ * 번 일이 있었나" 가 되고, 그 숫자를 아무도 보지 않게 된다.
+ *
+ * **대기줄이 비었을 때만 닫는다.** 이 알림들은 하나하나가 아니라 **줄 전체**를 가리킨다(누르면 처리 목록으로
+ * 간다). 한 건을 처리하고 그 사람의 그 종류를 전부 읽음으로 만들면, 아직 남은 일이 알림함에서 사라진다 —
+ * 지금 비울 수 있는 것은 "더 할 일이 없을 때" 뿐이다.
+ *
+ * **알릴 때와 같은 사람을 찾는다**(같은 recipients·같은 audience). 두 쪽이 갈리면 "알림은 왔는데 닫히지
+ * 않는" 칸이 생기고, 그 칸은 영영 안 읽음으로 남는다.
+ *
+ * **실패해도 던지지 않는다**(record 와 같은 규칙) — 처리는 이미 끝났다.
+ */
+
+/** 반품·교환 신청을 처리했다(승인·반려·철회·손님이 무름). 그 주문에 기다리는 신청이 더 없을 때 닫는다 */
+export async function clearReturnRequested(orderNo: string): Promise<void> {
+  try {
+    /*
+     * **한 주문에 신청이 여럿일 수 있다** — 줄을 나눠 따로 신청하면 그렇다. 하나를 처리했다고 닫으면
+     * 아직 접수 상태인 신청이 알림함에서 사라진다.
+     */
+    const waiting = await prisma.returnRequest.count({
+      where: { order: { orderNo }, status: 'REQUESTED' },
+    });
+    if (waiting > 0) return;
+
+    await markNoticesDone({ kinds: ['RETURN_REQUESTED'], about: { key: 'orderNo', value: orderNo } });
+  } catch (error) {
+    console.error('[notification] 반품 신청 알림을 닫지 못했다', { orderNo }, error);
+  }
+}
+
+/**
+ * 문의에 답했다(또는 지워져 없어졌다).
+ *
+ * **상품 문의와 고객센터 문의를 가른다** — 받은 사람도 종류도 다르다. 상품 문의 알림에는 상품 이름이
+ * 실려 있지만 그것으로 좁히지 않는다: 같은 이름의 상품이 둘 있을 수 있고, 무엇보다 **그 알림이 가리키는
+ * 것은 답변 대기줄**이다. 그래서 그 판매처의 대기줄이 비었을 때 그 사람들의 알림을 닫는다.
+ */
+export async function clearInquiryReceived(input: {
+  /** 상품 문의면 그 상품의 판매처(자사 상품이면 merchantId 가 null), 고객센터 문의면 null */
+  readonly product: { readonly merchantId: string | null } | null;
+}): Promise<void> {
+  try {
+    if (input.product === null) {
+      // 고객센터 문의는 상품이 없다 — 운영진의 대기줄이고, 알림에 실린 값도 없다(userIds 로만 좁힌다)
+      const waiting = await prisma.inquiry.count({
+        where: { productId: null, deletedAt: null, answeredAt: null },
+      });
+      if (waiting > 0) return;
+
+      await markNoticesDone({
+        kinds: ['SUPPORT_INQUIRY_RECEIVED'],
+        userIds: await recipients({ merchantIds: [], operators: true }, 'inquiry:answer'),
+      });
+      return;
+    }
+
+    const merchantId = input.product.merchantId;
+    const waiting = await prisma.inquiry.count({
+      // 자사 상품이면 merchantId 가 null 인 브랜드의 상품들이다 — 그 대기줄은 운영진의 것이다
+      where: { deletedAt: null, answeredAt: null, product: { brand: { merchantId } } },
+    });
+    if (waiting > 0) return;
+
+    await markNoticesDone({
+      kinds: ['INQUIRY_RECEIVED'],
+      userIds: await recipients(inquiryAudience(merchantId), 'inquiry:answer'),
+    });
+  } catch (error) {
+    console.error('[notification] 문의 알림을 닫지 못했다', error);
+  }
+}
+
+/**
+ * 입점 신청을 심사했다(승인·반려).
+ *
+ * 알림에는 가게 이름이 실려 있지만 그것으로 좁히지 않는다 — 같은 이름으로 두 번 신청하는 일이 있고,
+ * 그때 한 건을 심사하면 다른 한 건의 알림까지 닫힌다. 심사 대기줄이 비었을 때 닫는다.
+ */
+export async function clearMerchantApplied(): Promise<void> {
+  try {
+    const waiting = await prisma.merchant.count({ where: { status: 'PENDING' } });
+    if (waiting > 0) return;
+
+    await markNoticesDone({
+      kinds: ['MERCHANT_APPLIED'],
+      userIds: await recipients({ merchantIds: [], operators: true }, 'merchant:approve'),
+    });
+  } catch (error) {
+    console.error('[notification] 입점 신청 알림을 닫지 못했다', error);
+  }
+}

@@ -1,12 +1,13 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canManageProduct, merchantScope, becameAvailable, hasPermission,
+  canManageProduct, merchantScope, becameAvailable, leftLowStock, hasPermission,
   needsPublishPermission, isVisibleStatus, PUBLISH_PERMISSION,
   type Actor, type ProductStatus,
   searchTextFor, sellingPriceOf, isSlugTaken,
 } from '@shop/core';
 import { notifyRestocked } from '~/lib/restock/notify';
+import { clearLowStockDone } from '~/lib/notifications/low-stock';
 import { notifyProductReviewed } from '~/lib/notifications/product-review';
 import { recordAudit } from '~/lib/audit';
 import {
@@ -323,6 +324,18 @@ export async function updateStock(actor: Actor, productId: string, input: Update
       console.error('[restock] 알림 실패', { variantIds: restocked }, error);
     }
   }
+
+  /*
+   * **채웠으니 "재고가 부족하다" 는 끝난 일이다.**
+   *
+   * 기준 위로 올라온 옵션이 있을 때만 묻는다(core leftLowStock) — 10을 8로 고치는 평범한 수정에는
+   * 애초에 닫을 알림이 없다. 닫을 수 있는지(그 가게에 남은 재고 할 일이 없는지)는 그쪽이 본다.
+   */
+  const refilled = input.variants.some((v) => {
+    const was = owned.find((o) => o.id === v.variantId);
+    return was !== undefined && leftLowStock(was.stock, v.stock);
+  });
+  if (refilled) await clearLowStockDone(before.brand.merchantId);
 
   return {
     before: owned.map((o) => ({ sku: o.sku, stock: o.stock })),

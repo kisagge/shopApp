@@ -10,7 +10,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const db = vi.hoisted(() => ({
   user: { findMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { findMany: vi.fn<(...a: any[]) => any>() },
-  inquiry: { findUnique: vi.fn<(...a: any[]) => any>() },
+  inquiry: { findUnique: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
+  // 끝난 일인지 보려고 남은 대기줄을 센다
+  returnRequest: { count: vi.fn<(...a: any[]) => any>() },
+  merchant: { count: vi.fn<(...a: any[]) => any>() },
   notification: {
     createMany: vi.fn<(...a: any[]) => any>(),
     updateMany: vi.fn<(...a: any[]) => any>(),
@@ -21,6 +24,7 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const {
   notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied, notifyAddressChanged,
   notifyReturnAddressMissing, clearReturnAddressMissing,
+  clearReturnRequested, clearInquiryReceived, clearMerchantApplied,
 } = await import('~/lib/notifications/console-work');
 
 const where = () => db.user.findMany.mock.calls[0]![0].where as { suspendedAt: null; OR: Record<string, unknown>[] };
@@ -31,6 +35,9 @@ beforeEach(() => {
   db.user.findMany.mockResolvedValue([{ id: 'u-1' }, { id: 'u-2' }]);
   db.notification.createMany.mockResolvedValue({ count: 2 });
   db.notification.updateMany.mockResolvedValue({ count: 2 });
+  db.returnRequest.count.mockResolvedValue(0);
+  db.inquiry.count.mockResolvedValue(0);
+  db.merchant.count.mockResolvedValue(0);
 });
 
 describe('반품·교환 신청', () => {
@@ -293,5 +300,130 @@ describe('반품지 미등록 알림을 닫기', () => {
 
     await expect(clearReturnAddressMissing('m-a')).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 처리했으니 **"처리할 일" 은 끝난 일이다.**
+ *
+ * **대기줄이 비었을 때만 닫는다.** 이 알림들은 한 건이 아니라 줄 전체를 가리킨다(누르면 처리 목록으로
+ * 간다) — 한 건을 처리하고 그 종류를 전부 읽음으로 만들면 아직 남은 일이 알림함에서 사라진다.
+ */
+describe('처리할 일 알림을 닫기', () => {
+  const closed = () => db.notification.updateMany.mock.calls[0]?.[0].where as Record<string, unknown> | undefined;
+
+  describe('반품·교환 신청', () => {
+    it('그 주문에 기다리는 신청이 없으면 주문번호로 좁혀 닫는다', async () => {
+      await clearReturnRequested('20261005-0000001');
+
+      expect(db.returnRequest.count.mock.calls[0]![0].where).toEqual({
+        order: { orderNo: '20261005-0000001' }, status: 'REQUESTED',
+      });
+      expect(closed()).toEqual({
+        kind: { in: ['RETURN_REQUESTED'] },
+        readAt: null,
+        params: { path: ['orderNo'], equals: '20261005-0000001' },
+      });
+    });
+
+    /** 줄을 나눠 따로 신청하면 한 주문에 신청이 둘일 수 있다 */
+    it('아직 기다리는 신청이 남아 있으면 닫지 않는다', async () => {
+      db.returnRequest.count.mockResolvedValue(1);
+
+      await clearReturnRequested('20261005-0000001');
+
+      expect(db.notification.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('못 닫아도 던지지 않는다 — 처리는 이미 끝났다', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      db.returnRequest.count.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+      await expect(clearReturnRequested('20261005-0000001')).resolves.toBeUndefined();
+      expect(error).toHaveBeenCalled();
+    });
+  });
+
+  describe('문의', () => {
+    it('그 판매처의 답변 대기줄이 비면 그 가맹점의 알림을 닫는다', async () => {
+      await clearInquiryReceived({ product: { merchantId: 'm-a' } });
+
+      expect(db.inquiry.count.mock.calls[0]![0].where).toEqual({
+        deletedAt: null, answeredAt: null, product: { brand: { merchantId: 'm-a' } },
+      });
+      expect(where().OR).toEqual([
+        expect.objectContaining({ role: 'MERCHANT', merchantId: { in: ['m-a'] } }),
+      ]);
+      expect(closed()).toMatchObject({
+        kind: { in: ['INQUIRY_RECEIVED'] },
+        userId: { in: ['u-1', 'u-2'] },
+      });
+    });
+
+    /** 자사 상품 문의는 운영진이 답한다 — 그 줄도 운영진의 것이다 */
+    it('자사 상품이면 운영진의 알림을 닫는다', async () => {
+      await clearInquiryReceived({ product: { merchantId: null } });
+
+      expect(db.inquiry.count.mock.calls[0]![0].where.product).toEqual({ brand: { merchantId: null } });
+      expect(where().OR).toEqual([expect.objectContaining({ role: { in: expect.any(Array) } })]);
+      expect(closed()).toMatchObject({ kind: { in: ['INQUIRY_RECEIVED'] } });
+    });
+
+    /** 고객센터 문의는 상품이 없다 — 알림에 실린 값도 없어 받는 사람으로만 좁힌다 */
+    it('고객센터 문의는 상품 없는 대기줄을 세고 다른 종류를 닫는다', async () => {
+      await clearInquiryReceived({ product: null });
+
+      expect(db.inquiry.count.mock.calls[0]![0].where).toEqual({
+        productId: null, deletedAt: null, answeredAt: null,
+      });
+      expect(closed()).toMatchObject({ kind: { in: ['SUPPORT_INQUIRY_RECEIVED'] } });
+    });
+
+    it('답을 기다리는 문의가 남아 있으면 닫지 않는다', async () => {
+      db.inquiry.count.mockResolvedValue(3);
+
+      await clearInquiryReceived({ product: { merchantId: 'm-a' } });
+
+      expect(db.user.findMany).not.toHaveBeenCalled();
+      expect(db.notification.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('못 닫아도 던지지 않는다 — 답변은 이미 저장됐다', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      db.inquiry.count.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+      await expect(clearInquiryReceived({ product: null })).resolves.toBeUndefined();
+      expect(error).toHaveBeenCalled();
+    });
+  });
+
+  describe('입점 신청', () => {
+    it('심사 대기줄이 비면 승인할 수 있는 사람의 알림을 닫는다', async () => {
+      await clearMerchantApplied();
+
+      expect(db.merchant.count.mock.calls[0]![0].where).toEqual({ status: 'PENDING' });
+      expect(where().OR).toEqual([expect.objectContaining({ role: { in: expect.any(Array) } })]);
+      expect(closed()).toMatchObject({
+        kind: { in: ['MERCHANT_APPLIED'] },
+        userId: { in: ['u-1', 'u-2'] },
+      });
+    });
+
+    /** 같은 이름으로 두 번 신청하는 일이 있다 — 이름으로 좁히면 한 건을 심사하고 둘을 닫는다 */
+    it('심사를 기다리는 신청이 남아 있으면 닫지 않는다', async () => {
+      db.merchant.count.mockResolvedValue(2);
+
+      await clearMerchantApplied();
+
+      expect(db.notification.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('못 닫아도 던지지 않는다 — 심사는 이미 끝났다', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      db.merchant.count.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+      await expect(clearMerchantApplied()).resolves.toBeUndefined();
+      expect(error).toHaveBeenCalled();
+    });
   });
 });

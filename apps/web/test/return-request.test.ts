@@ -12,6 +12,10 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/* 처리한 뒤 "신청이 들어왔다" 를 닫는 일. 여기서 볼 것은 **언제 부르는가** 다 — 닫을 수 있는지는 그쪽이 본다 */
+const clearReturnRequested = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/console-work', () => ({ clearReturnRequested }));
+
 const { requestReturn, resolveReturn, receiveReturn, cancelOwnReturn } =
   await import('~/lib/orders/return-request');
 
@@ -710,5 +714,51 @@ describe('손님이 신청을 무른다', () => {
     await expect(cancelOwnReturn('20260901-0000001', customer)).rejects.toMatchObject({
       code: 'NO_REQUEST', status: 404,
     });
+  });
+});
+
+/**
+ * 처리했으니 **"반품 신청이 들어왔다" 는 끝난 일이다.**
+ *
+ * 운영 알림함은 쌓이는 만큼 비워지지 않았다 — 승인해도, 반려해도, 손님이 무른 뒤에도 그 알림은 안 읽음으로
+ * 남았다. 승인 뒤에 남는 일(물건을 받는 것)은 그 알림이 가리키던 것이 아니다.
+ */
+describe('처리하면 신청 알림을 닫으러 간다', () => {
+  const requested = {
+    id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
+    confirmedAt: null, deliveredAt: delivered,
+    items: [{ id: 'i-coat', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' }],
+    returnRequests: [{ id: 'r-1', type: 'RETURN', status: 'REQUESTED', itemIds: [], exchangeLines: [] }],
+  };
+
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue(requested);
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a')]);
+  });
+
+  it('승인하면 닫으러 간다 — 판단이 그 알림이 말한 일이었다', async () => {
+    await resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin);
+
+    expect(clearReturnRequested).toHaveBeenCalledWith('20260901-0000001');
+  });
+
+  it('반려해도 닫으러 간다', async () => {
+    await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '사용 흔적이 있습니다' }, admin);
+
+    expect(clearReturnRequested).toHaveBeenCalledWith('20260901-0000001');
+  });
+
+  it('손님이 무른 신청도 운영에게는 할 일이 없어진 것이다', async () => {
+    await cancelOwnReturn('20260901-0000001', { id: 'u-1', role: 'CUSTOMER', merchantId: null });
+
+    expect(clearReturnRequested).toHaveBeenCalledWith('20260901-0000001');
+  });
+
+  /** 막힌 처리는 신청을 그 자리에 둔다 — 알림만 닫으면 할 일이 사라진다 */
+  it('이미 처리된 신청이면 닫지 않는다', async () => {
+    db.returnRequest.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin)).rejects.toThrow();
+    expect(clearReturnRequested).not.toHaveBeenCalled();
   });
 });

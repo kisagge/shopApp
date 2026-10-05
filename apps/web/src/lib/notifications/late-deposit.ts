@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import { operatorRolesWith } from '@shop/core';
-import { recordNotifications, type NoticeInput } from './record';
+import { markNoticesDone, recordNotifications, type NoticeInput } from './record';
 
 /**
  * 취소한 주문에 들어온 입금을 알린다 — 돈을 보낸 손님에게, 그리고 돌려줄 수 있는 운영진에게.
@@ -53,4 +53,16 @@ export async function notifyLateDepositRefunded(input: { orderNo: string; userId
     params: { orderNo: input.orderNo, amount: amountText(input.amount) },
     linkPath: `/order/${encodeURIComponent(input.orderNo)}`,
   }]);
+}
+
+/**
+ * 돌려주었으니 **"환불이 필요하다" 는 끝난 일이다.**
+ *
+ * 그 알림은 대기줄이 아니라 **한 건**을 가리킨다 — 한 주문의 입금 하나에 대한 것이고, 닫는 자리도 그
+ * 주문을 처리한 순간이다. 그래서 주문번호로 좁혀 닫는다(대기줄을 셀 일이 없다).
+ *
+ * **실패해도 던지지 않는다**(record 와 같은 규칙) — 환불은 이미 끝났다.
+ */
+export async function clearLateDepositFound(orderNo: string): Promise<void> {
+  await markNoticesDone({ kinds: ['LATE_DEPOSIT_FOUND'], about: { key: 'orderNo', value: orderNo } });
 }

@@ -32,6 +32,10 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const notifyMerchantDecision = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/notifications/merchant-decision', () => ({ notifyMerchantDecision }));
 
+/* 심사 뒤 "신청이 들어왔다" 를 닫는 일도 같다 — 닫을 수 있는지(대기줄)는 그쪽이 본다 */
+const clearMerchantApplied = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/console-work', () => ({ clearMerchantApplied }));
+
 const activate = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/merchant/apply', () => ({ activateApprovedMerchant: activate }));
 
@@ -464,6 +468,25 @@ describe('심사 결과를 신청자에게', () => {
     ).rejects.toThrow();
 
     expect(notifyMerchantDecision).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **심사했으니 "입점 신청이 들어왔다" 는 끝난 일이다.**
+   *
+   * 운영 알림함은 쌓이는 만큼 비워지지 않았다 — 승인해도 반려해도 그 알림은 안 읽음으로 남았다.
+   */
+  it('심사하면 신청 알림을 닫으러 간다', async () => {
+    await updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'APPROVED' }));
+
+    expect(clearMerchantApplied).toHaveBeenCalledTimes(1);
+  });
+
+  it('막힌 전이에서는 닫지 않는다 — 신청은 그대로 기다린다', async () => {
+    await expect(
+      updateMerchantStatus(superAdmin, MERCHANT_ID, status({ status: 'TERMINATED', reason: '사유' })),
+    ).rejects.toThrow();
+
+    expect(clearMerchantApplied).not.toHaveBeenCalled();
   });
 });
 

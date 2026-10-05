@@ -8,6 +8,7 @@ import {
   statusBeforeReturn, missingReturnAddresses, canCancelOwnReturn, linesOfRequest,
 } from '@shop/core';
 import { destinationsFor } from './return-address';
+import { clearReturnRequested } from '~/lib/notifications/console-work';
 
 /**
  * 반품·교환 신청과 처리.
@@ -391,6 +392,12 @@ export async function resolveReturn(
     });
   });
 
+  /*
+   * **처리했으니 "신청이 들어왔다" 는 끝난 일이다.** 승인이든 반려든 판단이 이 알림이 말한 일이었다 —
+   * 승인 뒤에 남는 일(물건을 받는 것)은 그 알림이 가리키던 것이 아니다.
+   */
+  await clearReturnRequested(order.orderNo);
+
   return {
     orderNo: order.orderNo,
     status: approve ? 'APPROVED' : withdraw ? 'CANCELLED' : 'REJECTED',
@@ -455,6 +462,9 @@ export async function cancelOwnReturn(
       note: `${request.type === 'EXCHANGE' ? '교환' : '반품'} 신청 취소 — 손님이 무름`,
     });
   });
+
+  // 손님이 무른 신청도 운영에게는 할 일이 없어진 것이다
+  await clearReturnRequested(order.orderNo);
 
   return { orderNo: order.orderNo, status: 'CANCELLED', orderStatus: nextOrderStatus };
 }

@@ -246,6 +246,20 @@ export function crossedLowStock(
   return before > threshold && after <= threshold;
 }
 
+/**
+ * **기준 위로 다시 올라갔는가** — 그 옵션의 "재고 임박" 은 끝난 일이다.
+ *
+ * 내려갈 때 한 번 알리고(crossedLowStock) 올라올 때 한 번 닫는다. "기준보다 많으면 닫기" 로 하면
+ * 10에서 8로 줄이는 평범한 수정에도 닫으려 들고, 그때는 애초에 닫을 알림이 없다.
+ */
+export function leftLowStock(
+  before: number,
+  after: number,
+  threshold: number = LOW_STOCK_THRESHOLD,
+): boolean {
+  return before <= threshold && after > threshold;
+}
+
 export const isNotificationKind = (value: unknown): value is NotificationKind =>
   typeof value === 'string' && (NOTIFICATION_KIND as readonly string[]).includes(value);
 

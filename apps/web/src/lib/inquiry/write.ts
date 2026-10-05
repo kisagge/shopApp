@@ -7,6 +7,7 @@ import {
 } from '@shop/core';
 import type { CreateInquiryInput, AnswerInquiryInput } from '@shop/contract';
 import type { UploadedImage } from '~/lib/images/upload-files';
+import { clearInquiryReceived } from '~/lib/notifications/console-work';
 
 export class InquiryError extends Error {
   constructor(readonly code: InquiryErrorCode, readonly status = 400) {
@@ -123,6 +124,12 @@ export async function answerInquiry(
     select: { id: true, answer: true },
   });
 
+  /*
+   * **답했으니 "문의가 들어왔다" 는 끝난 일이다.** 그 알림은 답변 대기줄을 가리키므로(누르면 그 줄로
+   * 간다) 줄이 비었을 때 닫힌다 — 거기까지는 clearInquiryReceived 가 본다.
+   */
+  await clearInquiryReceived({ product: inquiry.product ? { merchantId: inquiry.product.brand.merchantId } : null });
+
   return {
     id: updated.id,
     authorId: inquiry.authorId,
@@ -146,7 +153,11 @@ export async function answerInquiry(
 export async function deleteInquiry(actor: Actor, inquiryId: string): Promise<void> {
   const inquiry = await prisma.inquiry.findFirst({
     where: { id: inquiryId, deletedAt: null },
-    select: { id: true, authorId: true },
+    select: {
+      id: true, authorId: true, answeredAt: true,
+      // 없어진 문의도 할 일이 아니다 — 누구의 대기줄에서 빠지는지 알아야 그 알림을 닫는다
+      product: { select: { brand: { select: { merchantId: true } } } },
+    },
   });
   if (!inquiry) throw new InquiryError('INQUIRY_NOT_FOUND', 404);
   if (!canDeleteInquiry(actor, inquiry)) throw new InquiryError('NOT_OWN_INQUIRY', 403);
@@ -158,5 +169,13 @@ export async function deleteInquiry(actor: Actor, inquiryId: string): Promise<vo
       where: { id: inquiryId },
       data: { deletedAt: new Date() },
     });
+  }
+
+  /*
+   * **지워진 문의도 할 일이 아니다.** 답을 기다리던 문의를 손님이 지우면(또는 운영진이 내리면) 그 줄에서
+   * 빠지는데, 알림은 그대로 남았다. 답이 달려 있던 문의라면 그때 이미 닫혔다 — 셀 것도 없다.
+   */
+  if (inquiry.answeredAt === null) {
+    await clearInquiryReceived({ product: inquiry.product ? { merchantId: inquiry.product.brand.merchantId } : null });
   }
 }

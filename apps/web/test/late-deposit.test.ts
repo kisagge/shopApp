@@ -23,7 +23,8 @@ const enforceRateLimit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/rate-limit', () => ({ enforceRateLimit }));
 
 const notifyLateDepositRefunded = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/notifications/late-deposit', () => ({ notifyLateDepositRefunded }));
+const clearLateDepositFound = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/late-deposit', () => ({ notifyLateDepositRefunded, clearLateDepositFound }));
 
 const { resolveLateDeposit } = await import('~/lib/admin/late-deposit');
 const { POST } = await import('~/app/api/admin/orders/[orderNo]/late-deposit/route');
@@ -134,5 +135,27 @@ describe('찾는 조건', () => {
 
   it('조건을 안 걸면 결제로 거르지 않는다', () => {
     expect(adminOrderWhere(null, {})).not.toHaveProperty('payment');
+  });
+});
+
+/**
+ * 돌려주었으니 **"환불이 필요하다" 는 끝난 일이다.**
+ *
+ * 운영 알림함은 쌓이는 만큼 비워지지 않았다 — 처리함을 누른 뒤에도 그 알림은 안 읽음으로 남았다. 이 알림은
+ * 대기줄이 아니라 한 건을 가리키므로(한 주문의 입금 하나) 주문번호로 닫는다.
+ */
+describe('처리하면 환불 필요 알림을 닫으러 간다', () => {
+  it('주문번호로 닫는다', async () => {
+    await resolveLateDeposit(admin, '20260916-0000001', NOW);
+
+    expect(clearLateDepositFound).toHaveBeenCalledWith('20260916-0000001');
+  });
+
+  /** 이미 처리된 입금을 또 누른 것은 아무것도 바꾸지 않았다 */
+  it('이미 처리된 입금이면 닫지 않는다', async () => {
+    db.payment.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(resolveLateDeposit(admin, '20260916-0000001', NOW)).rejects.toThrow();
+    expect(clearLateDepositFound).not.toHaveBeenCalled();
   });
 });
