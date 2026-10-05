@@ -9,6 +9,7 @@ import {
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 import { stockAttentionWhere } from './products';
 import { LATE_DEPOSIT_OPEN } from './orders';
+import { sellersMissingReturnAddress } from '~/lib/orders/return-address';
 
 /**
  * 매출은 **돈이 오간 시각**으로 센다 — 자세한 까닭은 `@shop/core` 의 revenue.ts.
@@ -63,6 +64,14 @@ export interface DashboardTodo {
    * 자동으로 돌려줄 수 없는 돈이라(가상계좌는 손님 계좌가 필요하다) 사람이 챙기지 않으면 영영 남는다.
    */
   readonly lateDeposits: number;
+  /**
+   * **반품지 없이 팔고 있는 판매처 수.**
+   *
+   * 반품지가 없으면 이제 매대에 올릴 수 없지만, 그 문이 생기기 전에 올라간 상품은 그대로 서 있다 —
+   * 그 가게의 물건이 돌아올 곳은 아직 없다. 상품이 아니라 판매처를 센다: 반품지 한 줄이 그 가게의
+   * 상품 전부를 구한다.
+   */
+  readonly noReturnAddress: number;
 }
 
 export interface TopProduct {
@@ -210,7 +219,7 @@ async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
 
 async function loadTodo(scope: string | null): Promise<DashboardTodo> {
   const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
-  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits] = await Promise.all([
+  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits, noReturnAddress] = await Promise.all([
     prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
     prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
     prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
@@ -223,8 +232,10 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
     prisma.product.count({ where: stockAttentionWhere('LOW', scope) }),
     // 목록 필터와 같은 조건이다 — 숫자를 누르면 그 주문들이 나온다
     scope === null ? prisma.payment.count({ where: LATE_DEPOSIT_OPEN }) : Promise.resolve(0),
+    // 돌려받을 곳 없이 파는 곳 — 가맹점은 자기 가게 하나를 본다
+    sellersMissingReturnAddress(scope),
   ]);
-  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits };
+  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits, noReturnAddress };
 }
 
 async function loadTopProducts(scope: string | null, w: Window): Promise<TopProduct[]> {

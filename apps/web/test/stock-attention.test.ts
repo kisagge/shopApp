@@ -24,6 +24,9 @@ const db = vi.hoisted(() => ({
   orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   product: { count: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   payment: { count: vi.fn<(...a: any[]) => any>() },
+  // 반품지 없이 파는 곳을 세는 조회
+  merchant: { count: vi.fn<(...a: any[]) => any>() },
+  returnAddress: { findUnique: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
@@ -50,6 +53,8 @@ beforeEach(() => {
   db.$queryRaw.mockResolvedValue([]);
   db.product.count.mockResolvedValue(0);
   db.payment.count.mockResolvedValue(0);
+  db.merchant.count.mockResolvedValue(0);
+  db.returnAddress.findUnique.mockResolvedValue({ id: 'platform' });
   db.product.findMany.mockResolvedValue([]);
 });
 
@@ -167,5 +172,71 @@ describe('취소 뒤 들어온 입금', () => {
 
     expect(d.todo.lateDeposits).toBe(0);
     expect(db.payment.count).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **반품지 없이 팔고 있는 곳.**
+ *
+ * 이제 반품지가 없으면 매대에 올릴 수 없지만(assertReturnAddress), 그 문이 생기기 전에 올라간 상품은
+ * 그대로 서 있다 — 그 가게의 물건은 돌아올 곳이 없다. 가맹점 목록에 "미등록" 뱃지는 붙어 있었어도
+ * **지금 파는 곳인지**는 거기서 알 수 없었다.
+ */
+describe('반품지 없이 파는 판매처', () => {
+  const NOW = new Date('2026-09-09T00:00:00Z');
+  const asked = () => db.merchant.count.mock.calls[0]![0].where as Record<string, any>;
+
+  it('파는 곳만 센다 — 팔지 않는 가맹점의 미등록은 급한 일이 아니다', async () => {
+    db.merchant.count.mockResolvedValue(2);
+
+    const d = await getDashboard(admin, '7d', NOW);
+
+    expect(d.todo.noReturnAddress).toBe(2);
+    expect(asked()['returnAddress']).toEqual({ is: null });
+    // 매대의 조건은 스토어프론트와 같은 것을 쓴다 — 손님에게 보이는데 숫자에는 없으면 안 된다
+    expect(asked()['brands'].some.products.some).toMatchObject({
+      deletedAt: null, publishedAt: { not: null },
+    });
+  });
+
+  /** 정지·해지된 가맹점의 상품은 매대에서 내려간다 — 지금 파는 곳만 센다 */
+  it('승인된 가맹점만 본다', async () => {
+    await getDashboard(admin, '7d', NOW);
+
+    expect(asked()['status']).toBe('APPROVED');
+  });
+
+  it('가맹점 대시보드는 자기 가게 하나만 본다', async () => {
+    db.merchant.count.mockResolvedValue(1);
+
+    const d = await getDashboard(merchant, '7d', NOW);
+
+    expect(asked()['id']).toBe('m-a');
+    expect(asked()['status']).toBeUndefined();
+    expect(d.todo.noReturnAddress).toBe(1);
+  });
+
+  /** 자사 상품도 돌아올 곳이 있어야 한다 — 플랫폼 반품지도 한 줄이라 한 곳으로 센다 */
+  it('자사 상품을 파는데 플랫폼 반품지가 없으면 한 곳을 더한다', async () => {
+    db.returnAddress.findUnique.mockResolvedValue(null);
+    db.product.count.mockResolvedValue(4);
+
+    const d = await getDashboard(admin, '7d', NOW);
+
+    expect(d.todo.noReturnAddress).toBe(1);
+  });
+
+  it('플랫폼 반품지가 있으면 자사는 묻지 않는다', async () => {
+    const d = await getDashboard(admin, '7d', NOW);
+
+    expect(d.todo.noReturnAddress).toBe(0);
+  });
+
+  it('가맹점은 플랫폼 반품지를 보지 않는다 — 자기 가게와 상관이 없다', async () => {
+    db.returnAddress.findUnique.mockResolvedValue(null);
+
+    await getDashboard(merchant, '7d', NOW);
+
+    expect(db.returnAddress.findUnique).not.toHaveBeenCalled();
   });
 });

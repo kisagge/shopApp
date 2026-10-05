@@ -7,6 +7,9 @@ const db = vi.hoisted(() => ({
   orderRefund: { aggregate: vi.fn<(...a: any[]) => any>() },
   product: { count: vi.fn<(...a: any[]) => any>() },
   payment: { count: vi.fn<(...a: any[]) => any>() },
+  // 반품지 없이 파는 곳을 세는 조회
+  merchant: { count: vi.fn<(...a: any[]) => any>() },
+  returnAddress: { findUnique: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
 }));
@@ -33,6 +36,8 @@ beforeEach(() => {
     .mockResolvedValue({ _sum: { subtotal: 0 } });
   db.order.count.mockResolvedValue(0);
   db.product.count.mockResolvedValue(0);
+  db.merchant.count.mockResolvedValue(0);
+  db.returnAddress.findUnique.mockResolvedValue({ id: 'platform' });
   db.payment.count.mockResolvedValue(0);
   db.order.findMany.mockResolvedValue([]);
   db.orderItem.groupBy.mockResolvedValue([]);

@@ -147,6 +147,21 @@ export default async function AdminDashboard({
               {d.todo.lateDeposits > 0 && (
                 <Todo href="/admin/orders?lateDeposit=1" label="취소 뒤 들어온 입금 (환불 필요)" count={d.todo.lateDeposits} urgent />
               )}
+              {/*
+                **반품지 없이 팔고 있는 곳.** 이제 반품지가 없으면 매대에 올릴 수 없지만, 그 문이 생기기
+                전에 올라간 상품은 그대로 서 있다 — 그 가게의 물건은 돌아올 곳이 없다. 가맹점 목록에
+                "미등록" 뱃지는 붙어 있었어도 **지금 파는 곳인지**는 거기서 알 수 없었다.
+
+                입금과 같은 규칙으로 없을 때는 줄을 세우지 않는다 — 늘 0 인 줄은 읽히지 않게 된다.
+              */}
+              {d.todo.noReturnAddress > 0 && (
+                <Todo
+                  href="/admin/merchants"
+                  label={d.scope ? '반품지 미등록 (팔고 있는 상품이 있습니다)' : '반품지 없이 파는 판매처'}
+                  count={d.todo.noReturnAddress}
+                  urgent
+                />
+              )}
               <Todo href="/admin/orders?status=PREPARING" label="배송 준비 중" count={d.todo.preparing} />
               <Todo href="/admin/orders?status=PENDING" label="입금 대기" count={d.todo.pendingPayment} />
               <Todo
@@ -336,7 +351,7 @@ function Todo({
   href, label, count, urgent, last,
 }: {
   href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING' | '/admin/orders?lateDeposit=1'
-    | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low';
+    | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low' | '/admin/merchants';
   label: string;
   count: number;
   urgent?: boolean;

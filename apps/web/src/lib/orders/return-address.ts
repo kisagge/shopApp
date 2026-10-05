@@ -8,6 +8,7 @@ import {
 } from '@shop/core';
 import type { ReturnAddressInput } from '@shop/contract';
 import { clearReturnAddressMissing, notifyReturnAddressChanged } from '~/lib/notifications/console-work';
+import { onDisplay } from '~/lib/queries/catalog/shelf';
 
 const ADDRESS_SELECT = {
   merchantId: true, recipient: true, phone: true, postalCode: true, address1: true, address2: true,
@@ -53,6 +54,41 @@ export async function ownersWithReturnAddress(
     select: { merchantId: true },
   });
   return new Set(rows.map((r) => r.merchantId));
+}
+
+/**
+ * **반품지 없이 팔고 있는 판매처의 수.**
+ *
+ * 이제 반품지가 없으면 매대에 올릴 수 없지만(assertReturnAddress), 그 문이 생기기 전에 올라간 상품은
+ * 그대로 서 있다. 그것을 볼 자리가 어디에도 없었다 — 가맹점 목록에 "미등록" 뱃지는 붙지만 그 가게가
+ * **지금 팔고 있는지**는 말해 주지 않고, 팔지 않는 가맹점의 미등록은 급한 일이 아니다.
+ *
+ * **판매처를 센다.** 반품지 한 줄이 그 가게의 상품 전부를 구하므로, 상품 200개를 세어 봐야 할 일은
+ * 하나다. 자사 상품도 한 판매처로 센다(플랫폼 반품지도 한 줄이다).
+ *
+ * **매대의 조건은 스토어프론트와 같은 것을 쓴다**(onDisplay) — 따로 적으면 손님에게는 보이는데 이
+ * 숫자에는 없는 상품이 생긴다.
+ */
+export async function sellersMissingReturnAddress(scope: string | null): Promise<number> {
+  const merchants = await prisma.merchant.count({
+    where: {
+      // 정지·해지된 가맹점의 상품은 매대에서 내려간다(sellableBrand) — 지금 파는 곳만 센다
+      ...(scope === null ? { status: 'APPROVED' as const } : { id: scope }),
+      returnAddress: { is: null },
+      brands: { some: { products: { some: onDisplay() } } },
+    },
+  });
+  // 가맹점은 자사 반품지와 상관이 없다 — 자기 가게 하나다
+  if (scope !== null) return merchants;
+
+  const platform = await prisma.returnAddress.findUnique({
+    where: { id: PLATFORM_RETURN_ADDRESS_ID },
+    select: { id: true },
+  });
+  if (platform) return merchants;
+
+  const own = await prisma.product.count({ where: { ...onDisplay(), brand: { merchantId: null } } });
+  return merchants + (own > 0 ? 1 : 0);
 }
 
 /** 이 판매처에 돌려받을 곳이 있는가. `merchantId` 가 null 이면 자사 상품(플랫폼 반품지) */
