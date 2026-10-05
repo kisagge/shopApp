@@ -96,3 +96,32 @@ describe('CI 단계 순서', () => {
     );
   });
 });
+
+/**
+ * 정리가 판정을 뒤집지 않는다.
+ *
+ * **전부 통과한 판이 exit 1 로 끝났다.** 트랩의 마지막 명령이 실패하면 그것이 스크립트의 끝 상태가
+ * 되는데, 방금 세운 `next start` 가 내려가는 중이면 빌드 폴더를 지우다 "Directory not empty" 가 난다.
+ * 그 숫자를 보고 다음 사람은 멀쩡한 코드를 뒤진다 — 실제로 한 판을 그렇게 썼다.
+ */
+describe('문지기의 끝 상태', () => {
+  const sh = () => readFileSync(join(ROOT, 'tooling/ci-local.sh'), 'utf8');
+
+  it('정리는 들어올 때의 상태를 그대로 내보낸다', () => {
+    const source = sh();
+    const cleanup = /cleanup\(\) \{(.*?)\n\}/s.exec(source)?.[1];
+    expect(cleanup, 'ci-local.sh 에서 cleanup 을 못 찾았다').toBeTruthy();
+
+    expect(cleanup, '들어올 때의 상태를 쥐지 않는다').toMatch(/status=\$\?/);
+    expect(cleanup!.trimEnd().endsWith('exit "$status"'), '마지막에 그 상태로 끝내지 않는다').toBe(true);
+  });
+
+  it('치우다 걸려도 넘어간다 — 서버가 내려가는 중이면 폴더에 손이 닿아 있다', () => {
+    expect(sh()).toMatch(/rm -rf "apps\/web\/\$NEXT_DIST_DIR" 2>\/dev\/null \|\| true/);
+  });
+
+  /** 개발 서버의 `.next` 와 다투지 않으려고 자기 폴더에서 빌드한다 */
+  it('문지기는 자기 빌드 폴더를 쓴다', () => {
+    expect(sh()).toMatch(/export NEXT_DIST_DIR=/);
+  });
+});

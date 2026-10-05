@@ -67,6 +67,13 @@ echo "▸ CI 에 없는 것을 지운다 (생성물 · 빌드 산출물 · 캐�
 rm -rf packages/db/src/generated "apps/web/$NEXT_DIST_DIR" .turbo
 
 cleanup() {
+  # **정리가 판정을 뒤집지 않는다.**
+  #
+  # 트랩의 마지막 명령이 실패하면 그것이 스크립트의 끝 상태가 된다 — 실제로 전부 통과한 판에서
+  # `rm` 하나가 "Directory not empty" 로 걸려 exit 1 이 나왔다. 그 숫자를 보고 다음 사람은 멀쩡한
+  # 코드를 뒤진다. 들어올 때의 상태를 쥐고 있다가 그대로 내보낸다.
+  status=$?
+
   docker exec "$CONTAINER" psql -U shop -d postgres -c "drop database if exists $DB_NAME;" >/dev/null 2>&1 || true
 
   # **빌드 산출물도 함께 치운다.**
@@ -80,7 +87,13 @@ cleanup() {
   # 멀쩡해서 원인을 한참 찾았다.
   #
   # DB 를 지우는 것과 같은 이유다 — 이 스크립트가 만든 것은 이 스크립트가 치운다.
-  rm -rf "apps/web/$NEXT_DIST_DIR"
+  #
+  # **치우다 걸려도 넘어간다.** 방금 세운 `next start` 가 내려가는 중이면 그 폴더에 아직 손이 닿아
+  # 있어서 "Directory not empty" 가 난다. 남겨 둬도 다음 실행이 시작할 때 지우고(그때는 아무 서버도
+  # 없다), 이 폴더는 이 스크립트만 쓴다 — 개발 서버는 `.next` 를 본다.
+  rm -rf "apps/web/$NEXT_DIST_DIR" 2>/dev/null || true
+
+  exit "$status"
 }
 trap cleanup EXIT
 
