@@ -1873,6 +1873,8 @@ enum NotificationKind {
   ORDER_ADDRESS_CHANGED
   /// 보낼 반품지가 바뀌었다 — 그 주소로 보내라고 안내받은 손님에게 간다
   RETURN_ADDRESS_CHANGED
+  /// 반품 신청이 들어왔는데 보낼 곳이 없다 — 등록할 수 있는 사람의 운영 알림함에 뜬다
+  RETURN_ADDRESS_MISSING
 }
 
 model Notification {

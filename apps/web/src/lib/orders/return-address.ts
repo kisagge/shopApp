@@ -1,8 +1,9 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  canEditReturnAddress, ForbiddenError, linesOfRequest, normalizeReturnAddress,
-  PLATFORM_RETURN_ADDRESS_ID, returnAddressChanged, returnDestinations, showsReturnAddress,
+  canEditReturnAddress, ForbiddenError, linesOfRequest, missingReturnAddresses,
+  normalizeReturnAddress, PLATFORM_RETURN_ADDRESS_ID, returnAddressChanged, returnDestinations,
+  showsReturnAddress,
   type Actor, type Permission, type ReturnAddress, type ReturnDestination,
 } from '@shop/core';
 import type { ReturnAddressInput } from '@shop/contract';
@@ -85,6 +86,30 @@ export async function approvedReturnDestinations(
 ): Promise<ReturnDestination[]> {
   if (!showsReturnAddress(request)) return [];
   return await destinationsFor(linesOfRequest(items, request), request.resolvedAt ?? null);
+}
+
+/**
+ * 이 신청에서 **보낼 곳이 없는** 판매처.
+ *
+ * **승인을 누르려다 막히고 나서야 드러났다.** 누를 생각을 안 하면 영영 드러나지 않고, 그사이 손님의
+ * 신청은 대기열에 갇혀 있다 — 손님 화면에는 "승인을 기다리는 중" 만 뜬다. 신청이 들어온 그 자리에서
+ * 등록할 사람에게 알리려고 미리 짚는다.
+ *
+ * 승인 때 막는 것과 같은 함수를 쓴다(core missingReturnAddresses) — 두 곳이 갈리면 "알림은 왔는데
+ * 승인은 되는" 또는 그 반대가 된다.
+ */
+export async function ownersMissingReturnAddress(
+  orderNo: string,
+  itemIds: readonly string[],
+): Promise<(string | null)[]> {
+  const order = await prisma.order.findUnique({
+    where: { orderNo },
+    select: { items: { select: { id: true, status: true, canceledAt: true, merchantId: true } } },
+  });
+  if (!order) return [];
+
+  const lines = linesOfRequest(order.items, { itemIds });
+  return missingReturnAddresses(await destinationsFor(lines));
 }
 
 export class ReturnAddressError extends Error {

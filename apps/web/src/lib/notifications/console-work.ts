@@ -166,3 +166,41 @@ export async function notifyReturnAddressChanged(
     console.error('[notification] 반품지 변경 알림을 못 만들었다', { count: affected.length }, error);
   }
 }
+
+/**
+ * 반품 신청이 들어왔는데 **보낼 곳이 없다** — 등록할 수 있는 사람에게.
+ *
+ * **등록할 사람이 판매처마다 다르다.** 가맹점 반품지는 그 가맹점이(merchant:write), 자사 상품을 받는
+ * 플랫폼 반품지는 운영진이 등록한다(shipping:write — 가게 전체의 약속이라 배송 정책과 같은 자리다).
+ * 그래서 누르면 갈 곳도 다르다.
+ *
+ * **실패해도 던지지 않는다.** 신청은 이미 들어왔다(record 와 같은 규칙).
+ */
+export async function notifyReturnAddressMissing(input: {
+  readonly orderNo: string;
+  /** 보낼 곳이 없는 판매처. null 이면 자사 상품(플랫폼 반품지) */
+  readonly owners: readonly (string | null)[];
+}): Promise<void> {
+  if (input.owners.length === 0) return;
+  try {
+    const notices: NoticeInput[] = [];
+    for (const owner of input.owners) {
+      const userIds = await recipients(
+        owner === null ? { merchantIds: [], operators: true } : { merchantIds: [owner], operators: false },
+        owner === null ? 'shipping:write' : 'merchant:write',
+      );
+      for (const userId of userIds) {
+        notices.push({
+          userId,
+          kind: 'RETURN_ADDRESS_MISSING',
+          params: { orderNo: input.orderNo },
+          // 누르면 그 반품지를 등록하는 자리로 간다 — 자사 상품은 배송비 화면에 있다
+          linkPath: owner === null ? '/admin/shipping' : `/admin/merchants/${encodeURIComponent(owner)}/return-address`,
+        });
+      }
+    }
+    await recordNotifications(notices);
+  } catch (error) {
+    console.error('[notification] 반품지 미등록 알림을 못 만들었다', { orderNo: input.orderNo }, error);
+  }
+}

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { returnRequestSchema } from '@shop/contract';
 import { requestReturn, cancelOwnReturn } from '~/lib/orders/return-request';
+import { ownersMissingReturnAddress } from '~/lib/orders/return-address';
 import { apiError, unauthorized } from '~/lib/api/respond';
 import { revalidateCatalog } from '~/lib/cache';
-import { notifyReturnRequested } from '~/lib/notifications/console-work';
+import { notifyReturnAddressMissing, notifyReturnRequested } from '~/lib/notifications/console-work';
 import { validationFailed } from '~/lib/i18n/validation';
 
 /** 고객의 반품·교환 신청 */
@@ -31,6 +32,16 @@ export async function POST(
     revalidateCatalog();
     // 처리할 사람에게 알린다 — 목록을 열어 보기 전까지 아무도 몰랐다
     await notifyReturnRequested({ orderNo: result.orderNo, itemIds: result.itemIds });
+
+    /*
+     * **보낼 곳이 없으면 승인할 수 없다.** 그 사실이 승인을 누르려다 막히고 나서야 드러났고, 누를
+     * 생각을 안 하면 영영 드러나지 않았다 — 그사이 이 신청은 대기열에 갇혀 있고 손님 화면에는
+     * "승인을 기다리는 중" 만 뜬다. 등록할 수 있는 사람에게 지금 알린다.
+     */
+    await notifyReturnAddressMissing({
+      orderNo: result.orderNo,
+      owners: await ownersMissingReturnAddress(result.orderNo, result.itemIds),
+    });
     return NextResponse.json(result);
   } catch (error) {
     return await apiError(error);

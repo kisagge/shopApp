@@ -15,8 +15,10 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied, notifyAddressChanged } =
-  await import('~/lib/notifications/console-work');
+const {
+  notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied, notifyAddressChanged,
+  notifyReturnAddressMissing,
+} = await import('~/lib/notifications/console-work');
 
 const where = () => db.user.findMany.mock.calls[0]![0].where as { suspendedAt: null; OR: Record<string, unknown>[] };
 const written = () => db.notification.createMany.mock.calls[0]![0].data as Record<string, unknown>[];
@@ -183,6 +185,61 @@ describe('배송지 변경', () => {
     db.orderItem.findMany.mockRejectedValue(new Error('DB 가 안 열린다'));
 
     await expect(notifyAddressChanged({ orderNo: '20260930-0000001', changedBy: 'u-1' })).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 반품 신청이 들어왔는데 보낼 곳이 없다.
+ *
+ * **승인을 누르려다 막히고 나서야 드러났다.** 누를 생각을 안 하면 영영 드러나지 않고, 그사이 손님의
+ * 신청은 대기열에 갇혀 있다 — 손님 화면에는 "승인을 기다리는 중" 만 뜬다.
+ */
+describe('반품지 미등록', () => {
+  it('가맹점 반품지가 없으면 그 가맹점이 듣고, 등록하는 자리로 간다', async () => {
+    await notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: ['m-a'] });
+
+    expect(where().OR).toEqual([
+      expect.objectContaining({ role: 'MERCHANT', merchantId: { in: ['m-a'] } }),
+    ]);
+    expect(written()[0]).toMatchObject({
+      kind: 'RETURN_ADDRESS_MISSING',
+      linkPath: '/admin/merchants/m-a/return-address',
+    });
+  });
+
+  /** 자사 상품을 받는 플랫폼 반품지는 가게 전체의 약속이라 배송 정책과 같은 자리에 있다 */
+  it('자사 상품이면 운영진이 듣고, 배송비 화면으로 간다', async () => {
+    await notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: [null] });
+
+    expect(where().OR).toEqual([expect.objectContaining({ role: { in: expect.any(Array) } })]);
+    expect(written()[0]).toMatchObject({ linkPath: '/admin/shipping' });
+  });
+
+  it('판매처가 둘이면 각자에게 각자의 자리로 보낸다', async () => {
+    db.user.findMany.mockResolvedValue([{ id: 'u-1' }]);
+
+    await notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: ['m-a', null] });
+
+    expect(written().map((n) => n['linkPath'])).toEqual([
+      '/admin/merchants/m-a/return-address',
+      '/admin/shipping',
+    ]);
+  });
+
+  it('빠진 곳이 없으면 아무것도 묻지 않는다', async () => {
+    await notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: [] });
+
+    expect(db.user.findMany).not.toHaveBeenCalled();
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('못 만들어도 던지지 않는다 — 신청은 이미 들어왔다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.user.findMany.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+    await expect(notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: ['m-a'] }))
+      .resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
   });
 });

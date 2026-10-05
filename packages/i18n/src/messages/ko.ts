@@ -1360,6 +1360,7 @@ export const ko = {
   'notif.LATE_DEPOSIT_FOUND': '취소한 주문 {orderNo} 에 {amount}원이 입금되었습니다 — 환불이 필요합니다',
   'notif.ORDER_ADDRESS_CHANGED': '주문 {orderNo} 의 배송지가 바뀌었습니다 — 보내기 전에 주소를 다시 확인해 주세요',
   'notif.RETURN_ADDRESS_CHANGED': '반품 {orderNo} 의 보낼 곳이 바뀌었습니다 — 아직 보내지 않으셨다면 새 주소를 확인해 주세요',
+  'notif.RETURN_ADDRESS_MISSING': '반품 신청 {orderNo} 의 보낼 곳이 없습니다 — 반품지를 등록해야 승인할 수 있습니다',
 } as const satisfies Record<string, Message>;
 
 export type MessageKey = keyof typeof ko;

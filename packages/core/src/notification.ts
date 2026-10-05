@@ -146,6 +146,14 @@ export const NOTIFICATION_KIND = [
    * 창고로 가고 아무도 그것을 기다리지 않는다.
    */
   'RETURN_ADDRESS_CHANGED',
+  /**
+   * 반품 신청이 들어왔는데 **보낼 곳이 없다** — 등록할 수 있는 사람에게.
+   *
+   * 반품지가 없으면 승인할 수 없다(missingReturnAddresses). 그런데 그 사실은 승인을 누르려다 막히고
+   * 나서야 드러났고, 누를 생각을 안 하면 영영 드러나지 않았다 — 그사이 손님의 신청은 대기열에 갇혀
+   * 있고, 손님 화면에는 "승인을 기다리는 중" 만 뜬다.
+   */
+  'RETURN_ADDRESS_MISSING',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KIND)[number];
 
@@ -175,6 +183,8 @@ export const CONSOLE_NOTIFICATION_KIND = [
   'LATE_DEPOSIT_FOUND',
   // 물건을 내보내는 자리에서 들을 말이다 — 손님으로 온 자리에 뜰 것이 아니다
   'ORDER_ADDRESS_CHANGED',
+  // 반품지를 등록하는 자리가 운영 화면이다
+  'RETURN_ADDRESS_MISSING',
 ] as const satisfies readonly NotificationKind[];
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>

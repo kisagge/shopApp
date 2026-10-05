@@ -53,6 +53,7 @@ const KIND_LABEL: Record<NotificationKind, string> = {
   LATE_DEPOSIT_FOUND: '취소 뒤 입금 — 환불 필요',
   ORDER_ADDRESS_CHANGED: '출고 전 배송지 변경',
   RETURN_ADDRESS_CHANGED: '반품지 변경',
+  RETURN_ADDRESS_MISSING: '반품지 미등록 — 승인 불가',
 };
 
 /** 값의 뜻. 자리 이름만 보여 주면 {optionLabel} 이 무엇인지 모른다 */

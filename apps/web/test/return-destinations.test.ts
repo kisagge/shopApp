@@ -12,10 +12,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const db = vi.hoisted(() => ({
   returnAddress: { findMany: vi.fn<(...a: any[]) => any>() },
+  order: { findUnique: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { approvedReturnDestinations } = await import('~/lib/orders/return-address');
+const { approvedReturnDestinations, ownersMissingReturnAddress } =
+  await import('~/lib/orders/return-address');
 
 const APPROVED_AT = new Date('2026-09-10T00:00:00Z');
 
@@ -95,5 +97,54 @@ describe('보낼 곳', () => {
     const found = await approvedReturnDestinations(items, request({ resolvedAt: null }));
 
     expect(found[0]!.changedSinceApproval).toBe(false);
+  });
+});
+
+/**
+ * 보낼 곳이 없는 판매처.
+ *
+ * **승인을 누르려다 막히고 나서야 드러났다.** 누를 생각을 안 하면 영영 드러나지 않고, 그사이 손님의
+ * 신청은 대기열에 갇혀 있다. 승인 때 막는 것과 같은 함수를 쓴다 — 두 곳이 갈리면 "알림은 왔는데
+ * 승인은 되는" 또는 그 반대가 된다.
+ */
+describe('보낼 곳이 없는 판매처', () => {
+  beforeEach(() => {
+    db.order.findUnique.mockResolvedValue({
+      items: [
+        { id: 'i-1', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' },
+        { id: 'i-2', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: null },
+      ],
+    });
+  });
+
+  it('등록된 곳은 빼고 빠진 곳만 짚는다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([row('m-a', APPROVED_AT)]);
+
+    expect(await ownersMissingReturnAddress('20261005-0000001', ['i-1', 'i-2'])).toEqual([null]);
+  });
+
+  it('둘 다 없으면 둘 다 짚는다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([]);
+
+    expect(await ownersMissingReturnAddress('20261005-0000001', ['i-1', 'i-2'])).toEqual(['m-a', null]);
+  });
+
+  it('전부 등록돼 있으면 빈 목록이다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([row('m-a', APPROVED_AT), row(null, APPROVED_AT)]);
+
+    expect(await ownersMissingReturnAddress('20261005-0000001', ['i-1', 'i-2'])).toEqual([]);
+  });
+
+  /** 신청한 줄만 본다 — 안 보내는 물건의 판매처까지 짚으면 엉뚱한 사람이 알림을 받는다 */
+  it('신청한 줄의 판매처만 본다', async () => {
+    db.returnAddress.findMany.mockResolvedValue([]);
+
+    expect(await ownersMissingReturnAddress('20261005-0000001', ['i-2'])).toEqual([null]);
+  });
+
+  it('없는 주문이면 빈 목록이다', async () => {
+    db.order.findUnique.mockResolvedValue(null);
+
+    expect(await ownersMissingReturnAddress('20261005-0000001', ['i-1'])).toEqual([]);
   });
 });
