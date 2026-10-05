@@ -15,6 +15,9 @@ vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 const cancelOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/cancel-order', () => ({ cancelOrder, CancelError: class extends Error {} }));
 
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 const getShippingPolicy = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/shipping-policy', () => ({ getShippingPolicy }));
 
@@ -273,5 +276,27 @@ describe('미리보기', () => {
     }));
     const preview = await previewCancelItems('20260914-0000001', ['i-coat', 'i-sock'], customer);
     expect(preview).toEqual({ kind: 'full', cash: 85_000 - 25_500, points: 3_500, shippingDeducted: 0 });
+  });
+});
+
+/**
+ * **잠겼던 재고가 돌아왔다.**
+ *
+ * 취소한 줄의 옵션이 기준 위로 올라왔다면 그 가게의 "재고 부족" 도 끝난 일이다. 닫을 수 있는지는
+ * 그쪽이 본다 — 여기서는 **어느 줄이 돌아왔는지**만 고른다.
+ */
+describe('돌아온 재고로 재고 부족 알림을 닫으러 간다', () => {
+  it('취소한 줄의 옵션만 넘긴다 — 남은 줄의 재고는 그대로다', async () => {
+    await cancelOrderItems('20260914-0000001', ['i-knit'], customer, '변심', gateway());
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit']);
+  });
+
+  it('취소가 막히면 묻지 않는다 — 재고는 그 자리에 있다', async () => {
+    await expect(
+      cancelOrderItems('20260914-0000001', ['없는줄'], customer, '변심', gateway()),
+    ).rejects.toThrow();
+
+    expect(clearLowStockForVariants).not.toHaveBeenCalled();
   });
 });

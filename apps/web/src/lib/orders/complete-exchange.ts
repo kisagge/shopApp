@@ -3,6 +3,7 @@ import { prisma } from '@shop/db';
 import { statusBeforeReturn, transition, type Actor, type CarrierCode } from '@shop/core';
 import { loadForResolve, ReturnError } from './return-request';
 import { notifyExchangeShipped } from './notify-exchange';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 
 /**
  * 교환 — 회수를 확인하고 바꾼 옵션을 보낸다.
@@ -84,6 +85,9 @@ export async function completeExchange(
     trackingNumber,
     lines: request.exchangeLines,
   });
+
+  // 돌아온 물건이 선반에 섰다 — 그 가게의 재고 할 일이 끝났으면 "재고 부족" 도 끝난 일이다
+  await clearLowStockForVariants(request.exchangeLines.map((l) => l.fromVariantId));
 
   return { orderNo: order.orderNo, orderStatus: back, exchanged: request.exchangeLines.length };
 }

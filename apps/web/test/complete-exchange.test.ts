@@ -24,6 +24,10 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const notifyExchangeShipped = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/orders/notify-exchange', () => ({ notifyExchangeShipped }));
 
+/* 돌아온 재고로 "재고 부족" 을 닫는 일. 여기서 볼 것은 **어느 옵션이 돌아왔는가** 다 */
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 const { completeExchange } = await import('~/lib/orders/complete-exchange');
 const { resolveReturn } = await import('~/lib/orders/return-request');
 
@@ -140,5 +144,27 @@ describe('교환 반려', () => {
     db.order.findFirst.mockResolvedValue(order({ type: 'RETURN', status: 'REQUESTED', exchangeLines: [] }));
     await resolveReturn('20260915-0000001', { action: 'REJECT', rejectReason: '기한 지남' }, admin);
     expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **재고가 돌아오면 그 할 일도 끝난다.**
+ *
+ * 교환은 재고가 두 번 움직인다 — 승인할 때 바꿀 옵션을 잡아 두고, 발송할 때 돌아온 물건을 되살린다.
+ * 닫으러 가는 것은 **실제로 선반에 돌아온 쪽**이다.
+ */
+describe('돌아온 재고로 재고 부족 알림을 닫으러 간다', () => {
+  it('교환을 발송하면 돌아온 물건의 옵션을 넘긴다', async () => {
+    await completeExchange('20260915-0000001', SHIP, admin, NOW);
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit-s']);
+  });
+
+  it('반려하면 잡아 두었던 옵션을 넘긴다 — 그 재고가 풀렸다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'REQUESTED' }));
+
+    await resolveReturn('20260915-0000001', { action: 'REJECT', rejectReason: '사진상 사용 흔적' }, admin);
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit-m']);
   });
 });

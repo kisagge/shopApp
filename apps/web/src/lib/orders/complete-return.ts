@@ -9,6 +9,7 @@ import {
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
 import { refundOrder } from '~/lib/admin/refund-order';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 import { policyOf } from './cancel-items';
 import { reclaimPurchaseReward, reclaimReviewReward } from './reclaim-reward';
 import { refundedSoFar } from './refund-ledger';
@@ -359,6 +360,14 @@ export async function completeReturn(
       props: { partial: true, fromReturn: true },
     });
   }
+
+  /*
+   * **물건이 돌아왔다 — 그 가게의 "재고 부족" 도 끝난 일일 수 있다.**
+   *
+   * 전부 반품은 refundOrder 를 타고 거기서 이미 묻는다(돌아온 재고가 있을 때만). 여기서 묻는 것은
+   * 일부 반품이다 — 재고를 여기서 직접 되살린다.
+   */
+  await clearLowStockForVariants(firstLines.map((l) => l.variantId));
 
   return done;
 }

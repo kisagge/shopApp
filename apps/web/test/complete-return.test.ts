@@ -15,6 +15,9 @@ vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 const refundOrder = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/refund-order', () => ({ refundOrder }));
 
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 const reclaimPurchaseReward = vi.hoisted(() => vi.fn<(...a: any[]) => any>(async () => ({ reclaimed: 0, shortfall: 0 })));
 const reclaimReviewReward = vi.hoisted(() => vi.fn<(...a: any[]) => any>(async () => ({ reclaimed: 0, shortfall: 0 })));
 vi.mock('~/lib/orders/reclaim-reward', () => ({ reclaimPurchaseReward, reclaimReviewReward }));
@@ -267,5 +270,19 @@ describe('중간에 끊긴 뒤 다시 누르면', () => {
     await completeReturn('20260914-0000002', admin, gateway());
 
     expect(db.returnRequest.updateMany.mock.calls[0]![0].where).toMatchObject({ id: 'rr-1', status: 'APPROVED' });
+  });
+});
+
+/**
+ * **물건이 돌아왔다 — 그 가게의 "재고 부족" 도 끝난 일일 수 있다.**
+ *
+ * 일부 반품은 여기서 직접 재고를 되살린다. 전부 반품은 환불 쪽(refundOrder)을 타고 거기서 묻는다 —
+ * 두 곳이 같은 일을 두 번 하지 않도록 길을 갈라 둔다.
+ */
+describe('돌아온 재고로 재고 부족 알림을 닫으러 간다', () => {
+  it('일부 반품은 돌려받은 줄의 옵션을 넘긴다', async () => {
+    await completeReturn('20260914-0000002', admin, gateway());
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit']);
   });
 });

@@ -7,6 +7,9 @@ vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 const markNoticesDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/notifications/record', () => ({ markNoticesDone }));
 
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 /** 잠근 뒤 다시 읽는 것도 같은 값을 보게 한다 — 달리 보이게 할 때만 트랜잭션 쪽을 바꾼다 */
 const read = vi.hoisted(() => ({
   findOrder: vi.fn<(...a: any[]) => any>(),
@@ -246,6 +249,29 @@ describe('취소하면 그 주문의 할 일 알림을 닫는다', () => {
       kinds: ['ORDER_ADDRESS_CHANGED'],
       about: { key: 'orderNo', value: '20260831-1234567' },
     });
+  });
+
+  /**
+   * **잠겼던 재고가 돌아왔다.** 그 옵션이 기준 위로 올라왔다면 그 가게의 "재고 부족" 도 끝난 일이다 —
+   * 닫을 수 있는지는 그쪽이 본다(한 옵션이 돌아와도 다른 옵션이 임박이면 여전히 할 일이다).
+   */
+  it('돌아온 재고로 재고 부족 알림도 닫으러 간다', async () => {
+    await cancelOrder('20260831-1234567', customer, '단순 변심', gateway());
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-coat-m', 'v-knit-l']);
+  });
+
+  it('이미 취소된 줄은 세지 않는다 — 그 재고는 그때 돌아갔다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      items: [
+        { variantId: 'v-coat-m', quantity: 2, canceledAt: null },
+        { variantId: 'v-knit-l', quantity: 1, canceledAt: new Date('2026-08-30') },
+      ],
+    }));
+
+    await cancelOrder('20260831-1234567', customer, '단순 변심', gateway());
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-coat-m']);
   });
 
   /** 막힌 취소는 아무것도 되돌리지 않았다 — 알림만 먼저 닫으면 할 일이 사라진다 */

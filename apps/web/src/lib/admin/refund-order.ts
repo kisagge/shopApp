@@ -7,6 +7,7 @@ import {
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 import { refundedSoFar } from '~/lib/orders/refund-ledger';
 import { reportLedgerMismatch } from '~/lib/errors/ledger';
 
@@ -308,6 +309,14 @@ export async function refundOrder(
     quantity,
     props: { reason, fromReturn },
   });
+
+  /*
+   * **돌아온 물건이 있을 때만 묻는다.** 반품에서 온 환불만 재고를 되살린다(fromReturn) — 그냥 환불은
+   * 물건이 손님에게 그대로 있어 선반에 돌아온 것이 없다.
+   */
+  if (stockRestored > 0) {
+    await clearLowStockForVariants(first.items.filter((i) => !i.canceledAt).map((i) => i.variantId));
+  }
 
   return {
     orderNo: first.orderNo,

@@ -18,7 +18,8 @@ const recordNotifications = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const markNoticesDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/notifications/record', () => ({ recordNotifications, markNoticesDone }));
 
-const { notifyLowStock, clearLowStockDone } = await import('~/lib/notifications/low-stock');
+const { notifyLowStock, clearLowStockDone, clearLowStockForVariants } =
+  await import('~/lib/notifications/low-stock');
 
 const variant = (id: string, merchantId: string | null, over: Record<string, unknown> = {}) => ({
   id,
@@ -159,6 +160,59 @@ describe('재고 부족 알림을 닫기', () => {
     product.count.mockRejectedValue(new Error('DB 가 흔들렸다'));
 
     await expect(clearLowStockDone('m-1')).resolves.toBeUndefined();
+    expect(error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * **재고가 돌아왔다** — 취소·환불·반품·교환으로.
+ *
+ * 사람이 채운 것만 보고 있었다. 그런데 재고는 돌아오기도 한다: 취소하면 잠긴 것이 풀리고, 반품이
+ * 도착하면 물건이 다시 선반에 선다. 그렇게 기준 위로 올라온 뒤에도 알림이 남으면 같은 고장이다.
+ */
+describe('돌아온 재고로 알림을 닫기', () => {
+  const owned = (merchantId: string | null) => ({ product: { brand: { merchantId } } });
+
+  it('돌아온 줄의 판매처를 찾아 묻는다', async () => {
+    productVariant.findMany.mockResolvedValue([owned('m-1')]);
+    user.findMany.mockResolvedValue([{ id: 'u-1' }]);
+
+    await clearLowStockForVariants(['v-1']);
+
+    expect(productVariant.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['v-1'] } });
+    expect(markNoticesDone).toHaveBeenCalledWith({ kinds: ['STOCK_LOW'], userIds: ['u-1'] });
+  });
+
+  /** 한 주문에 두 가게 물건이 섞인다 — 가게마다 한 번씩만 묻는다 */
+  it('판매처가 여럿이면 가게마다, 같은 가게는 한 번만 묻는다', async () => {
+    productVariant.findMany.mockResolvedValue([owned('m-1'), owned('m-2'), owned('m-1')]);
+    user.findMany.mockResolvedValue([{ id: 'u-1' }]);
+
+    await clearLowStockForVariants(['v-1', 'v-2', 'v-3']);
+
+    expect(product.count).toHaveBeenCalledTimes(2);
+  });
+
+  it('자사 상품 줄은 건너뛴다 — 애초에 아무에게도 안 보낸다', async () => {
+    productVariant.findMany.mockResolvedValue([owned(null)]);
+
+    await clearLowStockForVariants(['v-1']);
+
+    expect(product.count).not.toHaveBeenCalled();
+    expect(markNoticesDone).not.toHaveBeenCalled();
+  });
+
+  it('돌아온 줄이 없으면 아무것도 묻지 않는다', async () => {
+    await clearLowStockForVariants([]);
+
+    expect(productVariant.findMany).not.toHaveBeenCalled();
+  });
+
+  it('못 닫아도 던지지 않는다 — 취소도 환불도 이미 끝났다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    productVariant.findMany.mockRejectedValue(new Error('DB 가 흔들렸다'));
+
+    await expect(clearLowStockForVariants(['v-1'])).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
   });
 });

@@ -38,6 +38,9 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 const { refundOrder } = await import('~/lib/admin/refund-order');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -143,6 +146,21 @@ describe('되돌리는 것들', () => {
 
     expect(tx.productVariant.updateMany).not.toHaveBeenCalled();
     expect(result.stockRestored).toBe(0);
+  });
+
+  /** 물건이 선반에 돌아왔으니 그 가게의 "재고 부족" 도 끝난 일일 수 있다 */
+  it('재고가 돌아왔으면 재고 부족 알림도 닫으러 간다', async () => {
+    await refundOrder('20260904-1234567', admin, '사유', gateway);
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-1', 'v-2']);
+  });
+
+  it('돌아온 물건이 없으면 묻지 않는다 — 물건은 손님에게 그대로 있다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'CANCELLED' }));
+
+    await refundOrder('20260904-1234567', admin, '사유', gateway);
+
+    expect(clearLowStockForVariants).not.toHaveBeenCalled();
   });
 
   it('쓴 포인트를 원장과 함께 돌려준다', async () => {

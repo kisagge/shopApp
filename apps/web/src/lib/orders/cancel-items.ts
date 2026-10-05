@@ -9,6 +9,7 @@ import {
 import { getPaymentGateway } from '~/lib/payments';
 import { getShippingPolicy } from '~/lib/shipping-policy';
 import { recordServerEvent } from '~/lib/analytics/server';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 import { cancelOrder } from './cancel-order';
 import { refundedSoFar } from './refund-ledger';
 import { reportLedgerMismatch } from '~/lib/errors/ledger';
@@ -356,6 +357,11 @@ export async function cancelOrderItems(
       props: { reason, partial: true, byStaff: staff },
     });
   }
+
+  // 잠겼던 재고가 돌아왔다 — 그 가게의 재고 할 일이 끝났으면 "재고 부족" 도 끝난 일이다
+  await clearLowStockForVariants(
+    first.items.filter((i) => wanted.includes(i.id)).map((i) => i.variantId),
+  );
 
   return { orderNo, kind: 'partial', refunded, pointsReturned, shippingDeducted };
 }

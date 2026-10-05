@@ -9,6 +9,7 @@ import {
 } from '@shop/core';
 import { destinationsFor } from './return-address';
 import { clearReturnRequested } from '~/lib/notifications/console-work';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 
 /**
  * 반품·교환 신청과 처리.
@@ -398,6 +399,14 @@ export async function resolveReturn(
    */
   await clearReturnRequested(order.orderNo);
 
+  /*
+   * **반려·철회하면 교환으로 잡아 둔 재고가 풀린다**(revertOrder). 그 옵션이 기준 위로 올라왔다면
+   * 그 가게의 "재고 부족" 도 끝난 일일 수 있다 — 승인은 재고를 풀지 않으므로 묻지 않는다.
+   */
+  if (!approve) {
+    await clearLowStockForVariants(request.exchangeLines.map((l) => l.toVariantId));
+  }
+
   return {
     orderNo: order.orderNo,
     status: approve ? 'APPROVED' : withdraw ? 'CANCELLED' : 'REJECTED',
@@ -465,6 +474,8 @@ export async function cancelOwnReturn(
 
   // 손님이 무른 신청도 운영에게는 할 일이 없어진 것이다
   await clearReturnRequested(order.orderNo);
+  // 교환으로 잡아 둔 재고도 함께 풀렸다
+  await clearLowStockForVariants(request.exchangeLines.map((l) => l.toVariantId));
 
   return { orderNo: order.orderNo, status: 'CANCELLED', orderStatus: nextOrderStatus };
 }

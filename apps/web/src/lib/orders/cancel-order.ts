@@ -10,6 +10,7 @@ import { recordServerEvent } from '~/lib/analytics/server';
 import { refundedSoFar } from './refund-ledger';
 import { reportLedgerMismatch } from '~/lib/errors/ledger';
 import { markNoticesDone } from '~/lib/notifications/record';
+import { clearLowStockForVariants } from '~/lib/notifications/low-stock';
 
 export class CancelError extends Error {
   constructor(
@@ -310,6 +311,9 @@ export async function cancelOrder(
     kinds: ['ORDER_ADDRESS_CHANGED'],
     about: { key: 'orderNo', value: first.orderNo },
   });
+
+  // 잠겼던 재고가 돌아왔다 — 그 가게의 재고 할 일이 끝났으면 "재고 부족" 도 끝난 일이다
+  await clearLowStockForVariants(first.items.filter((i) => !i.canceledAt).map((i) => i.variantId));
 
   return {
     orderNo: first.orderNo,

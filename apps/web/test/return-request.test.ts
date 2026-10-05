@@ -16,6 +16,9 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const clearReturnRequested = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/notifications/console-work', () => ({ clearReturnRequested }));
 
+const clearLowStockForVariants = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockForVariants }));
+
 const { requestReturn, resolveReturn, receiveReturn, cancelOwnReturn } =
   await import('~/lib/orders/return-request');
 
@@ -760,5 +763,45 @@ describe('처리하면 신청 알림을 닫으러 간다', () => {
 
     await expect(resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin)).rejects.toThrow();
     expect(clearReturnRequested).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **잡아 둔 재고가 풀리면 그 할 일도 끝날 수 있다.**
+ *
+ * 교환을 승인하면 바꿀 옵션의 재고를 그 자리에서 잡는다. 반려·철회·손님의 취소는 그것을 되돌린다 —
+ * 그 옵션이 기준 위로 올라왔다면 그 가게의 "재고 부족" 도 끝난 일이다.
+ */
+describe('풀린 재고로 재고 부족 알림을 닫으러 간다', () => {
+  beforeEach(() => {
+    db.order.findFirst.mockResolvedValue({
+      id: 'o-1', orderNo: '20260901-0000001', status: 'RETURN_REQUESTED',
+      confirmedAt: null, deliveredAt: delivered,
+      items: [{ id: 'i-knit', status: 'RETURN_REQUESTED', canceledAt: null, merchantId: 'm-a' }],
+      returnRequests: [{
+        id: 'rr-1', type: 'EXCHANGE', status: 'REQUESTED', itemIds: ['i-knit'],
+        exchangeLines: [{ toVariantId: 'v-knit-m', quantity: 1 }],
+      }],
+    });
+    db.returnAddress.findMany.mockResolvedValue([addressOf('m-a')]);
+  });
+
+  it('반려하면 잡아 두었던 옵션을 넘긴다', async () => {
+    await resolveReturn('20260901-0000001', { action: 'REJECT', rejectReason: '기한 지남' }, admin);
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit-m']);
+  });
+
+  /** 승인은 재고를 풀지 않는다 — 오히려 바꿀 옵션을 잡아 둔다 */
+  it('승인에는 풀린 재고가 없다', async () => {
+    await resolveReturn('20260901-0000001', { action: 'APPROVE' }, admin);
+
+    expect(clearLowStockForVariants).not.toHaveBeenCalled();
+  });
+
+  it('손님이 무르면 그 옵션도 풀린다', async () => {
+    await cancelOwnReturn('20260901-0000001', { id: 'u-1', role: 'CUSTOMER', merchantId: null });
+
+    expect(clearLowStockForVariants).toHaveBeenCalledWith(['v-knit-m']);
   });
 });

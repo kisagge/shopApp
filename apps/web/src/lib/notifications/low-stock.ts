@@ -102,3 +102,36 @@ export async function clearLowStockDone(merchantId: string | null): Promise<void
     console.error('[notification] 재고 부족 알림을 닫지 못했다', { merchantId }, error);
   }
 }
+
+/**
+ * **재고가 돌아왔다** — 취소·환불·반품·교환으로.
+ *
+ * 사람이 채운 것만 보고 있었다(재고 조정). 그런데 재고는 돌아오기도 한다: 취소하면 잠긴 것이 풀리고,
+ * 반품이 도착하면 물건이 다시 선반에 선다. 그렇게 기준 위로 올라온 뒤에도 "재고가 부족합니다" 가
+ * 안 읽음으로 남으면, 뱃지의 숫자는 또 할 일의 수가 아니게 된다.
+ *
+ * **닫을 수 있는지는 clearLowStockDone 이 본다** — 여기서는 어느 가게의 일인지만 고른다. 돌아온 줄의
+ * 판매처가 여럿일 수 있다(한 주문에 두 가게 물건이 섞인다).
+ *
+ * **실패해도 던지지 않는다**(record 와 같은 규칙) — 취소도 환불도 이미 끝났다.
+ */
+export async function clearLowStockForVariants(variantIds: readonly string[]): Promise<void> {
+  if (variantIds.length === 0) return;
+
+  try {
+    const variants = await prisma.productVariant.findMany({
+      where: { id: { in: [...variantIds] } },
+      select: { product: { select: { brand: { select: { merchantId: true } } } } },
+    });
+    const owners = [
+      ...new Set(
+        variants.map((v) => v.product.brand.merchantId).filter((m): m is string => m !== null),
+      ),
+    ];
+    for (const owner of owners) {
+      await clearLowStockDone(owner);
+    }
+  } catch (error) {
+    console.error('[notification] 돌아온 재고로 알림을 닫지 못했다', { variantIds }, error);
+  }
+}
