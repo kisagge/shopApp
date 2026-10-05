@@ -19,7 +19,12 @@ const db = vi.hoisted(() => ({
   returnAddress: { findUnique: vi.fn<(...a: any[]) => any>(), upsert: vi.fn<(...a: any[]) => any>() },
   // 바꾸기 전에 "이 주소로 보내라고 안내받은" 신청을 센다
   returnRequest: { findMany: vi.fn<(...a: any[]) => any>() },
-  notification: { createMany: vi.fn<(...a: any[]) => any>() },
+  notification: {
+    createMany: vi.fn<(...a: any[]) => any>(),
+    // 등록하고 나면 "보낼 곳이 없다" 는 끝난 일이다
+    updateMany: vi.fn<(...a: any[]) => any>(),
+  },
+  user: { findMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -50,6 +55,8 @@ beforeEach(() => {
   db.merchant.findUnique.mockResolvedValue({ id: 'm-a' });
   db.returnRequest.findMany.mockResolvedValue([]);
   db.notification.createMany.mockResolvedValue({ count: 0 });
+  db.notification.updateMany.mockResolvedValue({ count: 1 });
+  db.user.findMany.mockResolvedValue([{ id: 'u-m' }]);
   db.returnAddress.findUnique.mockResolvedValue(null);
   db.returnAddress.upsert.mockImplementation(async ({ update, create }: any) => ({
     merchantId: create?.merchantId ?? null, ...(update ?? create),
@@ -194,5 +201,34 @@ describe('반품지가 바뀌면', () => {
     await call('m-a', input);
 
     expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 등록했으니 **"보낼 곳이 없다" 는 끝난 일이다.**
+ *
+ * 그 알림은 반품 신청이 들어왔는데 보낼 곳이 없을 때 등록할 수 있는 사람에게 간다. 등록한 뒤에도 안 읽음으로
+ * 남으면 뱃지의 숫자가 할 일의 수가 아니게 되고, 그러면 그 숫자를 아무도 보지 않는다.
+ */
+describe('등록하면 미등록 알림이 닫힌다', () => {
+  const closed = () => db.notification.updateMany.mock.calls[0]?.[0].where as Record<string, unknown> | undefined;
+
+  it('처음 등록한 것도 닫는다 — 그것이 바로 그 알림이 말한 일이다', async () => {
+    db.returnAddress.findUnique.mockResolvedValue(null);
+
+    expect((await call('m-a', input)).status).toBe(200);
+    expect(closed()).toMatchObject({
+      kind: { in: ['RETURN_ADDRESS_MISSING'] },
+      readAt: null,
+      userId: { in: ['u-m'] },
+    });
+  });
+
+  /** 막힌 저장은 주소를 바꾸지 않았다 — 알림만 닫으면 할 일이 사라진다 */
+  it('남의 반품지를 고치려다 막히면 닫지 않는다', async () => {
+    getActor.mockResolvedValue(merchant);
+
+    expect((await call('m-b', input)).status).toBe(403);
+    expect(db.notification.updateMany).not.toHaveBeenCalled();
   });
 });

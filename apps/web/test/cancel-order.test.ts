@@ -4,6 +4,9 @@ import { won, type Actor, type PaymentGateway } from '@shop/core';
 const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/analytics/server', () => ({ recordServerEvent }));
 
+const markNoticesDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/notifications/record', () => ({ markNoticesDone }));
+
 /** 잠근 뒤 다시 읽는 것도 같은 값을 보게 한다 — 달리 보이게 할 때만 트랜잭션 쪽을 바꾼다 */
 const read = vi.hoisted(() => ({
   findOrder: vi.fn<(...a: any[]) => any>(),
@@ -225,6 +228,32 @@ describe('취소할 수 없는 이유를 구분해서 알린다', () => {
     await expect(
       cancelOrder('20260831-1234567', admin, '배송 사고', gateway()),
     ).rejects.toThrow(/배송중/); // 상태머신이 SHIPPED → CANCELLED 를 막는다
+  });
+});
+
+/**
+ * 끝난 일의 알림.
+ *
+ * **취소한 주문에는 보낼 물건이 없다.** "배송지가 바뀌었습니다" 는 보내기 전에 주소를 다시 보라는 말이라,
+ * 취소와 함께 할 일이 없어진다. 상태로 닫는 쪽(transitionOrder)은 취소를 받지 않으므로 — 취소는 이 함수의
+ * 일이다 — 그 알림도 여기서 닫는다.
+ */
+describe('취소하면 그 주문의 할 일 알림을 닫는다', () => {
+  it('주문번호로 좁혀 읽음으로 남긴다', async () => {
+    await cancelOrder('20260831-1234567', customer, '단순 변심', gateway());
+
+    expect(markNoticesDone).toHaveBeenCalledWith({
+      kinds: ['ORDER_ADDRESS_CHANGED'],
+      about: { key: 'orderNo', value: '20260831-1234567' },
+    });
+  });
+
+  /** 막힌 취소는 아무것도 되돌리지 않았다 — 알림만 먼저 닫으면 할 일이 사라진다 */
+  it('취소가 막히면 닫지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(order({ status: 'CONFIRMED' }));
+
+    await expect(cancelOrder('20260831-1234567', admin, '고객 요청', gateway())).rejects.toThrow();
+    expect(markNoticesDone).not.toHaveBeenCalled();
   });
 });
 

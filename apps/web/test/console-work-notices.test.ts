@@ -11,13 +11,16 @@ const db = vi.hoisted(() => ({
   user: { findMany: vi.fn<(...a: any[]) => any>() },
   orderItem: { findMany: vi.fn<(...a: any[]) => any>() },
   inquiry: { findUnique: vi.fn<(...a: any[]) => any>() },
-  notification: { createMany: vi.fn<(...a: any[]) => any>() },
+  notification: {
+    createMany: vi.fn<(...a: any[]) => any>(),
+    updateMany: vi.fn<(...a: any[]) => any>(),
+  },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const {
   notifyReturnRequested, notifyInquiryReceived, notifyMerchantApplied, notifyAddressChanged,
-  notifyReturnAddressMissing,
+  notifyReturnAddressMissing, clearReturnAddressMissing,
 } = await import('~/lib/notifications/console-work');
 
 const where = () => db.user.findMany.mock.calls[0]![0].where as { suspendedAt: null; OR: Record<string, unknown>[] };
@@ -27,6 +30,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.user.findMany.mockResolvedValue([{ id: 'u-1' }, { id: 'u-2' }]);
   db.notification.createMany.mockResolvedValue({ count: 2 });
+  db.notification.updateMany.mockResolvedValue({ count: 2 });
 });
 
 describe('반품·교환 신청', () => {
@@ -240,6 +244,54 @@ describe('반품지 미등록', () => {
 
     await expect(notifyReturnAddressMissing({ orderNo: '20261005-0000001', owners: ['m-a'] }))
       .resolves.toBeUndefined();
+    expect(error).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 반품지를 등록하면 **"보낼 곳이 없다" 는 끝난 일이다.**
+ *
+ * 등록한 뒤에도 안 읽음으로 남으면 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "그동안 몇 번 일이 있었나" 가
+ * 되고, 그 숫자를 아무도 보지 않게 된다. 받는 사람으로 좁힌다 — 한 판매처에 반품지는 한 줄이라, 그 사람
+ * 앞으로 온 이 종류는 전부 그 반품지에 대한 것이다.
+ */
+describe('반품지 미등록 알림을 닫기', () => {
+  const closed = () => db.notification.updateMany.mock.calls[0]![0].where as Record<string, unknown>;
+
+  it('가맹점 반품지를 등록하면 그 가맹점의 알림이 읽음이 된다', async () => {
+    await clearReturnAddressMissing('m-a');
+
+    expect(where().OR).toEqual([
+      expect.objectContaining({ role: 'MERCHANT', merchantId: { in: ['m-a'] } }),
+    ]);
+    expect(closed()).toMatchObject({
+      kind: { in: ['RETURN_ADDRESS_MISSING'] },
+      readAt: null,
+      userId: { in: ['u-1', 'u-2'] },
+    });
+  });
+
+  /** 알릴 때와 같은 사람을 찾아야 한다 — 두 쪽이 갈리면 "알림은 왔는데 닫히지 않는" 칸이 생긴다 */
+  it('자사 상품 반품지를 등록하면 운영진의 알림이 읽음이 된다', async () => {
+    await clearReturnAddressMissing(null);
+
+    expect(where().OR).toEqual([expect.objectContaining({ role: { in: expect.any(Array) } })]);
+    expect(closed()['userId']).toEqual({ in: ['u-1', 'u-2'] });
+  });
+
+  it('들을 사람이 없으면 아무것도 하지 않는다 — 조건 없는 updateMany 가 되면 안 된다', async () => {
+    db.user.findMany.mockResolvedValue([]);
+
+    await clearReturnAddressMissing('m-a');
+
+    expect(db.notification.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('못 닫아도 던지지 않는다 — 반품지는 이미 등록됐다', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    db.user.findMany.mockRejectedValue(new Error('DB 가 안 열린다'));
+
+    await expect(clearReturnAddressMissing('m-a')).resolves.toBeUndefined();
     expect(error).toHaveBeenCalled();
   });
 });

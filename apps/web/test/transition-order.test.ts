@@ -11,6 +11,10 @@ const tx = vi.hoisted(() => ({
 const db = vi.hoisted(() => ({ order: { findFirst: vi.fn<(...a: any[]) => any>() }, $transaction: vi.fn<(...a: any[]) => any>() }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
+/** 끝난 일의 알림을 읽음으로 남기는 자리 — 들여다보려고 가로챈다 */
+const markNoticesDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/notifications/record', () => ({ markNoticesDone }));
+
 const { transitionOrder, TransitionError } = await import('~/lib/admin/transition-order');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -341,5 +345,57 @@ describe('환불 우회 차단', () => {
     tx.orderItem.findMany.mockResolvedValue([{ status: 'RETURNED' }, { status: 'RETURNED' }]);
 
     await expect(transitionOrder('20260831-1234567', 'RETURNED', admin)).resolves.toBeDefined();
+  });
+});
+
+/**
+ * 끝난 일의 알림.
+ *
+ * **"배송지가 바뀌었습니다" 는 보내기 전에 주소를 다시 보라는 말이다.** 출고 전 구간을 벗어나면
+ * (출고·취소) 그 말에 할 일이 없는데, 안 읽음으로 남으면 뱃지의 숫자가 할 일의 수가 아니게 된다.
+ */
+describe('배송지 변경 알림 닫기', () => {
+  it('출고하면 닫는다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    // 줄이 전부 옮겨졌을 때만 주문이 따라 옮겨진다 — 그 상태를 줄에서 다시 센다
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'SHIPPED' }, { status: 'SHIPPED' }]);
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', admin);
+
+    expect(markNoticesDone).toHaveBeenCalledWith({
+      kinds: ['ORDER_ADDRESS_CHANGED'],
+      about: { key: 'orderNo', value: '20260831-1234567' },
+    });
+  });
+
+  /**
+   * **다른 가맹점 상품이 남아 있으면 주문은 아직 배송 준비다.** 그 주소로 보낼 물건이 남아 있으니
+   * 알림도 닫지 않는다 — 한쪽이 출고했다고 닫으면 다른 쪽이 그 말을 못 듣는다.
+   */
+  it('한쪽만 출고했으면 닫지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'SHIPPED' }, { status: 'PREPARING' }]);
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', merchantA);
+
+    expect(markNoticesDone).not.toHaveBeenCalled();
+  });
+
+  /** 배송 준비는 아직 출고 전이다 — 그 주소로 보낼 일이 남아 있다 */
+  it('배송 준비로 옮기는 것은 닫지 않는다', async () => {
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'PREPARING' }]);
+
+    await transitionOrder('20260831-1234567', 'PREPARING', admin);
+
+    expect(markNoticesDone).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **취소는 이 자리로 오지 않는다.** 상태만 옮기면 돈과 재고가 그대로라, 취소는 전용 창구로만 간다
+   * (cancelOrder) — 그래서 그 알림도 거기서 닫는다.
+   */
+  it('취소는 이 함수가 받지 않는다', async () => {
+    await expect(transitionOrder('20260831-1234567', 'CANCELLED', admin))
+      .rejects.toMatchObject({ code: 'USE_CANCEL' });
   });
 });

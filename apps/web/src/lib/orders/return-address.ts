@@ -7,7 +7,7 @@ import {
   type Actor, type Permission, type ReturnAddress, type ReturnDestination,
 } from '@shop/core';
 import type { ReturnAddressInput } from '@shop/contract';
-import { notifyReturnAddressChanged } from '~/lib/notifications/console-work';
+import { clearReturnAddressMissing, notifyReturnAddressChanged } from '~/lib/notifications/console-work';
 
 const ADDRESS_SELECT = {
   merchantId: true, recipient: true, phone: true, postalCode: true, address1: true, address2: true,
@@ -167,6 +167,13 @@ export async function updateReturnAddress(
    * 사람이 받아 줘야 하고, 그것은 운영의 일이다. 알림이 실패해도 주소는 이미 바뀌었다.
    */
   if (returnAddressChanged(before, after)) await notifyReturnAddressChanged(affected);
+
+  /*
+   * **"보낼 곳이 없다" 는 알림은 끝난 일이다.** 등록하러 온 사람이 바로 이 사람이고, 등록한 뒤에도
+   * 그 알림이 안 읽음으로 남으면 뱃지가 할 일의 수를 말하지 않는다. 처음 등록한 때만이 아니라 고칠
+   * 때도 닫는다 — 미등록 알림이 남아 있는데 주소가 멀쩡한 경우가 그쪽이다.
+   */
+  await clearReturnAddressMissing(merchantId);
 
   return { before, after };
 }

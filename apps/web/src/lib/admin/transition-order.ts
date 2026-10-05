@@ -2,9 +2,10 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   adminStatusActions, canTransition, hasPermission, merchantScope, ORDER_STATUS_LABEL,
-  orderStatusFromItems,
+  orderStatusFromItems, ADDRESS_EDITABLE_STATUS,
   type Actor, type OrderStatus,
 } from '@shop/core';
+import { markNoticesDone } from '~/lib/notifications/record';
 import { grantPurchaseReward } from '~/lib/orders/grant-reward';
 import { notifyShipmentStage } from '~/lib/orders/notify-shipment';
 
@@ -238,9 +239,25 @@ export async function transitionOrder(
     });
   }
 
+  /*
+   * **끝난 일의 알림은 읽음으로 남긴다.** "배송지가 바뀌었습니다" 는 보내기 전에 주소를 다시 보라는
+   * 말이다 — 출고 전 구간을 벗어나면(출고·취소) 그 말에 할 일이 없는데, 안 읽음으로 남으면 뱃지의
+   * 숫자가 "할 일이 몇 개" 가 아니라 "그동안 몇 번 일이 있었나" 가 된다.
+   *
+   * 구간은 core 의 목록이 정한다(ADDRESS_EDITABLE_STATUS) — 표시·알림을 켜는 조건과 같은 목록이라
+   * 둘이 갈리지 않는다.
+   */
+  const moved = result.moveOrder && result.derived ? result.derived : order.status;
+  if (!ADDRESS_EDITABLE_STATUS.includes(moved)) {
+    await markNoticesDone({
+      kinds: ['ORDER_ADDRESS_CHANGED'],
+      about: { key: 'orderNo', value: order.orderNo },
+    });
+  }
+
   return {
     orderNo: order.orderNo,
-    orderStatus: result.moveOrder && result.derived ? result.derived : order.status,
+    orderStatus: moved,
     itemsMoved: result.count,
     waitingForOthers: !result.moveOrder,
     rewardGranted: rewarded.granted ? rewarded.amount : 0,

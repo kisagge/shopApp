@@ -9,6 +9,7 @@ import { getPaymentGateway } from '~/lib/payments';
 import { recordServerEvent } from '~/lib/analytics/server';
 import { refundedSoFar } from './refund-ledger';
 import { reportLedgerMismatch } from '~/lib/errors/ledger';
+import { markNoticesDone } from '~/lib/notifications/record';
 
 export class CancelError extends Error {
   constructor(
@@ -300,6 +301,15 @@ export async function cancelOrder(
       props: { reason, byStaff: isStaff },
     });
   }
+
+  /*
+   * **취소한 주문에는 보낼 물건이 없다.** "배송지가 바뀌었습니다" 는 보내기 전에 주소를 다시 보라는
+   * 말이라, 취소와 함께 할 일이 없어진다 — 안 읽음으로 남으면 뱃지의 숫자가 할 일의 수가 아니게 된다.
+   */
+  await markNoticesDone({
+    kinds: ['ORDER_ADDRESS_CHANGED'],
+    about: { key: 'orderNo', value: first.orderNo },
+  });
 
   return {
     orderNo: first.orderNo,

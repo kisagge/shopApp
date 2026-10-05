@@ -4,7 +4,7 @@ import {
   inquiryAudience, operatorRolesWith, returnAudience, shipmentAudience,
   type Permission, type ReturnAudience,
 } from '@shop/core';
-import { recordNotifications, type NoticeInput } from './record';
+import { markNoticesDone, recordNotifications, type NoticeInput } from './record';
 
 /**
  * 처리할 일을 운영 알림함에 알린다 — 반품·교환 신청, 상품 문의, 고객센터 문의, 입점 신청.
@@ -202,5 +202,23 @@ export async function notifyReturnAddressMissing(input: {
     await recordNotifications(notices);
   } catch (error) {
     console.error('[notification] 반품지 미등록 알림을 못 만들었다', { orderNo: input.orderNo }, error);
+  }
+}
+
+/**
+ * 반품지가 등록됐다 — **"보낼 곳이 없다" 는 알림은 끝난 일이다.**
+ *
+ * 받는 사람으로 좁힌다(params 가 아니라). 한 판매처에 반품지는 한 줄이라, 그 사람 앞으로 온 이 종류는
+ * 전부 그 반품지에 대한 것이다 — 주문번호마다 따로 지울 이유가 없다.
+ */
+export async function clearReturnAddressMissing(merchantId: string | null): Promise<void> {
+  try {
+    const userIds = await recipients(
+      merchantId === null ? { merchantIds: [], operators: true } : { merchantIds: [merchantId], operators: false },
+      merchantId === null ? 'shipping:write' : 'merchant:write',
+    );
+    await markNoticesDone({ kinds: ['RETURN_ADDRESS_MISSING'], userIds });
+  } catch (error) {
+    console.error('[notification] 반품지 미등록 알림을 닫지 못했다', { merchantId }, error);
   }
 }
