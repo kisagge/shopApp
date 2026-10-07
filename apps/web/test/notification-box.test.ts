@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { CONSOLE_NOTIFICATION_KIND } from '@shop/core';
+import { CONSOLE_NEWS_KIND, CONSOLE_NOTIFICATION_KIND } from '@shop/core';
 
 /**
  * 매장 알림함과 운영 알림함이 서로를 건드리지 않는다.
@@ -88,11 +88,21 @@ describe('읽음 처리', () => {
     expect(kinds, '매장에서 연 알림함이 운영 알림까지 읽음으로 만든다').not.toContain('STOCK_LOW');
   });
 
-  it('운영 알림함을 열면 운영 알림만 읽음이 된다', async () => {
+  /**
+   * **운영 알림함을 열면 소식만 읽힌다.**
+   *
+   * 거기에는 할 일과 소식이 섞여 있다. 할 일까지 읽음으로 만들면 아직 처리하지 않은 일이 알림함에서
+   * 사라지고, 반대로 소식을 남기면 아무도 닫지 않아 영영 쌓인다(보존 규칙은 읽은 것만 지운다).
+   */
+  it('운영 알림함을 열면 소식만 읽음이 된다 — 할 일은 남는다', async () => {
     await markRead(
       new Request('http://localhost/api/notifications/read?box=console', { method: 'POST' }),
     );
-    expect(kindsIn(notification.updateMany.mock.calls[0])).toEqual([...CONSOLE_NOTIFICATION_KIND]);
+
+    const kinds = kindsIn(notification.updateMany.mock.calls[0]);
+    expect(kinds).toEqual([...CONSOLE_NEWS_KIND]);
+    expect(kinds, '열어 본 것만으로 재고 할 일이 읽음이 됐다').not.toContain('STOCK_LOW');
+    expect(kinds).not.toContain('RETURN_REQUESTED');
   });
 
   it('모르는 알림함 이름은 매장으로 본다', async () => {
@@ -118,6 +128,13 @@ describe('줄을 골라 읽음 처리', () => {
       body: JSON.stringify(payload),
     });
   const where = () => notification.updateMany.mock.calls[0]![0].where as Record<string, any>;
+
+  /** 고른 줄은 사람이 "끝났다" 고 누른 것이다 — 할 일도 닫는다 */
+  it('고른 줄이면 할 일도 닫는다', async () => {
+    await markRead(body({ ids: ['clh1abc2300000000000000001'] }));
+
+    expect(kindsIn(notification.updateMany.mock.calls[0])).toEqual([...CONSOLE_NOTIFICATION_KIND]);
+  });
 
   it('고른 줄만 읽음으로 만든다', async () => {
     await markRead(body({ ids: ['clh1abc2300000000000000001', 'clh1abc2300000000000000002'] }));

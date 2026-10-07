@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { formatDateTime } from '@shop/i18n';
-import { LOW_STOCK_THRESHOLD } from '@shop/core';
+import { CONSOLE_NEWS_KIND, LOW_STOCK_THRESHOLD } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
 import { PageNav } from '~/components/page-nav';
@@ -9,6 +9,7 @@ import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
 import { getNotificationTemplates } from '~/lib/notifications/templates';
 import { MarkReadButton } from './mark-read-button';
+import { MarkNotificationsRead } from '~/components/mark-notifications-read';
 
 export const metadata: Metadata = { title: '알림' };
 export const dynamic = 'force-dynamic';
@@ -20,12 +21,13 @@ export const dynamic = 'force-dynamic';
  * 다 들어가는데, 매장에서는 손님 알림만, 여기서는 운영 알림만 본다 — 어느 것이
  * 어디에 속하는지는 core 의 CONSOLE_NOTIFICATION_KIND 가 정한다.
  *
- * **열었다고 읽음이 되지 않는다.** 여기 오는 것은 소식이 아니라 **할 일**이다(반품 신청·문의·입점
- * 신청·재고). 한 번 열면 전부 읽음이 되던 때에는 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "들여다봤는가"
- * 가 됐고, 아직 처리하지 않은 일은 목록을 훑어 기억하는 수밖에 없었다 — 코드가 끝난 일을 닫아 주는
- * 것(markNoticesDone)과 짝을 이루려면 사람도 자기 손으로 닫을 수 있어야 한다.
+ * **열었다고 할 일이 끝나지는 않는다.** 여기에는 할 일(반품 신청·문의·입점 신청·재고)과 소식(검수
+ * 결과·정산)이 섞여 있다. 한 번 열면 전부 읽음이 되던 때에는 뱃지의 숫자가 "할 일이 몇 개" 가 아니라
+ * "들여다봤는가" 가 됐고, 아직 처리하지 않은 일은 목록을 훑어 기억하는 수밖에 없었다 — 코드가 끝난 일을
+ * 닫아 주는 것(markNoticesDone)과 짝을 이루려면 사람도 자기 손으로 닫을 수 있어야 한다.
  *
- * 매장 알림함은 그대로 열면 읽음이 된다 — 거기 오는 것은 보고 지나가는 소식이다.
+ * **소식은 열면 읽힌다.** 아무도 "닫을" 일이 아니라서 그대로 두면 영영 안 읽음으로 쌓이고(보존 규칙은
+ * 읽은 것만 지운다) 뱃지는 다시 아무도 보지 않는 숫자가 된다. 어느 종류가 소식인지는 서버가 정한다.
  */
 export default async function AdminNotificationsPage({
   searchParams,
@@ -48,6 +50,13 @@ export default async function AdminNotificationsPage({
   const templates = await getNotificationTemplates(locale);
   // 사람이 닫을 수 있는 것 — 이 쪽에 보이는 안 읽은 줄
   const unreadIds = items.filter((n) => n.unread).map((n) => n.id);
+  /*
+   * 안 읽은 **소식**이 있을 때만 창구를 부른다. 할 일만 남았으면 부를 일이 없다 — 어느 쪽이든
+   * 서버가 소식만 읽지만, 아무것도 바뀌지 않을 요청을 화면이 열릴 때마다 보낼 이유가 없다.
+   */
+  const hasUnreadNews = items.some(
+    (n) => n.unread && (CONSOLE_NEWS_KIND as readonly string[]).includes(n.kind),
+  );
 
   return (
     <>
@@ -77,6 +86,9 @@ export default async function AdminNotificationsPage({
         </div>
       </header>
 
+
+      {/* 소식은 열면 읽힌다. 할 일은 남는다 — 어느 종류가 어느 쪽인지는 서버가 정한다 */}
+      {hasUnreadNews && <MarkNotificationsRead box="console" />}
 
       <div className="p-4 sm:p-8">
         {items.length === 0 ? (

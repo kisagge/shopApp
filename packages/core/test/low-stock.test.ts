@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   NOTIFICATION_KIND, CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND,
+  CONSOLE_TODO_KIND, CONSOLE_NEWS_KIND,
   LOW_STOCK_THRESHOLD, crossedLowStock, leftLowStock, stockLevel, STOCK_LEVEL_RANGE,
 } from '../src/notification';
 
@@ -101,6 +102,42 @@ describe('어느 알림함에 뜨는가', () => {
   it('재고 부족은 운영 알림함의 것이다', () => {
     expect(CONSOLE_NOTIFICATION_KIND).toContain('STOCK_LOW');
     expect(CUSTOMER_NOTIFICATION_KIND as readonly string[]).not.toContain('STOCK_LOW');
+  });
+});
+
+/**
+ * **한 알림함에 두 가지가 섞여 있다** — 할 일과 소식.
+ *
+ * 둘을 같게 다루면 어느 쪽이든 손해다. 열면 전부 읽음으로 만들면 아직 처리하지 않은 일까지 사라지고,
+ * 전부 남기면 아무도 닫지 않는 소식이 영영 쌓인다(보존 규칙은 읽은 것만 지운다) — 그러면 뱃지는 다시
+ * 아무도 보지 않는 숫자가 된다.
+ */
+describe('할 일과 소식', () => {
+  it('재고·반품 신청·문의는 할 일이다 — 사람이나 코드가 닫아야 끝난다', () => {
+    for (const kind of ['STOCK_LOW', 'RETURN_REQUESTED', 'INQUIRY_RECEIVED', 'RETURN_ADDRESS_MISSING'] as const) {
+      expect(CONSOLE_TODO_KIND as readonly string[], kind).toContain(kind);
+    }
+  });
+
+  it('검수 결과와 정산은 소식이다 — 아무도 "닫을" 일이 아니다', () => {
+    for (const kind of ['PRODUCT_APPROVED', 'PRODUCT_REJECTED', 'SETTLEMENT_CLOSED', 'SETTLEMENT_PAID'] as const) {
+      expect(CONSOLE_NEWS_KIND as readonly string[], kind).toContain(kind);
+    }
+  });
+
+  /**
+   * **둘을 합치면 운영 알림함과 같고, 겹치지 않는다.** 어느 쪽에도 안 들어간 종류는 열어도 안 읽히고
+   * 닫을 자리도 뚜렷하지 않아 영구히 남는다 — 종류를 새로 더할 때 가장 빠뜨리기 쉬운 칸이다.
+   */
+  it('가른 둘이 운영 알림함 전체와 같다', () => {
+    expect(new Set([...CONSOLE_TODO_KIND, ...CONSOLE_NEWS_KIND])).toEqual(new Set(CONSOLE_NOTIFICATION_KIND));
+    const todo = new Set<string>(CONSOLE_TODO_KIND);
+    expect(CONSOLE_NEWS_KIND.filter((k) => todo.has(k))).toEqual([]);
+  });
+
+  it('손님 알림은 어느 쪽도 아니다 — 이 가름은 운영 알림함 안의 일이다', () => {
+    const customer = new Set<string>(CUSTOMER_NOTIFICATION_KIND);
+    expect([...CONSOLE_TODO_KIND, ...CONSOLE_NEWS_KIND].filter((k) => customer.has(k))).toEqual([]);
   });
 });
 

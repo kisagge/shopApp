@@ -5,12 +5,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Actor } from '@shop/core';
 
 /**
- * 운영 알림함 — **열었다고 끝난 것이 아니다.**
+ * 운영 알림함 — **열었다고 할 일이 끝나지는 않는다.**
  *
- * 여기 오는 것은 소식이 아니라 할 일이다(반품 신청·문의·입점 신청·재고). 한 번 열면 안 읽은 것이 전부
- * 읽음이 되던 때에는 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "들여다봤는가" 가 됐고, 아직 처리하지 않은
- * 일은 목록을 훑어 기억하는 수밖에 없었다 — 코드가 끝난 일을 닫아 주는 것(markNoticesDone)과 짝이
- * 되려면 사람도 자기 손으로 닫을 수 있어야 한다.
+ * 여기에는 할 일(반품 신청·문의·입점 신청·재고)과 소식(검수 결과·정산)이 섞여 있다. 한 번 열면 안 읽은
+ * 것이 전부 읽음이 되던 때에는 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "들여다봤는가" 가 됐고, 아직
+ * 처리하지 않은 일은 목록을 훑어 기억하는 수밖에 없었다 — 코드가 끝난 일을 닫아 주는 것과 짝이 되려면
+ * 사람도 자기 손으로 닫을 수 있어야 한다.
+ *
+ * **소식은 열면 읽힌다.** 아무도 닫을 일이 아니라서 남겨 두면 영영 쌓인다 — 어느 종류가 소식인지는
+ * 서버가 정하고(core), 화면이 하는 일은 안 읽은 소식이 있을 때 그 창구를 한 번 부르는 것뿐이다.
  */
 
 const requireAdmin = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
@@ -57,16 +60,32 @@ const sent = () => {
   return { url, body: JSON.parse(init.body) as { ids: string[] } };
 };
 
-describe('열었다고 읽음이 되지 않는다', () => {
+describe('열었다고 할 일이 끝나지는 않는다', () => {
   /**
-   * **여기가 이 묶음의 요점이다.** 자동 읽음이 남아 있으면 그 아래 단추들은 아무 뜻이 없다 — 화면이
+   * **여기가 이 묶음의 요점이다.** 할 일까지 자동으로 읽히면 그 아래 단추들은 아무 뜻이 없다 — 화면이
    * 뜨는 순간 이미 전부 읽음이기 때문이다.
    */
-  it('화면이 뜨면서 읽음 창구를 부르지 않는다', async () => {
+  it('할 일만 안 읽음이면 읽음 창구를 부르지 않는다', async () => {
     await renderPage();
 
     await waitFor(() => expect(screen.getByRole('list')).toBeDefined());
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  /** 소식은 아무도 "닫을" 일이 아니라서 남겨 두면 영영 쌓인다 — 열어 본 것으로 끝이다 */
+  it('안 읽은 소식이 있으면 창구를 한 번 부른다 — 줄을 고르지 않는다', async () => {
+    getMyNotifications.mockResolvedValue({
+      rows: [notice({ id: 'n-news', kind: 'SETTLEMENT_PAID', params: { period: '2026-09', amount: '1,284,000' } })],
+      total: 1,
+    });
+
+    await renderPage();
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, RequestInit | undefined];
+    expect(url).toBe('/api/notifications/read?box=console');
+    // 종류를 화면이 적어 보내지 않는다 — 어느 쪽이 소식인지는 서버가 정한다
+    expect(init?.body).toBeUndefined();
   });
 
   it('안 읽은 줄에는 닫는 단추가 선다', async () => {

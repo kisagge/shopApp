@@ -186,6 +186,42 @@ export const CONSOLE_NOTIFICATION_KIND = [
   // 반품지를 등록하는 자리가 운영 화면이다
   'RETURN_ADDRESS_MISSING',
 ] as const satisfies readonly NotificationKind[];
+/**
+ * 운영 알림함 안의 **할 일** — 사람이나 코드가 닫아야 끝나는 것.
+ *
+ * **한 알림함에 두 가지가 섞여 있다.** 하나는 할 일이고(반품 신청이 들어왔다, 재고가 비어 간다),
+ * 하나는 소식이다(검수 결과, 정산 확정·지급). 둘을 같게 다루면 어느 쪽이든 손해다:
+ *
+ * · 열면 전부 읽음으로 만들면 **아직 처리하지 않은 일**까지 사라진다 — 뱃지가 "할 일이 몇 개" 가
+ *   아니라 "들여다봤는가" 가 된다(그래서 열어도 읽음을 찍지 않게 했다)
+ * · 그렇다고 전부 남기면 **소식이 영영 안 읽음으로 쌓인다** — 검수 결과·정산은 아무도 "닫을" 일이
+ *   아니라서 한 줄씩 눌러 주지 않으면 그대로다. 보존 규칙도 읽은 것만 지우므로(90일) 그 줄들은
+ *   영구히 남고, 뱃지는 다시 아무도 보지 않는 숫자가 된다.
+ *
+ * 그래서 가른다: **할 일은 남고, 소식은 열면 읽힌다.**
+ */
+export const CONSOLE_TODO_KIND = [
+  'STOCK_LOW',
+  'RETURN_REQUESTED',
+  'INQUIRY_RECEIVED',
+  'SUPPORT_INQUIRY_RECEIVED',
+  'MERCHANT_APPLIED',
+  'LATE_DEPOSIT_FOUND',
+  'ORDER_ADDRESS_CHANGED',
+  'RETURN_ADDRESS_MISSING',
+] as const satisfies readonly (typeof CONSOLE_NOTIFICATION_KIND)[number][];
+
+/**
+ * 운영 알림함 안의 **소식** — 보고 지나가는 것. 할 일의 나머지다.
+ *
+ * 빼서 만든다(손으로 적지 않는다): 둘을 각자 적으면 종류를 새로 더할 때 어느 쪽에도 안 들어가거나
+ * 양쪽에 들어가는 칸이 생긴다 — 검사가 그것을 보지만, 애초에 그럴 수 없게 두는 편이 낫다.
+ */
+export const CONSOLE_NEWS_KIND = CONSOLE_NOTIFICATION_KIND.filter(
+  (kind): kind is Exclude<(typeof CONSOLE_NOTIFICATION_KIND)[number], (typeof CONSOLE_TODO_KIND)[number]> =>
+    !(CONSOLE_TODO_KIND as readonly string[]).includes(kind),
+);
+
 export const CUSTOMER_NOTIFICATION_KIND = NOTIFICATION_KIND.filter(
   (kind): kind is Exclude<NotificationKind, (typeof CONSOLE_NOTIFICATION_KIND)[number]> =>
     !(CONSOLE_NOTIFICATION_KIND as readonly string[]).includes(kind),
