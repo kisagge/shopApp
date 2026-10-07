@@ -76,8 +76,18 @@ export async function getMyNotifications(
   userId: string,
   box: NotificationBox = 'customer',
   page = 1,
+  /**
+   * **안 읽은 것만 본다.**
+   *
+   * 운영 알림함이 할 일 목록이 되면서 필요해졌다 — 열어도 할 일은 읽음이 되지 않으므로, 읽고 지나간
+   * 소식과 끝난 할 일이 쌓이는 사이에서 **남은 일**을 찾으려면 거를 자리가 있어야 한다. 머리의
+   * 뱃지가 말하는 수와 이 목록이 맞아떨어지는 자리이기도 하다(둘 다 안 읽은 것을 센다).
+   *
+   * 매장 알림함은 열면 읽음이 되므로 거를 일이 없다 — 그쪽은 부르지 않는다.
+   */
+  unreadOnly = false,
 ): Promise<NotificationPage> {
-  const where = { userId, kind: { in: kindsOf(box) } };
+  const where = { userId, kind: { in: kindsOf(box) }, ...(unreadOnly ? { readAt: null } : {}) };
 
   /*
    * 쪽 번호로 넘긴다(운영 목록과 같은 셈법 — core 의 pagination).

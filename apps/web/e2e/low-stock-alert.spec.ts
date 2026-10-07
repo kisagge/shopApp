@@ -108,21 +108,20 @@ async function consoleAlerts(w: World): Promise<number> {
 }
 
 /**
- * 이 상품의 재고 알림 중 **안 읽은** 줄 수.
+ * 이 상품의 재고 알림 중 **안 읽은** 줄 수 — 알림함의 "안 읽음" 으로 거른다.
  *
- * 안 읽은 줄에만 닫는 단추가 선다 — 그것을 센다. 사이드바 뱃지는 이 계정의 운영 알림 전부를 세므로
- * 다른 검사가 남긴 알림에 흔들린다(예전에는 알림함을 열 때마다 전부 읽음이 되어 그것이 가려져 있었다).
+ * 사이드바 뱃지는 이 계정의 운영 알림 전부를 세므로 다른 검사가 남긴 알림에 흔들린다(예전에는
+ * 알림함을 열 때마다 전부 읽음이 되어 그것이 가려져 있었다). 상품으로 좁혀서 센다.
+ *
+ * 거르는 자리를 지나가는 셈이기도 하다 — 이 알림함은 열어도 할 일이 읽음이 되지 않으므로, 남은
+ * 일을 찾는 길이 바로 이 탭이다.
  */
 async function unreadAlerts(w: World): Promise<number> {
   const page = await w.merchant.newPage();
   try {
-    await page.goto('/admin/notifications');
+    await page.goto('/admin/notifications?unread=1');
     await ready(page);
-    return await page
-      .locator('#main li')
-      .filter({ hasText: w.productName })
-      .getByRole('button', { name: /읽음 처리/ })
-      .count();
+    return await page.locator('#main li').filter({ hasText: w.productName }).count();
   } finally {
     await page.close();
   }
@@ -254,7 +253,10 @@ test('운영 알림함에는 그 옵션과 남은 수가 적혀 있고, 눌러�
     await closing.close();
   }
 
+  // 닫았으니 "안 읽음" 에서 빠진다 — 뱃지가 말하는 수와 이 목록이 같은 것을 센다
   expect(await unreadAlerts(w), '사람이 닫았는데 그 줄이 안 읽음으로 남았다').toBe(0);
+  // 전체에는 남아 있다. 읽음은 지우는 것이 아니다 — 무슨 일이 있었는지는 거슬러 볼 수 있어야 한다
+  expect(await consoleAlerts(w), '읽음으로 닫았더니 줄이 사라졌다').toBe(before + 1);
 });
 
 test('이미 기준 아래면 또 오지 않는다', async () => {

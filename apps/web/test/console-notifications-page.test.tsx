@@ -19,9 +19,11 @@ import type { Actor } from '@shop/core';
 const requireAdmin = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/guard', () => ({ requireAdmin }));
 const getMyNotifications = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+const countUnread = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/queries/notifications', async (importOriginal) => ({
   ...(await importOriginal<typeof import('~/lib/queries/notifications')>()),
   getMyNotifications,
+  countUnread,
 }));
 const getNotificationTemplates = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/notifications/templates', () => ({ getNotificationTemplates }));
@@ -51,10 +53,12 @@ beforeEach(() => {
   requireAdmin.mockResolvedValue(admin);
   getNotificationTemplates.mockResolvedValue(new Map());
   getMyNotifications.mockResolvedValue({ rows: [notice()], total: 1 });
+  countUnread.mockResolvedValue(1);
   vi.stubGlobal('fetch', vi.fn<(...a: any[]) => any>(async () => new Response('{"marked":1}', { status: 200 })));
 });
 
-const renderPage = async () => render(await Page({ searchParams: Promise.resolve({}) }));
+const renderPage = async (params: Record<string, string> = {}) =>
+  render(await Page({ searchParams: Promise.resolve(params) }));
 const sent = () => {
   const [url, init] = vi.mocked(fetch).mock.calls[0] as [string, { body: string }];
   return { url, body: JSON.parse(init.body) as { ids: string[] } };
@@ -177,5 +181,72 @@ describe('할 일을 보러 가는 것과 닫는 것은 다른 동작이다', ()
 
     const link = screen.getByRole('link', { name: /반품/ });
     expect(within(link).queryByRole('button')).toBeNull();
+  });
+});
+
+/**
+ * **읽은 줄 사이에서 남은 일을 찾을 길.**
+ *
+ * 이 알림함은 열어도 할 일이 읽음이 되지 않는다. 그래서 끝난 것과 지나간 소식이 쌓이는 사이에 남은
+ * 일이 묻힌다 — 머리의 뱃지는 "셋 남았다" 고 하는데 목록에서 그 셋을 찾으려면 서른 줄을 훑어야 했다.
+ */
+describe('안 읽은 것만 보기', () => {
+  const tabs = () => screen.getByRole('navigation', { name: '알림 보기' });
+
+  it('기본은 전체다', async () => {
+    await renderPage();
+
+    expect(within(tabs()).getByRole('link', { name: '전체' })).toHaveProperty('ariaCurrent', 'page');
+    expect(getMyNotifications.mock.calls[0]![3]).toBe(false);
+  });
+
+  it('안 읽음 탭은 안 읽은 것만 받아 온다', async () => {
+    await renderPage({ unread: '1' });
+
+    expect(getMyNotifications.mock.calls[0]![3]).toBe(true);
+    expect(within(tabs()).getByRole('link', { name: /안 읽음/ })).toHaveProperty('ariaCurrent', 'page');
+  });
+
+  /** 뱃지는 3 인데 들어가면 2 건인 날이 오면, 그 뱃지를 믿지 않게 된다 */
+  it('탭의 수는 머리의 뱃지와 같은 함수에서 온다', async () => {
+    countUnread.mockResolvedValue(3);
+
+    await renderPage();
+
+    expect(within(tabs()).getByRole('link', { name: /안 읽음\s*3/ })).toBeDefined();
+    expect(countUnread).toHaveBeenCalledWith('u-admin', 'console');
+  });
+
+  it('남은 일이 없으면 수를 달지 않는다', async () => {
+    countUnread.mockResolvedValue(0);
+
+    await renderPage();
+
+    expect(within(tabs()).getByRole('link', { name: /^안 읽음$/ })).toBeDefined();
+  });
+
+  it('안 읽음 탭이 비면 남은 일이 없다고 말한다', async () => {
+    getMyNotifications.mockResolvedValue({ rows: [], total: 0 });
+
+    await renderPage({ unread: '1' });
+
+    expect(screen.getByText(/남은 할 일이 없다는 뜻입니다/)).toBeDefined();
+  });
+
+  /** 빠뜨리면 쪽을 넘기는 순간 조건이 풀린다 — 상품 목록에서 이미 겪은 자리다 */
+  it('쪽을 넘겨도 필터가 유지된다', async () => {
+    getMyNotifications.mockResolvedValue({ rows: [notice()], total: 60 });
+
+    await renderPage({ unread: '1' });
+
+    const next = screen.getByRole('link', { name: /다음/ });
+    expect(next.getAttribute('href')).toContain('unread=1');
+    expect(next.getAttribute('href')).toContain('page=2');
+  });
+
+  it('모르는 값은 필터로 쓰지 않는다', async () => {
+    await renderPage({ unread: '어쩌구' });
+
+    expect(getMyNotifications.mock.calls[0]![3]).toBe(false);
   });
 });

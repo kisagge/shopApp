@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { formatDateTime } from '@shop/i18n';
 import { CONSOLE_NEWS_KIND, LOW_STOCK_THRESHOLD } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
+import { countUnread, getMyNotifications, NOTIFICATION_PAGE_SIZE } from '~/lib/queries/notifications';
 import { PageNav } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
@@ -32,16 +32,20 @@ export const dynamic = 'force-dynamic';
 export default async function AdminNotificationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ page?: string }>;
+  searchParams: Promise<{ page?: string; unread?: string }>;
 }) {
   const actor = await requireAdmin('admin:access');
 
-  const { page: pageParam } = await searchParams;
+  const { page: pageParam, unread } = await searchParams;
+  // 주소에 아무 값이나 들어올 수 있다. 아는 값만 필터로 쓴다
+  const unreadOnly = unread === '1';
   // 범위를 벗어난 값은 core 가 당긴다(pageNav). 여기서는 숫자로만 만든다.
   const page = Math.max(Number.parseInt(pageParam ?? '1', 10) || 1, 1);
 
-  const [notifications, locale, t] = await Promise.all([
-    getMyNotifications(actor.id, 'console', page),
+  const [notifications, unreadCount, locale, t] = await Promise.all([
+    getMyNotifications(actor.id, 'console', page, unreadOnly),
+    // 탭에 붙는 수. 머리의 뱃지와 같은 함수를 쓴다 — 따로 세면 뱃지는 3 인데 들어가면 2 건인 날이 온다
+    countUnread(actor.id, 'console'),
     getLocale(),
     getT(),
   ]);
@@ -91,9 +95,35 @@ export default async function AdminNotificationsPage({
       {hasUnreadNews && <MarkNotificationsRead box="console" />}
 
       <div className="p-4 sm:p-8">
+        {/*
+          **읽은 줄 사이에서 남은 일을 찾을 길이 있어야 한다.** 이 알림함은 열어도 할 일이 읽음이
+          되지 않으므로, 끝난 것과 지나간 소식이 쌓이는 사이에 남은 일이 묻힌다 — 문의 대기줄이
+          쓰는 모양을 그대로 따른다(탭에 수를 달고, 그 수는 머리의 뱃지와 같은 함수에서 온다).
+        */}
+        <nav aria-label="알림 보기" className="mb-4 flex gap-1 border-b border-[var(--border)]">
+          {([false, true] as const).map((only) => (
+            <Link
+              key={String(only)}
+              href={{
+                pathname: '/admin/notifications',
+                ...(only ? { query: { unread: '1' } } : {}),
+              }}
+              aria-current={unreadOnly === only ? 'page' : undefined}
+              className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-4 py-2.5 text-[13px] no-underline ${
+                unreadOnly === only
+                  ? 'border-[var(--brand)] font-medium text-[var(--fg)]'
+                  : 'border-transparent text-[var(--fg-secondary)] hover:text-[var(--fg)]'
+              }`}
+            >
+              {only ? '안 읽음' : '전체'}
+              {only && unreadCount > 0 && <span className="tnum ml-1.5 text-accent">{unreadCount}</span>}
+            </Link>
+          ))}
+        </nav>
+
         {items.length === 0 ? (
           <p className="rounded-md border border-[var(--border)] bg-[var(--bg)] py-16 text-center text-[13px] text-[var(--fg-muted)]">
-            새 알림이 없습니다.
+            {unreadOnly ? '안 읽은 알림이 없습니다. 남은 할 일이 없다는 뜻입니다.' : '새 알림이 없습니다.'}
           </p>
         ) : (
           <ul
@@ -165,9 +195,12 @@ export default async function AdminNotificationsPage({
           page={page}
           total={notifications.total}
           pageSize={NOTIFICATION_PAGE_SIZE}
+          /* 필터를 유지한 채 쪽을 넘긴다 — 빠뜨리면 넘기는 순간 조건이 풀린다(상품 목록과 같다) */
           hrefOf={(n) => ({
             pathname: '/admin/notifications',
-            ...(n === 1 ? {} : { query: { page: String(n) } }),
+            ...(unreadOnly || n > 1
+              ? { query: { ...(unreadOnly ? { unread: '1' } : {}), ...(n > 1 ? { page: String(n) } : {}) } }
+              : {}),
           })}
         />
       </div>

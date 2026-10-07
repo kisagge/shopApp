@@ -85,6 +85,26 @@ describe('내 알림 읽기', () => {
     expect(rows.map((n) => n.unread)).toEqual([true, false]);
   });
 
+  /**
+   * **안 읽은 것만 보기.**
+   *
+   * 운영 알림함이 할 일 목록이 되면서 필요해졌다 — 열어도 할 일은 읽음이 되지 않으므로, 끝난 것과
+   * 지나간 소식이 쌓이는 사이에서 남은 일을 찾으려면 거를 자리가 있어야 한다.
+   */
+  it('거르면 안 읽은 것만 읽고, 전체 수도 같은 조건으로 센다', async () => {
+    await getMyNotifications('u-1', 'console', 1, true);
+
+    expect(db.notification.findMany.mock.calls[0]![0].where.readAt).toBeNull();
+    // 쪽 수를 세는 쪽이 같은 조건이 아니면 "3건" 이라 해 놓고 빈 쪽이 나온다
+    expect(db.notification.count.mock.calls[0]![0].where.readAt).toBeNull();
+  });
+
+  it('거르지 않으면 읽은 것도 함께 본다', async () => {
+    await getMyNotifications('u-1', 'console');
+
+    expect(db.notification.findMany.mock.calls[0]![0].where.readAt).toBeUndefined();
+  });
+
   it('세는 것은 안 읽은 것만이다', async () => {
     await countUnread('u-1');
     expect(db.notification.count.mock.calls[0]![0].where).toMatchObject({
