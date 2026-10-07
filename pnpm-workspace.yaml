@@ -36,3 +36,9 @@ overrides:
   # minimatch 가 못 받는다.
   brace-expansion@1: '^1.1.21'
   brace-expansion@>=4: '^5.0.12'
+  # librsvg 의 CVE-2026-96889(GHSA-wq5f-xc86-pv6w). 우리는 sharp 를 직접 올렸지만 next 아래로도 깔린다 —
+  # 이미지 변환은 요청 경로에서 도는 일이라(업로드 다듬기·og 이미지) 거기까지 같은 버전으로 맞춘다.
+  sharp: '^0.35.5'
+  # 구간 오프셋으로 이벤트 루프를 멈추는 DoS(GHSA-68fv-2mgg-jv7q). postcss·tailwind·vite 아래에만 있는
+  # 빌드 도구인데, 받는 범위가 ^1.0.0 이라 올려도 그 안이다.
+  source-map-js: '^1.2.2'
