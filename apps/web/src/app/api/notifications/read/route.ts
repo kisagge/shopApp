@@ -2,14 +2,19 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { prisma } from '@shop/db';
 import { CONSOLE_NOTIFICATION_KIND, CUSTOMER_NOTIFICATION_KIND } from '@shop/core';
-import { unauthorized } from '~/lib/api/respond';
+import { markNotificationsReadSchema } from '@shop/contract';
+import { unauthorized, invalidJson } from '~/lib/api/respond';
+import { validationFailed } from '~/lib/i18n/validation';
 
 /**
- * 안 읽은 알림을 모두 읽음으로.
+ * 알림을 읽음으로.
  *
  * **POST 다.** 목록 화면을 열기만 해도 지워지게 하려면 GET 이 값을 바꿔야
  * 하는데, 그러면 브라우저가 미리 받아 두는 것만으로 뱃지가 사라진다.
- * 화면이 뜬 뒤 이 창구를 한 번 부른다.
+ *
+ * **줄을 고를 수 있다.** 운영 알림함은 할 일 목록이라 **열었다는 것이 처리했다는 뜻이 아니다** — 그
+ * 알림함은 자동으로 읽음을 찍지 않고, 사람이 끝낸 줄만 닫는다. 매장 알림함은 소식을 전하는 자리라
+ * 화면이 뜬 뒤 한 번 부른다(그때는 `ids` 가 없다 — 그 알림함 전체다).
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const user = await getSessionUser(request.headers);
@@ -28,9 +33,36 @@ export async function POST(request: Request): Promise<NextResponse> {
   const box = new URL(request.url).searchParams.get('box') === 'console' ? 'console' : 'customer';
   const kinds = box === 'console' ? [...CONSOLE_NOTIFICATION_KIND] : [...CUSTOMER_NOTIFICATION_KIND];
 
-  // 이미 읽은 것은 건드리지 않는다 — 읽은 시각이 뒤로 밀리면 안 된다
+  /*
+   * **본문은 없어도 된다.** 매장 알림함은 아무것도 보내지 않고 그 알림함 전체를 뜻한다 — 빈 본문에
+   * 400 을 주면 새 코드가 배포된 사이에 열려 있던 화면의 뱃지가 영영 안 지워진다.
+   */
+  const raw = await request.text();
+  let ids: readonly string[] | undefined;
+  if (raw.trim().length > 0) {
+    let body: unknown;
+    try {
+      body = JSON.parse(raw);
+    } catch {
+      return await invalidJson();
+    }
+    const parsed = markNotificationsReadSchema.safeParse(body);
+    if (!parsed.success) return await validationFailed(parsed.error);
+    ids = parsed.data.ids;
+  }
+  // 고르긴 했는데 빈 목록이면 할 일이 없다 — 조건 없는 updateMany 로 번지면 안 된다
+  if (ids !== undefined && ids.length === 0) return NextResponse.json({ marked: 0 });
+
   const { count } = await prisma.notification.updateMany({
-    where: { userId: user.id, readAt: null, kind: { in: kinds } },
+    where: {
+      // 남의 알림함은 건드릴 수 없다. id 를 받아도 이 조건은 그대로 걸린다
+      userId: user.id,
+      // 이미 읽은 것은 건드리지 않는다 — 읽은 시각이 뒤로 밀리면 안 된다
+      readAt: null,
+      // 고른 줄이라도 이 알림함의 종류여야 한다 — 남의 알림함 뱃지를 여기서 지울 수는 없다
+      kind: { in: kinds },
+      ...(ids ? { id: { in: [...ids] } } : {}),
+    },
     data: { readAt: new Date() },
   });
 

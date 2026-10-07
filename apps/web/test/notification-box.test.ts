@@ -103,3 +103,84 @@ describe('읽음 처리', () => {
     expect(kindsIn(notification.updateMany.mock.calls[0])).not.toContain('STOCK_LOW');
   });
 });
+
+/**
+ * **고른 줄만 닫는다.**
+ *
+ * 운영 알림함은 할 일 목록이라 열었다고 끝난 것이 아니다 — 사람이 끝낸 줄을 하나씩 닫는다. 그 창구가
+ * 아무 줄이나 닫을 수 있으면 남의 알림함이나 다른 알림함의 뱃지를 지우는 길이 된다.
+ */
+describe('줄을 골라 읽음 처리', () => {
+  const body = (payload: unknown, box = 'console') =>
+    new Request(`http://localhost/api/notifications/read?box=${box}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+  const where = () => notification.updateMany.mock.calls[0]![0].where as Record<string, any>;
+
+  it('고른 줄만 읽음으로 만든다', async () => {
+    await markRead(body({ ids: ['clh1abc2300000000000000001', 'clh1abc2300000000000000002'] }));
+
+    expect(where()['id']).toEqual({
+      in: ['clh1abc2300000000000000001', 'clh1abc2300000000000000002'],
+    });
+    expect(where()['readAt']).toBeNull();
+  });
+
+  /** id 를 받아도 이 조건은 그대로 걸린다 — 남의 알림 id 를 적어 보내도 닿지 않는다 */
+  it('남의 알림함은 건드릴 수 없다', async () => {
+    await markRead(body({ ids: ['clh1abc2300000000000000001'] }));
+
+    expect(where()['userId']).toBe('u-1');
+  });
+
+  /** 고른 줄이라도 그 알림함의 종류여야 한다 — 매장 창구로 운영 뱃지를 지울 수 없다 */
+  it('고른 줄도 그 알림함의 종류여야 한다', async () => {
+    await markRead(body({ ids: ['clh1abc2300000000000000001'] }, 'customer'));
+
+    expect(kindsIn(notification.updateMany.mock.calls[0])).not.toContain('STOCK_LOW');
+  });
+
+  it('줄을 고르지 않으면 그 알림함 전체다 — 매장이 그렇게 부른다', async () => {
+    await markRead(body({}));
+
+    expect(where()['id']).toBeUndefined();
+  });
+
+  it('본문이 없어도 된다 — 배포 사이에 열려 있던 화면의 뱃지가 안 지워지면 안 된다', async () => {
+    await markRead(new Request('http://localhost/api/notifications/read', { method: 'POST' }));
+
+    expect(notification.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('빈 목록이면 아무것도 하지 않는다 — 조건 없는 updateMany 가 되면 안 된다', async () => {
+    const res = await markRead(body({ ids: [] }));
+
+    expect(await res.json()).toEqual({ marked: 0 });
+    expect(notification.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('id 모양이 아니면 거절한다', async () => {
+    const res = await markRead(body({ ids: ['../../etc/passwd'] }));
+
+    expect(res.status).toBe(400);
+    expect(notification.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('JSON 이 아니면 거절한다', async () => {
+    const res = await markRead(new Request('http://localhost/api/notifications/read?box=console', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: '{ 망가진',
+    }));
+
+    expect(res.status).toBe(400);
+    expect(notification.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('로그인하지 않으면 401', async () => {
+    getSessionUser.mockResolvedValue(null);
+
+    expect((await markRead(body({ ids: ['clh1abc2300000000000000001'] }))).status).toBe(401);
+    expect(notification.updateMany).not.toHaveBeenCalled();
+  });
+});

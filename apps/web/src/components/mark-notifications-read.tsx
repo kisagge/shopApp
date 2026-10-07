@@ -3,25 +3,25 @@
 import { useEffect } from 'react';
 
 /**
- * 목록을 연 뒤 읽음으로 표시한다.
+ * 매장 알림함을 연 뒤 읽음으로 표시한다.
  *
  * **GET 이 값을 바꾸지 않게** 하려고 따로 둔다. 화면을 그리면서 표시해
  * 버리면 브라우저가 링크를 미리 받아 두는 것만으로 뱃지가 사라진다.
  *
  * 화면을 새로 그리지 않는다. 이번 화면은 무엇이 새것이었는지 보여 주고
  * 있고, 다음에 들어올 때 뱃지가 없으면 그것으로 충분하다.
+ *
+ * **운영 알림함은 이것을 쓰지 않는다.** 거기 오는 것은 소식이 아니라 할 일이라(반품 신청·문의·입점
+ * 신청·재고) **열었다는 것이 처리했다는 뜻이 아니다** — 열면 전부 읽음이 되던 때에는 뱃지의 숫자가
+ * "할 일이 몇 개" 가 아니라 "들여다봤는가" 였다. 그 알림함은 사람이 줄마다 닫는다(MarkReadButton).
+ * 그래서 이 컴포넌트는 알림함을 고르지 않는다 — 고를 수 있게 두면 운영 화면에 다시 붙게 된다.
  */
-export function MarkNotificationsRead({
-  box = 'customer',
-}: {
-  /** 어느 알림함을 열었는가. 다른 알림함의 것까지 읽음으로 만들면 안 된다. */
-  box?: 'customer' | 'console';
-}) {
+export function MarkNotificationsRead() {
   useEffect(() => {
-    void fetch(`/api/notifications/read?box=${box}`, { method: 'POST' }).catch(() => {
+    void fetch('/api/notifications/read?box=customer', { method: 'POST' }).catch(() => {
       // 못 눌러도 다음 방문에 다시 시도된다. 화면을 막을 이유가 없다.
     });
-  }, [box]);
+  }, []);
 
   return null;
 }

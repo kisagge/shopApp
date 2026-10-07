@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { NOTIFICATION_KIND, MAIL_TEMPLATE_KIND } from '@shop/core';
+import { cuidSchema } from './common';
 
 /**
  * 알림 문구 템플릿 저장.
@@ -32,4 +33,16 @@ export const updateMailTemplateSchema = z.object({
   subject: mailField,
   heading: mailField,
   lead: mailField,
+});
+
+/**
+ * 읽음으로 표시할 알림.
+ *
+ * **운영 알림함은 할 일 목록이라 열었다고 끝난 것이 아니다.** 그래서 사람이 줄마다 닫는다 — 어느 줄인지
+ * 받아야 한다. 비워 두면(또는 아예 안 보내면) 그 알림함 전체다("모두 읽음").
+ *
+ * 한 번에 한 쪽(30줄)보다 넉넉히 받되 상한을 둔다 — 끝없는 목록이 오면 조회가 길어진다.
+ */
+export const markNotificationsReadSchema = z.object({
+  ids: z.array(cuidSchema).max(100, 'valid.tooManyItems').optional(),
 });

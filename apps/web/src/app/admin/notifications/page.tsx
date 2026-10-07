@@ -8,7 +8,7 @@ import { PageNav } from '~/components/page-nav';
 import { getLocale, getT } from '~/lib/i18n/server';
 import { notificationText } from '~/lib/i18n/notification';
 import { getNotificationTemplates } from '~/lib/notifications/templates';
-import { MarkNotificationsRead } from '~/components/mark-notifications-read';
+import { MarkReadButton } from './mark-read-button';
 
 export const metadata: Metadata = { title: '알림' };
 export const dynamic = 'force-dynamic';
@@ -20,8 +20,12 @@ export const dynamic = 'force-dynamic';
  * 다 들어가는데, 매장에서는 손님 알림만, 여기서는 운영 알림만 본다 — 어느 것이
  * 어디에 속하는지는 core 의 CONSOLE_NOTIFICATION_KIND 가 정한다.
  *
- * 지금은 재고 부족 하나뿐이다. 대시보드에도 "재고 부족" 이 뜨지만 **열어야
- * 안다** — 품절은 곧바로 매출 손실이고, 재입고에는 며칠이 걸린다.
+ * **열었다고 읽음이 되지 않는다.** 여기 오는 것은 소식이 아니라 **할 일**이다(반품 신청·문의·입점
+ * 신청·재고). 한 번 열면 전부 읽음이 되던 때에는 뱃지의 숫자가 "할 일이 몇 개" 가 아니라 "들여다봤는가"
+ * 가 됐고, 아직 처리하지 않은 일은 목록을 훑어 기억하는 수밖에 없었다 — 코드가 끝난 일을 닫아 주는
+ * 것(markNoticesDone)과 짝을 이루려면 사람도 자기 손으로 닫을 수 있어야 한다.
+ *
+ * 매장 알림함은 그대로 열면 읽음이 된다 — 거기 오는 것은 보고 지나가는 소식이다.
  */
 export default async function AdminNotificationsPage({
   searchParams,
@@ -42,7 +46,8 @@ export default async function AdminNotificationsPage({
   const items = notifications.rows;
   // 운영이 고친 문구. 이미 온 알림도 이것으로 읽힌다 — 알림에는 문장이 아니라 값만 저장한다
   const templates = await getNotificationTemplates(locale);
-  const hadUnread = items.some((n) => n.unread);
+  // 사람이 닫을 수 있는 것 — 이 쪽에 보이는 안 읽은 줄
+  const unreadIds = items.filter((n) => n.unread).map((n) => n.id);
 
   return (
     <>
@@ -55,17 +60,23 @@ export default async function AdminNotificationsPage({
           적혀 있었는데, 검수 결과가 더해졌다 — 비워 두면 왜 여기 떴는지 모른다.
           기준값은 손으로 적지 않는다: 대시보드·상품 화면과 같은 곳에서 온다.
         */}
-        <p className="text-[13px] text-[var(--fg-muted)]">
-          상품 검수 결과와, 옵션 재고가 <b className="tnum">{LOW_STOCK_THRESHOLD}개</b> 이하로
-          내려간 것을 알려 드립니다
-        </p>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <p className="text-[13px] text-[var(--fg-muted)]">
+            상품 검수 결과와, 옵션 재고가 <b className="tnum">{LOW_STOCK_THRESHOLD}개</b> 이하로
+            내려간 것을 알려 드립니다
+          </p>
+          {/*
+            **이 쪽에 보이는 것만 닫는다.** "모두" 가 안 보이는 뒤쪽까지 뜻하면, 서른한 번째 할 일이
+            읽은 적도 없이 사라진다 — 읽음은 되돌릴 수 없다.
+          */}
+          <MarkReadButton
+            ids={unreadIds}
+            label={`이 쪽의 안 읽은 알림 ${unreadIds.length}건 모두 읽음 처리`}
+            variant="all"
+          />
+        </div>
       </header>
 
-      {/*
-        **읽음은 이 알림함의 것만.** 매장 알림함을 열었다고 여기 것까지 읽음이
-        되면, 가맹점이 매장에 들렀다 가는 것만으로 재고 알림 뱃지가 사라진다.
-      */}
-      {hadUnread && <MarkNotificationsRead box="console" />}
 
       <div className="p-4 sm:p-8">
         {items.length === 0 ? (
@@ -106,16 +117,30 @@ export default async function AdminNotificationsPage({
               );
 
               return (
-                <li key={n.id} className="border-b border-[var(--border)] last:border-0">
+                /*
+                  **단추는 링크 밖에 선다.** 링크 안에 단추를 넣으면 안 되고(중첩), 무엇보다 할 일을
+                  보러 가는 것과 할 일을 닫는 것은 다른 동작이다 — 한 자리에 두면 보러 누른 사람이
+                  닫아 버린다.
+                */
+                <li
+                  key={n.id}
+                  className="flex items-start gap-2 border-b border-[var(--border)] pr-4 last:border-0"
+                >
                   {n.linkPath ? (
                     <Link
                       href={{ pathname: n.linkPath }}
-                      className="flex items-start gap-2.5 px-4 py-4 text-[var(--fg)] no-underline hover:bg-[var(--surface)]"
+                      className="flex min-w-0 flex-1 items-start gap-2.5 px-4 py-4 text-[var(--fg)] no-underline hover:bg-[var(--surface)]"
                     >
                       {body}
                     </Link>
                   ) : (
-                    <p className="flex items-start gap-2.5 px-4 py-4">{body}</p>
+                    <p className="flex min-w-0 flex-1 items-start gap-2.5 px-4 py-4">{body}</p>
+                  )}
+                  {n.unread && (
+                    <span className="flex min-h-13 items-center py-4">
+                      {/* 무엇을 닫는지 이름에 담는다 — "읽음, 단추" 가 열 번 읽히면 누를 수 없다 */}
+                      <MarkReadButton ids={[n.id]} label={`${text} 읽음 처리`} />
+                    </span>
                   )}
                 </li>
               );

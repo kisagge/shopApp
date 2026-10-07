@@ -15,7 +15,11 @@ import {
  * 1. **넘는 순간 알림이 온다** — 6 에서 하나 사서 5 가 되면.
  * 2. **이미 아래면 또 오지 않는다** — 5 에서 하나 더 사도.
  * 3. **매장 알림함에는 안 뜬다** — 가맹점 계정도 매장에 로그인한다.
- * 4. **운영 알림함을 열면 읽음이 되고, 누르면 재고를 고치는 자리로 간다.**
+ * 4. **열어도 읽음이 되지 않고, 사람이 닫아야 닫힌다** — 그리고 누르면 재고를 고치는 자리로 간다.
+ *
+ * 4번이 한동안 반대였다(열면 전부 읽음). 운영 알림함에 오는 것은 소식이 아니라 **할 일**이라,
+ * 한 번 열면 아직 채우지 않은 재고까지 읽음이 됐다 — 그러면 뱃지의 숫자는 "할 일이 몇 개" 가
+ * 아니라 "들여다봤는가" 가 된다.
  *
  * 매장 알림함이 운영 알림까지 읽음으로 만들던 결함은 여기가 아니라 단위 검사
  * (notification-box)가 지킨다 — 왜 여기서 못 잡는지는 3번 검사에 적었다.
@@ -89,9 +93,8 @@ async function buyOne(w: World): Promise<void> {
 /**
  * 운영 알림함에서 이 상품의 재고 알림이 몇 줄인지.
  *
- * **이 화면을 열면 읽음이 된다** — 알림함은 그러라고 있다. 그래서 "안 읽음" 을
- * 확인해야 하는 자리에서는 이것을 부르지 않고 사이드바 뱃지를 본다. 처음에 이것으로
- * 도착을 기다렸다가, 뒤에서 뱃지를 보려니 이미 제가 다 읽어 버린 뒤였다.
+ * **이제 열어도 읽음이 되지 않는다** — 할 일 목록이라 열었다는 것이 처리했다는 뜻이 아니다.
+ * 그래서 이 함수를 불러도 뱃지가 사라지지 않는다(예전에는 세는 것만으로 다 읽어 버렸다).
  */
 async function consoleAlerts(w: World): Promise<number> {
   const page = await w.merchant.newPage();
@@ -99,6 +102,27 @@ async function consoleAlerts(w: World): Promise<number> {
     await page.goto('/admin/notifications');
     await ready(page);
     return await page.locator('#main li').filter({ hasText: w.productName }).count();
+  } finally {
+    await page.close();
+  }
+}
+
+/**
+ * 이 상품의 재고 알림 중 **안 읽은** 줄 수.
+ *
+ * 안 읽은 줄에만 닫는 단추가 선다 — 그것을 센다. 사이드바 뱃지는 이 계정의 운영 알림 전부를 세므로
+ * 다른 검사가 남긴 알림에 흔들린다(예전에는 알림함을 열 때마다 전부 읽음이 되어 그것이 가려져 있었다).
+ */
+async function unreadAlerts(w: World): Promise<number> {
+  const page = await w.merchant.newPage();
+  try {
+    await page.goto('/admin/notifications');
+    await ready(page);
+    return await page
+      .locator('#main li')
+      .filter({ hasText: w.productName })
+      .getByRole('button', { name: /읽음 처리/ })
+      .count();
   } finally {
     await page.close();
   }
@@ -122,7 +146,13 @@ let before = 0;
 
 test.beforeAll(async ({ browser }) => {
   w = await open(browser);
-  // 알림함을 한 번 열어 둔다 — 앞선 실행의 것을 읽음으로 만들어 뱃지 0 에서 시작한다
+  /*
+   * 앞선 실행이 남긴 것을 읽음으로 만들어 **뱃지 0 에서 시작한다.** 예전에는 알림함을 한 번 여는
+   * 것으로 됐는데, 이제 열어도 읽음이 되지 않으므로 창구를 직접 부른다(줄을 고르지 않으면 그
+   * 알림함 전체다 — 화면의 "모두 읽음" 이 쓰는 길과 같다).
+   */
+  const clear = await w.merchant.request.post('/api/notifications/read?box=console');
+  expect(clear.ok(), `앞선 실행의 알림을 못 비웠다 (${clear.status()})`).toBe(true);
   before = await consoleAlerts(w);
   // 기준(5) 바로 위에서 시작한다
   await setStock(w, 6);
@@ -180,7 +210,7 @@ test('매장 알림함에는 재고 알림이 뜨지 않는다', async () => {
   expect(await hasUnreadBadge(w)).toBe(true);
 });
 
-test('운영 알림함에는 그 옵션과 남은 수가 적혀 있고, 열면 읽음이 된다', async () => {
+test('운영 알림함에는 그 옵션과 남은 수가 적혀 있고, 눌러서 닫을 때까지 남는다', async () => {
   const page = await w.merchant.newPage();
   try {
     await page.goto('/admin/notifications');
@@ -191,13 +221,40 @@ test('운영 알림함에는 그 옵션과 남은 수가 적혀 있고, 열면 �
     // 누르면 곧바로 재고를 고치는 자리로 간다
     await expect(row.getByRole('link')).toHaveAttribute('href', `/admin/products/${w.productId}`);
 
+    // 읽음 처리가 화면이 뜬 뒤에 나가던 때가 있었다 — 그 시간을 주고도 남아 있어야 한다
     await page.waitForTimeout(1_500);
   } finally {
     await page.close();
   }
 
   expect(await consoleAlerts(w)).toBe(before + 1);
-  expect(await hasUnreadBadge(w), '운영 알림함을 열었는데 뱃지가 남았다').toBe(false);
+  /*
+   * **여기가 이 검사의 요점이다.** 재고는 아직 5개다 — 할 일이 끝나지 않았는데 열어 본 것만으로
+   * 뱃지가 사라지면, 그 숫자는 할 일의 수가 아니라 "들여다봤는가" 가 된다.
+   */
+  expect(await hasUnreadBadge(w), '열어 본 것만으로 뱃지가 사라졌다').toBe(true);
+
+  // 사람이 끝냈다고 누르면 그때 닫힌다
+  const closing = await w.merchant.newPage();
+  try {
+    await closing.goto('/admin/notifications');
+    await ready(closing);
+    await closing
+      .locator('#main li')
+      .filter({ hasText: w.productName })
+      .first()
+      .getByRole('button', { name: /읽음 처리/ })
+      .click();
+    // 닫히면 그 줄의 단추가 사라진다(읽은 줄에는 없다)
+    await expect(
+      closing.locator('#main li').filter({ hasText: w.productName }).first()
+        .getByRole('button', { name: /읽음 처리/ }),
+    ).toHaveCount(0);
+  } finally {
+    await closing.close();
+  }
+
+  expect(await unreadAlerts(w), '사람이 닫았는데 그 줄이 안 읽음으로 남았다').toBe(0);
 });
 
 test('이미 기준 아래면 또 오지 않는다', async () => {
@@ -209,5 +266,6 @@ test('이미 기준 아래면 또 오지 않는다', async () => {
 
   // 응답 뒤에 남는 일이라, "안 왔다" 를 확인하려면 올 만한 시간을 준다
   await w.buyerPage.waitForTimeout(3_000);
-  expect(await hasUnreadBadge(w), '이미 알린 옵션에 또 보냈다').toBe(false);
+  // 앞 검사에서 그 줄을 닫았다 — 또 왔다면 안 읽은 줄이 다시 선다
+  expect(await unreadAlerts(w), '이미 알린 옵션에 또 보냈다').toBe(0);
 });
