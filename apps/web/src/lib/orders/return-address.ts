@@ -91,6 +91,30 @@ export async function sellersMissingReturnAddress(scope: string | null): Promise
   return merchants + (own > 0 ? 1 : 0);
 }
 
+/**
+ * 이 가맹점이 **아직 못 하는 일** — 등록하지 않아 막혀 있는 것.
+ *
+ * 둘 다 "없으면 막는다" 는 자리다: 반품지가 없으면 상품을 매대에 올릴 수 없고(assertReturnAddress),
+ * 정산 계좌가 없으면 지급을 할 수 없다. 운영진은 가맹점 목록에서 남의 빈칸을 보지만(미등록 뱃지),
+ * **정작 그 가맹점 자신에게는 말해 주는 자리가 없었다** — 승인받고 들어와 상품을 올리려다 막히고
+ * 나서야 알았다. 막는 쪽을 만들었으면 들어오는 길에 말해 주는 쪽도 있어야 한다.
+ */
+export async function merchantSetupTodo(
+  merchantId: string,
+): Promise<{ returnAddress: boolean; settlementAccount: boolean }> {
+  const merchant = await prisma.merchant.findUnique({
+    where: { id: merchantId },
+    select: { settlementAccount: true, returnAddress: { select: { id: true } } },
+  });
+  // 없는 가맹점이면 할 말도 없다 — 조회가 비면 화면은 아무 줄도 세우지 않는다
+  if (!merchant) return { returnAddress: false, settlementAccount: false };
+
+  return {
+    returnAddress: merchant.returnAddress === null,
+    settlementAccount: merchant.settlementAccount === null,
+  };
+}
+
 /** 이 판매처에 돌려받을 곳이 있는가. `merchantId` 가 null 이면 자사 상품(플랫폼 반품지) */
 export async function hasReturnAddress(merchantId: string | null): Promise<boolean> {
   return (await ownersWithReturnAddress([merchantId])).has(merchantId);

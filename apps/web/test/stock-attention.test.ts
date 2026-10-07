@@ -25,7 +25,7 @@ const db = vi.hoisted(() => ({
   product: { count: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>() },
   payment: { count: vi.fn<(...a: any[]) => any>() },
   // 반품지 없이 파는 곳을 세는 조회
-  merchant: { count: vi.fn<(...a: any[]) => any>() },
+  merchant: { count: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>() },
   returnAddress: { findUnique: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
@@ -54,6 +54,8 @@ beforeEach(() => {
   db.product.count.mockResolvedValue(0);
   db.payment.count.mockResolvedValue(0);
   db.merchant.count.mockResolvedValue(0);
+  // 가맹점이 자기 대시보드를 볼 때 "아직 못 하는 일" 을 묻는다 — 기본은 둘 다 등록된 가게다
+  db.merchant.findUnique.mockResolvedValue({ settlementAccount: '00100000000001', returnAddress: { id: 'ra-1' } });
   db.returnAddress.findUnique.mockResolvedValue({ id: 'platform' });
   db.product.findMany.mockResolvedValue([]);
 });
@@ -238,5 +240,46 @@ describe('반품지 없이 파는 판매처', () => {
     await getDashboard(merchant, '7d', NOW);
 
     expect(db.returnAddress.findUnique).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 가맹점이 **아직 못 하는 일** — 등록하지 않아 막혀 있는 것.
+ *
+ * 둘 다 "없으면 막는다" 는 자리다: 반품지가 없으면 상품을 매대에 올릴 수 없고, 정산 계좌가 없으면
+ * 지급을 할 수 없다. 운영진 화면에서는 세지 않는다 — 남의 가게의 빈칸은 가맹점 목록이 보여 준다.
+ */
+describe('가맹점이 아직 못 하는 일', () => {
+  const NOW = new Date('2026-09-09T00:00:00Z');
+
+  it('자기 가게의 빈칸을 묻는다', async () => {
+    db.merchant.findUnique.mockResolvedValue({ settlementAccount: null, returnAddress: null });
+
+    const d = await getDashboard(merchant, '7d', NOW);
+
+    expect(db.merchant.findUnique.mock.calls[0]![0].where).toEqual({ id: 'm-a' });
+    expect(d.todo.merchantSetup).toEqual({ returnAddress: true, settlementAccount: true });
+  });
+
+  it('등록돼 있으면 막힌 것이 없다', async () => {
+    const d = await getDashboard(merchant, '7d', NOW);
+
+    expect(d.todo.merchantSetup).toEqual({ returnAddress: false, settlementAccount: false });
+  });
+
+  /** 남의 가게를 여기서 세면 누구의 일인지 알 수 없다 */
+  it('운영진은 묻지 않는다', async () => {
+    const d = await getDashboard(admin, '7d', NOW);
+
+    expect(d.todo.merchantSetup).toBeNull();
+    expect(db.merchant.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('없는 가맹점이면 할 말도 없다', async () => {
+    db.merchant.findUnique.mockResolvedValue(null);
+
+    const d = await getDashboard(merchant, '7d', NOW);
+
+    expect(d.todo.merchantSetup).toEqual({ returnAddress: false, settlementAccount: false });
   });
 });

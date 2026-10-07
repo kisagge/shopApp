@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({
   product: { count: vi.fn<(...a: any[]) => any>() },
   payment: { count: vi.fn<(...a: any[]) => any>() },
   // 반품지 없이 파는 곳을 세는 조회
-  merchant: { count: vi.fn<(...a: any[]) => any>() },
+  merchant: { count: vi.fn<(...a: any[]) => any>(), findUnique: vi.fn<(...a: any[]) => any>() },
   returnAddress: { findUnique: vi.fn<(...a: any[]) => any>() },
   eventLog: { groupBy: vi.fn<(...a: any[]) => any>() },
   $queryRaw: vi.fn<(...a: any[]) => any>(),
@@ -37,6 +37,8 @@ beforeEach(() => {
   db.order.count.mockResolvedValue(0);
   db.product.count.mockResolvedValue(0);
   db.merchant.count.mockResolvedValue(0);
+  // 가맹점이 자기 대시보드를 볼 때 "아직 못 하는 일" 을 묻는다 — 기본은 둘 다 등록된 가게다
+  db.merchant.findUnique.mockResolvedValue({ settlementAccount: '00100000000001', returnAddress: { id: 'ra-1' } });
   db.returnAddress.findUnique.mockResolvedValue({ id: 'platform' });
   db.payment.count.mockResolvedValue(0);
   db.order.findMany.mockResolvedValue([]);

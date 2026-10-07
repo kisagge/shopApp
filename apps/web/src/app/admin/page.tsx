@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import type { Route } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, isDashboardRange, customPeriod, ORDER_STATUS_LABEL, USER_ROLE_LABEL, LOW_STOCK_THRESHOLD,
@@ -7,6 +8,7 @@ import {
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getDashboard } from '~/lib/queries/admin/dashboard';
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 import { RevenueChart } from '~/components/admin/revenue-chart';
 import { RangeTabs } from '~/components/admin/range-tabs';
 import { Compare, CustomPeriodForm, type KpiCompare } from '~/components/admin/dashboard-period';
@@ -154,12 +156,34 @@ export default async function AdminDashboard({
 
                 입금과 같은 규칙으로 없을 때는 줄을 세우지 않는다 — 늘 0 인 줄은 읽히지 않게 된다.
               */}
-              {d.todo.noReturnAddress > 0 && (
+              {d.scope === null && d.todo.noReturnAddress > 0 && (
+                <Todo href="/admin/merchants" label="반품지 없이 파는 판매처" count={d.todo.noReturnAddress} urgent />
+              )}
+              {/*
+                **승인받고 들어온 가맹점에게 가장 먼저 할 일.** 반품지가 없으면 상품을 매대에 올릴 수
+                없고 정산 계좌가 없으면 지급을 받을 수 없다 — 운영진은 가맹점 목록에서 남의 빈칸을
+                보지만, 정작 그 가맹점 자신에게는 말해 주는 자리가 없었다. 막는 쪽을 만들었으면
+                들어오는 길에 말해 주는 쪽도 있어야 한다.
+
+                **파는 상품이 없어도 세운다.** 새로 승인된 가맹점은 아직 아무것도 안 팔아서 위의
+                줄에 걸리지 않는데, 그 사람에게 가장 먼저 할 일이 바로 이것이다. 이미 팔고 있으면
+                급한 일이다("확인 필요") — 그 물건은 지금도 돌아올 곳이 없다.
+              */}
+              {d.scope && d.todo.merchantSetup?.returnAddress && (
                 <Todo
-                  href="/admin/merchants"
-                  label={d.scope ? '반품지 미등록 (팔고 있는 상품이 있습니다)' : '반품지 없이 파는 판매처'}
-                  count={d.todo.noReturnAddress}
-                  urgent
+                  href={returnAddressPath(d.scope) as Route}
+                  label={
+                    d.todo.noReturnAddress > 0
+                      ? '반품지 미등록 — 팔고 있는 상품이 있습니다'
+                      : '반품지 미등록 — 등록해야 상품을 매대에 올릴 수 있습니다'
+                  }
+                  urgent={d.todo.noReturnAddress > 0}
+                />
+              )}
+              {d.scope && d.todo.merchantSetup?.settlementAccount && (
+                <Todo
+                  href={`/admin/merchants/${d.scope}/settings` as Route}
+                  label="정산 계좌 미등록 — 등록해야 정산금을 받을 수 있습니다"
                 />
               )}
               <Todo href="/admin/orders?status=PREPARING" label="배송 준비 중" count={d.todo.preparing} />
@@ -351,23 +375,32 @@ function Todo({
   href, label, count, urgent, last,
 }: {
   href: '/admin/orders?status=PREPARING' | '/admin/orders?status=PENDING' | '/admin/orders?lateDeposit=1'
-    | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low' | '/admin/merchants';
+    | '/admin/returns' | '/admin/products?stock=out' | '/admin/products?stock=low' | '/admin/merchants'
+    // 가맹점마다 다른 자리로 간다(자기 반품지·자기 정산 계좌) — 그 둘만 주소가 열려 있다
+    | Route;
   label: string;
-  count: number;
+  /**
+   * 몇 건인가. **없으면 숫자를 그리지 않는다** — "등록했는가" 는 세는 일이 아니라서,
+   * 거기에 1 을 적으면 읽는 사람이 "한 건 더 올 수 있나" 를 생각하게 된다.
+   */
+  count?: number;
   urgent?: boolean;
   last?: boolean;
 }) {
+  const urgentNow = urgent === true && (count === undefined || count > 0);
   return (
     <li className={last ? '' : 'border-b border-[var(--surface-2)]'}>
       <Link href={href} className="flex min-h-13 items-center justify-between gap-3 no-underline">
         <span className="flex items-center gap-2 text-[13px]">
           {label}
-          {urgent && count > 0 && <Badge tone="danger">확인 필요</Badge>}
+          {urgentNow && <Badge tone="danger">확인 필요</Badge>}
         </span>
         <span className="flex items-center gap-2">
-          <span className={`tnum text-base font-semibold ${urgent && count > 0 ? 'text-accent' : ''}`}>
-            {count}
-          </span>
+          {count !== undefined && (
+            <span className={`tnum text-base font-semibold ${urgentNow ? 'text-accent' : ''}`}>
+              {count}
+            </span>
+          )}
           <span aria-hidden="true" className="text-[var(--fg-muted)]">›</span>
         </span>
       </Link>

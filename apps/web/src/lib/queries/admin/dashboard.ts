@@ -9,7 +9,7 @@ import {
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 import { stockAttentionWhere } from './products';
 import { LATE_DEPOSIT_OPEN } from './orders';
-import { sellersMissingReturnAddress } from '~/lib/orders/return-address';
+import { merchantSetupTodo, sellersMissingReturnAddress } from '~/lib/orders/return-address';
 
 /**
  * 매출은 **돈이 오간 시각**으로 센다 — 자세한 까닭은 `@shop/core` 의 revenue.ts.
@@ -72,6 +72,14 @@ export interface DashboardTodo {
    * 상품 전부를 구한다.
    */
   readonly noReturnAddress: number;
+  /**
+   * 가맹점이 **아직 못 하는 일** — 등록하지 않아 막혀 있는 것. 운영진 화면에서는 null 이다:
+   * 남의 가게의 빈칸은 가맹점 목록이 보여 주고, 여기 세우면 누구의 일인지 알 수 없다.
+   *
+   * 파는 상품이 없어도 세운다. noReturnAddress 는 **지금 팔고 있는지**를 말하므로 새로 승인된
+   * 가맹점에게는 0 인데, 그 사람에게 가장 먼저 할 일이 바로 이것이다.
+   */
+  readonly merchantSetup: { readonly returnAddress: boolean; readonly settlementAccount: boolean } | null;
 }
 
 export interface TopProduct {
@@ -219,7 +227,10 @@ async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
 
 async function loadTodo(scope: string | null): Promise<DashboardTodo> {
   const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
-  const [preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits, noReturnAddress] = await Promise.all([
+  const [
+    preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits,
+    noReturnAddress, merchantSetup,
+  ] = await Promise.all([
     prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
     prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
     prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
@@ -234,8 +245,13 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
     scope === null ? prisma.payment.count({ where: LATE_DEPOSIT_OPEN }) : Promise.resolve(0),
     // 돌려받을 곳 없이 파는 곳 — 가맹점은 자기 가게 하나를 본다
     sellersMissingReturnAddress(scope),
+    // 자기 가게의 빈칸. 운영진은 남의 가게를 여기서 세지 않는다
+    scope === null ? Promise.resolve(null) : merchantSetupTodo(scope),
   ]);
-  return { preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits, noReturnAddress };
+  return {
+    preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits,
+    noReturnAddress, merchantSetup,
+  };
 }
 
 async function loadTopProducts(scope: string | null, w: Window): Promise<TopProduct[]> {
