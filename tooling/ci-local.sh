@@ -92,6 +92,9 @@ cleanup() {
   # 있어서 "Directory not empty" 가 난다. 남겨 둬도 다음 실행이 시작할 때 지우고(그때는 아무 서버도
   # 없다), 이 폴더는 이 스크립트만 쓴다 — 개발 서버는 `.next` 를 본다.
   rm -rf "apps/web/$NEXT_DIST_DIR" 2>/dev/null || true
+  # **여기서 실패하면 안 된다.** `[ -n "" ]` 는 1 로 끝나는데, set -e 아래의 트랩에서는 그것이
+  # 트랩을 끊고 그 1 이 스크립트의 끝 상태가 된다 — 정리가 판정을 뒤집는 그 고장이다.
+  if [ -n "${E2E_LOG:-}" ]; then rm -f "$E2E_LOG"; fi
 
   exit "$status"
 }
@@ -108,6 +111,21 @@ if [ "$MODE" = full ]; then
   pnpm --filter @shop/auth run seed
 fi
 
+# **재시도는 켜되, 재시도로 통과한 판은 초록이 아니다.**
+#
+# CI 는 한 번 재시도한다(playwright.config). 로컬만 0 이면 "CI 와 같은 조건" 이 거짓말이 되고,
+# 무엇보다 한 번 흔들린 판이 그대로 빨갛게 끝나 멀쩡한 코드를 뒤지게 된다 — 실제로 두 판을 그렇게
+# 썼다. 재시도가 붙으면 그 자리에 "재시도로 통과" 가 찍혀서, 로직이 아니라 타이밍이라는 것이 바로 보인다.
+#
+# 그렇다고 넘어가지는 않는다. 여기서 초록은 **"커밋해도 된다"** 는 뜻이고 이 저장소는 푸시가 곧
+# 배포다 — 운에 기댄 판을 통과로 치면, 가리개를 켜 둔 채 배포하는 셈이 된다. 아래에서 세어 보고
+# 이름을 적어 알린다.
+E2E_LOG=""
+if [ "$MODE" = full ]; then
+  export E2E_RETRIES=1
+  E2E_LOG="$(mktemp -t ci-local-e2e)"
+fi
+
 # CI 와 같은 순서다. 의존성 권고를 먼저 보는 이유는 이것만 turbo 밖에
 # 있어서다 — 패키지별 작업이 아니라 잠금 파일 하나를 보는 일이다.
 echo "▸ audit"
@@ -120,8 +138,20 @@ node tooling/audit.mjs
 # 함께 test/ci-order.test.ts 가 지킨다.
 for step in $STEPS; do
   echo "▸ $step"
-  pnpm turbo run "$step"
+  if [ "$step" = e2e ] && [ -n "$E2E_LOG" ]; then
+    # pipefail 이 켜져 있어 tee 를 지나도 실패는 그대로 실패다
+    pnpm turbo run e2e | tee "$E2E_LOG"
+  else
+    pnpm turbo run "$step"
+  fi
 done
+
+# **재시도로 통과한 것을 눈에 띄게.** Playwright 는 결국 통과했으면 0 으로 끝난다 —
+# "N flaky" 는 요약 한 줄로 지나가고, 수백 줄 로그의 가운데에서는 아무도 못 본다.
+FLAKY=""
+if [ -n "$E2E_LOG" ] && [ -f "$E2E_LOG" ]; then
+  FLAKY="$(awk '/[0-9]+ flaky/{f=1} f && /[0-9]+ (passed|did not run)/{exit} f{print}' "$E2E_LOG" || true)"
+fi
 
 echo
 if [ "$MODE" = quick ]; then
@@ -129,6 +159,15 @@ if [ "$MODE" = quick ]; then
   echo "✓ 빠른 문지기 통과 — lint · typecheck · build · 단위"
   echo "  e2e 는 안 돌았습니다. 화면·API·스키마를 건드렸다면 pnpm ci:local 을 돌리세요."
   echo "  (푸시하면 Vercel 이 그대로 배포합니다)"
+elif [ -n "$FLAKY" ]; then
+  echo "✗ 전부 통과하기는 했지만 — 재시도로 통과한 검사가 있습니다."
+  echo
+  echo "$FLAKY" | sed 's/^/  /'
+  echo
+  echo "  **이 판은 초록이 아닙니다.** 그 검사는 지금 조건이 아니라 운에 기대고 있습니다."
+  echo "  한 번 더 돌려 같은 자리가 또 나오면 그 검사(또는 그 화면)를 고치세요 —"
+  echo "  기다림의 상한이 검사의 상한보다 크지는 않은지부터 봅니다."
+  exit 1
 else
   echo "✓ CI 와 같은 조건에서 전부 통과했습니다."
 fi

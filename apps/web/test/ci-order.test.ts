@@ -125,3 +125,37 @@ describe('문지기의 끝 상태', () => {
     expect(sh()).toMatch(/export NEXT_DIST_DIR=/);
   });
 });
+
+/**
+ * **재시도는 켜되, 재시도로 통과한 판은 초록이 아니다.**
+ *
+ * 로컬 문지기만 재시도가 0 이면 "CI 와 같은 조건" 이 거짓말이 되고, 한 번 흔들린 판이 그대로 빨갛게
+ * 끝나 멀쩡한 코드를 뒤지게 된다 — 실제로 두 판을 그렇게 썼다. 그렇다고 넘어가면 더 나쁘다: 여기서
+ * 초록은 "커밋해도 된다" 는 뜻이고 이 저장소는 푸시가 곧 배포라, 운에 기댄 판을 통과로 치면 가리개를
+ * 켜 둔 채 배포하는 셈이 된다.
+ *
+ * **이 둘은 함께 있어야 한다.** 재시도만 켜고 알리지 않으면 "N flaky" 가 수백 줄 로그의 가운데를
+ * 지나가고 아무도 못 본다 — 그게 재시도의 가장 흔한 실패 모양이다.
+ */
+describe('재시도와 그 값', () => {
+  const sh = () => readFileSync(join(ROOT, 'tooling/ci-local.sh'), 'utf8');
+  const config = () => readFileSync(join(ROOT, 'apps/web/playwright.config.ts'), 'utf8');
+
+  it('문지기가 재시도를 켠다 — CI 와 같은 한 번', () => {
+    expect(sh(), 'ci-local.sh 가 재시도를 켜지 않는다').toMatch(/export E2E_RETRIES=1/);
+    expect(config(), 'playwright.config 이 그 값을 읽지 않는다').toMatch(/E2E_RETRIES/);
+  });
+
+  it('켰으면 재시도로 통과한 것을 세어 이름을 알린다', () => {
+    const source = sh();
+    expect(source, 'e2e 출력을 남기지 않는다 — 남기지 않으면 셀 수가 없다').toMatch(/tee "\$E2E_LOG"/);
+    expect(source, '재시도로 통과한 것을 찾지 않는다').toMatch(/flaky/);
+  });
+
+  /** 통과로 치면 다음 사람은 그 가리개를 켜 둔 채 커밋한다 */
+  it('재시도로 통과한 판은 0 으로 끝내지 않는다', () => {
+    const source = sh();
+    const tail = source.slice(source.indexOf('FLAKY='));
+    expect(tail, '재시도로 통과한 판에서 1 로 끝내지 않는다').toMatch(/\[ -n "\$FLAKY" \][\s\S]*exit 1/);
+  });
+});

@@ -17,7 +17,16 @@ export default defineConfig({
   // vitest 는 test/ 만 본다. 서로 건드리지 않는다.
   fullyParallel: true,
   forbidOnly: !!process.env['CI'],
-  retries: process.env['CI'] ? 1 : 0,
+  /**
+   * **재시도는 고치는 것이 아니라 알려 주는 것이다.**
+   *
+   * 한 번 더 돌려서 통과하면 그 검사가 진 까닭은 로직이 아니라 타이밍·순서다 — 그 한 마디가
+   * 실패 로그에 붙는 것만으로 어디를 볼지가 갈린다(첫 시도의 trace 도 남는다: retain-on-failure).
+   *
+   * **그렇다고 초록은 아니다.** 로컬 문지기(ci-local.sh)는 재시도를 켜 두고, 재시도로 통과한 판을
+   * 통과로 치지 않는다 — 거기서 초록은 "커밋해도 된다" 는 뜻이고, 이 저장소에서 푸시는 곧 배포다.
+   */
+  retries: Number(process.env['E2E_RETRIES'] ?? (process.env['CI'] ? '1' : '0')),
   // 로컬에서는 Playwright 기본값(코어 수)에 맡기고, CI 에서는 재현하기
   // 쉽게 줄인다. exactOptionalPropertyTypes 라 undefined 를 넘기지 못하므로
   // 아예 키를 빼서 기본값을 쓰게 한다.
