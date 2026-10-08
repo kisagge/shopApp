@@ -37,6 +37,15 @@ describe('내 주문 좁히기', () => {
     expect(lastWhere()['userId']).toBe('u-1');
   });
 
+  /** 선물로 보낸 주문을 받는 사람 번호로 찾는다. 자기 주문만 보이는 것은 userId 가 지킨다 */
+  it('전화번호는 받는 사람 번호로 찾는다 — 번호 조각으로 읽으면 0건이 된다', async () => {
+    await getMyOrders('u-1', { search: readMyOrderSearch('010-1234-5678') });
+
+    expect(lastWhere()['recipientPhone']).toBe('010-1234-5678');
+    expect(lastWhere()['orderNo']).toBeUndefined();
+    expect(lastWhere()['userId']).toBe('u-1');
+  });
+
   it('완전한 주문번호는 정확히 일치로 찾는다', async () => {
     // 유니크 인덱스를 쓰는 갈래다. 부분 일치로 던지면 전체를 훑는다.
     await getMyOrders('u-1', { search: readMyOrderSearch('20260831-8842713') });

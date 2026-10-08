@@ -29,6 +29,40 @@ describe('검색어 읽기', () => {
     expect(readOrderSearch('123').kind).toBe('buyer');
   });
 
+  /**
+   * **전화번호가 주문번호 조각으로 빨려 들어가고 있었다.**
+   *
+   * 숫자와 하이픈이면 전부 번호의 일부로 읽었는데 "010-1234-5678" 이 바로 그 모양이다 — 주문번호에
+   * 그런 조각이 있을 리 없으니 **언제나 0건**이 나왔고, 운영자는 "그런 주문이 없습니다" 라고 답하게
+   * 된다. 조용히 틀리는 종류다. 택배사와 고객센터가 쥐고 오는 것이 바로 전화번호라 더 그렇다.
+   */
+  describe('전화번호', () => {
+    it('하이픈을 넣든 빼든 같은 값으로 읽는다 — 저장할 때 쓴 함수와 같은 것을 쓴다', () => {
+      expect(readOrderSearch('010-1234-5678')).toEqual({ kind: 'phone', value: '010-1234-5678' });
+      expect(readOrderSearch('01012345678')).toEqual({ kind: 'phone', value: '010-1234-5678' });
+    });
+
+    /** 받는 사람 번호로 저장되는 것은 휴대폰뿐이다(PHONE_PATTERN 이 01X 만 받는다) — 10~11자리 */
+    it('열 자리 휴대폰도 전화로 본다', () => {
+      expect(readOrderSearch('016-123-4567').kind).toBe('phone');
+    });
+
+    it('아홉 자리 유선번호는 전화로 보지 않는다 — 저장될 수 없는 모양이다', () => {
+      expect(readOrderSearch('02-123-4567').kind).toBe('orderNoPartial');
+    });
+
+    it('주문번호는 전화로 읽지 않는다 — 길이가 다르다', () => {
+      expect(readOrderSearch('20260831-8842713').kind).toBe('orderNo');
+      // 날짜 여덟 자리는 번호의 일부다. 부분으로 칠 때 열한 자리를 치지는 않는다
+      expect(readOrderSearch('20260831').kind).toBe('orderNoPartial');
+      expect(readOrderSearch('8842713').kind).toBe('orderNoPartial');
+    });
+
+    it('이름에 섞인 숫자는 전화가 아니다', () => {
+      expect(readOrderSearch('김010-1234-5678').kind).toBe('buyer');
+    });
+  });
+
   it('그 밖은 이름으로 본다', () => {
     expect(readOrderSearch('김민수')).toEqual({ kind: 'buyer', value: '김민수' });
     expect(readOrderSearch('demo').kind).toBe('buyer');

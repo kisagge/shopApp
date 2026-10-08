@@ -128,14 +128,14 @@ export default async function AdminOrdersPage({
 
           <div className="flex flex-col gap-1.5">
             <label htmlFor="order-q" className="text-xs font-medium text-[var(--fg-secondary)]">
-              주문번호 · 주문자
+              주문번호 · 이름 · 전화번호
             </label>
             <input
               id="order-q"
               name="q"
               type="search"
               defaultValue={q ?? ''}
-              placeholder="20260904-1234567 또는 이름"
+              placeholder="20260904-1234567 · 이름 · 010-1234-5678"
               maxLength={60}
               className="h-10 w-64 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-[13px]"
             />

@@ -34,15 +34,55 @@ describe('주문번호 검색', () => {
     expect(whereOf()['orderNo']).toEqual({ contains: '8842713' });
   });
 
-  it('이름은 대소문자를 가리지 않는다', async () => {
+  /**
+   * **이름은 둘일 수 있다.** 주문한 사람과 받는 사람이 다른 주문이 흔하다(선물·가족·회사).
+   * 운영자가 문의를 받아 쥔 이름이 어느 쪽인지는 모른다 — 한쪽만 보면 "그런 주문 없습니다" 가 된다.
+   */
+  it('이름은 주문자와 받는 사람을 함께 보고, 대소문자를 가리지 않는다', async () => {
     await getAdminOrders(admin, { q: 'Demo' });
-    expect(whereOf()['user']).toEqual({ name: { contains: 'Demo', mode: 'insensitive' } });
+
+    expect(whereOf()['OR']).toEqual([
+      { user: { name: { contains: 'Demo', mode: 'insensitive' } } },
+      { recipient: { contains: 'Demo', mode: 'insensitive' } },
+    ]);
   });
 
   it('검색어가 없으면 조건을 붙이지 않는다', async () => {
     await getAdminOrders(admin, {});
     expect(whereOf()['orderNo']).toBeUndefined();
-    expect(whereOf()['user']).toBeUndefined();
+    expect(whereOf()['OR']).toBeUndefined();
+    expect(whereOf()['recipientPhone']).toBeUndefined();
+  });
+});
+
+/**
+ * **전화번호가 주문번호 조각으로 빨려 들어가고 있었다.**
+ *
+ * 숫자와 하이픈이면 전부 번호의 일부로 읽었는데 "010-1234-5678" 이 바로 그 모양이다 — 주문번호에
+ * 그런 조각이 있을 리 없으니 언제나 0건이 나왔고, 운영자는 "그런 주문이 없습니다" 라고 답하게 된다.
+ * 택배사와 고객센터가 쥐고 오는 것이 바로 전화번호다.
+ */
+describe('전화번호 검색', () => {
+  it('받는 사람의 번호로 찾는다', async () => {
+    await getAdminOrders(admin, { q: '010-1234-5678' });
+
+    expect(whereOf()['recipientPhone']).toBe('010-1234-5678');
+    // 번호로 읽었으니 주문번호 조각으로는 안 던진다 — 그게 0건의 원인이었다
+    expect(whereOf()['orderNo']).toBeUndefined();
+  });
+
+  it('하이픈 없이 쳐도 같은 주문을 찾는다 — 저장할 때 쓴 함수로 맞춘다', async () => {
+    await getAdminOrders(admin, { q: '01012345678' });
+
+    expect(whereOf()['recipientPhone']).toBe('010-1234-5678');
+  });
+
+  it('가맹점이 전화로 찾아도 자기 주문 제한이 풀리지 않는다', async () => {
+    await getAdminOrders(merchant, { q: '010-1234-5678' });
+
+    const where = whereOf();
+    expect(where['items']).toEqual({ some: { merchantId: 'm-a' } });
+    expect(where['recipientPhone']).toBe('010-1234-5678');
   });
 });
 
@@ -70,7 +110,8 @@ describe('가맹점 범위', () => {
 
     const where = whereOf();
     expect(where['items']).toEqual({ some: { merchantId: 'm-a' } });
-    expect(where['user']).toEqual({ name: { contains: '홍길동', mode: 'insensitive' } });
+    // 이름은 OR 로 두 칸을 보지만, 그 OR 은 범위 제한과 **나란한 키**라 Prisma 가 AND 로 묶는다
+    expect(where['OR']).toHaveLength(2);
   });
 
   it('상태·검색·기간이 함께 걸린다', async () => {

@@ -173,11 +173,14 @@ export async function getMyOrders(
         ? { orderNo: search.value }
         : search.kind === 'orderNoPartial'
           ? { orderNo: { contains: search.value } }
-          : {
-              items: {
-                some: { productName: { contains: search.value, mode: 'insensitive' as const } },
-              },
-            };
+          // 선물로 보낸 주문을 받는 사람 번호로 찾는다. 자기 주문만 보이는 것은 바깥 조건이 지킨다
+          : search.kind === 'phone'
+            ? { recipientPhone: search.value }
+            : {
+                items: {
+                  some: { productName: { contains: search.value, mode: 'insensitive' as const } },
+                },
+              };
 
   const placedAt =
     range && (range.from || range.until)

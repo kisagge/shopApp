@@ -74,17 +74,48 @@ test.describe('주문 검색', () => {
     const first = page.locator('tbody tr td:first-child a').first();
     const orderNo = (await first.innerText()).trim();
 
-    await page.getByLabel('주문번호 · 주문자').fill(orderNo);
+    await page.getByLabel('주문번호 · 이름 · 전화번호').fill(orderNo);
     await page.getByRole('button', { name: '검색' }).click();
 
     await expect(page.locator('tbody tr')).toHaveCount(1);
     await expect(page.locator('tbody tr td:first-child')).toContainText(orderNo);
   });
 
+  /**
+   * **전화번호가 주문번호 조각으로 빨려 들어가고 있었다.**
+   *
+   * 숫자와 하이픈이면 전부 번호의 일부로 읽어서, "010-..." 은 언제나 0건이었다 — 운영자는 "그런
+   * 주문이 없습니다" 라고 답하게 된다. 단위 검사는 목 위에서 도느라 **저장된 모양과 검색어 모양이
+   * 실제로 맞는지**를 못 본다(하이픈을 넣어 저장하고 안 넣고 찾으면 안 나온다). 그걸 여기서 본다.
+   */
+  test('받는 사람 전화번호로 그 주문을 찾는다', async ({ page }) => {
+    await page.goto('/admin/orders');
+    await ready(page);
+
+    const orderNo = (await page.locator('tbody tr td:first-child a').first().innerText()).trim();
+    await page.goto(`/admin/orders/${orderNo}`);
+    await ready(page);
+    // 화면에 적힌 그대로 — 저장된 모양이다
+    const phone = (await page.getByRole('definition').filter({ hasText: /^01\d/ }).first().innerText()).trim();
+
+    await page.goto('/admin/orders');
+    await ready(page);
+    await page.getByLabel('주문번호 · 이름 · 전화번호').fill(phone);
+    await page.getByRole('button', { name: '검색' }).click();
+
+    const rows = page.locator('tbody tr');
+    await expect(rows.filter({ hasText: orderNo })).toHaveCount(1);
+
+    // 하이픈을 빼고 쳐도 같은 주문이 나온다 — 저장할 때 쓴 함수로 맞추기 때문이다
+    await page.goto(`/admin/orders?q=${encodeURIComponent(phone.replace(/\D/g, ''))}`);
+    await ready(page);
+    await expect(page.locator('tbody tr').filter({ hasText: orderNo })).toHaveCount(1);
+  });
+
   test('조건이 주소에 남는다 — 새로고침해도 같은 결과다', async ({ page }) => {
     await page.goto('/admin/orders');
     await ready(page);
-    await page.getByLabel('주문번호 · 주문자').fill('데모');
+    await page.getByLabel('주문번호 · 이름 · 전화번호').fill('데모');
     await page.getByRole('button', { name: '검색' }).click();
 
     await expect(page).toHaveURL(/[?&]q=/);

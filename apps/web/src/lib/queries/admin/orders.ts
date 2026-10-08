@@ -68,9 +68,26 @@ export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) 
       ? { orderNo: term.value }
       : term.kind === 'orderNoPartial'
         ? { orderNo: { contains: term.value } }
-        : term.kind === 'buyer'
-          ? { user: { name: { contains: term.value, mode: 'insensitive' as const } } }
-          : {};
+        : term.kind === 'phone'
+          /*
+           * **받는 사람의 번호로 찾는다.** 택배사도 고객센터도 쥐고 오는 것이 그것이다. 저장할 때
+           * 쓴 함수로 같은 모양을 만들어 두었으므로(core normalizePhone) 정확히 일치로 본다 —
+           * 하이픈을 넣고 치든 빼고 치든 같은 값이 된다.
+           */
+          ? { recipientPhone: term.value }
+          : term.kind === 'buyer'
+            /*
+             * **이름은 둘일 수 있다.** 주문한 사람과 받는 사람이 다른 주문이 흔하다(선물·가족·회사).
+             * 운영자가 쥔 이름이 어느 쪽인지는 모르므로 둘 다 본다 — 범위 제한은 이 객체 바깥의
+             * 키라서 Prisma 가 AND 로 묶는다(가맹점이 남의 주문을 보게 되지 않는다).
+             */
+            ? {
+                OR: [
+                  { user: { name: { contains: term.value, mode: 'insensitive' as const } } },
+                  { recipient: { contains: term.value, mode: 'insensitive' as const } },
+                ],
+              }
+            : {};
 
   const placedAt =
     range.from || range.until

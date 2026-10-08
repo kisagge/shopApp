@@ -22,6 +22,11 @@ describe('내 주문 검색어', () => {
     expect(readMyOrderSearch('8842713').kind).toBe('orderNoPartial');
   });
 
+  /** 선물로 보낸 주문을 받는 사람 번호로 찾는다 — 어차피 자기 주문만 보인다(조회가 범위를 건다) */
+  it('전화번호는 손님에게도 전화번호다', () => {
+    expect(readMyOrderSearch('010-1234-5678')).toEqual({ kind: 'phone', value: '010-1234-5678' });
+  });
+
   it('나머지는 상품명이다 — 손님은 자기 이름으로 찾지 않는다', () => {
     expect(readMyOrderSearch('울 코트')).toEqual({ kind: 'product', value: '울 코트' });
   });
