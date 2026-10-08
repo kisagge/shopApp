@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import {
-  MEMBER_GRADE, MERCHANT_STATUS, merchantStatusNeedsReason, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type MerchantStatus,
+  MEMBER_GRADE, MERCHANT_STATUS, merchantStatusNeedsReason, POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, USER_ROLE, type MerchantStatus,
 } from '@shop/core';
 import { cuidSchema } from './common';
 
@@ -28,7 +28,14 @@ export const updateMerchantStatusSchema = z
   });
 export type UpdateMerchantStatusInput = z.infer<typeof updateMerchantStatusSchema>;
 
-export const USER_ROLE_INPUT = ['CUSTOMER', 'MERCHANT', 'ADMIN', 'SUPER_ADMIN'] as const;
+/**
+ * 권한 부여로 받을 수 있는 역할.
+ *
+ * **core 의 목록을 그대로 쓴다.** 여기 다시 적어 두면 역할이 하나 늘 때 계약만 모른 채 남아, 운영
+ * 화면에는 뜨는데 저장은 거절되는(또는 그 반대) 자리가 생긴다. 일부러 받지 않을 역할이 생기면 그때
+ * 빼면서 **왜 빼는지**를 적는 편이 낫다 — 베낀 목록은 그 까닭을 남기지 못한다.
+ */
+export const USER_ROLE_INPUT = USER_ROLE;
 export type UserRoleInput = (typeof USER_ROLE_INPUT)[number];
 
 export const assignRoleSchema = z

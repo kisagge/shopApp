@@ -2,7 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type PointAdjustDirection } from '@shop/core';
+import {
+  POINT_ADJUST_DIRECTION, POINT_ADJUST_MAX, POINT_ADJUST_NOTE_MAX, type PointAdjustDirection,
+} from '@shop/core';
 
 const won = (n: number) => `${n.toLocaleString('ko-KR')}P`;
 
@@ -126,7 +128,8 @@ export function PointAdjustForm({
       <fieldset disabled={confirming || pending} className="flex flex-col gap-4">
         <fieldset className="flex gap-4 text-[13px]">
           <legend className="sr-only">지급 또는 차감</legend>
-          {(['GRANT', 'DEDUCT'] as const).map((d) => (
+          {/* 방향은 core 가 들고 있다 — 여기 다시 적으면 둘이 갈린다 */}
+          {POINT_ADJUST_DIRECTION.map((d) => (
             <label key={d} className="flex items-center gap-1.5">
               <input
                 type="radio"

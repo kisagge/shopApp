@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { Button, Field } from '@shop/ui';
-import { generateCouponCode, COUPON_KIND_LABEL } from '@shop/core';
+import { generateCouponCode, COUPON_KIND, COUPON_KIND_LABEL } from '@shop/core';
 import type { CouponRow, NamedOption, Target } from './types';
 
 /** 'YYYY-MM-DDTHH:mm' (datetime-local) 을 KST 로 해석해 ISO 로 */
@@ -167,7 +167,8 @@ export function CouponForm({
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1.5 text-xs font-medium text-[var(--fg-secondary)]">할인 방식</legend>
         <div className="flex gap-2">
-          {(['AMOUNT', 'PERCENT'] as const).map((k) => (
+          {/* 종류는 core 가 들고 있다 — 여기 다시 적으면 종류가 늘어도 이 화면에는 안 뜬다 */}
+          {COUPON_KIND.map((k) => (
             <label
               key={k}
               className="flex cursor-pointer items-center gap-2 rounded-sm border border-[var(--border)] px-3.5 py-2.5 text-[13px] has-[:checked]:border-[var(--brand)]"
