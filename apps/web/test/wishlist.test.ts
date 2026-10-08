@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { isOnDisplay, PRODUCT_STATUS } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   product: { findFirst: vi.fn<(...a: any[]) => any>() },
@@ -111,12 +112,44 @@ describe('목록', () => {
     ['미게시', { publishedAt: null }],
     ['숨김', { status: 'HIDDEN' }],
     ['작성 중', { status: 'DRAFT' }],
+    /*
+     * **검수 대기가 빠져 있었다.** 조건을 여기서 손으로 적어서, 가맹점이 상품을 고치려고 검수 대기로
+     * 내린 사이에 찜 목록은 멀쩡한 카드를 그렸다 — 누르면 매대 조회가 걸러 404 다.
+     */
+    ['검수 대기', { status: 'PENDING_REVIEW' }],
   ])('%s 상품은 판매 종료로 표시한다', async (_l, over) => {
     // 목록에서 지우지 않는다 — 조용히 사라지면 자기가 찜을 지운 줄 안다
     db.wishlistItem.findMany.mockResolvedValue([row(over)]);
     const [item] = await getWishlist(USER);
     expect(item?.unavailable).toBe(true);
     expect(item?.name).toBe('코트');
+  });
+
+  it('품절은 판매 종료가 아니다 — 매대에는 그대로 서 있다', async () => {
+    db.wishlistItem.findMany.mockResolvedValue([row({ status: 'SOLD_OUT' })]);
+    expect((await getWishlist(USER))[0]?.unavailable).toBe(false);
+  });
+
+  /**
+   * **상태마다 매대와 같은 답을 내는가.**
+   *
+   * 이 판단을 손으로 적으면 한 칸이 빠진다(실제로 검수 대기가 빠져 있었다). 판단은 core 한 곳에
+   * 있고, 여기서는 그것과 **모든 상태에서** 같은 답을 내는지 맞춰 본다 — 새 상태가 생겨도 걸린다.
+   */
+  it('매대에 서 있는가는 core 와 같은 답이다', async () => {
+    for (const status of PRODUCT_STATUS) {
+      db.wishlistItem.findMany.mockResolvedValue([row({ status })]);
+      const [item] = await getWishlist(USER);
+
+      expect(item?.unavailable, status).toBe(
+        !isOnDisplay({
+          deletedAt: null,
+          publishedAt: new Date('2026-07-01'),
+          status,
+          merchantStatus: 'APPROVED',
+        }),
+      );
+    }
   });
 
   it('가맹점이 정지되면 판매 종료다', async () => {

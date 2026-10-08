@@ -1,4 +1,4 @@
-import type { ProductStatus } from './product-publish';
+import { isVisibleStatus, type ProductStatus } from './product-publish';
 import type { LineIssue } from './cart';
 import { MAX_CART_LINES, MAX_QUANTITY, type CartLineState } from './cart-sync';
 
@@ -26,13 +26,19 @@ export interface VariantState {
  *
  * 재고는 보지 않는다. 품절은 "담을 수 없다" 가 아니라 "지금은 살 수 없다" 여서
  * 부르는 쪽마다 다루는 법이 다르다(견적은 알리고, 다시 담기는 건너뛴다).
+ *
+ * **상태는 이름으로 적지 않는다.** 한동안 `HIDDEN` 만 적어 두어 **검수 대기가 빠져 있었다** — 가맹점이
+ * 고치려고 상품을 검수 대기로 내려도 이미 담긴 줄은 그대로 팔렸다. 매대에서 내려간 물건이 장바구니에서는
+ * 팔리는 셈이고, 이쪽은 돈이 걸린 길이다. 매대에 보이는 상태인지(isVisibleStatus) 하나로 묻는다 —
+ * 상태가 늘어도 여기가 따라 틀리지 않는다.
  */
 export function variantUnavailable(v: VariantState | null): Extract<LineIssue, 'NOT_FOUND' | 'INACTIVE'> | null {
   // 상품이 사라졌거나 아직 올라간 적이 없다
   if (v === null || v.productDeleted || v.productStatus === 'DRAFT') return 'NOT_FOUND';
   if (
     !v.isActive
-    || v.productStatus === 'HIDDEN'
+    // 숨김·검수 대기 — 매대에 서 있지 않으면 지금 살 수 있는 물건이 아니다
+    || !isVisibleStatus(v.productStatus)
     // 가맹점이 정지되면 그 상품은 팔 수 없다. 상품 상태만 보면 정지 처분이 판매를 멈추지 못한다
     || (v.merchantStatus ?? 'APPROVED') !== 'APPROVED'
   ) {

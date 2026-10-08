@@ -115,6 +115,24 @@ describe('담아 둔 사이에 생긴 문제를 알린다', () => {
     expect(q.lines[0]?.issue).toBe('INACTIVE');
   });
 
+  /**
+   * **검수 대기가 빠져 있었다.**
+   *
+   * 담을 수 없는 상태를 이름으로 적어 두어(숨김 하나) 가맹점이 고치려고 상품을 검수 대기로 내려도
+   * 이미 담긴 줄은 그대로 팔렸다 — 매대에서 내려간 물건이 장바구니에서는 팔리는 셈이다. 견적에 문제
+   * 줄이 하나라도 있으면 주문은 만들어지지 않으므로(core checkOrder), 여기서 서는 것이 곧 돈을 막는 것이다.
+   */
+  it('검수를 기다리는 상품도 담을 수 없다 — 매대에 서 있지 않다', async () => {
+    findManyVariants.mockResolvedValue([
+      variant({ product: { ...variant().product, status: 'PENDING_REVIEW' } }),
+    ]);
+
+    const q = await quoteCart({ lines: [{ variantId: 'v-coat-m', quantity: 1 }], isRemoteArea: false }, null);
+
+    expect(q.lines[0]?.issue).toBe('INACTIVE');
+    expect(q.lines[0]?.quantity).toBe(0);
+  });
+
   it('문제 있는 줄과 정상인 줄이 섞여도 정상인 것만 계산한다', async () => {
     findManyVariants.mockResolvedValue([
       variant(),

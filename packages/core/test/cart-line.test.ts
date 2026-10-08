@@ -4,6 +4,7 @@ import {
   type VariantState, type ReorderVariant,
 } from '../src/cart-line';
 import { MAX_CART_LINES, MAX_QUANTITY } from '../src/cart-sync';
+import { PRODUCT_STATUS, isVisibleStatus } from '../src/product-publish';
 
 const live: VariantState = {
   isActive: true, productStatus: 'ACTIVE', productDeleted: false, merchantStatus: 'APPROVED',
@@ -33,6 +34,12 @@ describe('담을 수 있는 옵션인가', () => {
   it.each([
     ['옵션 판매를 멈췄다', { ...live, isActive: false }],
     ['상품을 숨겼다', { ...live, productStatus: 'HIDDEN' as const }],
+    /*
+     * **검수 대기가 빠져 있었다.** 상태를 이름으로 적어 두어서(HIDDEN 하나), 가맹점이 고치려고
+     * 상품을 검수 대기로 내려도 이미 담긴 줄은 그대로 팔렸다 — 매대에서 내려간 물건이 장바구니에서는
+     * 팔리는 셈이고, 이쪽은 돈이 걸린 길이다.
+     */
+    ['검수를 기다린다', { ...live, productStatus: 'PENDING_REVIEW' as const }],
     ['가맹점이 정지됐다', { ...live, merchantStatus: 'SUSPENDED' }],
   ])('%s — 팔지 않는 것', (_label, v) => {
     /*
@@ -40,6 +47,19 @@ describe('담을 수 있는 옵션인가', () => {
      * 옵션 바꾸기가 그 가게의 옵션으로 바꿔 담게 해 놓고 견적에서 막는다.
      */
     expect(variantUnavailable(v)).toBe('INACTIVE');
+  });
+
+  /**
+   * **상태를 이름으로 적지 않는다.**
+   *
+   * 매대에 보이는 상태인지 하나로 묻는다 — 상태가 늘어도 여기가 따라 틀리지 않게. 작성 중(DRAFT)만
+   * 예외로 앞에서 "없는 것" 으로 가른다: 한 번도 올라간 적 없는 물건이라 팔지 않는 것과 뜻이 다르다.
+   */
+  it('매대에 보이지 않는 상태는 전부 팔지 않는 것이다', () => {
+    for (const status of PRODUCT_STATUS) {
+      const result = variantUnavailable({ ...live, productStatus: status });
+      expect(result === null, status).toBe(isVisibleStatus(status));
+    }
   });
 });
 

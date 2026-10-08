@@ -1,5 +1,6 @@
 import 'server-only';
 import { prisma } from '@shop/db';
+import { isOnDisplay } from '@shop/core';
 
 /**
  * 찜.
@@ -68,6 +69,11 @@ export async function removeFromWishlist(userId: string, productId: string): Pro
  *
  * 판매가 내려간 상품도 지우지 않고 표시만 바꾼다. 조용히 사라지면
  * 사용자는 자기가 찜을 지운 줄 안다.
+ *
+ * **매대에 서 있는가는 core 가 판단한다**(isOnDisplay). 여기서 손으로 적어 두었더니 한 칸이 빠져
+ * 있었다 — 검수 대기(PENDING_REVIEW)를 "살 수 있음" 으로 읽어서, 가맹점이 고치려고 상품을 내린
+ * 사이에 찜 목록은 멀쩡한 카드를 그렸다. 누르면 매대 조회가 걸러 404 다. 바로 그 어긋남 때문에
+ * 판단을 한 곳으로 모은 것이다(core 주석: 셋이 각자 적었더니 하나가 다른 답을 냈다).
  */
 export async function getWishlist(userId: string): Promise<WishlistProduct[]> {
   const rows = await prisma.wishlistItem.findMany({
@@ -91,7 +97,6 @@ export async function getWishlist(userId: string): Promise<WishlistProduct[]> {
   return rows.map((row) => {
     const p = row.product;
     const image = p.images[0];
-    const merchantOk = (p.brand.merchant?.status ?? 'APPROVED') === 'APPROVED';
     return {
       productId: p.id,
       slug: p.slug,
@@ -102,12 +107,13 @@ export async function getWishlist(userId: string): Promise<WishlistProduct[]> {
       imageUrl: image?.url ?? null,
       imageAlt: image?.alt ?? null,
       soldOut: p.variants.length > 0 && p.variants.every((v) => v.stock <= 0),
-      unavailable:
-        p.deletedAt !== null ||
-        p.publishedAt === null ||
-        p.status === 'DRAFT' ||
-        p.status === 'HIDDEN' ||
-        !merchantOk,
+      unavailable: !isOnDisplay({
+        deletedAt: p.deletedAt,
+        publishedAt: p.publishedAt,
+        status: p.status,
+        // 자사 브랜드면 승인을 물을 상대가 없다
+        merchantStatus: p.brand.merchant?.status ?? null,
+      }),
       addedAt: row.createdAt,
     };
   });
