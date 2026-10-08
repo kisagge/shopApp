@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, adminStatusActions, hasPermission, ORDER_STATUS_LABEL, canRegisterShipment,
-  PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf,
+  PAYMENT_STATUS_LABEL, isPaidStatus, canResolveReturnOf, PARTIAL_CANCELLABLE_STATUS,
   checkAddressEdit, awaitingDeposit, showsAddressChanged,
   type OrderStatus,
 } from '@shop/core';
@@ -97,7 +97,8 @@ export default async function AdminOrderDetail({
   const liveItems = order.items.filter((i) => !i.canceledAt);
   const canCancelItems =
     hasPermission(actor, 'order:refund') &&
-    (order.status === 'PAID' || order.status === 'PREPARING') &&
+    // 서버가 막는 것과 같은 목록이다 — 각자 적으면 눌러 본 뒤에야 안 되는 것을 안다
+    PARTIAL_CANCELLABLE_STATUS.includes(order.status) &&
     order.payment !== null && isPaidStatus(order.payment.status) &&
     order.payment.method !== 'VIRTUAL_ACCOUNT' &&
     // 남은 줄이 하나여도 세운다 — 부품이 단추를 감추고, 방금 끝난 취소의 안내를 남긴다

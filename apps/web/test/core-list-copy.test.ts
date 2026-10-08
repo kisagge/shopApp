@@ -16,6 +16,15 @@ import { join, resolve, relative } from 'node:path';
  * **통째로 베낀 것만 센다.** 부분집합은 대개 뜻이 있는 추림이고(출고 전 상태, 끝나지 않은 신청),
  * 그 추림에는 이름과 까닭이 붙는다. 반면 **원본과 똑같은 목록**을 다시 적은 것은 추림이 아니라 사본이다.
  * 그 상수 이름을 파일이 한 번이라도 부르면 넘어간다 — 알고 쓰는 자리다.
+ *
+ * **배열만 보면 절반만 본다.** 사본은 `||` 사슬로도 적힌다(`status === 'A' || status === 'B'`). 다만 그쪽은
+ * 그냥 두 값을 묻는 평범한 가지도 많아서, 조건을 더 좁힌다 — **core 가 이미 이름을 붙여 둔 묶음**(다른
+ * 목록의 진부분집합인 것: 출고 전 줄, 끝나지 않은 신청, 돈이 되돌아간 상태…)과 **똑같은 값들**을 조건식으로
+ * 다시 적은 자리만 센다. 그 묶음에는 이미 이름과 까닭이 있으므로, 다시 적는 것은 그 까닭을 버리는 일이다.
+ *
+ * **이 검사가 못 잡는 것도 적어 둔다.** 같은 뜻을 **다른 모양으로** 적은 것(찜 목록이 매대 조건을 손으로
+ * 이어 적었던 일)은 글자가 겹치지 않아 여기 안 걸린다. 그 자리는 "모든 값에서 core 와 같은 답을 내는가" 를
+ * 맞춰 보는 검사가 각자 지킨다(wishlist·cart-line). 패턴으로 잡히는 것과 뜻으로만 잡히는 것을 섞지 않는다.
  */
 
 const ROOT = resolve(import.meta.dirname, '../../..');
@@ -68,6 +77,47 @@ describe('core 의 목록을 베끼지 않는다', () => {
     // 손으로 적은 목록이 아니라 소스에서 읽어 왔는지 — 아는 것 몇 개로 확인한다
     expect(lists.get('COUPON_KIND')).toEqual(new Set(['AMOUNT', 'PERCENT']));
     expect([...(lists.get('RETURN_STATUS') ?? [])]).toContain('CANCELLED');
+  });
+
+  it('core 가 이름 붙인 묶음을 조건식으로 다시 적은 자리가 없다', () => {
+    const lists = coreLists();
+    /*
+     * 이름 붙은 묶음 — 다른 목록의 **진부분집합**인 것. 전체 목록(ORDER_STATUS 같은)은 제외한다:
+     * 그 안의 값 둘을 묻는 조건은 묶음을 베낀 것이 아니라 그냥 두 가지를 가르는 가지다.
+     */
+    const named = [...lists].filter(([n, v]) => [...lists].some(([n2, v2]) =>
+      n2 !== n && v.size < v2.size && [...v].every((x) => v2.has(x))));
+    expect(named.length, '이름 붙은 묶음을 못 찾았다 — 이 검사는 아무것도 안 본 것이다').toBeGreaterThan(3);
+
+    const chain = /(?:[A-Za-z_$][\w$.?]*\s*===\s*'[A-Z][A-Z0-9_]*'\s*\|\|\s*)+[A-Za-z_$][\w$.?]*\s*===\s*'[A-Z][A-Z0-9_]*'/g;
+    const copies: string[] = [];
+
+    for (const dir of SOURCES) {
+      for (const file of walk(join(ROOT, dir))) {
+        const rel = relative(ROOT, file);
+        if (EXEMPT[rel]) continue;
+        const source = readFileSync(file, 'utf8');
+
+        for (const m of source.matchAll(chain)) {
+          const values = new Set([...m[0].matchAll(/'([A-Z][A-Z0-9_]*)'/g)].map((v) => v[1]!));
+
+          for (const [name, members] of named) {
+            if (values.size !== members.size) continue;
+            if ([...values].some((v) => !members.has(v))) continue;
+            if (new RegExp(`\\b${name}\\b`).test(source)) continue;
+
+            const line = source.slice(0, m.index).split('\n').length;
+            copies.push(`${rel}:${line} — core 의 ${name} 를 조건식으로 다시 적었다`);
+          }
+        }
+      }
+    }
+
+    expect(
+      copies,
+      '이름과 까닭이 붙은 묶음이다. core 의 것을 부르거나, 다시 적어야 할 까닭을 EXEMPT 에 적는다:\n' +
+        copies.join('\n'),
+    ).toEqual([]);
   });
 
   it('원본과 똑같은 목록을 다시 적은 자리가 없다', () => {

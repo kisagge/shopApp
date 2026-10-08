@@ -101,6 +101,18 @@ export const isCancellableByCustomer = (status: OrderStatus): boolean =>
   status === 'PENDING' || status === 'PAID';
 
 /**
+ * 운영진이 **일부만** 취소할 수 있는 주문 상태 — 출고 전까지. 나간 물건은 반품이다.
+ *
+ * **줄 축과 다른 축이다.** 줄이 아직 안 나갔는지는 UNSHIPPED_LINE_STATUS 가 답한다. 지금은 값이
+ * 같지만 주문은 줄들을 합쳐 본 상태라, 줄 하나가 먼저 나가는 일이 생기면 그때 갈린다 — 한 이름으로
+ * 묶으면 그 갈림을 못 따라간다. 그래서 둘 다 이름을 갖는다.
+ *
+ * **화면과 서버가 같은 목록을 본다.** 단추를 세울지 정하는 화면과 막는 창구가 각자 적어 두면, 눌러
+ * 본 뒤에야 안 되는 것을 알거나(화면이 넓게 적음) 할 수 있는 일을 못 하게 된다(좁게 적음).
+ */
+export const PARTIAL_CANCELLABLE_STATUS: readonly OrderStatus[] = ['PAID', 'PREPARING'];
+
+/**
  * 송장을 붙일 수 있는 주문인가.
  *
  * **이 함수가 없어서 아무 주문에나 붙었다.** 송장 등록은 상태 전이보다 **먼저**

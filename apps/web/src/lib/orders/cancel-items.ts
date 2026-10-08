@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
   canRefundOrder, isPaidStatus, planPartialCancel, remainingRefund, shippingPolicyFrom, PartialCancelError,
-  ORDER_STATUS_LABEL, UNSHIPPED_LINE_STATUS, won,
+  ORDER_STATUS_LABEL, PARTIAL_CANCELLABLE_STATUS, UNSHIPPED_LINE_STATUS, won,
   type Actor, type OrderStatus, type PaymentGateway, type ShippingPolicy, type Won,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
@@ -58,15 +58,6 @@ export interface CancelItemsResult {
   readonly shippingDeducted: number;
 }
 
-/**
- * 출고 전 **주문** 상태. 운영진은 여기까지 일부 취소를 받는다 — 나간 물건은 반품이다.
- *
- * 줄이 나갔는지는 core 의 목록이 답한다(UNSHIPPED_LINE_STATUS). 지금은 값이 같지만 **다른 축**이라
- * 한 이름으로 묶지 않는다 — 주문은 줄들을 합쳐 본 상태이고, 줄 하나가 먼저 나가는 일이 생기면 그때
- * 갈린다. 반대로 줄을 보는 자리에서 이 목록을 쓰면 그 갈림을 못 따라간다.
- */
-const BEFORE_SHIPPING: readonly OrderStatus[] = ['PAID', 'PREPARING'];
-
 /** 손님이 스스로 일부를 취소할 수 있는 주문 상태 — 전액 취소와 같은 선(결제완료까지) */
 const CUSTOMER_PARTIAL: readonly OrderStatus[] = ['PAID'];
 
@@ -113,7 +104,7 @@ export async function policyOf(json: unknown): Promise<ShippingPolicy> {
 
 function assertCancellable(loaded: Loaded, itemIds: readonly string[], staff: boolean): void {
   const { order } = loaded;
-  const allowed = staff ? BEFORE_SHIPPING : CUSTOMER_PARTIAL;
+  const allowed = staff ? PARTIAL_CANCELLABLE_STATUS : CUSTOMER_PARTIAL;
   if (!allowed.includes(order.status)) {
     throw new CancelItemsError(
       'NOT_CANCELLABLE',
