@@ -1,7 +1,7 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  isMyReturnTurn, returnStageOf, RETURN_STAGE,
+  isMyReturnTurn, returnStageOf, RETURN_STAGE, OPEN_RETURN_STATUS,
   type Actor, type ReturnReason, type ReturnStage, type ReturnType,
   offsetOf,
 } from '@shop/core';
@@ -36,15 +36,22 @@ export interface ReturnQueuePage {
   readonly counts: Readonly<Record<ReturnQueueView, number>>;
 }
 
-/** 단계를 조회 조건으로. 단계 판정(core returnStageOf)과 같은 갈래여야 한다 — 검사가 맞춘다 */
+/**
+ * 단계를 조회 조건으로. 단계 판정(core returnStageOf)과 같은 갈래여야 한다 — 검사가 맞춘다.
+ *
+ * **끝난 것을 이름으로 적어 두어 한 칸이 빠져 있었다.** core 는 "접수도 승인도 아니면 끝난 것" 으로
+ * 보는데(returnStageOf), 여기서는 완료·반려만 적어서 **철회된 신청(CANCELLED)이 어느 탭에도 뜨지
+ * 않았다** — 운영진이 무른 것도, 손님이 취소한 것도 조용히 사라졌다. 끝난 자리는 빼기로 적는다:
+ * 진행 중인 목록(core OPEN_RETURN_STATUS)이 아닌 것이 끝난 것이다.
+ */
 export function stageWhere(view: ReturnQueueView) {
   switch (view) {
-    case 'OPEN': return { status: { in: ['REQUESTED', 'APPROVED'] } };
+    case 'OPEN': return { status: { in: [...OPEN_RETURN_STATUS] } };
     case 'REVIEW': return { status: 'REQUESTED' };
     case 'AWAIT_ARRIVAL': return { status: 'APPROVED', receivedAt: null };
     case 'REFUND': return { status: 'APPROVED', receivedAt: { not: null }, type: 'RETURN' };
     case 'RESHIP': return { status: 'APPROVED', receivedAt: { not: null }, type: 'EXCHANGE' };
-    case 'DONE': return { status: { in: ['COMPLETED', 'REJECTED'] } };
+    case 'DONE': return { status: { notIn: [...OPEN_RETURN_STATUS] } };
   }
 }
 

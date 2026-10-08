@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RETURN_STAGE, returnStageOf, type Actor } from '@shop/core';
+import { RETURN_STAGE, RETURN_STATUS, returnStageOf, type Actor } from '@shop/core';
 
 /**
  * 반품·교환 처리 대기열 조회 — 범위, 단계 조건이 단계 판정과 같은 갈래인지, 순서, 내 차례, 기다린 날.
@@ -43,20 +43,41 @@ function matches(where: Record<string, any>, r: { type: string; status: string; 
     if (cond === null) return value === null;
     if (typeof cond !== 'object') return value === cond;
     if ('in' in cond) return cond.in.includes(value);
+    if ('notIn' in cond) return !cond.notIn.includes(value);
     if ('not' in cond) return cond.not === null ? value !== null : value !== cond.not;
     throw new Error(`모르는 조건 ${key}`);
   });
 }
 
 describe('단계 조건', () => {
+  /**
+   * **상태를 손으로 적은 검사는 같은 칸을 또 빠뜨린다.**
+   *
+   * 여기 목록에 철회(CANCELLED)가 없어서, 조회가 "끝난 것 = 완료·반려" 로 적어 둔 것을 이 검사가
+   * 그대로 통과시켰다 — 무른 신청은 어느 탭에도 뜨지 않았다. 상태는 core 의 목록에서 받는다:
+   * 상태가 늘면 표본도 함께 는다.
+   */
   it('각 단계의 조회 조건이 core 의 단계 판정과 같은 신청을 고른다 — 둘이 갈리면 탭 수와 줄의 단계가 어긋난다', () => {
     const samples = [];
-    for (const type of ['RETURN', 'EXCHANGE']) for (const status of ['REQUESTED', 'APPROVED', 'REJECTED', 'COMPLETED'])
+    for (const type of ['RETURN', 'EXCHANGE']) for (const status of RETURN_STATUS)
       for (const receivedAt of [null, NOW]) samples.push({ type, status, receivedAt });
     for (const stage of RETURN_STAGE) {
       for (const s of samples) expect(matches(stageWhere(stage), s), `${stage} ${JSON.stringify(s)}`).toBe(returnStageOf(s) === stage);
     }
     for (const s of samples) expect(matches(stageWhere('OPEN'), s)).toBe(returnStageOf(s) !== 'DONE');
+  });
+
+  /**
+   * **무른 신청이 어느 탭에도 없었다.** 운영진이 승인을 무른 것(철회)도, 손님이 취소한 것도 끝난
+   * 것인데, 조회가 "완료·반려" 만 적어 두어 조용히 사라졌다 — 운영자는 "그 신청 어디 갔지" 를 묻게 되고,
+   * 그 사이 교환으로 잡았다 푼 재고의 자취도 대기열에서는 보이지 않는다.
+   */
+  it('철회된 신청도 "끝난 것" 에 선다', () => {
+    const withdrawn = { type: 'RETURN', status: 'CANCELLED', receivedAt: null };
+
+    expect(returnStageOf(withdrawn)).toBe('DONE');
+    expect(matches(stageWhere('DONE'), withdrawn), '끝난 것에 없다').toBe(true);
+    expect(matches(stageWhere('OPEN'), withdrawn), '진행 중으로 잡힌다').toBe(false);
   });
 });
 
