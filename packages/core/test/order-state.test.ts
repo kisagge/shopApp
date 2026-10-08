@@ -4,7 +4,7 @@ import {
   ORDER_STATUS, canTransition, transition, nextStatuses, isTerminal,
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, orderStatusFromItems,
   adminStatusActions, OrderTransitionError, type OrderStatus,
-  statusBeforeReturn, isRepayable, canRegisterShipment,
+  statusBeforeReturn, isRepayable, canRegisterShipment, showsOldestFirst,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -338,5 +338,39 @@ describe('송장을 붙일 수 있는가', () => {
   it('반품접수는 전이표에 길이 있어도 붙일 수 없다', () => {
     expect(canTransition('RETURN_REQUESTED', 'SHIPPED')).toBe(true);
     expect(canRegisterShipment('RETURN_REQUESTED')).toBe(false);
+  });
+});
+
+/**
+ * **목록을 어느 쪽으로 세우는가.**
+ *
+ * 새 주문이 앞을 막으면 가장 오래 기다린 사람이 영영 밀린다 — 스무 건이 넘어가면 사흘 된 주문이
+ * 둘째 쪽으로 가고, 그 쪽은 아무도 안 넘긴다. 상품 검수 대기와 반품 대기열이 이미 같은 규칙을
+ * 쓰는데 주문 목록만 반대로 서 있었다.
+ */
+describe('오래 기다린 것부터 보여 줄 자리인가', () => {
+  it('아직 내보내지 않은 주문이 그렇다', () => {
+    for (const status of ['PENDING', 'PAID', 'PREPARING'] as const) {
+      expect(showsOldestFirst(status), status).toBe(true);
+    }
+  });
+
+  /** 거기서는 방금 일어난 일이 위에 와야 한다 — 그 줄들은 누가 처리하기를 기다리지 않는다 */
+  it('보낸 뒤의 목록은 최신순이다', () => {
+    for (const status of ['SHIPPED', 'DELIVERED', 'CONFIRMED', 'CANCELLED', 'REFUNDED', 'RETURNED', 'RETURN_REQUESTED'] as const) {
+      expect(showsOldestFirst(status), status).toBe(false);
+    }
+  });
+
+  /** 할 일 목록이 아니라 장부다 — 무엇이 막 들어왔는지 보는 자리다 */
+  it('전체 탭은 최신순이다', () => {
+    expect(showsOldestFirst(undefined)).toBe(false);
+  });
+
+  /** 모든 상태가 둘 중 한 쪽에는 들어간다 — 빠진 상태가 생기면 그 탭의 순서가 말없이 달라진다 */
+  it('모든 상태에 답이 있다', () => {
+    for (const status of ORDER_STATUS) {
+      expect(typeof showsOldestFirst(status), status).toBe('boolean');
+    }
   });
 });

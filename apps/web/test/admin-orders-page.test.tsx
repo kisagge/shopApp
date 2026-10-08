@@ -83,3 +83,29 @@ describe('주문 목록', () => {
     expect(screen.queryByText('배송지 변경')).toBeNull();
   });
 });
+
+/**
+ * **어느 쪽으로 세웠는지 말해 준다.**
+ *
+ * 아무 말 없이 순서만 바뀌면 사람은 목록이 뒤집힌 줄 모르고 맨 위를 "가장 새 주문" 으로 읽는다 —
+ * 그 오해는 오래된 주문을 또 뒤로 민다.
+ */
+describe('목록을 세운 방향을 말한다', () => {
+  it('처리할 일이 남은 탭에서는 그 사실을 적는다', async () => {
+    await renderPage({ status: 'PREPARING' });
+
+    expect(screen.getByText(/오래 기다린 주문부터/)).toBeDefined();
+  });
+
+  it('보낸 뒤의 탭에서는 적지 않는다 — 거기는 최신순이 맞다', async () => {
+    await renderPage({ status: 'DELIVERED' });
+
+    expect(screen.queryByText(/오래 기다린 주문부터/)).toBeNull();
+  });
+
+  it('전체 탭에서도 적지 않는다', async () => {
+    await renderPage();
+
+    expect(screen.queryByText(/오래 기다린 주문부터/)).toBeNull();
+  });
+});

@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
-import { format, hasPermission, ORDER_STATUS_LABEL, type OrderStatus } from '@shop/core';
+import {
+  format, hasPermission, showsOldestFirst, ORDER_STATUS_LABEL, type OrderStatus,
+} from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getAdminOrders } from '~/lib/queries/admin/orders';
@@ -121,6 +123,16 @@ export default async function AdminOrdersPage({
             ))}
           </ul>
         </nav>
+
+        {/*
+          **어느 쪽으로 세웠는지 말해 준다.** 아무 말 없이 순서만 바뀌면 사람은 목록이 뒤집힌 줄
+          모르고 맨 위를 "가장 새 주문" 으로 읽는다 — 그 오해는 오래된 주문을 또 뒤로 민다.
+        */}
+        {showsOldestFirst(filter) && (
+          <p className="mb-4 text-[12px] text-[var(--fg-muted)]">
+            오래 기다린 주문부터 보여 줍니다 — 새 주문이 앞을 막지 않도록.
+          </p>
+        )}
 
         {/* GET 폼이라 조건이 주소에 남는다 — 새로고침해도, 공유해도 같은 결과가 나온다 */}
         <form method="get" action="/admin/orders" role="search" className="mb-5 flex flex-wrap items-end gap-3">

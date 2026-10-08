@@ -171,6 +171,31 @@ export const isRepayable = (
   return paymentStatus === 'READY' || paymentStatus === 'ABORTED' || paymentStatus === 'FAILED';
 };
 
+/**
+ * 아직 내보내지 않은 주문. **목록을 어느 쪽으로 세울지**를 정하는 데만 쓴다.
+ *
+ * 내보내지 않았다 = 보낼 일이 남았다. 값은 다른 목록들과 겹치지만(주소를 고칠 수 있는 구간,
+ * 일부 취소를 받는 구간) 축이 다르다 — 내보내지 않았어도 주소는 못 고치는 날이 올 수 있다.
+ * 그래서 내보내지 않고 **판단만 내보낸다**(showsOldestFirst): 목록이 하나 더 생기면 그만큼 또
+ * 베껴질 자리가 생긴다.
+ */
+const NOT_SENT_YET: readonly OrderStatus[] = ['PENDING', 'PAID', 'PREPARING'];
+
+/**
+ * 이 목록은 **오래 기다린 것부터** 보여 줄 자리인가.
+ *
+ * **새 주문이 앞을 막으면 가장 오래 기다린 사람이 영영 밀린다.** 상품 검수 대기와 반품 대기열이
+ * 이미 같은 규칙을 쓴다(진행 중인 것은 오래된 것부터, 끝난 것은 최근 것부터) — 정작 주문 목록만
+ * 반대로 서 있었다. 스무 건이 넘어가면 사흘 된 주문이 둘째 쪽으로 밀리고, 그 쪽은 아무도 안 넘긴다.
+ *
+ * **보낸 뒤의 목록은 최신순이 맞다**(배송중·배송완료·구매확정·취소). 거기서는 방금 일어난 일이
+ * 위에 와야 하고, 그 줄들은 누가 처리하기를 기다리고 있지 않다.
+ *
+ * **전체 탭도 최신순이다.** 할 일 목록이 아니라 장부다 — 무엇이 막 들어왔는지를 보는 자리다.
+ */
+export const showsOldestFirst = (status: OrderStatus | undefined): boolean =>
+  status !== undefined && NOT_SENT_YET.includes(status);
+
 /** 재고를 붙잡고 있는 상태. 재고 복원 판단에 쓴다. */
 export const holdsInventory = (status: OrderStatus): boolean =>
   status === 'PENDING' || status === 'PAID' || status === 'PREPARING' ||

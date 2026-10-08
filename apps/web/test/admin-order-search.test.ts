@@ -86,6 +86,40 @@ describe('전화번호 검색', () => {
   });
 });
 
+/**
+ * **처리할 일이 남은 탭은 오래 기다린 것부터.**
+ *
+ * 새 주문이 앞을 막으면 사흘 된 주문이 둘째 쪽으로 밀리고 그 쪽은 아무도 안 넘긴다 — 검수 대기·반품
+ * 대기열이 이미 쓰는 규칙인데 주문 목록만 반대였다. 어느 탭이 그런지는 core 가 정한다.
+ */
+describe('목록을 세우는 방향', () => {
+  const orderBy = () => db.order.findMany.mock.calls[0]![0].orderBy as { placedAt?: string; id?: string }[];
+
+  it('아직 내보내지 않은 탭은 오래된 것부터', async () => {
+    await getAdminOrders(admin, { status: 'PREPARING' });
+
+    expect(orderBy()).toEqual([{ placedAt: 'asc' }, { id: 'asc' }]);
+  });
+
+  it('보낸 뒤의 탭은 최신순', async () => {
+    await getAdminOrders(admin, { status: 'DELIVERED' });
+
+    expect(orderBy()).toEqual([{ placedAt: 'desc' }, { id: 'desc' }]);
+  });
+
+  it('전체 탭은 최신순 — 할 일 목록이 아니라 장부다', async () => {
+    await getAdminOrders(admin, {});
+
+    expect(orderBy()).toEqual([{ placedAt: 'desc' }, { id: 'desc' }]);
+  });
+
+  /** 같은 시각에 들어온 주문의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다 */
+  it('어느 쪽이든 id 로 마저 가른다 — 방향도 함께 뒤집는다', async () => {
+    await getAdminOrders(admin, { status: 'PAID' });
+    expect(orderBy()[1]).toEqual({ id: 'asc' });
+  });
+});
+
 describe('기간 검색', () => {
   it('시작만 주면 하한만 건다', async () => {
     await getAdminOrders(admin, { from: '2026-09-01' });

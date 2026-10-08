@@ -1,7 +1,8 @@
 import 'server-only';
 import { prisma } from '@shop/db';
 import {
-  won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged, ADDRESS_EDITABLE_STATUS,
+  won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged, showsOldestFirst,
+  ADDRESS_EDITABLE_STATUS,
   type Actor, type Won, type OrderStatus,
   offsetOf,
 } from '@shop/core';
@@ -124,8 +125,15 @@ export async function getAdminOrders(
   const readAt = (at: number) =>
     prisma.order.findMany({
       where,
-      // 같은 시각에 들어온 주문의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠진다
-      orderBy: [{ placedAt: 'desc' }, { id: 'desc' }],
+      /*
+       * **처리할 일이 남은 탭은 오래 기다린 것부터**(core showsOldestFirst). 새 주문이 앞을 막으면
+       * 사흘 된 주문이 둘째 쪽으로 밀리고 그 쪽은 아무도 안 넘긴다 — 검수 대기·반품 대기열이 이미
+       * 쓰는 규칙이다. 같은 시각에 들어온 주문의 순서가 흔들리면 쪽을 넘길 때 행이 겹치거나 빠지므로
+       * id 로 마저 가른다(방향도 함께 뒤집는다).
+       */
+      orderBy: showsOldestFirst(query.status)
+        ? [{ placedAt: 'asc' as const }, { id: 'asc' as const }]
+        : [{ placedAt: 'desc' as const }, { id: 'desc' as const }],
       take,
       skip: offsetOf(at, take),
       select: {
