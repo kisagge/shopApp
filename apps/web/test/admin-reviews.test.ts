@@ -143,6 +143,20 @@ describe('대기줄', () => {
     expect(page.rows[0]!.state).toBe('reported');
   });
 
+  /**
+   * **상한에 걸릴 때 남길 것은 오래 기다린 쪽이다.**
+   *
+   * 점수는 SQL 로 못 매기므로 가져와서 메모리에서 세운다 — 그러면 **DB 에서 자르는 방향**이 무엇이
+   * 보이느냐를 정한다. 최신순으로 자르고 있어서, 상한을 넘기는 날에는 가장 오래 기다린 신고가 통째로
+   * 잘려 나갔다. 바로 아래 정렬이 "새 신고가 계속 앞을 막으면 안 된다" 고 적어 두고 그 위에서 반대로
+   * 자르던 셈이다(검수 대기·반품 대기열·주문 목록과도 어긋난다).
+   */
+  it('상한에 걸리면 오래 기다린 쪽을 남긴다', async () => {
+    await getAdminReviews(ADMIN, { tab: 'reported' });
+
+    expect(db.review.findMany.mock.calls[0]![0].orderBy).toEqual({ createdAt: 'asc' });
+  });
+
   it('상한을 넘으면 잘랐다고 말한다', async () => {
     // 조용히 자르면 아래쪽 건이 영영 처리되지 않는다
     db.review.findMany.mockResolvedValue(

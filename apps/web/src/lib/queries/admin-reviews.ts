@@ -244,7 +244,18 @@ export async function getAdminReviews(
      */
     const raw = (await prisma.review.findMany({
       where: { deletedAt: null, reports: { some: { resolvedAt: null } }, ...mine, ...search },
-      orderBy: { createdAt: 'desc' },
+      /*
+       * **상한에 걸릴 때 남길 것은 오래 기다린 쪽이다.**
+       *
+       * 점수는 SQL 로 못 매기므로 가져와서 메모리에서 세운다 — 그러면 **DB 에서 자르는 방향**이
+       * 무엇이 보이느냐를 정한다. 최신순으로 자르고 있어서, 상한을 넘기는 날에는 가장 오래 기다린
+       * 신고가 통째로 잘려 나갔다. 바로 아래 정렬이 "새 신고가 계속 앞을 막으면 안 된다" 고
+       * 적어 두고 그 위에서 반대로 자르고 있던 셈이다(검수 대기·반품 대기열과도 어긋난다).
+       *
+       * 대가는 있다 — 상한을 넘는 동안 **갓 들어온 높은 점수**가 창 밖에 머문다. 그래도 이쪽이
+       * 낫다: 점수는 처리하면 사라지지만, 밀려난 신고는 영영 밀린다.
+       */
+      orderBy: { createdAt: 'asc' },
       take: QUEUE_CAP + 1,
       select: reviewSelect,
     })) as RawReview[];
