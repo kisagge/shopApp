@@ -100,6 +100,14 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# **잠금 파일이 package.json 과 맞는가.**
+#
+# 여기는 기계에 이미 깔린 node_modules 로 돈다. 그래서 의존성을 고치고 잠금 파일을 커밋하지 않아도
+# 멀쩡히 통과하는데, CI 와 Vercel 은 `--frozen-lockfile` 로 처음부터 깔기 때문에 거기서야 깨진다 —
+# 이 저장소는 푸시가 곧 배포라 그 자리는 "배포가 깨졌다" 로 나타난다. 바뀐 것이 없으면 몇 초다.
+echo "▸ 잠금 파일"
+pnpm install --frozen-lockfile
+
 # Prisma 클라이언트는 두 쪽 다 필요하다 — 위에서 지웠고, 타입체크가 그것을 본다.
 echo "▸ Prisma 클라이언트"
 pnpm --filter @shop/db run generate
@@ -111,18 +119,18 @@ if [ "$MODE" = full ]; then
   pnpm --filter @shop/auth run seed
 fi
 
-# **재시도는 켜되, 재시도로 통과한 판은 초록이 아니다.**
+# **여기는 문지기다.** 검사 도구들이 "문지기로 돌고 있다" 를 알아야 켜는 것들이 있다.
 #
-# CI 는 한 번 재시도한다(playwright.config). 로컬만 0 이면 "CI 와 같은 조건" 이 거짓말이 되고,
-# 무엇보다 한 번 흔들린 판이 그대로 빨갛게 끝나 멀쩡한 코드를 뒤지게 된다 — 실제로 두 판을 그렇게
-# 썼다. 재시도가 붙으면 그 자리에 "재시도로 통과" 가 찍혀서, 로직이 아니라 타이밍이라는 것이 바로 보인다.
-#
-# 그렇다고 넘어가지는 않는다. 여기서 초록은 **"커밋해도 된다"** 는 뜻이고 이 저장소는 푸시가 곧
-# 배포다 — 운에 기댄 판을 통과로 치면, 가리개를 켜 둔 채 배포하는 셈이 된다. 아래에서 세어 보고
-# 이름을 적어 알린다.
+#   · 재시도 한 번(CI 와 같게). 한 번 흔들린 판이 그대로 빨갛게 끝나면 멀쩡한 코드를 뒤지게 된다 —
+#     실제로 두 판을 그렇게 썼다. 재시도가 붙으면 "재시도로 통과" 가 찍혀 로직이 아니라 타이밍이라는
+#     것이 바로 보인다. 그렇다고 넘어가지는 않는다(아래에서 세어 이름을 적는다).
+#   · **`.only` 막기.** 한 줄만 돌려 보려고 붙이는 표시를 지우지 않고 커밋하면 그 파일의 나머지가
+#     조용히 안 돈다 — 문지기가 무엇을 봤는지 아무도 모르는 초록이 된다. CI 는 막고 있었는데 여기만
+#     안 막고 있었고, 여기서 초록은 "커밋해도 된다" 는 뜻이라 더 위험하다.
+export GATE=1
+
 E2E_LOG=""
 if [ "$MODE" = full ]; then
-  export E2E_RETRIES=1
   E2E_LOG="$(mktemp -t ci-local-e2e)"
 fi
 
@@ -138,7 +146,11 @@ node tooling/audit.mjs
 # 함께 test/ci-order.test.ts 가 지킨다.
 for step in $STEPS; do
   echo "▸ $step"
-  if [ "$step" = e2e ] && [ -n "$E2E_LOG" ]; then
+  if [ "$step" = test ]; then
+    # vitest 는 CI 깃발로 `.only` 를 막는다(allowOnly 의 기본값). 그 한 단계만 CI 와 같은 깃발로 돈다 —
+    # 전체에 걸면 Playwright 의 워커 수·리포터까지 CI 모양이 되어 로컬 게이트가 크게 느려진다.
+    CI=1 pnpm turbo run test
+  elif [ "$step" = e2e ] && [ -n "$E2E_LOG" ]; then
     # pipefail 이 켜져 있어 tee 를 지나도 실패는 그대로 실패다
     pnpm turbo run e2e | tee "$E2E_LOG"
   else
@@ -170,4 +182,8 @@ elif [ -n "$FLAKY" ]; then
   exit 1
 else
   echo "✓ CI 와 같은 조건에서 전부 통과했습니다."
+  echo
+  # **같지 않은 것도 말해 준다.** "같은 조건" 이라고만 하면 여기 초록을 CI 초록으로 읽는다.
+  echo "  다만 여기서 못 보는 것: 리눅스에서만 나는 것(글꼴·시스템 의존성),"
+  echo "  그리고 E2E 동시성(여기는 코어 수, CI 는 2) — 경합은 둘 중 한쪽에서만 드러나기도 합니다."
 fi

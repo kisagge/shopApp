@@ -141,9 +141,37 @@ describe('재시도와 그 값', () => {
   const sh = () => readFileSync(join(ROOT, 'tooling/ci-local.sh'), 'utf8');
   const config = () => readFileSync(join(ROOT, 'apps/web/playwright.config.ts'), 'utf8');
 
-  it('문지기가 재시도를 켠다 — CI 와 같은 한 번', () => {
-    expect(sh(), 'ci-local.sh 가 재시도를 켜지 않는다').toMatch(/export E2E_RETRIES=1/);
-    expect(config(), 'playwright.config 이 그 값을 읽지 않는다').toMatch(/E2E_RETRIES/);
+  it('문지기임을 알린다 — 재시도와 `.only` 막기가 그 깃발로 켜진다', () => {
+    expect(sh(), 'ci-local.sh 가 문지기 깃발을 세우지 않는다').toMatch(/export GATE=1/);
+
+    const source = config();
+    expect(source, 'playwright.config 이 그 깃발을 읽지 않는다').toMatch(/process\.env\['GATE'\]/);
+    // 깃발 하나로 묶는다 — 따로 두면 어느 날 한쪽만 켜진 채 돈다
+    expect(source, '재시도가 그 깃발을 따르지 않는다').toMatch(/retries:\s*GATE/);
+    expect(source, '`.only` 막기가 그 깃발을 따르지 않는다').toMatch(/forbidOnly:\s*GATE/);
+  });
+
+  /**
+   * **`.only` 는 단위 검사에도 있다.** vitest 는 CI 깃발로 그것을 막는다(allowOnly 의 기본값) —
+   * 그 한 단계만 CI 와 같은 깃발로 돌린다. 전체에 걸면 Playwright 의 워커 수·리포터까지 CI 모양이
+   * 되어 로컬 게이트가 크게 느려진다.
+   */
+  it('단위 검사 단계는 CI 깃발로 돈다', () => {
+    expect(sh()).toMatch(/CI=1 pnpm turbo run test/);
+  });
+
+  /**
+   * **잠금 파일 어긋남은 배포에서만 드러난다.** 여기는 이미 깔린 node_modules 로 도는데, CI 와
+   * Vercel 은 처음부터 깐다 — 이 저장소는 푸시가 곧 배포라 그 자리가 "배포가 깨졌다" 가 된다.
+   */
+  it('잠금 파일이 package.json 과 맞는지 먼저 본다', () => {
+    expect(sh()).toMatch(/pnpm install --frozen-lockfile/);
+  });
+
+  /** "같은 조건" 이라고만 하면 여기 초록을 CI 초록으로 읽는다 — 못 보는 것을 끝에 적는다 */
+  it('못 보는 것을 끝에 말한다', () => {
+    const tail = sh().slice(sh().indexOf('전부 통과했습니다'));
+    expect(tail, '차이를 말하지 않는다').toMatch(/못 보는 것/);
   });
 
   it('켰으면 재시도로 통과한 것을 세어 이름을 알린다', () => {

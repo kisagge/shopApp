@@ -9,6 +9,14 @@ import { E2E_CRON_SECRET, STATE_FILE } from './e2e/state';
  * 라우팅도 가짜다. 진짜 서버와 진짜 DB 를 거쳐야만 드러나는 것들이 이
  * 대화에서만 여러 번 나왔다(중첩 form, 옛 Prisma 클라이언트, 라벨 불일치).
  */
+/**
+ * **문지기로 돌고 있는가** — CI 이거나 로컬 문지기(ci-local.sh)다.
+ *
+ * 하나로 묶는 이유가 있다. 재시도·`.only` 막기처럼 "문지기일 때만" 켜는 것이 늘 때마다 깃발을
+ * 따로 만들면, 어느 날 한쪽만 켜진 채로 돌게 된다 — 그 판은 통과했지만 무엇을 봤는지 모른다.
+ */
+const GATE = !!process.env['CI'] || process.env['GATE'] === '1';
+
 const PORT = Number(process.env['E2E_PORT'] ?? 3100);
 const BASE_URL = `http://localhost:${PORT}`;
 
@@ -16,7 +24,14 @@ export default defineConfig({
   testDir: './e2e',
   // vitest 는 test/ 만 본다. 서로 건드리지 않는다.
   fullyParallel: true,
-  forbidOnly: !!process.env['CI'],
+  /**
+   * **`.only` 를 남겨 두면 그 파일의 나머지가 조용히 안 돈다.**
+   *
+   * 한 줄만 돌려 보려고 붙이는 표시인데, 지우지 않고 커밋하면 그 명세의 다른 검사들이 사라진 채
+   * 초록이 된다 — 문지기가 무엇을 봤는지 아무도 모르게 되는 자리다. CI 는 막고 있었는데 **로컬
+   * 문지기는 안 막고 있었다**: 거기서 초록은 "커밋해도 된다" 는 뜻이라 더 위험하다.
+   */
+  forbidOnly: GATE,
   /**
    * **재시도는 고치는 것이 아니라 알려 주는 것이다.**
    *
@@ -26,7 +41,7 @@ export default defineConfig({
    * **그렇다고 초록은 아니다.** 로컬 문지기(ci-local.sh)는 재시도를 켜 두고, 재시도로 통과한 판을
    * 통과로 치지 않는다 — 거기서 초록은 "커밋해도 된다" 는 뜻이고, 이 저장소에서 푸시는 곧 배포다.
    */
-  retries: Number(process.env['E2E_RETRIES'] ?? (process.env['CI'] ? '1' : '0')),
+  retries: GATE ? 1 : 0,
   // 로컬에서는 Playwright 기본값(코어 수)에 맡기고, CI 에서는 재현하기
   // 쉽게 줄인다. exactOptionalPropertyTypes 라 undefined 를 넘기지 못하므로
   // 아예 키를 빼서 기본값을 쓰게 한다.
