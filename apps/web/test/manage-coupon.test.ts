@@ -14,6 +14,10 @@ const db = vi.hoisted(() => ({
   },
   $executeRaw: vi.fn<(...a: any[]) => any>(),
   $transaction: vi.fn<(...a: any[]) => any>(),
+  // 대상 이름을 붙이려고 세 표를 읽는다
+  product: { findMany: vi.fn<(...a: any[]) => any>() },
+  brand: { findMany: vi.fn<(...a: any[]) => any>() },
+  category: { findMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({
   prisma: db,
@@ -21,7 +25,7 @@ vi.mock('@shop/db', () => ({
 }));
 
 const {
-  createCoupon, updateCoupon, issueCouponToUser, claimCouponByCode,
+  createCoupon, updateCoupon, issueCouponToUser, claimCouponByCode, listCoupons,
 } = await import('~/lib/admin/manage-coupon');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -49,6 +53,8 @@ const coupon = (over: Record<string, unknown> = {}) => ({
   startsAt: new Date('2026-09-01T00:00:00+09:00'),
   endsAt: new Date('2026-09-30T23:59:59+09:00'),
   issueLimit: 100, issuedCount: 0,
+  // 조회가 늘 함께 읽어 온다(대상 이름을 붙여야 한다)
+  targets: [],
   ...over,
 });
 
@@ -60,6 +66,9 @@ beforeEach(() => {
   db.userCoupon.create.mockResolvedValue({ id: 'uc-1' });
   db.$executeRaw.mockResolvedValue(1);
   db.$transaction.mockImplementation(async (fn: any) => fn(db));
+  db.product.findMany.mockResolvedValue([]);
+  db.brand.findMany.mockResolvedValue([]);
+  db.category.findMany.mockResolvedValue([]);
 });
 
 describe('권한', () => {
@@ -292,5 +301,125 @@ describe('쿠폰 수정 — 그 사이에 발급되면', () => {
     await updateCoupon(admin, 'c-1', { endsAt: '2026-10-31T23:59:59+09:00' });
 
     expect(db.coupon.update.mock.calls[0]?.[0].where).toEqual({ id: 'c-1' });
+  });
+});
+
+/**
+ * 목록의 **대상 칸** — "지정 3개" 만 적혀 있었다.
+ *
+ * 대상은 만들 때만 정하고 다시 열어 볼 화면이 없다. 그래서 상위 분류에 걸어 **어떤 상품에도 붙지
+ * 않는** 쿠폰(커밋 40d51fd 가 막은 그 쿠폰)이 이미 섞여 있어도 목록에서는 멀쩡한 쿠폰과 구별되지
+ * 않는다. 손님은 "쓸 수 없습니다" 만 보고, 운영은 까닭을 모른다 — 이름과 경고를 함께 적는다.
+ */
+describe('쿠폰 목록의 대상', () => {
+  const row = (targets: { targetType: string; targetId: string }[]) => ({
+    ...coupon(),
+    kind: 'AMOUNT', value: 5000, percent: 0, maxDiscount: null, minimumOrder: 0,
+    downloadable: false,
+    _count: { issued: 0, targets: targets.length },
+    targets,
+  });
+
+  it('id 대신 이름을 적는다', async () => {
+    db.coupon.findMany.mockResolvedValue([
+      row([
+        { targetType: 'PRODUCT', targetId: 'p-1' },
+        { targetType: 'BRAND', targetId: 'b-1' },
+        { targetType: 'CATEGORY', targetId: 'c-coat' },
+      ]),
+    ]);
+    db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+    db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
+    db.category.findMany.mockResolvedValue([{ id: 'c-coat', name: '코트', _count: { children: 0 } }]);
+
+    const [got] = await listCoupons(admin, now);
+
+    expect(got!.targetNames).toEqual(['울 코트', 'MOOR', '코트']);
+    expect(got!.deadTargets).toBe(false);
+  });
+
+  it('상위 분류가 걸려 있으면 붙는 상품이 없다고 짚는다', async () => {
+    db.coupon.findMany.mockResolvedValue([row([{ targetType: 'CATEGORY', targetId: 'c-outer' }])]);
+    db.category.findMany.mockResolvedValue([
+      { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+    ]);
+
+    const [got] = await listCoupons(admin, now);
+
+    expect(got!.targetNames).toEqual(['아우터']);
+    expect(got!.deadTargets).toBe(true);
+  });
+
+  it('사라진 대상도 자리를 지킨다 — 수와 이름이 어긋나면 안 된다', async () => {
+    db.coupon.findMany.mockResolvedValue([
+      row([
+        { targetType: 'PRODUCT', targetId: 'p-1' },
+        { targetType: 'PRODUCT', targetId: 'p-gone' },
+      ]),
+    ]);
+    db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+
+    const [got] = await listCoupons(admin, now);
+
+    expect(got!.targetNames).toHaveLength(2);
+    expect(got!.targetNames[1]).toBe('(알 수 없음)');
+    expect(got!.targetCount).toBe(2);
+  });
+
+  /** 쿠폰마다 세 번씩 묻지 않는다 — 목록은 한 화면에 수십 줄이다 */
+  it('대상이 많아도 표는 세 번만 읽는다', async () => {
+    db.coupon.findMany.mockResolvedValue([
+      row([{ targetType: 'PRODUCT', targetId: 'p-1' }]),
+      row([{ targetType: 'PRODUCT', targetId: 'p-2' }]),
+      row([{ targetType: 'CATEGORY', targetId: 'c-coat' }]),
+    ]);
+
+    await listCoupons(admin, now);
+
+    expect(db.product.findMany).toHaveBeenCalledTimes(1);
+    expect(db.brand.findMany).toHaveBeenCalledTimes(1);
+    expect(db.category.findMany).toHaveBeenCalledTimes(1);
+    // 한 번에 다 묻는다
+    expect(db.product.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['p-1', 'p-2'] } });
+  });
+
+  it('전체 쿠폰만 있으면 아무것도 묻지 않는다', async () => {
+    db.coupon.findMany.mockResolvedValue([row([])]);
+
+    const [got] = await listCoupons(admin, now);
+
+    expect(got!.targetNames).toEqual([]);
+    expect(db.product.findMany).not.toHaveBeenCalled();
+    expect(db.category.findMany).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 만들고·고친 줄은 목록을 다시 읽지 않고 **그 자리에 끼워진다**(화면이 돌려받은 줄을 세운다).
+   * 그래서 세 자리가 같은 모양을 내놔야 한다 — 하나라도 빠뜨리면 그 줄만 대상 칸이 빈다.
+   */
+  it('만든 직후 돌려주는 줄에도 대상 설명이 있다', async () => {
+    db.category.findMany.mockResolvedValue([
+      { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+    ]);
+
+    const created = await createCoupon(
+      admin,
+      input({ targets: [{ targetType: 'CATEGORY', targetId: 'c-outer' }] }),
+    );
+
+    expect(created.targetNames).toEqual(['아우터']);
+    expect(created.deadTargets).toBe(true);
+  });
+
+  it('고친 뒤 돌려주는 줄에도 대상 설명이 있다', async () => {
+    db.coupon.update.mockResolvedValue({
+      ...row([{ targetType: 'BRAND', targetId: 'b-1' }]),
+    });
+    db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
+
+    const updated = await updateCoupon(admin, 'c-1', { name: '이름만 고친다' });
+
+    expect(updated.targetNames).toEqual(['MOOR']);
+    expect(updated.deadTargets).toBe(false);
   });
 });

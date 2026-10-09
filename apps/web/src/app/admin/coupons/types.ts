@@ -21,6 +21,10 @@ export interface CouponRow {
   status: CouponStatus;
   editable: boolean;
   targetCount: number;
+  /** 대상 이름 — "지정 3개" 만으로는 무엇에 걸었는지 알 수 없다 */
+  targetNames: readonly string[];
+  /** 상위 분류처럼 **어떤 상품에도 붙지 않는** 대상이 섞여 있는가 */
+  deadTargets: boolean;
 }
 
 export interface NamedOption { id: string; name: string }

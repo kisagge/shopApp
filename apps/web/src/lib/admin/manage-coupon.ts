@@ -49,6 +49,66 @@ export interface CouponRow {
   readonly editable: boolean;
   /** 대상이 정해져 있으면 그 수. 0이면 장바구니 전체. */
   readonly targetCount: number;
+  /**
+   * 대상 이름 몇 개 — 목록에서 바로 읽을 수 있게.
+   *
+   * **"지정 3개" 만 적혀 있었다.** 무엇에 걸었는지는 열어 볼 길도 없었다(대상은 만들 때만 정하고
+   * 화면에 다시 뜨지 않는다). 그러면 **어떤 상품에도 안 붙는 쿠폰**이 섞여 있어도 아무도 모른다 —
+   * 상위 분류에 걸어 둔 쿠폰이 실제로 그랬다.
+   */
+  readonly targetNames: readonly string[];
+  /**
+   * 어떤 상품에도 붙지 않는 대상이 있는가.
+   *
+   * 지금은 상위 분류가 그렇다 — 상품은 말단 분류에만 붙고 판정은 정확히 일치할 때만 맞다고 본다.
+   * 이제 그런 쿠폰은 만들 수 없지만(고를 수 없다), **이미 만들어진 것**은 그대로 남아 있다.
+   */
+  readonly deadTargets: boolean;
+}
+
+type TargetRow = { readonly targetType: string; readonly targetId: string };
+
+/**
+ * 대상에 **이름**을 붙인다. id 를 그대로 적으면 읽는 사람에게는 없는 것과 같다.
+ *
+ * 세 표를 한 번씩만 읽는다(쿠폰마다 묻지 않는다). 분류는 **말단인지**도 함께 본다 — 상품은 말단
+ * 분류에만 붙고 판정은 정확히 일치할 때만 맞다고 보므로, 상위 분류에 걸린 대상은 어떤 상품에도
+ * 붙지 않는다. 이제 그렇게 만들 수는 없지만(고를 수 없다) **이미 만들어진 것**은 그대로 남는다.
+ */
+async function describeTargets(
+  perCoupon: readonly (readonly TargetRow[])[],
+): Promise<{ targetNames: string[]; deadTargets: boolean }[]> {
+  const all = perCoupon.flat();
+  // 대상이 하나도 없으면(전체 쿠폰만 있는 목록) 아무것도 묻지 않는다
+  if (all.length === 0) return perCoupon.map(() => ({ targetNames: [], deadTargets: false }));
+
+  const ids = (type: string) => [...new Set(all.filter((t) => t.targetType === type).map((t) => t.targetId))];
+
+  const [products, brands, categories] = await Promise.all([
+    prisma.product.findMany({ where: { id: { in: ids('PRODUCT') } }, select: { id: true, name: true } }),
+    prisma.brand.findMany({ where: { id: { in: ids('BRAND') } }, select: { id: true, name: true } }),
+    prisma.category.findMany({
+      where: { id: { in: ids('CATEGORY') } },
+      select: { id: true, name: true, _count: { select: { children: true } } },
+    }),
+  ]);
+
+  const nameOf = new Map<string, string>([
+    ...products.map((p) => [`PRODUCT:${p.id}`, p.name] as const),
+    ...brands.map((b) => [`BRAND:${b.id}`, b.name] as const),
+    ...categories.map((c) => [`CATEGORY:${c.id}`, c.name] as const),
+  ]);
+  // 말단이 아닌 분류 = 어떤 상품도 이 분류를 직접 갖지 않는다
+  const dead = new Set(categories.filter((c) => c._count.children > 0).map((c) => `CATEGORY:${c.id}`));
+
+  return perCoupon.map((targets) => {
+    const keys = targets.map((t) => `${t.targetType}:${t.targetId}`);
+    return {
+      // 사라진 대상(상품을 지운 경우)도 자리는 지킨다 — 비워 두면 수와 이름이 어긋난다
+      targetNames: keys.map((k) => nameOf.get(k) ?? '(알 수 없음)'),
+      deadTargets: keys.some((k) => dead.has(k)),
+    };
+  });
 }
 
 export async function listCoupons(actor: Actor, now = new Date()): Promise<CouponRow[]> {
@@ -62,13 +122,17 @@ export async function listCoupons(actor: Actor, now = new Date()): Promise<Coupo
       startsAt: true, endsAt: true, isActive: true, downloadable: true,
       // 발급된 것 중 실제로 쓴 수. 발급 수만으로는 효과를 알 수 없다.
       _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
+      targets: { select: { targetType: true, targetId: true } },
     },
   });
 
-  return rows.map((r) => ({
+  const described = await describeTargets(rows.map((r) => r.targets));
+
+  return rows.map((r, i) => ({
     ...r,
     usedCount: r._count.issued,
     targetCount: r._count.targets,
+    ...described[i]!,
     status: couponStatus(r, now),
     editable: canEditDiscount(r.issuedCount),
   }));
@@ -116,10 +180,13 @@ export async function createCoupon(actor: Actor, input: CreateCouponInput): Prom
         startsAt: true, endsAt: true, isActive: true, downloadable: true,
       },
     });
+    // 만든 직후 화면이 이 줄을 그대로 세운다 — 목록과 같은 설명을 달아 보낸다
+    const [described] = await describeTargets([input.targets]);
     return {
       ...created,
       usedCount: 0,
       targetCount: input.targets.length,
+      ...described!,
       status: couponStatus(created, new Date()),
       editable: true,
     };
@@ -191,13 +258,17 @@ export async function updateCoupon(
       maxDiscount: true, minimumOrder: true, issueLimit: true, issuedCount: true,
       startsAt: true, endsAt: true, isActive: true, downloadable: true,
       _count: { select: { issued: { where: { usedAt: { not: null } } }, targets: true } },
+      targets: { select: { targetType: true, targetId: true } },
     },
   });
 
+  // 고친 줄이 목록의 제 자리로 돌아간다 — 대상 설명도 함께 돌려줘야 그 칸이 비지 않는다
+  const [described] = await describeTargets([updated.targets]);
   return {
     ...updated,
     usedCount: updated._count.issued,
     targetCount: updated._count.targets,
+    ...described!,
     status: couponStatus(updated, new Date()),
     editable: canEditDiscount(updated.issuedCount),
   };

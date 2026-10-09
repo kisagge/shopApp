@@ -97,7 +97,30 @@ export function CouponTable({
                 {c.targetCount === 0 ? (
                   '전체'
                 ) : (
-                  <span className="tnum">지정 {c.targetCount}개</span>
+                  /*
+                    **무엇에 걸었는지 적는다.** 여기는 "지정 3개" 만 있었고, 대상은 만들 때만
+                    정하므로 다시 열어 볼 화면도 없다 — 그래서 상위 분류에 걸어 어떤 상품에도
+                    붙지 않는 쿠폰이 섞여 있어도 아무 표시가 없었다. 손님에게는 "쓸 수 없는
+                    쿠폰" 으로만 보이고, 운영은 까닭을 모른다.
+                  */
+                  <span className="flex flex-col items-start gap-1">
+                    <span>
+                      {c.targetNames.slice(0, 3).join(', ')}
+                      {c.targetNames.length > 3 && (
+                        <span className="tnum text-[var(--fg-muted)]">
+                          {' '}외 {c.targetNames.length - 3}개
+                        </span>
+                      )}
+                    </span>
+                    {c.deadTargets && (
+                      <>
+                        <Badge tone="danger">붙는 상품 없음</Badge>
+                        <span className="text-[11px] text-[var(--fg-muted)]">
+                          상위 분류는 상품에 직접 붙지 않습니다. 하위 분류로 다시 만들어 주세요.
+                        </span>
+                      </>
+                    )}
+                  </span>
                 )}
               </td>
               <td className="tnum px-4 py-3 text-right">
