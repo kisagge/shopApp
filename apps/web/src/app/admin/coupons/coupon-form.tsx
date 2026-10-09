@@ -285,6 +285,10 @@ export function CouponForm({
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-[var(--fg-muted)]">카테고리</span>
+            {/*
+              **내려온 것은 말단 분류뿐이다**(page.tsx). 상품은 말단에만 붙고 적용 판정은 정확히
+              일치할 때만 맞다고 보므로, 상위를 고르면 저장도 발급도 되는데 어떤 상품에도 안 붙는다.
+            */}
             <div className="flex flex-wrap gap-1.5">
               {categories.map((c) => (
                 <label

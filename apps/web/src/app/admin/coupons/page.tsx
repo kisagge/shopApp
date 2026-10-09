@@ -13,7 +13,19 @@ export default async function AdminCouponsPage() {
     listCoupons(actor),
     // 대상 지정에 쓸 목록. 브랜드·카테고리는 수가 적어 통째로 내려도 된다.
     prisma.brand.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
-    prisma.category.findMany({ orderBy: { name: 'asc' }, select: { id: true, name: true } }),
+    /*
+     * **말단 분류만 내려 준다** — 상품 폼과 같은 조건이다.
+     *
+     * 상품은 말단에만 붙고, 쿠폰 적용 판정은 상품의 분류와 **정확히 일치**할 때만 맞다고 본다
+     * (core couponCoversProduct·장바구니 범위). 상위 분류를 고를 수 있게 두면 "아우터" 쿠폰이
+     * 저장도 발급도 되는데 **어떤 상품에도 붙지 않는다** — 손님은 "쓸 수 없는 쿠폰" 만 보고
+     * 운영은 까닭을 모른다. 오류도 경고도 없는 고장이라 고를 수 없게 하는 편이 낫다.
+     */
+    prisma.category.findMany({
+      where: { children: { none: {} } },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
   ]);
 
   return (
