@@ -2,7 +2,8 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
-  format, hasPermission, showsOldestFirst, ORDER_STATUS_LABEL, type OrderStatus,
+  format, hasPermission, showsOldestFirst, notSentYet, waitingDays, shipmentLate,
+  ORDER_STATUS_LABEL, type OrderStatus,
 } from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
@@ -37,6 +38,8 @@ export default async function AdminOrdersPage({
   }>;
 }) {
   const actor = await requireAdmin('order:read');
+  // 한 번만 읽는다 — 줄마다 시계를 보면 같은 화면 안에서 날이 바뀔 수 있다
+  const now = new Date();
   const { status, page: pageParam, q, from, to, lateDeposit: lateParam } = await searchParams;
   const filter = status && isOrderStatus(status) ? status : undefined;
   // 취소 뒤 입금은 운영진 일이다 — 가맹점에게는 이 조건을 걸지 않는다(조회도 무시한다)
@@ -271,7 +274,27 @@ export default async function AdminOrdersPage({
                       <td className="px-4 py-3 text-[13px] whitespace-nowrap">{o.buyerName}</td>
                       <td className="tnum px-4 py-3 text-right text-[13px] font-semibold">{format(o.amount)}</td>
                       <td className="tnum px-4 py-3 text-xs text-[var(--fg-muted)]">
-                        {o.placedAt.toLocaleDateString('ko-KR')}
+                        {/*
+                          **날짜만으로는 사흘 밀린 주문과 오늘 주문이 같은 무게로 보인다.** 아직
+                          보내지 않은 탭은 오래 기다린 것부터 세우게 했지만(core showsOldestFirst),
+                          위에 섰다는 것과 "며칠이나 기다렸다" 는 다른 말이다 — 날짜를 읽고 오늘
+                          날짜를 떠올려 빼는 일을 사람에게 맡기면 바쁜 날 아무도 안 한다.
+
+                          늦은 줄은 색만으로 말하지 않는다 — 글자로 적는다.
+                        */}
+                        <span className="flex flex-col gap-0.5">
+                          <span>{o.placedAt.toLocaleDateString('ko-KR')}</span>
+                          {notSentYet(o.status) && (
+                            <span className={shipmentLate(o.status, o.placedAt, now)
+                              ? 'font-semibold text-accent'
+                              : undefined}>
+                              {waitingDays(o.placedAt, now) === 0
+                                ? '오늘 접수'
+                                : `${waitingDays(o.placedAt, now)}일 기다림`}
+                              {shipmentLate(o.status, o.placedAt, now) && ' · 늦음'}
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-center">
                         <div className="flex flex-col items-center gap-1">

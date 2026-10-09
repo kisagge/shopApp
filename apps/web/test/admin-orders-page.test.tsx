@@ -109,3 +109,85 @@ describe('목록을 세운 방향을 말한다', () => {
     expect(screen.queryByText(/오래 기다린 주문부터/)).toBeNull();
   });
 });
+
+/**
+ * **기다린 날.**
+ *
+ * 오래 기다린 것부터 세우게 만들었어도 목록에는 접수 날짜만 있었다 — 사흘 밀린 주문과 오늘 주문이
+ * 같은 무게로 보인다. 날짜를 읽고 오늘 날짜를 떠올려 빼는 일은 바쁜 날 아무도 하지 않는다.
+ * 판단은 core 가 하고(waitingDays·shipmentLate) 목록은 그 값을 적는다.
+ */
+describe('며칠 기다렸는지 적는다', () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const daysAgo = (n: number) => new Date(Date.now() - n * dayMs);
+  const line = () => screen.getByRole('row', { name: /20260930-0000001/ });
+
+  it('아직 안 보낸 주문에는 기다린 날을 적는다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PREPARING', placedAt: daysAgo(3) })], total: 1,
+    });
+    await renderPage({ status: 'PREPARING' });
+
+    expect(within(line()).getByText(/3일 기다림/)).toBeInTheDocument();
+  });
+
+  it('오늘 들어온 주문은 "오늘 접수" 다 — 0일이라고 적지 않는다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PAID', placedAt: new Date() })], total: 1,
+    });
+    await renderPage({ status: 'PAID' });
+
+    expect(within(line()).getByText('오늘 접수')).toBeInTheDocument();
+  });
+
+  /** 색으로만 말하면 색을 못 보는 사람에게는 아무 표시가 없는 것과 같다 */
+  it('늦은 줄은 글자로 늦었다고 적는다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PAID', placedAt: daysAgo(4) })], total: 1,
+    });
+    await renderPage({ status: 'PAID' });
+
+    expect(within(line()).getByText(/4일 기다림 · 늦음/)).toBeInTheDocument();
+  });
+
+  it('하루 지난 주문은 아직 늦지 않았다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PAID', placedAt: daysAgo(1) })], total: 1,
+    });
+    await renderPage({ status: 'PAID' });
+
+    expect(within(line()).getByText('1일 기다림')).toBeInTheDocument();
+  });
+
+  /** 입금 대기는 손님을 기다리는 중이다 — 거기에 빨간 줄을 그으면 정작 늦은 줄이 묻힌다 */
+  it('입금 대기는 오래 기다려도 늦었다고 하지 않는다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PENDING', placedAt: daysAgo(10) })], total: 1,
+    });
+    await renderPage({ status: 'PENDING' });
+
+    expect(within(line()).getByText('10일 기다림')).toBeInTheDocument();
+    expect(within(line()).queryByText(/늦음/)).toBeNull();
+  });
+
+  it('이미 보낸 주문에는 적지 않는다 — 늘 붙어 있으면 아무도 안 본다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'DELIVERED', placedAt: daysAgo(9) })], total: 1,
+    });
+    await renderPage({ status: 'DELIVERED' });
+
+    expect(within(line()).queryByText(/기다림/)).toBeNull();
+    // 주문일은 그대로 있다 — 새 표시가 원래 있던 것을 덮지 않는다
+    expect(within(line()).getByText(daysAgo(9).toLocaleDateString('ko-KR'))).toBeInTheDocument();
+  });
+
+  /** 장부에서도 늦은 줄은 눈에 띄어야 한다 — 전체 탭은 순서만 최신순이다 */
+  it('전체 탭에서도 안 보낸 줄에는 적는다', async () => {
+    getAdminOrders.mockResolvedValue({
+      rows: [row({ status: 'PREPARING', placedAt: daysAgo(5) })], total: 1,
+    });
+    await renderPage();
+
+    expect(within(line()).getByText(/5일 기다림 · 늦음/)).toBeInTheDocument();
+  });
+});

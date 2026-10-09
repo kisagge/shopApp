@@ -1,3 +1,4 @@
+import { kstDayIndex } from './kst';
 import type { PaymentStatusCode } from './payment';
 
 /**
@@ -194,7 +195,39 @@ const NOT_SENT_YET: readonly OrderStatus[] = ['PENDING', 'PAID', 'PREPARING'];
  * **전체 탭도 최신순이다.** 할 일 목록이 아니라 장부다 — 무엇이 막 들어왔는지를 보는 자리다.
  */
 export const showsOldestFirst = (status: OrderStatus | undefined): boolean =>
-  status !== undefined && NOT_SENT_YET.includes(status);
+  status !== undefined && notSentYet(status);
+
+/** 이 주문은 아직 보낼 일이 남았는가 */
+export const notSentYet = (status: OrderStatus): boolean => NOT_SENT_YET.includes(status);
+
+/**
+ * 이 주문이 **기다린 날** — 오늘 들어온 주문은 0, 어제 것은 1.
+ *
+ * 달력으로 센다(KST). 시각 차를 24로 나누면 어젯밤 11시에 들어온 주문이 "0일" 이 되는데, 운영자는
+ * 그것을 **어제 주문**으로 센다. 미래 시각이 들어오면(시계가 어긋난 날) 음수로 겁주지 않고 0이다.
+ */
+export const waitingDays = (placedAt: Date, now: Date): number =>
+  Math.max(kstDayIndex(now) - kstDayIndex(placedAt), 0);
+
+/**
+ * 늦었다고 보는 선 — **돈을 받은 날부터** 이만큼 지나도록 못 보냈으면 짚는다.
+ *
+ * 하루는 너무 짧다(주말·공휴일에 들어온 주문이 모두 빨간 줄이 된다). 사흘은 너무 길다 — 손님이
+ * 먼저 전화하는 날이다.
+ */
+export const LATE_SHIPPING_DAYS = 2;
+
+/**
+ * **돈을 받고도 못 보낸 주문.**
+ *
+ * 입금 대기는 빼야 한다 — 그건 손님을 기다리는 중이고, 운영이 서둘러서 끝나는 일이 아니다.
+ * 뺄 상태를 손으로 다시 적지 않고 "아직 안 보낸 것" 에서 걸러 낸다(한쪽이 늘면 함께 늘어난다).
+ */
+const PAID_NOT_SENT: readonly OrderStatus[] = NOT_SENT_YET.filter((s) => s !== 'PENDING');
+
+/** 발송이 늦었는가 — 목록에서 눈에 띄게 해야 하는 줄 */
+export const shipmentLate = (status: OrderStatus, placedAt: Date, now: Date): boolean =>
+  PAID_NOT_SENT.includes(status) && waitingDays(placedAt, now) >= LATE_SHIPPING_DAYS;
 
 /** 재고를 붙잡고 있는 상태. 재고 복원 판단에 쓴다. */
 export const holdsInventory = (status: OrderStatus): boolean =>

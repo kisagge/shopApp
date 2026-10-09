@@ -54,6 +54,7 @@ export * from './account-notice';
 export * from './return-queue';
 export * from './return-address';
 export * from './expiry-notice';
+export * from './kst';
 export * from './dashboard-period';
 export * from './mail-template';
 export * from './support';

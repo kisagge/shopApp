@@ -5,6 +5,7 @@ import {
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, orderStatusFromItems,
   adminStatusActions, OrderTransitionError, type OrderStatus,
   statusBeforeReturn, isRepayable, canRegisterShipment, showsOldestFirst,
+  notSentYet, waitingDays, shipmentLate, LATE_SHIPPING_DAYS,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -371,6 +372,80 @@ describe('오래 기다린 것부터 보여 줄 자리인가', () => {
   it('모든 상태에 답이 있다', () => {
     for (const status of ORDER_STATUS) {
       expect(typeof showsOldestFirst(status), status).toBe('boolean');
+    }
+  });
+});
+
+/**
+ * **며칠 기다렸나.**
+ *
+ * 아직 안 보낸 탭을 오래 기다린 것부터 세우게 했지만, 목록에는 접수 **날짜**만 있었다 — 사흘 밀린
+ * 주문과 오늘 주문이 같은 무게로 보인다. 위에 섰다는 것과 "며칠이나 기다렸다" 는 다른 말이고,
+ * 날짜를 보고 오늘을 떠올려 빼는 일은 바쁜 날 아무도 하지 않는다.
+ */
+describe('기다린 날', () => {
+  const at = (iso: string) => new Date(iso);
+
+  it('오늘 들어온 주문은 0일이다', () => {
+    expect(waitingDays(at('2026-10-09T01:00:00+09:00'), at('2026-10-09T23:00:00+09:00'))).toBe(0);
+  });
+
+  /** 시각 차를 24로 나누면 아홉 시간밖에 안 지난 어제 주문이 "0일" 이 된다 */
+  it('어젯밤 주문은 아침에 벌써 1일이다', () => {
+    expect(waitingDays(at('2026-10-08T23:00:00+09:00'), at('2026-10-09T08:00:00+09:00'))).toBe(1);
+  });
+
+  it('달력으로 센다 — 사흘 전은 3일이다', () => {
+    expect(waitingDays(at('2026-10-06T12:00:00+09:00'), at('2026-10-09T12:00:00+09:00'))).toBe(3);
+  });
+
+  /** 시계가 어긋난 날에도 "-1일 기다림" 같은 말을 적지 않는다 */
+  it('미래 시각이 들어오면 0이다', () => {
+    expect(waitingDays(at('2026-10-10T00:00:00+09:00'), at('2026-10-09T12:00:00+09:00'))).toBe(0);
+  });
+});
+
+/**
+ * **늦었다고 말할 자격.**
+ *
+ * 입금 대기는 손님을 기다리는 중이다 — 운영이 서둘러서 끝나는 일이 아니고, 거기에 빨간 줄을 그으면
+ * 정작 돈을 받고도 못 보낸 줄이 묻힌다.
+ */
+describe('발송이 늦었는가', () => {
+  const placed = (daysAgo: number) =>
+    new Date(Date.UTC(2026, 9, 9, 3) - daysAgo * 24 * 60 * 60 * 1000);
+  const now = new Date(Date.UTC(2026, 9, 9, 3)); // 2026-10-09 12:00 KST
+
+  it('돈을 받고 이틀 지나면 늦은 것이다', () => {
+    expect(shipmentLate('PAID', placed(LATE_SHIPPING_DAYS), now)).toBe(true);
+    expect(shipmentLate('PREPARING', placed(LATE_SHIPPING_DAYS), now)).toBe(true);
+  });
+
+  it('하루 지난 것은 아직 늦지 않았다', () => {
+    expect(shipmentLate('PAID', placed(1), now)).toBe(false);
+  });
+
+  it('입금 대기는 아무리 오래 기다려도 우리가 늦은 것이 아니다', () => {
+    expect(shipmentLate('PENDING', placed(30), now)).toBe(false);
+    // 그래도 며칠 기다렸는지는 센다 — 세는 것과 짚는 것은 다른 일이다
+    expect(waitingDays(placed(30), now)).toBe(30);
+    expect(notSentYet('PENDING')).toBe(true);
+  });
+
+  /** 이미 보낸 주문은 늦을 수 없다 — 늦었는지는 보낼 일이 남은 줄에만 묻는다 */
+  it('보낸 뒤의 상태는 아무리 오래돼도 늦지 않았다', () => {
+    for (const status of ORDER_STATUS.filter((s) => !notSentYet(s))) {
+      expect(shipmentLate(status, placed(30), now), status).toBe(false);
+    }
+  });
+
+  /**
+   * 목록을 세우는 판단과 기다린 날을 적는 판단은 **같은 목록**을 봐야 한다 — 한쪽만 늘어나면
+   * 오래 기다린 것부터 세워 놓고 기다린 날은 안 적는 탭이 생긴다.
+   */
+  it('오래된 것부터 세우는 탭 = 기다린 날을 적는 줄', () => {
+    for (const status of ORDER_STATUS) {
+      expect(notSentYet(status), status).toBe(showsOldestFirst(status));
     }
   });
 });

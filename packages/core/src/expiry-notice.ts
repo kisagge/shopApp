@@ -14,13 +14,9 @@ import { pointExpirySchedule, type PointLedgerEntry } from './point-expiry';
 export const EXPIRY_NOTICE_LEAD_DAYS = 7;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 /** 알릴 범위의 끝 — 지금부터 이때까지 사라지는 것 */
 export const expiryNoticeUntil = (now: Date): Date => new Date(now.getTime() + EXPIRY_NOTICE_LEAD_DAYS * DAY_MS);
-
-/** 알림에 싣는 날짜. 말과 상관없이 읽히는 `YYYY-MM-DD`(KST) */
-export const kstDate = (at: Date): string => new Date(at.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
 
 /**
  * 한 사람의 곧 사라질 적립금 — 안 쓴 몫만(먼저 사라질 것부터 썼다고 보는 소멸 규칙 그대로), 가장 이른 날과 날짜별 목록.

@@ -8,6 +8,8 @@
  * 인덱스였다.
  */
 
+import { kstDate, kstDayIndex } from './kst';
+
 export interface PointLedgerEntry {
   /** 양수는 적립, 음수는 사용·소멸 */
   readonly amount: number;
@@ -85,7 +87,6 @@ export function expiringSoonAmount(
   return expirableAmount(entries, horizon) - expirableAmount(entries, now);
 }
 
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface PointExpiryDay {
@@ -126,7 +127,7 @@ export function pointExpirySchedule(
     const at = e.expiresAt.getTime();
     if (at <= cutoff || at > horizon) continue;
 
-    const date = new Date(at + KST_OFFSET_MS).toISOString().slice(0, 10);
+    const date = kstDate(new Date(at));
     const day = byDate.get(date);
     if (day) {
       day.amount += e.remaining;
@@ -141,5 +142,3 @@ export function pointExpirySchedule(
     .map(([date, d]) => ({ date, amount: d.amount, expiresAt: d.expiresAt, daysLeft: kstDayIndex(d.expiresAt) - today }));
 }
 
-/** KST 기준 날짜 번호 — 두 시각의 날짜 차를 시각이 아니라 달력으로 센다 */
-const kstDayIndex = (at: Date): number => Math.floor((at.getTime() + KST_OFFSET_MS) / DAY_MS);
