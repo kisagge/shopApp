@@ -120,13 +120,17 @@ describe('해제', () => {
 });
 
 describe('발송', () => {
-  const pending = [
-    {
-      id: 'r-1', userId: 'u-1', variantId: 'v-1',
-      user: { email: 'a@plain.test' },
-      variant: { label: '블랙 / M', product: { name: '울 코트', slug: 'wool-coat' } },
-    },
-  ];
+  /** 매대에 서 있는 상품의 대기자 한 줄 — 보내는 쪽도 신청과 같은 것을 본다(isOnDisplay) */
+  const onDisplay = {
+    name: '울 코트', slug: 'wool-coat', status: 'ACTIVE', deletedAt: null,
+    publishedAt: new Date('2026-07-01'), brand: { merchant: { status: 'APPROVED' } },
+  };
+  const pendingRow = (product: Record<string, unknown> = {}) => ({
+    id: 'r-1', userId: 'u-1', variantId: 'v-1',
+    user: { email: 'a@plain.test' },
+    variant: { label: '블랙 / M', product: { ...onDisplay, ...product } },
+  });
+  const pending = [pendingRow()];
 
   const readsPending = (rows: { id: string }[]) => {
     lastPending = rows;
@@ -144,6 +148,38 @@ describe('발송', () => {
       // 보관한 상품의 대기자는 부르지 않는다 — 눌러 들어가면 없는 상품이다
       variant: { product: { deletedAt: null } },
     });
+  });
+
+  /**
+   * **매대에 없는 상품의 알림은 보내지 않는다.**
+   *
+   * 신청은 매대에 서 있을 때만 받는데(subscribeRestock) 보내는 쪽은 보관만 걸러 더 느슨했다 —
+   * 신청한 뒤 숨겨지거나 검수 대기로 내려가거나 가맹점이 멈춘 상품에도 "다시 들어왔습니다" 가
+   * 나갔고, 누르면 매대 조회가 걸러 404 다. 기다리던 사람에게 가장 나쁜 모양이다.
+   */
+  it.each([
+    ['숨겼다', { status: 'HIDDEN' }],
+    ['검수를 기다린다', { status: 'PENDING_REVIEW' }],
+    ['게시된 적이 없다', { publishedAt: null }],
+    ['가맹점이 멈췄다', { brand: { merchant: { status: 'SUSPENDED' } } }],
+  ])('%s — 보내지 않는다', async (_label, product) => {
+    readsPending([pendingRow(product)]);
+
+    const r = await notifyRestocked(['v-1']);
+
+    expect(r.notified).toBe(0);
+    // **표시도 걸지 않는다.** 표시부터 하면 받지도 못한 알림을 받은 것이 된다
+    expect(db.$queryRaw, '표시부터 하면 받지도 못한 알림을 받은 것이 된다').not.toHaveBeenCalled();
+    expect(sent, '메일이 나갔다').toHaveLength(0);
+  });
+
+  it('신청은 지우지 않는다 — 되돌아오면 그때 간다', async () => {
+    readsPending([pendingRow({ status: 'HIDDEN' })]);
+
+    await notifyRestocked(['v-1']);
+
+    expect(db.restockNotification.deleteMany).not.toHaveBeenCalled();
+    expect(db.restockNotification.updateMany).not.toHaveBeenCalled();
   });
 
   it('보내기 전에 먼저 표시한다 — 반대면 같은 사람에게 두 번 간다', async () => {
@@ -192,11 +228,7 @@ describe('발송', () => {
   it('다른 실행이 먼저 가져간 사람에게는 보내지 않는다', async () => {
     readsPending([
       pending[0]!,
-      {
-        id: 'r-2', userId: 'u-2', variantId: 'v-1',
-        user: { email: 'b@plain.test' },
-        variant: { label: '블랙 / L', product: { name: '울 코트', slug: 'wool-coat' } },
-      },
+      { ...pendingRow(), id: 'r-2', userId: 'u-2', user: { email: 'b@plain.test' } },
     ]);
     // 첫 줄은 다른 실행이 이미 표시했다 — 이긴 줄만 돌아온다
     db.$queryRaw.mockResolvedValue([{ id: 'r-2' }]);

@@ -390,6 +390,7 @@ export const en: Dictionary = {
   'my.restockEmpty': 'No alerts set. Choose a sold-out option to set one.',
   'my.restocked': 'Back in stock',
   'my.restockedThenOut': 'It sold out again after the alert. You can set another one on the product page.',
+  'my.restockUnavailable': 'This product is not on sale right now, so no alert will be sent. Subscribe again from the product page when it returns.',
 
   'my.reviewLead': 'You can review anything that has been delivered.',
   'my.reviewNone': 'Nothing to review right now.',

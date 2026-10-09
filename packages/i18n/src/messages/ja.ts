@@ -386,6 +386,7 @@ export const ja: Dictionary = {
   'my.restockEmpty': '設定した通知がありません。売り切れのオプションを選ぶと申請できます。',
   'my.restocked': '再入荷',
   'my.restockedThenOut': '通知のあと再び売り切れました。商品ページからもう一度申請できます。',
+  'my.restockUnavailable': '現在販売していない商品のため、お知らせは送られません。再開したら商品ページから申し込んでください。',
 
   'my.reviewLead': '配送が完了した商品にレビューを書けます。',
   'my.reviewNone': '今レビューを書ける商品がありません。',

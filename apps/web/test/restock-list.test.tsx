@@ -122,3 +122,34 @@ describe('지우기', () => {
     expect(screen.getByRole('button', { name: '울 코트 2 재입고 알림 삭제' })).toBeTruthy();
   });
 });
+
+/**
+ * **오지 않을 알림을 기다리게 두지 않는다.**
+ *
+ * 신청은 매대에 서 있을 때만 받고(subscribeRestock) 보내는 쪽도 같은 것을 본다. 그 사이에 상품이
+ * 내려가면 이 줄은 영영 기다리는 줄이 되는데, 화면은 아무 말도 하지 않았다 — 손님은 기다리고
+ * 있다고 믿는다.
+ */
+describe('지금 매대에 없는 상품', () => {
+  it('판매 종료라고 말하고, 알림이 가지 않는다는 것도 적는다', () => {
+    render(<RestockList rows={[{ ...row(1), unavailable: true }]} />);
+
+    expect(screen.getByText('판매 종료')).toBeTruthy();
+    expect(screen.getByText(/알림이 가지 않습니다/)).toBeTruthy();
+  });
+
+  /** 기다릴 수 있는 줄에는 그 말을 하지 않는다 — 늘 붙어 있으면 아무도 안 읽는다 */
+  it('매대에 있는 줄에는 적지 않는다', () => {
+    render(<RestockList rows={[row(1)]} />);
+
+    expect(screen.queryByText('판매 종료')).toBeNull();
+    expect(screen.queryByText(/알림이 가지 않습니다/)).toBeNull();
+  });
+
+  /** "알림 뒤 다시 품절" 은 기다릴 수 있는 줄의 말이다 — 둘을 함께 띄우면 서로 어긋난다 */
+  it('판매 종료면 "알림 뒤 다시 품절" 은 띄우지 않는다', () => {
+    render(<RestockList rows={[{ ...row(1), notified: true, inStock: false, unavailable: true }]} />);
+
+    expect(screen.queryByText(/다시 품절/)).toBeNull();
+  });
+});

@@ -28,7 +28,15 @@ const pending = (over: Record<string, unknown> = {}) => ({
   userId: 'u-1',
   variantId: 'v-1',
   user: { email: 'buyer@plain.test' },
-  variant: { label: '차콜 / M', product: { name: '오버사이즈 울 블렌드 코트', slug: 'coat' } },
+  variant: {
+    label: '차콜 / M',
+    // 보내는 쪽이 "매대에 서 있는가" 를 본다 — 신청과 같은 판단이다(core isOnDisplay)
+    product: {
+      name: '오버사이즈 울 블렌드 코트', slug: 'coat',
+      status: 'ACTIVE', deletedAt: null, publishedAt: new Date('2026-07-01'),
+      brand: { merchant: { status: 'APPROVED' } },
+    },
+  },
   ...over,
 });
 

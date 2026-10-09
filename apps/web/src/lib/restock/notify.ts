@@ -185,11 +185,41 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
       variantId: true,
       user: { select: { email: true, locale: true } },
       variant: {
-        select: { label: true, product: { select: { name: true, slug: true } } },
+        select: {
+          label: true,
+          // 매대에 서 있는지 묻는 데 필요한 것들 — 판단은 core 가 한다
+          product: {
+            select: {
+              name: true, slug: true, status: true, deletedAt: true, publishedAt: true,
+              brand: { select: { merchant: { select: { status: true } } } },
+            },
+          },
+        },
       },
     },
   });
-  if (pending.length === 0) return { notified: 0, variantIds: [] };
+
+  /*
+   * **매대에 없는 상품의 알림은 보내지 않는다.**
+   *
+   * 보관(deletedAt)만 걸러 내고 있었다. 그런데 신청은 **매대에 서 있을 때만** 받는데(subscribeRestock
+   * 의 isOnDisplay) 보내는 쪽은 그보다 느슨해서, 신청한 뒤 상품이 숨겨지거나 검수 대기로 내려가거나
+   * 가맹점이 멈춘 경우에도 "다시 들어왔습니다" 가 나갔다 — 누르면 매대 조회가 걸러 **404** 다.
+   * 기다리던 사람에게 가장 나쁜 모양이다.
+   *
+   * **신청은 지우지 않는다.** 되돌아오면 그때 간다(보관을 거르면서 적어 둔 것과 같은 규칙).
+   * 표시를 걸기 **전에** 거른다 — 표시부터 하면 그 사람은 받지도 못한 알림을 받은 것이 된다.
+   */
+  const live = pending.filter((row) => {
+    const product = row.variant.product;
+    return isOnDisplay({
+      deletedAt: product.deletedAt,
+      publishedAt: product.publishedAt,
+      status: product.status,
+      merchantStatus: product.brand.merchant?.status ?? null,
+    });
+  });
+  if (live.length === 0) return { notified: 0, variantIds: [] };
 
   const now = new Date();
 
@@ -210,12 +240,12 @@ export async function notifyRestocked(variantIds: readonly string[]): Promise<No
   const claimed = await prisma.$queryRaw<{ id: string }[]>`
     UPDATE restock_notifications
        SET "notifiedAt" = ${now}
-     WHERE id IN (${Prisma.join(pending.map((p) => p.id))})
+     WHERE id IN (${Prisma.join(live.map((p) => p.id))})
        AND "notifiedAt" IS NULL
     RETURNING id
   `;
   const won = new Set(claimed.map((row) => row.id));
-  const mine = pending.filter((p) => won.has(p.id));
+  const mine = live.filter((p) => won.has(p.id));
   // 다른 실행이 전부 먼저 가져갔다
   if (mine.length === 0) return { notified: 0, variantIds: [] };
 

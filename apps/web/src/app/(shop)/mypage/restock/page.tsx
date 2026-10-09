@@ -3,6 +3,7 @@ import { getViewer } from '~/lib/viewer';
 import { redirect } from 'next/navigation';
 import type { Metadata } from 'next';
 import { prisma } from '@shop/db';
+import { isOnDisplay } from '@shop/core';
 import { RestockList } from '~/components/restock-list';
 import { getT } from '~/lib/i18n/server';
 import { NO_INDEX } from '~/lib/no-index';
@@ -24,21 +25,42 @@ async function load(userId: string) {
       variant: {
         select: {
           label: true, stock: true,
-          product: { select: { name: true, slug: true, brand: { select: { name: true } } } },
+          product: {
+            select: {
+              name: true, slug: true, status: true, deletedAt: true, publishedAt: true,
+              brand: { select: { name: true, merchant: { select: { status: true } } } },
+            },
+          },
         },
       },
     },
   });
 
-  return rows.map((r) => ({
-    variantId: r.variantId,
-    optionLabel: r.variant.label,
-    productName: r.variant.product.name,
-    productSlug: r.variant.product.slug,
-    brandName: r.variant.product.brand.name,
-    inStock: r.variant.stock > 0,
-    notified: r.notifiedAt !== null,
-  }));
+  return rows.map((r) => {
+    const product = r.variant.product;
+    return {
+      variantId: r.variantId,
+      optionLabel: r.variant.label,
+      productName: product.name,
+      productSlug: product.slug,
+      brandName: product.brand.name,
+      inStock: r.variant.stock > 0,
+      notified: r.notifiedAt !== null,
+      /*
+       * **오지 않을 알림을 기다리게 두지 않는다.**
+       *
+       * 신청은 매대에 서 있을 때만 받고(subscribeRestock), 보내는 쪽도 같은 것을 본다. 그 사이에
+       * 상품이 내려가면 이 줄은 영영 기다리는 줄이 되는데, 화면은 아무 말도 하지 않았다 — 손님은
+       * 기다리고 있다고 믿는다. 판단은 core 가 한다(찜 목록과 같은 함수).
+       */
+      unavailable: !isOnDisplay({
+        deletedAt: product.deletedAt,
+        publishedAt: product.publishedAt,
+        status: product.status,
+        merchantStatus: product.brand.merchant?.status ?? null,
+      }),
+    };
+  });
 }
 
 export default async function RestockPage() {

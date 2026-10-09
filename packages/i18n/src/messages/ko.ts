@@ -403,6 +403,7 @@ export const ko = {
   'my.restockEmpty': '걸어 둔 알림이 없습니다. 품절된 옵션을 고르면 신청할 수 있습니다.',
   'my.restocked': '재입고됨',
   'my.restockedThenOut': '알림 이후 다시 품절됐습니다. 상품 화면에서 다시 신청할 수 있습니다.',
+  'my.restockUnavailable': '지금은 판매하지 않는 상품이라 알림이 가지 않습니다. 다시 올라오면 상품 화면에서 신청해 주세요.',
 
   'my.reviewLead': '배송이 완료된 상품에 후기를 남길 수 있습니다.',
   'my.reviewNone': '지금 리뷰를 쓸 수 있는 상품이 없습니다.',

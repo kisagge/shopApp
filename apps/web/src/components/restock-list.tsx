@@ -15,6 +15,8 @@ export interface RestockRowView {
   readonly brandName: string;
   readonly inStock: boolean;
   readonly notified: boolean;
+  /** 지금 매대에 없는 상품 — 기다려도 알림이 가지 않는다 */
+  readonly unavailable?: boolean;
 }
 
 /**
@@ -84,9 +86,20 @@ export function RestockList({ rows }: { rows: readonly RestockRowView[] }) {
                 </Link>
                 {/* 상태를 색으로만 알리지 않는다 */}
                 {r.notified && <Badge tone="success">{t('my.restocked')}</Badge>}
+                {/* 상태를 색으로만 알리지 않는다 — 찜 목록과 같은 말을 쓴다 */}
+                {r.unavailable && (
+                  <span className="text-[11px] font-medium text-accent">{t('my.discontinued')}</span>
+                )}
               </p>
               <p className="text-[13px] text-[var(--fg-secondary)]">{r.optionLabel}</p>
-              {r.notified && !r.inStock && (
+              {/*
+                **기다려도 오지 않는다는 것을 말한다.** 신청은 매대에 서 있을 때만 받고 보내는 쪽도
+                같은 것을 보는데, 그 사이에 상품이 내려가면 이 줄은 영영 기다리는 줄이 된다.
+              */}
+              {r.unavailable && (
+                <p className="text-[12px] text-[var(--fg-muted)]">{t('my.restockUnavailable')}</p>
+              )}
+              {!r.unavailable && r.notified && !r.inStock && (
                 <p className="text-[12px] text-[var(--fg-muted)]">{t('my.restockedThenOut')}</p>
               )}
             </div>
