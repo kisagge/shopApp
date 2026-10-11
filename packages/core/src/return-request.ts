@@ -1,3 +1,4 @@
+import { kstDayIndex, kstDayStart } from './kst';
 import type { OrderStatus } from './order-state';
 
 /**
@@ -59,6 +60,20 @@ const WINDOW_DAYS: Readonly<Record<ReturnReason, number>> = {
 export const returnWindowDays = (reason: ReturnReason): number => WINDOW_DAYS[reason];
 
 /**
+ * 신청할 수 있는 **마지막 순간** — 그날의 끝(KST).
+ *
+ * **달력으로 센다.** 전에는 `받은 시각 + 7×24시간` 이었다. 월요일 15시에 받으면 다음 월요일
+ * 15시 1분에 닫혔는데, 화면은 손님에게 "배송완료 후 7일 이내에 신청할 수 있습니다" 라고 적는다
+ * (`ret.byCustomer`) — 사람은 그것을 달력으로 읽는다. 받은 시각이 늦을수록 하루를 덜 받는
+ * 셈이었고, 시계를 들여다볼 수 없는 손님에게는 까닭 없이 거절당한 것으로 보인다.
+ *
+ * 세는 법도 달력을 따른다 — 받은 날은 세지 않고(민법의 초일 불산입) 그 다음 날부터 센다.
+ * 월요일에 받으면 다음 월요일 자정까지다. 주문이 기다린 날을 셀 때와 같은 시계를 쓴다(core/kst).
+ */
+export const returnDeadline = (from: Date, reason: ReturnReason): Date =>
+  new Date(kstDayStart(kstDayIndex(from) + returnWindowDays(reason) + 1).getTime() - 1);
+
+/**
  * 이 상태에서 고를 수 있는 사유.
  *
  * **화면과 서버가 같은 목록을 본다.** 화면이 고를 수 없는 것을 내밀면 사람은
@@ -69,8 +84,6 @@ export function availableReturnReasons(status: OrderStatus): readonly ReturnReas
   // 확정은 "이대로 받겠다" 는 뜻이라 변심의 길이 닫힌다. 판매자 귀책은 남는다.
   return status === 'CONFIRMED' ? SELLER_FAULT : RETURN_REASON;
 }
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * 돌려보낼 수 있는 **줄**의 상태 — 받았거나 받는 중인 것.
@@ -198,12 +211,12 @@ export function checkReturnEligibility(input: {
   if (deliveredAt === null) {
     return {
       ok: true,
-      deadline: new Date(now.getTime() + returnWindowDays(reason) * DAY_MS),
+      deadline: returnDeadline(now, reason),
       borneBy: shippingBorneBy(reason),
     };
   }
 
-  const deadline = new Date(deliveredAt.getTime() + returnWindowDays(reason) * DAY_MS);
+  const deadline = returnDeadline(deliveredAt, reason);
   if (now.getTime() > deadline.getTime()) {
     return {
       ok: false,

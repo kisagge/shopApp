@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   shippingBorneBy, returnWindowDays, checkReturnEligibility, canRequestReturn,
   availableReturnReasons, isOpenReturn, canCancelOwnReturn, OPEN_RETURN_STATUS,
-  RETURN_REASON,
+  RETURN_REASON, returnDeadline,
 } from '../src/return-request';
+import { kstDayIndex, kstDayStart } from '../src/kst';
 
 const DAY = 24 * 60 * 60 * 1000;
 const delivered = new Date('2026-09-01T10:00:00+09:00');
@@ -214,5 +215,120 @@ describe('손님이 무르기', () => {
   it('아직 끝나지 않은 신청 목록과 어긋나지 않는다', () => {
     // 무를 수 있는 것은 끝나지 않은 것 중 하나여야 한다 — 끝난 것을 무르면 기록이 두 번 바뀐다
     expect(OPEN_RETURN_STATUS).toContain('REQUESTED');
+  });
+});
+
+/**
+ * **기한을 달력으로 센다.**
+ *
+ * 전에는 `받은 시각 + 7×24시간` 이었다. 월요일 15시에 받으면 다음 월요일 15시 1분에 닫혔는데,
+ * 화면은 손님에게 "배송완료 후 7일 이내에 신청할 수 있습니다" 라고 적는다 — 사람은 그것을 달력으로
+ * 읽는다. 받은 시각이 늦을수록 하루를 덜 받는 셈이었고, 시계를 들여다볼 수 없는 손님에게는 까닭
+ * 없이 거절당한 것으로 보인다. 받은 날은 세지 않고 그 다음 날부터 센다(초일 불산입).
+ */
+describe('기한은 달력으로 센다', () => {
+  /** 늦은 시각에 받은 주문 — 시각으로 재면 가장 손해를 보던 자리 */
+  const lateDelivery = new Date('2026-09-01T23:30:00+09:00');
+  const endOfWindow = (reason: typeof RETURN_REASON[number], from: Date) =>
+    kstDayStart(kstDayIndex(from) + returnWindowDays(reason) + 1).getTime();
+  const ask = (reason: typeof RETURN_REASON[number], now: Date, deliveredAt = lateDelivery) =>
+    checkReturnEligibility({ status: 'DELIVERED', deliveredAt, reason, now });
+
+  it.each([...RETURN_REASON])('%s — 마지막 날의 끝까지 받는다', (reason) => {
+    const lastMoment = new Date(endOfWindow(reason, lateDelivery) - 1);
+
+    expect(ask(reason, lastMoment).ok).toBe(true);
+  });
+
+  it.each([...RETURN_REASON])('%s — 자정이 지나면 거절한다', (reason) => {
+    const midnight = new Date(endOfWindow(reason, lateDelivery));
+
+    const r = ask(reason, midnight);
+    expect(r.ok).toBe(false);
+    expect(r).toMatchObject({
+      code: 'WINDOW_CLOSED',
+      vars: { reason: `returnReason.${reason}`, days: returnWindowDays(reason) },
+    });
+  });
+
+  /** 시각으로 재던 때라면 이 순간은 이미 닫혀 있었다 — 23시 30분에 받았기 때문이다 */
+  it('23시 30분에 받아도 7일을 꽉 받는다', () => {
+    const sevenDaysLater = new Date('2026-09-08T20:00:00+09:00');
+
+    expect(ask('CHANGED_MIND', sevenDaysLater).ok).toBe(true);
+    // 받은 시각 + 168시간은 9월 8일 23시 30분이라, 20시는 둘 다 통과한다 — 그 뒤가 갈린다
+    expect(ask('CHANGED_MIND', new Date('2026-09-08T23:59:59+09:00')).ok).toBe(true);
+  });
+
+  it('하루를 더 넘기면 그때는 닫힌다', () => {
+    expect(ask('CHANGED_MIND', new Date('2026-09-09T00:00:00+09:00')).ok).toBe(false);
+  });
+
+  it('받은 날은 세지 않는다 — 다음 날부터 센다', () => {
+    // 9월 1일에 받았으면 9월 2일부터 7일 = 9월 8일이 마지막 날
+    const r = ask('CHANGED_MIND', new Date('2026-09-02T00:00:00+09:00'));
+
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.deadline.getTime()).toBe(endOfWindow('CHANGED_MIND', lateDelivery) - 1);
+  });
+
+  it('돌려주는 기한이 그 마지막 순간과 같다', () => {
+    const r = ask('DEFECT', new Date('2026-09-02T00:00:00+09:00'));
+
+    expect(r.ok && r.deadline.getTime()).toBe(endOfWindow('DEFECT', lateDelivery) - 1);
+    expect(returnDeadline(lateDelivery, 'DEFECT').getTime()).toBe(r.ok ? r.deadline.getTime() : 0);
+  });
+
+  it('변심 7일과 하자 30일이 섞이지 않는다', () => {
+    const afterSeven = new Date(endOfWindow('CHANGED_MIND', lateDelivery));
+
+    expect(ask('CHANGED_MIND', afterSeven).ok).toBe(false);
+    expect(ask('DEFECT', afterSeven).ok).toBe(true);
+  });
+
+  /**
+   * **배송 중이면 기한이 아직 시작되지 않았다.** 받기도 전에 기한이 흐르면 배송이 늦을수록
+   * 손해다 — 그래서 지금부터 센다(배송완료가 찍히면 그때부터 다시 센다). 의도한 바라 못 박는다.
+   */
+  it('배송 중이면 지금부터 센다', () => {
+    const now = new Date('2026-09-05T13:00:00+09:00');
+
+    const r = checkReturnEligibility({
+      status: 'SHIPPED', deliveredAt: null, reason: 'CHANGED_MIND', now,
+    });
+
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.deadline.getTime()).toBe(endOfWindow('CHANGED_MIND', now) - 1);
+  });
+});
+
+/**
+ * **버튼을 띄울지는 가장 넉넉한 기한으로 본다.** 사유를 아직 모르는 시점이라 좁게 잡으면 하자
+ * 신고를 할 수 있는 사람에게 버튼이 안 보인다 — 그 경계도 달력이어야 신청 창구와 어긋나지 않는다.
+ */
+describe('신청 버튼을 띄울지 — 가장 넉넉한 기한의 경계', () => {
+  const deliveredAt = new Date('2026-09-01T23:30:00+09:00');
+  const widest = Math.max(...RETURN_REASON.map(returnWindowDays));
+  const end = kstDayStart(kstDayIndex(deliveredAt) + widest + 1).getTime();
+
+  it('마지막 날의 끝까지 띄운다', () => {
+    expect(canRequestReturn({ status: 'DELIVERED', deliveredAt, now: new Date(end - 1) })).toBe(true);
+  });
+
+  it('자정이 지나면 감춘다', () => {
+    expect(canRequestReturn({ status: 'DELIVERED', deliveredAt, now: new Date(end) })).toBe(false);
+  });
+
+  /** 버튼이 보이면 적어도 한 사유는 받아 줘야 한다 — 눌렀더니 다 막히면 안 된다 */
+  it('버튼이 보이는 동안에는 받아 주는 사유가 반드시 있다', () => {
+    for (const at of [end - 1, end - DAY, end - 20 * DAY]) {
+      const now = new Date(at);
+      expect(canRequestReturn({ status: 'DELIVERED', deliveredAt, now }), String(at)).toBe(true);
+      expect(
+        RETURN_REASON.some((reason) =>
+          checkReturnEligibility({ status: 'DELIVERED', deliveredAt, reason, now }).ok),
+        String(at),
+      ).toBe(true);
+    }
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { expirableAmount, expiringSoonAmount, pointExpirySchedule, EXPIRY_NOTICE_DAYS } from '../src/point-expiry';
+import { kstDayIndex } from '../src/kst';
 
 const NOW = new Date('2026-09-04T00:00:00Z');
 const day = (n: number) => new Date(NOW.getTime() + n * 24 * 60 * 60 * 1000);
@@ -164,5 +165,93 @@ describe('날짜별 소멸 예정', () => {
     const within = pointExpirySchedule(entries, NOW, EXPIRY_NOTICE_DAYS);
     expect(within.reduce((s, d) => s + d.amount, 0)).toBe(expiringSoonAmount(entries, NOW));
     expect(within.every((d) => d.daysLeft <= EXPIRY_NOTICE_DAYS)).toBe(true);
+  });
+});
+
+/**
+ * **소멸의 경계 — 기한이 곧 지금이면 사라진 것이다.**
+ *
+ * `expiresAt <= now` 로 적어 두었지만 그 "같은 순간" 을 검사한 적이 없었다. 소멸 배치가 하루에 몇
+ * 번 돌고 그때마다 이 함수가 답을 내므로, 경계에서 한 번 다르게 답하면 같은 포인트가 두 번
+ * 소멸되거나(또는 영영 안 되거나) 한다.
+ */
+describe('소멸의 경계', () => {
+  const at = (ms: number) => new Date(ms);
+  const expiring = (amount: number, expiresAt: Date) => ({ amount, createdAt: day(-100), expiresAt });
+
+  it('기한이 정확히 지금이면 소멸 대상이다', () => {
+    expect(expirableAmount([expiring(500, NOW)], NOW)).toBe(500);
+  });
+
+  it('1밀리초 뒤면 아직 아니다', () => {
+    expect(expirableAmount([expiring(500, at(NOW.getTime() + 1))], NOW)).toBe(0);
+  });
+
+  /** 지난 날짜를 "예정" 이라 적을 수는 없다 — 두 함수가 같은 한 줄을 서로 배타적으로 집는다 */
+  it('지금이 기한이면 날짜별 예정에는 넣지 않는다', () => {
+    const entries = [expiring(500, NOW)];
+
+    expect(expirableAmount(entries, NOW)).toBe(500);
+    expect(pointExpirySchedule(entries, NOW)).toEqual([]);
+  });
+
+  it('1밀리초 뒤면 예정에 들어간다 — 소멸 대상에서는 빠진다', () => {
+    const entries = [expiring(500, at(NOW.getTime() + 1))];
+
+    expect(expirableAmount(entries, NOW)).toBe(0);
+    expect(pointExpirySchedule(entries, NOW)).toHaveLength(1);
+  });
+});
+
+/**
+ * **"30일 안에" 를 재는 시계가 둘이었다.**
+ *
+ * 금액을 세는 쪽은 `지금 + 30×24시간` 으로 밀리초를 재고, 날짜별 예정은 남은 날을 **달력**으로
+ * 셌다. 그래서 달력으로 D-30 인 적립이 "30일 안에 사라집니다" 에는 **안 드는** 일이 생겼다 —
+ * 기한이 그날 늦게 찍힌 몫 전부가 그랬다. 화면은 달력으로 말하므로(`my.pointsExpiring`)
+ * 손님은 사라질 돈을 적게 들었고, 그 차이는 날마다 달라져 누구도 알아볼 수 없다.
+ */
+describe('곧 사라질 포인트의 경계', () => {
+  // NOW 는 KST 2026-09-04 09:00 — 그날 늦게 만료되는 몫이 시각 기준에서 밀려났다
+  const lateThatDay = (daysLater: number) => {
+    const index = kstDayIndex(NOW) + daysLater;
+    // 그날 KST 23:00
+    return new Date((index + 1) * 24 * 60 * 60 * 1000 - 9 * 60 * 60 * 1000 - 60 * 60 * 1000);
+  };
+  const expiring = (amount: number, expiresAt: Date) => ({ amount, createdAt: day(-100), expiresAt });
+
+  it('달력으로 마지막 날에 사라지는 것은 예고에 든다 — 그날 늦게 만료돼도', () => {
+    const entries = [expiring(700, lateThatDay(EXPIRY_NOTICE_DAYS))];
+
+    expect(expiringSoonAmount(entries, NOW)).toBe(700);
+  });
+
+  it('하루 더 뒤는 들지 않는다', () => {
+    const entries = [expiring(700, lateThatDay(EXPIRY_NOTICE_DAYS + 1))];
+
+    expect(expiringSoonAmount(entries, NOW)).toBe(0);
+  });
+
+  /** 남은 날이 30 이라고 적어 놓고 금액에서 빼면, 화면의 두 자리가 서로 다른 말을 한다 */
+  it('예고 금액과 날짜별 합이 경계에서도 같다', () => {
+    const entries = [
+      expiring(700, lateThatDay(EXPIRY_NOTICE_DAYS)),
+      expiring(300, lateThatDay(1)),
+      expiring(100, lateThatDay(EXPIRY_NOTICE_DAYS + 1)),
+    ];
+
+    const schedule = pointExpirySchedule(entries, NOW, EXPIRY_NOTICE_DAYS);
+    const sum = schedule.reduce((n, d) => n + d.amount, 0);
+
+    expect(sum).toBe(expiringSoonAmount(entries, NOW));
+    expect(schedule.map((d) => d.daysLeft)).toEqual([1, EXPIRY_NOTICE_DAYS]);
+  });
+
+  it('남은 날이 기준과 같은 줄은 반드시 예고에 든다', () => {
+    const entries = [expiring(500, lateThatDay(EXPIRY_NOTICE_DAYS))];
+    const [row] = pointExpirySchedule(entries, NOW, EXPIRY_NOTICE_DAYS);
+
+    expect(row?.daysLeft).toBe(EXPIRY_NOTICE_DAYS);
+    expect(expiringSoonAmount(entries, NOW)).toBe(500);
   });
 });

@@ -8,7 +8,7 @@
  * 인덱스였다.
  */
 
-import { kstDate, kstDayIndex } from './kst';
+import { kstDate, kstDayIndex, kstDayStart } from './kst';
 
 export interface PointLedgerEntry {
   /** 양수는 적립, 음수는 사용·소멸 */
@@ -82,12 +82,22 @@ export function expiringSoonAmount(
   now: Date,
   withinDays = EXPIRY_NOTICE_DAYS,
 ): number {
-  const horizon = new Date(now.getTime() + withinDays * 24 * 60 * 60 * 1000);
   // 그 시점에 소멸될 총액에서 지금 이미 소멸될 것을 뺀다
-  return expirableAmount(entries, horizon) - expirableAmount(entries, now);
+  return expirableAmount(entries, noticeHorizon(now, withinDays)) - expirableAmount(entries, now);
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * "N일 안에" 의 끝 — **그 날의 끝**(KST).
+ *
+ * **시계가 둘이었다.** 여기서는 `지금 + N×24시간` 으로 밀리초를 재는데, 바로 아래 날짜별 예정은
+ * 남은 날을 `kstDayIndex` 로 **달력**으로 센다. 그래서 달력으로 D-30 인 적립이 "30일 안에
+ * 사라집니다" 에는 **안 드는** 일이 생겼다 — 기한이 그날 늦게 찍힌 몫 전부가 그랬다. 손님은
+ * 사라질 돈을 적게 들었고, 그 차이는 날마다 조금씩 달라져 누구도 알아볼 수 없다.
+ *
+ * 화면이 "30일 안에" 라고 말하므로 달력이 맞다(`my.pointsExpiring`). 한 시계로 맞춘다.
+ */
+const noticeHorizon = (now: Date, withinDays: number): Date =>
+  new Date(kstDayStart(kstDayIndex(now) + withinDays + 1).getTime() - 1);
 
 export interface PointExpiryDay {
   /** 소멸되는 날(KST) — `YYYY-MM-DD` */
@@ -118,7 +128,10 @@ export function pointExpirySchedule(
   withinDays?: number,
 ): PointExpiryDay[] {
   const cutoff = now.getTime();
-  const horizon = withinDays === undefined ? Number.POSITIVE_INFINITY : cutoff + withinDays * DAY_MS;
+  // 금액을 세는 쪽과 **같은 끝**을 본다 — 둘이 다른 시계를 쓰면 합이 어긋난다
+  const horizon = withinDays === undefined
+    ? Number.POSITIVE_INFINITY
+    : noticeHorizon(now, withinDays).getTime();
   const today = kstDayIndex(now);
 
   const byDate = new Map<string, { amount: number; expiresAt: Date }>();
