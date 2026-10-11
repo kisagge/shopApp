@@ -1,4 +1,4 @@
-import { kstDayIndex } from './kst';
+import { kstDayIndex, kstDayStart } from './kst';
 import type { PaymentStatusCode } from './payment';
 
 /**
@@ -223,11 +223,27 @@ export const LATE_SHIPPING_DAYS = 2;
  * 입금 대기는 빼야 한다 — 그건 손님을 기다리는 중이고, 운영이 서둘러서 끝나는 일이 아니다.
  * 뺄 상태를 손으로 다시 적지 않고 "아직 안 보낸 것" 에서 걸러 낸다(한쪽이 늘면 함께 늘어난다).
  */
-const PAID_NOT_SENT: readonly OrderStatus[] = NOT_SENT_YET.filter((s) => s !== 'PENDING');
+export const LATE_SHIPPING_STATUS: readonly OrderStatus[] = NOT_SENT_YET.filter((s) => s !== 'PENDING');
 
-/** 발송이 늦었는가 — 목록에서 눈에 띄게 해야 하는 줄 */
-export const shipmentLate = (status: OrderStatus, placedAt: Date, now: Date): boolean =>
-  PAID_NOT_SENT.includes(status) && waitingDays(placedAt, now) >= LATE_SHIPPING_DAYS;
+/**
+ * 발송이 늦었는가 — 목록에서 눈에 띄게 해야 하는 줄.
+ *
+ * **세는 시계가 둘이다.** 손님이 기다린 날은 **주문한 날**부터 세지만(waitingDays), 늦었다고
+ * 말할 수 있는 것은 **입금을 확인한 날**부터다 — 무통장 주문이 닷새 뒤에 입금되면 그날까지는
+ * 손님을 기다린 것이고, 우리 차례는 그때 시작한다. 둘을 한 시계로 세면 가상계좌 주문이 입금되는
+ * 순간 이미 늦은 줄이 된다.
+ */
+export const shipmentLate = (status: OrderStatus, paidAt: Date | null, now: Date): boolean =>
+  paidAt !== null && LATE_SHIPPING_STATUS.includes(status) && waitingDays(paidAt, now) >= LATE_SHIPPING_DAYS;
+
+/**
+ * 같은 선을 **DB 에 물을 때** 쓰는 경계 — 입금 시각이 이보다 앞이면 늦은 것이다.
+ *
+ * 줄마다 판단하는 쪽(shipmentLate)과 수를 세는 쪽이 각자 날을 세면 갈린다. 날짜로 센 판단을
+ * 시각 하나로 바꿔 주는 자리를 여기 두고, 두 쪽이 같은 답을 내는지 검사가 붙어 있다.
+ */
+export const lateShippingBefore = (now: Date): Date =>
+  kstDayStart(kstDayIndex(now) - (LATE_SHIPPING_DAYS - 1));
 
 /** 재고를 붙잡고 있는 상태. 재고 복원 판단에 쓴다. */
 export const holdsInventory = (status: OrderStatus): boolean =>

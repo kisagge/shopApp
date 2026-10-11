@@ -3,7 +3,7 @@ import type { Metadata } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, hasPermission, showsOldestFirst, notSentYet, waitingDays, shipmentLate,
-  ORDER_STATUS_LABEL, type OrderStatus,
+  LATE_SHIPPING_DAYS, ORDER_STATUS_LABEL, type OrderStatus,
 } from '@shop/core';
 import { OrderSearchError } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
@@ -35,15 +35,20 @@ export default async function AdminOrdersPage({
 }: {
   searchParams: Promise<{
     status?: string; page?: string; q?: string; from?: string; to?: string; lateDeposit?: string;
+    late?: string;
   }>;
 }) {
   const actor = await requireAdmin('order:read');
   // 한 번만 읽는다 — 줄마다 시계를 보면 같은 화면 안에서 날이 바뀔 수 있다
   const now = new Date();
-  const { status, page: pageParam, q, from, to, lateDeposit: lateParam } = await searchParams;
+  const {
+    status, page: pageParam, q, from, to, lateDeposit: lateParam, late: lateShipParam,
+  } = await searchParams;
   const filter = status && isOrderStatus(status) ? status : undefined;
   // 취소 뒤 입금은 운영진 일이다 — 가맹점에게는 이 조건을 걸지 않는다(조회도 무시한다)
   const lateDeposit = lateParam === '1' && actor.merchantId === null;
+  // 늦은 발송은 가맹점에게도 자기 일이다 — 범위는 조회가 건다
+  const lateShipping = lateShipParam === '1';
 
   /**
    * 날짜가 잘못 들어오면 목록을 비우지 않고 조건 없이 보여 준다.
@@ -58,10 +63,10 @@ export default async function AdminOrdersPage({
   let result;
   let searchError: string | null = null;
   try {
-    result = await getAdminOrders(actor, { status: filter, page: asked, q, from, to, lateDeposit });
+    result = await getAdminOrders(actor, { status: filter, page: asked, q, from, to, lateDeposit, lateShipping });
   } catch (error) {
     searchError = error instanceof OrderSearchError ? error.message : '검색 조건을 확인해 주세요.';
-    result = await getAdminOrders(actor, { status: filter, page: asked, lateDeposit });
+    result = await getAdminOrders(actor, { status: filter, page: asked, lateDeposit, lateShipping });
   }
   const orders = result.rows;
 
@@ -69,6 +74,7 @@ export default async function AdminOrdersPage({
   const kept = {
     ...(filter ? { status: filter } : {}),
     ...(lateDeposit ? { lateDeposit: '1' } : {}),
+    ...(lateShipping ? { late: '1' } : {}),
     ...(q ? { q } : {}),
     ...(from ? { from } : {}),
     ...(to ? { to } : {}),
@@ -202,6 +208,25 @@ export default async function AdminOrdersPage({
           addressChanged={result.addressChanged}
         />
 
+        {/*
+          **무엇만 보는 중인지 말하고, 돌아갈 길을 준다.** 대시보드에서 눌러 들어오면 목록이
+          좁혀진 채로 열리는데, 그 말이 없으면 "주문이 셋뿐" 으로 읽힌다.
+        */}
+        {lateShipping && (
+          <p role="status" className="mb-5 flex flex-wrap items-center gap-x-3 rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
+            입금 후 {LATE_SHIPPING_DAYS}일이 지났는데 아직 보내지 않은 주문만 보는 중입니다.
+            <Link
+              href={{
+                pathname: '/admin/orders',
+                query: Object.fromEntries(Object.entries(kept).filter(([key]) => key !== 'late')),
+              }}
+              className="underline underline-offset-2"
+            >
+              전체 주문 보기
+            </Link>
+          </p>
+        )}
+
         {lateDeposit && (
           <p role="status" className="mb-5 flex flex-wrap items-center gap-x-3 rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
             취소한 뒤 입금이 들어와 아직 돌려주지 않은 주문만 보는 중입니다.
@@ -226,11 +251,14 @@ export default async function AdminOrdersPage({
         <div className="rounded-md border border-[var(--border)] bg-[var(--bg)]">
           {orders.length === 0 ? (
             <p className="py-20 text-center text-[13px] text-[var(--fg-muted)]">
-              {searching
-                ? '조건에 맞는 주문이 없습니다. 검색어나 기간을 바꿔 보세요.'
-                : filter
-                  ? `${ORDER_STATUS_LABEL[filter]} 상태의 주문이 없습니다.`
-                  : '주문이 없습니다.'}
+              {/* 늦은 주문이 없는 것은 좋은 소식이다 — "주문이 없습니다" 로 읽히면 안 된다 */}
+              {lateShipping
+                ? '발송이 늦은 주문이 없습니다.'
+                : searching
+                  ? '조건에 맞는 주문이 없습니다. 검색어나 기간을 바꿔 보세요.'
+                  : filter
+                    ? `${ORDER_STATUS_LABEL[filter]} 상태의 주문이 없습니다.`
+                    : '주문이 없습니다.'}
             </p>
           ) : (
             <div className="relative overflow-x-auto">
@@ -280,18 +308,22 @@ export default async function AdminOrdersPage({
                           위에 섰다는 것과 "며칠이나 기다렸다" 는 다른 말이다 — 날짜를 읽고 오늘
                           날짜를 떠올려 빼는 일을 사람에게 맡기면 바쁜 날 아무도 안 한다.
 
+                          **시계가 둘이다.** 기다린 날은 **주문한 날**부터 세고, 늦었다는 말은
+                          **입금을 확인한 날**부터 센다 — 무통장 주문이 닷새 뒤 입금되면 그날까지는
+                          손님을 기다린 것이다. 둘을 한 시계로 세면 입금되는 순간 이미 늦은 줄이 된다.
+
                           늦은 줄은 색만으로 말하지 않는다 — 글자로 적는다.
                         */}
                         <span className="flex flex-col gap-0.5">
                           <span>{o.placedAt.toLocaleDateString('ko-KR')}</span>
                           {notSentYet(o.status) && (
-                            <span className={shipmentLate(o.status, o.placedAt, now)
+                            <span className={shipmentLate(o.status, o.paidAt, now)
                               ? 'font-semibold text-accent'
                               : undefined}>
                               {waitingDays(o.placedAt, now) === 0
                                 ? '오늘 접수'
                                 : `${waitingDays(o.placedAt, now)}일 기다림`}
-                              {shipmentLate(o.status, o.placedAt, now) && ' · 늦음'}
+                              {shipmentLate(o.status, o.paidAt, now) && ' · 늦음'}
                             </span>
                           )}
                         </span>

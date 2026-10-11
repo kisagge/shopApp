@@ -4,6 +4,7 @@ import type { Route } from 'next';
 import { Badge } from '@shop/ui';
 import {
   format, won, isDashboardRange, customPeriod, ORDER_STATUS_LABEL, USER_ROLE_LABEL, LOW_STOCK_THRESHOLD,
+  LATE_SHIPPING_DAYS,
   type DashboardPeriod, type DashboardRange,
 } from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
@@ -158,6 +159,22 @@ export default async function AdminDashboard({
               */}
               {d.scope === null && d.todo.noReturnAddress > 0 && (
                 <Todo href="/admin/merchants" label="반품지 없이 파는 판매처" count={d.todo.noReturnAddress} urgent />
+              )}
+              {/*
+                **돈을 받고도 못 보낸 주문.** 목록에는 줄마다 "늦음" 이 적히지만 그것은 주문 목록을
+                열어야 보인다 — 아침에 먼저 알아야 하는 수다. 여기도 없을 때는 줄을 세우지 않는다.
+
+                "배송 준비 중" 과 겹치는 줄이다(늦은 주문은 대개 거기 있다). 그래도 따로 세운다 —
+                스무 건 중 늦은 셋이 어느 것인지는 수가 하나뿐일 때 알 수 없다. 며칠이 늦음인지는
+                core 가 정한다(LATE_SHIPPING_DAYS) — 글자로 박아 두면 기준을 바꿀 때 이 줄만 거짓이 된다.
+              */}
+              {d.todo.lateShipping > 0 && (
+                <Todo
+                  href="/admin/orders?late=1"
+                  label={`발송 늦은 주문 — 입금 후 ${LATE_SHIPPING_DAYS}일 넘김`}
+                  count={d.todo.lateShipping}
+                  urgent
+                />
               )}
               {/*
                 **승인받고 들어온 가맹점에게 가장 먼저 할 일.** 반품지가 없으면 상품을 매대에 올릴 수

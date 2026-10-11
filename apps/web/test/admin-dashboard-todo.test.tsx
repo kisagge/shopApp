@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen, within } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { won, type Actor } from '@shop/core';
+import { won, LATE_SHIPPING_DAYS, type Actor } from '@shop/core';
 
 /**
  * 대시보드의 "처리가 필요한 일" — **반품지 없이 팔고 있는 곳.**
@@ -40,7 +40,7 @@ const dashboard = (
   period: kpi,
   previous: { ...kpi, from: new Date('2026-09-24'), until: new Date('2026-10-01'), conversionRate: null },
   todo: {
-    preparing: 0, pendingPayment: 0, returnRequested: 0, outOfStock: 0, lowStock: 0,
+    preparing: 0, pendingPayment: 0, lateShipping: 0, returnRequested: 0, outOfStock: 0, lowStock: 0,
     lateDeposits: 0, noReturnAddress: 0,
     // 운영진 화면에서는 null — 남의 가게의 빈칸은 가맹점 목록이 보여 준다
     merchantSetup: scope === null ? null : { returnAddress: false, settlementAccount: false },
@@ -156,5 +156,61 @@ describe('가맹점이 아직 못 하는 일', () => {
     await renderPage();
 
     expect(todoList().queryByRole('link', { name: /미등록/ })).toBeNull();
+  });
+});
+
+/**
+ * **발송 늦은 주문.**
+ *
+ * 목록에는 줄마다 "늦음" 이 적히지만 그것은 주문 목록을 열어야 보인다 — 늦은 줄이 몇인지는 아침에
+ * 대시보드에서 먼저 알아야 하는 수다. "배송 준비 중" 과 겹치지만 따로 세운다: 스무 건 중 늦은
+ * 셋이 어느 것인지는 수가 하나뿐일 때 알 수 없다.
+ */
+describe('발송 늦은 주문', () => {
+  it('있으면 줄을 세우고, 눌러서 그 주문만 볼 수 있다', async () => {
+    getDashboard.mockResolvedValue(dashboard({ lateShipping: 3 }));
+
+    await renderPage();
+
+    const link = todoList().getByRole('link', { name: /발송 늦은 주문/ });
+    // 눌러서 도착하는 목록이 같은 조건으로 좁혀진다 — 숫자를 찾을 수 있어야 한다
+    expect(link.getAttribute('href')).toBe('/admin/orders?late=1');
+    expect(within(link).getByText('3')).toBeDefined();
+  });
+
+  /** 늘 0 인 줄은 읽히지 않게 된다 — 취소 뒤 입금·반품지와 같은 규칙이다 */
+  it('없으면 줄을 세우지 않는다', async () => {
+    await renderPage();
+
+    expect(todoList().queryByText(/발송 늦은/)).toBeNull();
+  });
+
+  it('급한 일로 표시한다', async () => {
+    getDashboard.mockResolvedValue(dashboard({ lateShipping: 1 }));
+
+    await renderPage();
+
+    const link = todoList().getByRole('link', { name: /발송 늦은 주문/ });
+    expect(within(link).getByText('확인 필요')).toBeDefined();
+  });
+
+  /** 며칠이 늦음인지는 core 가 정한다 — 글자로 박아 두면 기준을 바꿀 때 이 줄만 거짓이 된다 */
+  it('기준 날수를 core 에서 가져와 적는다', async () => {
+    getDashboard.mockResolvedValue(dashboard({ lateShipping: 1 }));
+
+    await renderPage();
+
+    expect(todoList().getByRole('link', { name: new RegExp(`입금 후 ${LATE_SHIPPING_DAYS}일 넘김`) }))
+      .toBeDefined();
+  });
+
+  /** 늦은 발송은 가맹점에게도 자기 일이다 — 취소 뒤 입금과 다르다(그건 플랫폼 계좌의 돈이다) */
+  it('가맹점 화면에도 이 줄이 있다', async () => {
+    requireAdmin.mockResolvedValue(merchant);
+    getDashboard.mockResolvedValue(dashboard({ lateShipping: 2 }, 'm-a'));
+
+    await renderPage();
+
+    expect(todoList().getByRole('link', { name: /발송 늦은 주문/ })).toBeDefined();
   });
 });

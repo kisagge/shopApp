@@ -2,7 +2,7 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   won, readOrderSearch, readDateRange, actorLabel, showsAddressChanged, showsOldestFirst,
-  ADDRESS_EDITABLE_STATUS,
+  ADDRESS_EDITABLE_STATUS, LATE_SHIPPING_STATUS, lateShippingBefore,
   type Actor, type Won, type OrderStatus,
   offsetOf,
 } from '@shop/core';
@@ -18,6 +18,11 @@ export interface AdminOrderRow {
   readonly orderNo: string;
   readonly status: OrderStatus;
   readonly placedAt: Date;
+  /**
+   * 입금을 확인한 시각. **늦었는지는 이것부터 센다**(core shipmentLate) — 손님이 기다린 날은
+   * 주문한 날부터지만, 우리 차례는 돈이 들어온 날 시작한다. 무통장 주문은 둘이 며칠 벌어진다.
+   */
+  readonly paidAt: Date | null;
   readonly amount: Won;
   readonly buyerName: string;
   readonly itemCount: number;
@@ -42,7 +47,20 @@ export interface AdminOrderFilter {
    * 운영진만 본다 — 가맹점은 결제를 보지 않고, 받은 돈은 플랫폼 계좌에 있다.
    */
   readonly lateDeposit?: boolean | undefined;
+  /**
+   * **돈을 받고도 못 보낸** 주문만. 대시보드의 "처리가 필요한 일" 이 여기로 보낸다.
+   *
+   * 조건은 core 가 정한 선 하나를 쓴다(lateShippingBefore) — 세는 쪽과 보여 주는 쪽이 각자
+   * 날을 세면, 대시보드가 "3건" 이라 해 놓고 눌러서 도착한 목록이 비어 있는 일이 생긴다.
+   */
+  readonly lateShipping?: boolean | undefined;
 }
+
+/** 돈을 받고도 못 보낸 주문. 목록 필터와 대시보드 숫자가 이것 하나를 쓴다 */
+export const lateShippingWhere = (now: Date) => ({
+  status: { in: [...LATE_SHIPPING_STATUS] },
+  paidAt: { lt: lateShippingBefore(now) },
+});
 
 /**
  * 운영 주문의 조회 조건.
@@ -54,7 +72,7 @@ export interface AdminOrderFilter {
 /** 취소 뒤 들어왔고 아직 돌려주지 않은 입금. 목록 필터와 대시보드 숫자가 이것 하나를 쓴다 */
 export const LATE_DEPOSIT_OPEN = { lateDepositAt: { not: null }, lateDepositResolvedAt: null } as const;
 
-export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) {
+export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter, now = new Date()) {
   const term = readOrderSearch(filter.q);
   const range = readDateRange(filter.from, filter.to);
 
@@ -104,6 +122,8 @@ export function adminOrderWhere(scope: string | null, filter: AdminOrderFilter) 
     ...(filter.status ? { status: filter.status } : {}),
     ...(scope ? { items: { some: { merchantId: scope } } } : {}),
     ...(filter.lateDeposit && scope === null ? { payment: { is: LATE_DEPOSIT_OPEN } } : {}),
+    // AND 로 겹친다 — 상태 탭과 함께 걸려도 서로 덮어쓰지 않는다(주소는 손으로 고칠 수 있다)
+    ...(filter.lateShipping ? { AND: [lateShippingWhere(now)] } : {}),
     ...search,
     ...placedAt,
   };
@@ -137,7 +157,7 @@ export async function getAdminOrders(
       take,
       skip: offsetOf(at, take),
       select: {
-        id: true, orderNo: true, status: true, placedAt: true, payable: true,
+        id: true, orderNo: true, status: true, placedAt: true, paidAt: true, payable: true,
         addressChangedAt: true,
         user: { select: { name: true } },
         items: {
@@ -170,6 +190,7 @@ export async function getAdminOrders(
       orderNo: o.orderNo,
       status: o.status,
       placedAt: o.placedAt,
+      paidAt: o.paidAt,
       amount: won(scope ? o.items.reduce((s, i) => s + i.subtotal, 0) : o.payable),
       buyerName: maskName(o.user.name),
       itemCount: o.items.length,

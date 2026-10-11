@@ -5,7 +5,8 @@ import {
   isCancellableByCustomer, holdsInventory, slowestFulfillmentStatus, orderStatusFromItems,
   adminStatusActions, OrderTransitionError, type OrderStatus,
   statusBeforeReturn, isRepayable, canRegisterShipment, showsOldestFirst,
-  notSentYet, waitingDays, shipmentLate, LATE_SHIPPING_DAYS,
+  notSentYet, waitingDays, shipmentLate, lateShippingBefore,
+  LATE_SHIPPING_DAYS, LATE_SHIPPING_STATUS,
 } from '../src/order-state';
 
 describe('주문 상태 전이', () => {
@@ -410,33 +411,103 @@ describe('기다린 날', () => {
  *
  * 입금 대기는 손님을 기다리는 중이다 — 운영이 서둘러서 끝나는 일이 아니고, 거기에 빨간 줄을 그으면
  * 정작 돈을 받고도 못 보낸 줄이 묻힌다.
+ *
+ * **그리고 시계가 둘이다.** 손님이 기다린 날은 주문한 날부터지만(waitingDays), 늦었다고 말할 수
+ * 있는 것은 **입금을 확인한 날**부터다. 무통장 주문은 둘이 며칠씩 벌어진다 — 한 시계로 세면
+ * 입금되는 순간 이미 늦은 줄이 된다.
  */
 describe('발송이 늦었는가', () => {
-  const placed = (daysAgo: number) =>
-    new Date(Date.UTC(2026, 9, 9, 3) - daysAgo * 24 * 60 * 60 * 1000);
-  const now = new Date(Date.UTC(2026, 9, 9, 3)); // 2026-10-09 12:00 KST
+  const now = new Date('2026-10-09T12:00:00+09:00');
+  /** KST 로 n일 전 같은 시각 */
+  const daysAgo = (n: number) => new Date(now.getTime() - n * 24 * 60 * 60 * 1000);
 
-  it('돈을 받고 이틀 지나면 늦은 것이다', () => {
-    expect(shipmentLate('PAID', placed(LATE_SHIPPING_DAYS), now)).toBe(true);
-    expect(shipmentLate('PREPARING', placed(LATE_SHIPPING_DAYS), now)).toBe(true);
+  describe('선 자체', () => {
+    it(`입금 후 ${LATE_SHIPPING_DAYS}일이면 늦은 것이다`, () => {
+      expect(shipmentLate('PAID', daysAgo(LATE_SHIPPING_DAYS), now)).toBe(true);
+      expect(shipmentLate('PREPARING', daysAgo(LATE_SHIPPING_DAYS), now)).toBe(true);
+    });
+
+    it('하루 지난 것은 아직 늦지 않았다', () => {
+      expect(shipmentLate('PAID', daysAgo(1), now)).toBe(false);
+    });
+
+    it('오늘 입금된 것은 당연히 늦지 않았다', () => {
+      expect(shipmentLate('PAID', now, now)).toBe(false);
+    });
+
+    /** 달력으로 센다 — 하루가 바뀌는 순간이 선이다 */
+    it('자정을 넘기는 순간 늦어진다', () => {
+      const justBefore = new Date('2026-10-07T23:59:59+09:00'); // 이틀 전 날짜
+      const justAfter = new Date('2026-10-08T00:00:00+09:00'); // 하루 전 날짜
+
+      expect(shipmentLate('PAID', justBefore, now)).toBe(true);
+      expect(shipmentLate('PAID', justAfter, now)).toBe(false);
+    });
   });
 
-  it('하루 지난 것은 아직 늦지 않았다', () => {
-    expect(shipmentLate('PAID', placed(1), now)).toBe(false);
+  describe('누가 늦을 수 있는가', () => {
+    it('입금 대기는 아무리 오래 기다려도 우리가 늦은 것이 아니다', () => {
+      expect(shipmentLate('PENDING', null, now)).toBe(false);
+      // 그래도 며칠 기다렸는지는 센다 — 세는 것과 짚는 것은 다른 일이다
+      expect(waitingDays(daysAgo(30), now)).toBe(30);
+      expect(notSentYet('PENDING')).toBe(true);
+    });
+
+    /** 상태가 어긋난 줄(손으로 고친 주문)에도 "늦음" 을 적지 않는다 — 입금이 없으면 셀 것이 없다 */
+    it('입금 시각이 없으면 상태가 무엇이든 늦지 않았다', () => {
+      for (const status of ORDER_STATUS) {
+        expect(shipmentLate(status, null, now), status).toBe(false);
+      }
+    });
+
+    it('이미 보낸 주문은 아무리 오래돼도 늦지 않았다', () => {
+      for (const status of ORDER_STATUS.filter((s) => !LATE_SHIPPING_STATUS.includes(s))) {
+        expect(shipmentLate(status, daysAgo(30), now), status).toBe(false);
+      }
+    });
+
+    /** 늦을 수 있는 상태는 "아직 안 보낸 것" 에서 입금 대기만 뺀 것이다 — 손으로 적지 않았다 */
+    it('늦을 수 있는 상태 = 아직 안 보낸 상태 − 입금 대기', () => {
+      for (const status of ORDER_STATUS) {
+        expect(LATE_SHIPPING_STATUS.includes(status), status)
+          .toBe(notSentYet(status) && status !== 'PENDING');
+      }
+    });
   });
 
-  it('입금 대기는 아무리 오래 기다려도 우리가 늦은 것이 아니다', () => {
-    expect(shipmentLate('PENDING', placed(30), now)).toBe(false);
-    // 그래도 며칠 기다렸는지는 센다 — 세는 것과 짚는 것은 다른 일이다
-    expect(waitingDays(placed(30), now)).toBe(30);
-    expect(notSentYet('PENDING')).toBe(true);
-  });
+  /**
+   * **줄마다 판단하는 쪽과 수를 세는 쪽이 같은 답을 내야 한다.**
+   *
+   * 대시보드는 DB 에 "입금이 이 시각보다 앞인 것" 을 묻고(lateShippingBefore), 목록은 줄마다
+   * shipmentLate 로 판단한다. 두 자리가 반 나절이라도 어긋나면 "3건" 을 눌렀는데 둘만 늦음으로
+   * 보이거나, 빈 표가 나온다 — 그래서 경계 앞뒤 48시간을 한 시간씩 다 맞춰 본다.
+   */
+  describe('판단과 조회 경계가 같은 답을 낸다', () => {
+    it('경계 앞뒤 48시간을 한 시간씩 맞춰 본다', () => {
+      const cutoff = lateShippingBefore(now);
+      for (let hours = -48; hours <= 48; hours += 1) {
+        const paidAt = new Date(cutoff.getTime() + hours * 60 * 60 * 1000);
+        expect(shipmentLate('PAID', paidAt, now), `${hours}시간`)
+          .toBe(paidAt.getTime() < cutoff.getTime());
+      }
+    });
 
-  /** 이미 보낸 주문은 늦을 수 없다 — 늦었는지는 보낼 일이 남은 줄에만 묻는다 */
-  it('보낸 뒤의 상태는 아무리 오래돼도 늦지 않았다', () => {
-    for (const status of ORDER_STATUS.filter((s) => !notSentYet(s))) {
-      expect(shipmentLate(status, placed(30), now), status).toBe(false);
-    }
+    /** 경계는 KST 자정에 떨어진다 — 시각으로 세면 하루 중 언제 보느냐에 따라 답이 달라진다 */
+    it('경계는 같은 날 언제 보아도 같다', () => {
+      const morning = new Date('2026-10-09T00:30:00+09:00');
+      const night = new Date('2026-10-09T23:30:00+09:00');
+
+      expect(lateShippingBefore(morning).getTime()).toBe(lateShippingBefore(night).getTime());
+      // 그리고 그 경계는 KST 자정이다
+      expect(lateShippingBefore(now).toISOString()).toBe('2026-10-07T15:00:00.000Z');
+    });
+
+    it('날이 바뀌면 경계도 하루 움직인다', () => {
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+      const dayMs = 24 * 60 * 60 * 1000;
+
+      expect(lateShippingBefore(tomorrow).getTime() - lateShippingBefore(now).getTime()).toBe(dayMs);
+    });
   });
 
   /**

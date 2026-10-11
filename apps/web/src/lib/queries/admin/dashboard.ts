@@ -8,7 +8,7 @@ import {
 } from '@shop/core';
 import { assertAdminQuery, scopeOf, maskName } from './scope';
 import { stockAttentionWhere } from './products';
-import { LATE_DEPOSIT_OPEN } from './orders';
+import { LATE_DEPOSIT_OPEN, lateShippingWhere } from './orders';
 import { merchantSetupTodo, sellersMissingReturnAddress } from '~/lib/orders/return-address';
 
 /**
@@ -52,6 +52,14 @@ export interface DashboardKpi {
 export interface DashboardTodo {
   readonly preparing: number;
   readonly pendingPayment: number;
+  /**
+   * **돈을 받고도 못 보낸** 주문 수(core LATE_SHIPPING_DAYS 를 넘긴 것).
+   *
+   * 목록에는 줄마다 "늦음" 이 적히지만 그것은 주문 목록을 열어야 보인다 — 늦은 줄이 몇인지는
+   * 아침에 대시보드에서 먼저 알아야 하는 수다. 눌러서 도착하는 목록과 **같은 조건**을 쓴다
+   * (lateShippingWhere): 세는 쪽과 보여 주는 쪽이 갈리면 "3건" 을 눌렀는데 빈 표가 나온다.
+   */
+  readonly lateShipping: number;
   readonly returnRequested: number;
   /**
    * 품절·임박 옵션이 있는 **상품** 수. 눌러서 도착하는 상품 목록의 탭과 같은 조건이다
@@ -149,7 +157,7 @@ export async function getDashboard(
   const [current, previous, todo, topRows, recent, daily, funnel, prevFunnel] = await Promise.all([
     loadKpi(scope, period),
     loadKpi(scope, prev),
-    loadTodo(scope),
+    loadTodo(scope, now),
     loadTopProducts(scope, period),
     loadRecentOrders(scope),
     loadDailyRevenue(scope, period),
@@ -225,14 +233,16 @@ async function loadKpi(scope: string | null, w: Window): Promise<DashboardKpi> {
   };
 }
 
-async function loadTodo(scope: string | null): Promise<DashboardTodo> {
+async function loadTodo(scope: string | null, now: Date): Promise<DashboardTodo> {
   const scoped = scope ? { items: { some: { merchantId: scope } } } : {};
   const [
-    preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits,
+    preparing, pendingPayment, lateShipping, returnRequested, outOfStock, lowStock, lateDeposits,
     noReturnAddress, merchantSetup,
   ] = await Promise.all([
     prisma.order.count({ where: { status: 'PREPARING', ...scoped } }),
     prisma.order.count({ where: { status: 'PENDING', ...scoped } }),
+    // 목록 필터와 같은 조건이다 — 숫자를 누르면 그 주문들이 나온다
+    prisma.order.count({ where: { ...scoped, ...lateShippingWhere(now) } }),
     prisma.order.count({ where: { status: 'RETURN_REQUESTED', ...scoped } }),
     /*
      * **품절과 임박을 가른다.** 예전에는 `재고 ≤ 5` 하나로 세어 "품절 임박" 이라 불렀는데,
@@ -249,7 +259,7 @@ async function loadTodo(scope: string | null): Promise<DashboardTodo> {
     scope === null ? Promise.resolve(null) : merchantSetupTodo(scope),
   ]);
   return {
-    preparing, pendingPayment, returnRequested, outOfStock, lowStock, lateDeposits,
+    preparing, pendingPayment, lateShipping, returnRequested, outOfStock, lowStock, lateDeposits,
     noReturnAddress, merchantSetup,
   };
 }

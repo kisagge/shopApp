@@ -14,6 +14,9 @@ export const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 /** KST 기준 날짜 번호 — 두 시각의 날짜 차를 시각이 아니라 달력으로 센다 */
 export const kstDayIndex = (at: Date): number => Math.floor((at.getTime() + KST_OFFSET_MS) / DAY_MS);
 
+/** 그 날짜 번호의 하루가 **시작하는 순간**(KST 자정). 날짜로 센 판단을 DB 에 물을 때 쓴다 */
+export const kstDayStart = (dayIndex: number): Date => new Date(dayIndex * DAY_MS - KST_OFFSET_MS);
+
 /** 말과 상관없이 읽히는 `YYYY-MM-DD`(KST) */
 export const kstDate = (at: Date): string =>
   new Date(at.getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
