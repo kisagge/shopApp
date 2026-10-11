@@ -10,6 +10,15 @@ import { clampToLastPage } from '../paged';
 
 // ── 상품 ──────────────────────────────────────────────────────
 
+export interface AttentionOption {
+  /** 옵션 조합 이름 — "오트밀 / M" */
+  readonly label: string;
+  readonly stock: number;
+  readonly level: Exclude<StockLevel, 'OK'>;
+  /** 이 옵션의 재입고를 기다리는 사람 수 */
+  readonly waiting: number;
+}
+
 export interface AdminProductRow {
   readonly id: string;
   readonly slug: string;
@@ -20,7 +29,17 @@ export interface AdminProductRow {
   readonly salePrice: Won | null;
   readonly status: string;
   readonly totalStock: number;
-  readonly lowStock: boolean;
+  /**
+   * 손이 필요한 **옵션들** — 품절·임박인 것만, 급한 것부터.
+   *
+   * **합계만 적혀 있었다.** 옵션이 여덟인 상품에서 하나가 품절이면 합계는 멀쩡해서 줄에 아무
+   * 표시도 없었다 — 품절 숫자를 눌러 들어온 목록에서 **그 줄이 왜 거기 있는지** 알 수 없다.
+   * 조건은 조회가 쓰는 것과 같다(stockAttentionWhere = 옵션 하나라도 걸리면 그 상품이 뜬다).
+   *
+   * 기다리는 사람도 옵션마다 센다: 0 인 옵션 둘 중 하나는 열두 명이 기다리고 하나는 아무도
+   * 안 기다린다 — 무엇을 먼저 채울지는 그것으로 정한다.
+   */
+  readonly stockAttention: readonly AttentionOption[];
   /**
    * 이 상품의 재입고를 기다리는 사람 수.
    *
@@ -117,6 +136,7 @@ export async function getAdminProducts(
       category: { select: { name: true } },
       variants: {
         select: {
+          label: true,
           stock: true,
           // 기다리는 사람 수. 이미 알림을 받은 건(notifiedAt)은 끝난 건이라 뺀다
           _count: { select: { restockAlerts: { where: { notifiedAt: null } } } },
@@ -147,7 +167,18 @@ export async function getAdminProducts(
       salePrice: p.salePrice === null ? null : won(p.salePrice),
       status: p.status,
       totalStock: p.variants.reduce((s, v) => s + v.stock, 0),
-      lowStock: p.variants.some((v) => stockLevel(v.stock) === 'LOW'),
+      /*
+       * **급한 것부터.** 품절이 임박보다 먼저고, 같은 급이면 남은 것이 적은 쪽, 그다음 이름 순
+       * (볼 때마다 순서가 달라지면 비교할 수 없다). 줄에는 앞의 둘만 적으므로 순서가 곧 눈에
+       * 들어오는 것이다 — 품절이 끝줄에 있으면 아무도 못 본다.
+       */
+      stockAttention: p.variants
+        .map((v) => ({ label: v.label, stock: v.stock, level: stockLevel(v.stock), waiting: v._count.restockAlerts }))
+        .filter((v): v is AttentionOption => v.level !== 'OK')
+        .sort((a, b) =>
+          Number(b.level === 'OUT') - Number(a.level === 'OUT') ||
+          a.stock - b.stock ||
+          a.label.localeCompare(b.label, 'ko')),
       waitingRestock: p.variants.reduce((s, v) => s + v._count.restockAlerts, 0),
       createdAt: p.createdAt,
       reviewRequestedAt: p.reviewRequestedAt,

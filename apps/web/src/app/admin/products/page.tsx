@@ -268,23 +268,43 @@ export default async function AdminProductsPage({
                           {rate > 0 && <span className="tnum ml-1 text-[11px] text-accent">{rate}%</span>}
                         </td>
                         <td className="px-4 py-3 text-right">
+                          {/*
+                            **합계만 적혀 있었다.** 옵션이 여덟인 상품에서 하나가 품절이면 합계는
+                            멀쩡해서 이 칸에 아무 표시도 없었다 — 품절 숫자를 눌러 들어온 목록에서
+                            그 줄이 왜 거기 있는지 알 수 없다. 어느 옵션인지를 적는다(조회가 급한
+                            것부터 세워 준다). 색으로만 말하지 않는다 — "품절"·"임박" 을 글자로 적는다.
+                          */}
                           <span
                             className={`tnum text-[13px] font-semibold ${
-                              p.totalStock === 0 ? 'text-accent' : p.lowStock ? 'text-warning' : ''
+                              p.totalStock === 0 ? 'text-accent' : p.stockAttention.length > 0 ? 'text-warning' : ''
                             }`}
                           >
                             {p.totalStock}
                           </span>
-                          {/* 재고 경고를 색으로만 알리지 않는다 */}
-                          {p.totalStock > 0 && p.lowStock && (
-                            <span className="block text-[10px] text-warning">임박</span>
+                          {p.stockAttention.slice(0, 2).map((v) => (
+                            <span
+                              key={v.label}
+                              className={`block text-[10px] ${v.level === 'OUT' ? 'text-accent' : 'text-warning'}`}
+                            >
+                              {v.level === 'OUT' ? '품절' : '임박'} {v.label}
+                              {v.level === 'LOW' && <span className="tnum"> {v.stock}개</span>}
+                              {/*
+                                **기다리는 사람은 그 옵션 옆에 붙는다.** 무엇을 먼저 채울지는 남은
+                                수만 보고 정할 일이 아니다 — 0 개인 옵션 둘 중 하나는 열두 명이
+                                기다리고 하나는 아무도 안 기다린다.
+                              */}
+                              {v.waiting > 0 && (
+                                <span className="tnum"> · {v.waiting.toLocaleString('ko-KR')}명 대기</span>
+                              )}
+                            </span>
+                          ))}
+                          {p.stockAttention.length > 2 && (
+                            <span className="tnum block text-[10px] text-[var(--fg-muted)]">
+                              외 {p.stockAttention.length - 2}개 옵션
+                            </span>
                           )}
-                          {/*
-                            **기다리는 사람은 재고 옆에 붙는다.** 무엇을 먼저 채울지는
-                            남은 수만 보고 정할 일이 아니다 — 0 개인 옵션 둘 중 하나는
-                            열두 명이 기다리고 하나는 아무도 안 기다린다.
-                          */}
-                          {p.waitingRestock > 0 && (
+                          {/* 손댈 옵션이 없는데도 기다리는 사람이 있으면(알림만 남은 경우) 그것도 말한다 */}
+                          {p.stockAttention.length === 0 && p.waitingRestock > 0 && (
                             <span className="tnum block text-[10px] text-warning">
                               {p.waitingRestock.toLocaleString('ko-KR')}명 대기
                             </span>
