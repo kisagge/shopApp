@@ -2,8 +2,8 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import {
   assertPermission, couponStatus, canEditDiscount, normalizeCouponCode,
-  validateCouponDefinition, isIssuable,
-  type Actor, type CouponStatus,
+  validateCouponDefinition, isIssuable, COUPON_TARGET_TYPE,
+  type Actor, type CouponStatus, type CouponTargetType,
 } from '@shop/core';
 import type { CreateCouponInput, UpdateCouponInput } from '@shop/contract';
 import { recordNotifications, type NoticeInput } from '~/lib/notifications/record';
@@ -50,20 +50,28 @@ export interface CouponRow {
   /** 대상이 정해져 있으면 그 수. 0이면 장바구니 전체. */
   readonly targetCount: number;
   /**
-   * 대상 이름 몇 개 — 목록에서 바로 읽을 수 있게.
+   * 걸어 둔 대상 — 종류·이름, 그리고 **그것이 어떤 상품에도 안 붙는지**.
    *
    * **"지정 3개" 만 적혀 있었다.** 무엇에 걸었는지는 열어 볼 길도 없었다(대상은 만들 때만 정하고
-   * 화면에 다시 뜨지 않는다). 그러면 **어떤 상품에도 안 붙는 쿠폰**이 섞여 있어도 아무도 모른다 —
+   * 화면에 다시 뜨지 않는다). 그러면 어떤 상품에도 안 붙는 쿠폰이 섞여 있어도 아무도 모른다 —
    * 상위 분류에 걸어 둔 쿠폰이 실제로 그랬다.
+   *
+   * **죽은 자리를 쿠폰 단위가 아니라 대상 단위로 들고 있다.** 스무 개를 걸어 둔 쿠폰에서
+   * "하나가 죽었다" 만 알면 그 하나를 찾느라 스무 줄을 눈으로 훑어야 한다.
    */
-  readonly targetNames: readonly string[];
+  readonly targets: readonly CouponTargetRow[];
+}
+
+export interface CouponTargetRow {
+  readonly type: CouponTargetType;
+  readonly name: string;
   /**
-   * 어떤 상품에도 붙지 않는 대상이 있는가.
+   * 어떤 상품에도 붙지 않는 대상.
    *
    * 지금은 상위 분류가 그렇다 — 상품은 말단 분류에만 붙고 판정은 정확히 일치할 때만 맞다고 본다.
    * 이제 그런 쿠폰은 만들 수 없지만(고를 수 없다), **이미 만들어진 것**은 그대로 남아 있다.
    */
-  readonly deadTargets: boolean;
+  readonly dead: boolean;
 }
 
 type TargetRow = { readonly targetType: string; readonly targetId: string };
@@ -77,10 +85,10 @@ type TargetRow = { readonly targetType: string; readonly targetId: string };
  */
 async function describeTargets(
   perCoupon: readonly (readonly TargetRow[])[],
-): Promise<{ targetNames: string[]; deadTargets: boolean }[]> {
+): Promise<{ targets: CouponTargetRow[] }[]> {
   const all = perCoupon.flat();
   // 대상이 하나도 없으면(전체 쿠폰만 있는 목록) 아무것도 묻지 않는다
-  if (all.length === 0) return perCoupon.map(() => ({ targetNames: [], deadTargets: false }));
+  if (all.length === 0) return perCoupon.map(() => ({ targets: [] }));
 
   const ids = (type: string) => [...new Set(all.filter((t) => t.targetType === type).map((t) => t.targetId))];
 
@@ -101,14 +109,27 @@ async function describeTargets(
   // 말단이 아닌 분류 = 어떤 상품도 이 분류를 직접 갖지 않는다
   const dead = new Set(categories.filter((c) => c._count.children > 0).map((c) => `CATEGORY:${c.id}`));
 
-  return perCoupon.map((targets) => {
-    const keys = targets.map((t) => `${t.targetType}:${t.targetId}`);
-    return {
-      // 사라진 대상(상품을 지운 경우)도 자리는 지킨다 — 비워 두면 수와 이름이 어긋난다
-      targetNames: keys.map((k) => nameOf.get(k) ?? '(알 수 없음)'),
-      deadTargets: keys.some((k) => dead.has(k)),
-    };
-  });
+  return perCoupon.map((targets) => ({
+    /*
+     * **죽은 자리를 먼저 세운다.** 스무 개를 걸어 둔 쿠폰에서 문제가 하나면, 그 하나가 끝줄에
+     * 있으면 아무도 못 본다. 그다음은 종류·이름 순 — 저장된 순서는 고른 순서라 읽는 사람에게는
+     * 아무 뜻이 없고, 같은 쿠폰이 볼 때마다 다른 순서로 서면 비교할 수가 없다.
+     */
+    targets: targets
+      .map((t) => {
+        const key = `${t.targetType}:${t.targetId}`;
+        return {
+          type: t.targetType as CouponTargetType,
+          // 사라진 대상(상품을 지운 경우)도 자리는 지킨다 — 비워 두면 수와 이름이 어긋난다
+          name: nameOf.get(key) ?? '(알 수 없음)',
+          dead: dead.has(key),
+        };
+      })
+      .sort((a, b) =>
+        Number(b.dead) - Number(a.dead) ||
+        COUPON_TARGET_TYPE.indexOf(a.type) - COUPON_TARGET_TYPE.indexOf(b.type) ||
+        a.name.localeCompare(b.name, 'ko')),
+  }));
 }
 
 export async function listCoupons(actor: Actor, now = new Date()): Promise<CouponRow[]> {

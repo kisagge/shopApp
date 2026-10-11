@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { COUPON_KIND, COUPON_CODE_PATTERN } from '@shop/core';
+import { COUPON_KIND, COUPON_CODE_PATTERN, COUPON_TARGET_TYPE } from '@shop/core';
 
 /**
  * 쿠폰 발행 계약.
@@ -15,7 +15,7 @@ import { COUPON_KIND, COUPON_CODE_PATTERN } from '@shop/core';
  * 그 줄들의 합계로 잰다** — 전체로 재면 대상 아닌 상품으로 채울 수 있다.
  */
 export const couponTargetSchema = z.object({
-  targetType: z.enum(['PRODUCT', 'BRAND', 'CATEGORY']),
+  targetType: z.enum(COUPON_TARGET_TYPE),
   targetId: z.string().min(1, 'valid.tooShortChars').max(40, 'valid.tooLongChars'),
 });
 

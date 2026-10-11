@@ -19,7 +19,7 @@ const row = (over: Partial<CouponRow> = {}): CouponRow => ({
   issueLimit: null, issuedCount: 0, usedCount: 0,
   startsAt: '2026-09-01T00:00:00+09:00', endsAt: '2026-09-30T23:59:59+09:00',
   isActive: true, downloadable: false, status: 'ACTIVE', editable: true,
-  targetCount: 0, targetNames: [], deadTargets: false,
+  targetCount: 0, targets: [],
   ...over,
 });
 
@@ -45,38 +45,28 @@ describe('대상 칸', () => {
     expect(target().textContent).toBe('전체');
   });
 
-  it('대상 이름을 적는다 — 수만으로는 아무것도 알 수 없다', () => {
-    renderTable(row({ targetCount: 2, targetNames: ['울 코트', 'MOOR'] }));
+  /** 칸을 제대로 꽂았는지만 본다 — 안의 그림(펼치기·경고)은 coupon-targets 검사가 본다 */
+  it('대상이 있으면 그 칸에 대상을 그린다', () => {
+    renderTable(row({
+      targetCount: 2,
+      targets: [
+        { type: 'PRODUCT', name: '울 코트', dead: false },
+        { type: 'BRAND', name: 'MOOR', dead: false },
+      ],
+    }));
 
     expect(target().textContent).toContain('울 코트, MOOR');
+    // 수만 적던 때로 돌아가지 않는다
     expect(target().textContent).not.toContain('지정 2개');
   });
 
-  /** 한 쿠폰에 수십 개를 걸 수 있다 — 표가 세로로 늘어지면 목록을 못 읽는다 */
-  it('많으면 셋만 적고 나머지는 수로 센다', () => {
+  it('붙는 상품이 없는 대상이면 그 칸에서 경고가 보인다', () => {
     renderTable(row({
-      targetCount: 5,
-      targetNames: ['울 코트', 'MOOR', '코트', '패딩', '니트'],
+      targetCount: 1,
+      targets: [{ type: 'CATEGORY', name: '아우터', dead: true }],
     }));
 
-    const text = target().textContent;
-    expect(text).toContain('울 코트, MOOR, 코트');
-    expect(text).toContain('외 2개');
-    expect(text).not.toContain('패딩');
-  });
-
-  it('붙는 상품이 없으면 그렇게 말하고, 무엇을 해야 하는지도 적는다', () => {
-    renderTable(row({ targetCount: 1, targetNames: ['아우터'], deadTargets: true }));
-
-    const text = target().textContent;
-    expect(text).toContain('아우터');
-    expect(text).toContain('붙는 상품 없음');
-    expect(text).toContain('하위 분류로 다시 만들어 주세요');
-  });
-
-  it('멀쩡한 쿠폰에는 경고를 달지 않는다', () => {
-    renderTable(row({ targetCount: 1, targetNames: ['코트'] }));
-
-    expect(target().textContent).not.toContain('붙는 상품 없음');
+    expect(target().textContent).toContain('아우터');
+    expect(target().textContent).toContain('붙는 상품 없음');
   });
 });

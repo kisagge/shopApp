@@ -22,7 +22,7 @@ const row = (over: Partial<CouponRow> = {}): CouponRow => ({
   issueLimit: null, issuedCount: 0, usedCount: 0,
   startsAt: '2026-09-01T00:00:00+09:00', endsAt: '2026-09-30T23:59:59+09:00',
   isActive: true, downloadable: false, status: 'ACTIVE', editable: true,
-  targetCount: 1, targetNames: ['울 코트'], deadTargets: false,
+  targetCount: 1, targets: [{ type: 'PRODUCT', name: '울 코트', dead: false }],
   ...over,
 });
 
@@ -52,7 +52,7 @@ describe('중지한 뒤에도', () => {
 
   /** 상위 분류에 걸린 쿠폰은 중지해도 여전히 상위 분류에 걸려 있다 — 경고가 따라가야 한다 */
   it('붙는 상품이 없다는 경고도 따라간다', async () => {
-    const dead = row({ targetNames: ['아우터'], deadTargets: true });
+    const dead = row({ targets: [{ type: 'CATEGORY', name: '아우터', dead: true }] });
     fetchMock.mockResolvedValue(
       Response.json({ coupon: { ...dead, isActive: false, status: 'INACTIVE' } }),
     );

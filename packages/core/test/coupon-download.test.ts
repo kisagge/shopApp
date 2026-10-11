@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { couponCoversProduct, isDownloadable } from '../src';
+import {
+  couponCoversProduct, isDownloadable, COUPON_TARGET_TYPE, COUPON_TARGET_LABEL,
+} from '../src';
 
 const NOW = new Date('2026-09-15T00:00:00Z');
 const coupon = (over: Record<string, unknown> = {}) => ({
@@ -25,5 +27,37 @@ describe('couponCoversProduct', () => {
     expect(couponCoversProduct([{ targetType: 'BRAND', targetId: 'b-1' }], product)).toBe(true);
     expect(couponCoversProduct([{ targetType: 'CATEGORY', targetId: 'c-1' }], product)).toBe(true);
     expect(couponCoversProduct([{ targetType: 'PRODUCT', targetId: 'p-2' }, { targetType: 'BRAND', targetId: 'b-9' }], product)).toBe(false);
+  });
+});
+
+/**
+ * **쿠폰을 걸 수 있는 자리 목록.**
+ *
+ * 계약(zod)이 같은 세 값을 손으로 적고 있었다 — 한쪽이 늘면 다른 쪽은 조용히 거절한다. 적용
+ * 판정(couponCoversProduct)이 보는 자리와도 같아야 한다: 고를 수는 있는데 아무 상품에도 안
+ * 붙는 종류가 생기면, 그것이 바로 "아우터" 쿠폰과 같은 고장이다.
+ */
+describe('쿠폰 대상의 종류', () => {
+  it('세 종류다 — 상품·브랜드·분류', () => {
+    expect([...COUPON_TARGET_TYPE]).toEqual(['PRODUCT', 'BRAND', 'CATEGORY']);
+  });
+
+  /** "아우터" 만 적으면 그것이 분류인지 브랜드인지 알 수 없다 */
+  it('모든 종류에 사람이 읽을 이름이 있다', () => {
+    for (const type of COUPON_TARGET_TYPE) {
+      expect(COUPON_TARGET_LABEL[type], type).toBeTruthy();
+    }
+    expect(Object.keys(COUPON_TARGET_LABEL)).toHaveLength(COUPON_TARGET_TYPE.length);
+  });
+
+  /** 종류마다 적용 판정이 보는 칸이 있다 — 없으면 걸어도 아무 상품에 안 붙는다 */
+  it('모든 종류가 실제로 상품에 붙을 수 있다', () => {
+    const product = { id: 'p-1', brandId: 'b-1', categoryId: 'c-1' };
+    const idOf = { PRODUCT: 'p-1', BRAND: 'b-1', CATEGORY: 'c-1' } as const;
+
+    for (const type of COUPON_TARGET_TYPE) {
+      expect(couponCoversProduct([{ targetType: type, targetId: idOf[type] }], product), type)
+        .toBe(true);
+    }
   });
 });

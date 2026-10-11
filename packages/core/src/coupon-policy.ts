@@ -174,6 +174,22 @@ export function isDownloadable(
 }
 
 /**
+ * 쿠폰을 걸 수 있는 자리.
+ *
+ * 계약(zod)이 같은 목록을 손으로 적고 있었다 — 한쪽이 늘면 다른 쪽은 조용히 거절한다.
+ */
+export const COUPON_TARGET_TYPE = ['PRODUCT', 'BRAND', 'CATEGORY'] as const;
+
+export type CouponTargetType = (typeof COUPON_TARGET_TYPE)[number];
+
+/** 사람에게 보여 줄 이름 — "아우터" 만 적으면 그것이 분류인지 브랜드인지 알 수 없다 */
+export const COUPON_TARGET_LABEL: Record<CouponTargetType, string> = {
+  PRODUCT: '상품',
+  BRAND: '브랜드',
+  CATEGORY: '분류',
+};
+
+/**
  * 이 쿠폰이 이 상품에 쓰이는가 — 상품 화면에 받기 단추를 띄울지. 대상이 없으면 전체, 있으면 상품·브랜드·카테고리 중 하나라도
  * 맞으면. 장바구니가 할인을 계산할 때의 범위와 같은 뜻이다.
  */

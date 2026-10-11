@@ -310,6 +310,9 @@ describe('쿠폰 수정 — 그 사이에 발급되면', () => {
  * 대상은 만들 때만 정하고 다시 열어 볼 화면이 없다. 그래서 상위 분류에 걸어 **어떤 상품에도 붙지
  * 않는** 쿠폰(커밋 40d51fd 가 막은 그 쿠폰)이 이미 섞여 있어도 목록에서는 멀쩡한 쿠폰과 구별되지
  * 않는다. 손님은 "쓸 수 없습니다" 만 보고, 운영은 까닭을 모른다 — 이름과 경고를 함께 적는다.
+ *
+ * 죽은 자리는 **쿠폰이 아니라 대상마다** 들고 있다: 스무 개를 걸어 둔 쿠폰에서 "하나가 죽었다" 만
+ * 알면 그 하나를 찾느라 스무 줄을 눈으로 훑어야 한다.
  */
 describe('쿠폰 목록의 대상', () => {
   const row = (targets: { targetType: string; targetId: string }[]) => ({
@@ -319,107 +322,205 @@ describe('쿠폰 목록의 대상', () => {
     _count: { issued: 0, targets: targets.length },
     targets,
   });
+  const target = (targetType: string, targetId: string) => ({ targetType, targetId });
 
-  it('id 대신 이름을 적는다', async () => {
-    db.coupon.findMany.mockResolvedValue([
-      row([
-        { targetType: 'PRODUCT', targetId: 'p-1' },
-        { targetType: 'BRAND', targetId: 'b-1' },
-        { targetType: 'CATEGORY', targetId: 'c-coat' },
-      ]),
-    ]);
-    db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
-    db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
-    db.category.findMany.mockResolvedValue([{ id: 'c-coat', name: '코트', _count: { children: 0 } }]);
+  describe('이름을 붙인다', () => {
+    it('세 종류 모두 id 대신 이름을 적는다', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('PRODUCT', 'p-1'), target('BRAND', 'b-1'), target('CATEGORY', 'c-coat')]),
+      ]);
+      db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+      db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
+      db.category.findMany.mockResolvedValue([{ id: 'c-coat', name: '코트', _count: { children: 0 } }]);
 
-    const [got] = await listCoupons(admin, now);
+      const [got] = await listCoupons(admin, now);
 
-    expect(got!.targetNames).toEqual(['울 코트', 'MOOR', '코트']);
-    expect(got!.deadTargets).toBe(false);
+      expect(got!.targets).toEqual([
+        { type: 'PRODUCT', name: '울 코트', dead: false },
+        { type: 'BRAND', name: 'MOOR', dead: false },
+        { type: 'CATEGORY', name: '코트', dead: false },
+      ]);
+    });
+
+    it('사라진 대상도 자리를 지킨다 — 수와 이름이 어긋나면 안 된다', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('PRODUCT', 'p-1'), target('PRODUCT', 'p-gone')]),
+      ]);
+      db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets).toHaveLength(2);
+      expect(got!.targets.map((t) => t.name)).toContain('(알 수 없음)');
+      expect(got!.targetCount).toBe(2);
+    });
   });
 
-  it('상위 분류가 걸려 있으면 붙는 상품이 없다고 짚는다', async () => {
-    db.coupon.findMany.mockResolvedValue([row([{ targetType: 'CATEGORY', targetId: 'c-outer' }])]);
-    db.category.findMany.mockResolvedValue([
-      { id: 'c-outer', name: '아우터', _count: { children: 3 } },
-    ]);
+  describe('붙는 상품이 없는 대상', () => {
+    it('상위 분류를 짚는다', async () => {
+      db.coupon.findMany.mockResolvedValue([row([target('CATEGORY', 'c-outer')])]);
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+      ]);
 
-    const [got] = await listCoupons(admin, now);
+      const [got] = await listCoupons(admin, now);
 
-    expect(got!.targetNames).toEqual(['아우터']);
-    expect(got!.deadTargets).toBe(true);
+      expect(got!.targets).toEqual([{ type: 'CATEGORY', name: '아우터', dead: true }]);
+    });
+
+    it('말단 분류는 짚지 않는다', async () => {
+      db.coupon.findMany.mockResolvedValue([row([target('CATEGORY', 'c-coat')])]);
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-coat', name: '코트', _count: { children: 0 } },
+      ]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets[0]!.dead).toBe(false);
+    });
+
+    /** 쿠폰 단위로 "하나가 죽었다" 만 알면 스무 줄 중 어느 것인지 찾아야 한다 */
+    it('섞여 있으면 죽은 것만 표시된다', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('CATEGORY', 'c-outer'), target('CATEGORY', 'c-coat')]),
+      ]);
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+        { id: 'c-coat', name: '코트', _count: { children: 0 } },
+      ]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets.filter((t) => t.dead).map((t) => t.name)).toEqual(['아우터']);
+    });
   });
 
-  it('사라진 대상도 자리를 지킨다 — 수와 이름이 어긋나면 안 된다', async () => {
-    db.coupon.findMany.mockResolvedValue([
-      row([
-        { targetType: 'PRODUCT', targetId: 'p-1' },
-        { targetType: 'PRODUCT', targetId: 'p-gone' },
-      ]),
-    ]);
-    db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+  /**
+   * **읽는 순서를 조회가 정한다.** 저장된 순서는 고른 순서라 읽는 사람에게 아무 뜻이 없고,
+   * 접으면 앞의 셋만 보이므로 **문제가 앞에 서야 한다** — 끝줄에 있으면 아무도 못 본다.
+   */
+  describe('세우는 순서', () => {
+    it('죽은 대상이 먼저 선다 — 접어도 보이게', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([
+          target('PRODUCT', 'p-1'), target('PRODUCT', 'p-2'),
+          target('PRODUCT', 'p-3'), target('CATEGORY', 'c-outer'),
+        ]),
+      ]);
+      db.product.findMany.mockResolvedValue([
+        { id: 'p-1', name: '가' }, { id: 'p-2', name: '나' }, { id: 'p-3', name: '다' },
+      ]);
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+      ]);
 
-    const [got] = await listCoupons(admin, now);
+      const [got] = await listCoupons(admin, now);
 
-    expect(got!.targetNames).toHaveLength(2);
-    expect(got!.targetNames[1]).toBe('(알 수 없음)');
-    expect(got!.targetCount).toBe(2);
+      expect(got!.targets[0]).toEqual({ type: 'CATEGORY', name: '아우터', dead: true });
+    });
+
+    it('그다음은 종류 순 — 상품, 브랜드, 분류', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('CATEGORY', 'c-coat'), target('BRAND', 'b-1'), target('PRODUCT', 'p-1')]),
+      ]);
+      db.product.findMany.mockResolvedValue([{ id: 'p-1', name: '울 코트' }]);
+      db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-coat', name: '코트', _count: { children: 0 } },
+      ]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets.map((t) => t.type)).toEqual(['PRODUCT', 'BRAND', 'CATEGORY']);
+    });
+
+    /** 같은 쿠폰이 볼 때마다 다른 순서로 서면 비교할 수가 없다 */
+    it('같은 종류 안에서는 이름 순', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('PRODUCT', 'p-na'), target('PRODUCT', 'p-ga'), target('PRODUCT', 'p-da')]),
+      ]);
+      db.product.findMany.mockResolvedValue([
+        { id: 'p-na', name: '나 셔츠' }, { id: 'p-ga', name: '가 코트' }, { id: 'p-da', name: '다 니트' },
+      ]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets.map((t) => t.name)).toEqual(['가 코트', '나 셔츠', '다 니트']);
+    });
   });
 
-  /** 쿠폰마다 세 번씩 묻지 않는다 — 목록은 한 화면에 수십 줄이다 */
-  it('대상이 많아도 표는 세 번만 읽는다', async () => {
-    db.coupon.findMany.mockResolvedValue([
-      row([{ targetType: 'PRODUCT', targetId: 'p-1' }]),
-      row([{ targetType: 'PRODUCT', targetId: 'p-2' }]),
-      row([{ targetType: 'CATEGORY', targetId: 'c-coat' }]),
-    ]);
+  describe('묻는 횟수', () => {
+    /** 쿠폰마다 세 번씩 묻지 않는다 — 목록은 한 화면에 수십 줄이다 */
+    it('대상이 많아도 표는 세 번만 읽는다', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('PRODUCT', 'p-1')]),
+        row([target('PRODUCT', 'p-2')]),
+        row([target('CATEGORY', 'c-coat')]),
+      ]);
 
-    await listCoupons(admin, now);
+      await listCoupons(admin, now);
 
-    expect(db.product.findMany).toHaveBeenCalledTimes(1);
-    expect(db.brand.findMany).toHaveBeenCalledTimes(1);
-    expect(db.category.findMany).toHaveBeenCalledTimes(1);
-    // 한 번에 다 묻는다
-    expect(db.product.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['p-1', 'p-2'] } });
-  });
+      expect(db.product.findMany).toHaveBeenCalledTimes(1);
+      expect(db.brand.findMany).toHaveBeenCalledTimes(1);
+      expect(db.category.findMany).toHaveBeenCalledTimes(1);
+      // 한 번에 다 묻는다
+      expect(db.product.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['p-1', 'p-2'] } });
+    });
 
-  it('전체 쿠폰만 있으면 아무것도 묻지 않는다', async () => {
-    db.coupon.findMany.mockResolvedValue([row([])]);
+    it('같은 대상을 두 쿠폰이 걸어도 한 번만 묻는다', async () => {
+      db.coupon.findMany.mockResolvedValue([
+        row([target('PRODUCT', 'p-1')]),
+        row([target('PRODUCT', 'p-1')]),
+      ]);
 
-    const [got] = await listCoupons(admin, now);
+      await listCoupons(admin, now);
 
-    expect(got!.targetNames).toEqual([]);
-    expect(db.product.findMany).not.toHaveBeenCalled();
-    expect(db.category.findMany).not.toHaveBeenCalled();
+      expect(db.product.findMany.mock.calls[0]![0].where).toEqual({ id: { in: ['p-1'] } });
+    });
+
+    it('전체 쿠폰만 있으면 아무것도 묻지 않는다', async () => {
+      db.coupon.findMany.mockResolvedValue([row([])]);
+
+      const [got] = await listCoupons(admin, now);
+
+      expect(got!.targets).toEqual([]);
+      expect(db.product.findMany).not.toHaveBeenCalled();
+      expect(db.category.findMany).not.toHaveBeenCalled();
+    });
   });
 
   /**
    * 만들고·고친 줄은 목록을 다시 읽지 않고 **그 자리에 끼워진다**(화면이 돌려받은 줄을 세운다).
    * 그래서 세 자리가 같은 모양을 내놔야 한다 — 하나라도 빠뜨리면 그 줄만 대상 칸이 빈다.
    */
-  it('만든 직후 돌려주는 줄에도 대상 설명이 있다', async () => {
-    db.category.findMany.mockResolvedValue([
-      { id: 'c-outer', name: '아우터', _count: { children: 3 } },
-    ]);
+  describe('세 자리가 같은 모양을 낸다', () => {
+    it('만든 직후 돌려주는 줄에도 대상 설명이 있다', async () => {
+      db.category.findMany.mockResolvedValue([
+        { id: 'c-outer', name: '아우터', _count: { children: 3 } },
+      ]);
 
-    const created = await createCoupon(
-      admin,
-      input({ targets: [{ targetType: 'CATEGORY', targetId: 'c-outer' }] }),
-    );
+      const created = await createCoupon(
+        admin,
+        input({ targets: [{ targetType: 'CATEGORY', targetId: 'c-outer' }] }),
+      );
 
-    expect(created.targetNames).toEqual(['아우터']);
-    expect(created.deadTargets).toBe(true);
-  });
-
-  it('고친 뒤 돌려주는 줄에도 대상 설명이 있다', async () => {
-    db.coupon.update.mockResolvedValue({
-      ...row([{ targetType: 'BRAND', targetId: 'b-1' }]),
+      expect(created.targets).toEqual([{ type: 'CATEGORY', name: '아우터', dead: true }]);
     });
-    db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
 
-    const updated = await updateCoupon(admin, 'c-1', { name: '이름만 고친다' });
+    it('고친 뒤 돌려주는 줄에도 대상 설명이 있다', async () => {
+      db.coupon.update.mockResolvedValue({ ...row([target('BRAND', 'b-1')]) });
+      db.brand.findMany.mockResolvedValue([{ id: 'b-1', name: 'MOOR' }]);
 
-    expect(updated.targetNames).toEqual(['MOOR']);
-    expect(updated.deadTargets).toBe(false);
+      const updated = await updateCoupon(admin, 'c-1', { name: '이름만 고친다' });
+
+      expect(updated.targets).toEqual([{ type: 'BRAND', name: 'MOOR', dead: false }]);
+    });
+
+    /** 전체 쿠폰을 만들면 빈 배열이다 — undefined 면 화면이 그 칸에서 터진다 */
+    it('대상 없이 만들어도 빈 배열이 온다', async () => {
+      const created = await createCoupon(admin, input({ targets: [] }));
+
+      expect(created.targets).toEqual([]);
+    });
   });
 });
