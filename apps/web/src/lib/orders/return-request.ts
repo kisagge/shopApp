@@ -518,7 +518,8 @@ async function revertOrder(
     data: { status: nextOrderStatus },
   });
   if (moved.count === 0) {
-    throw new ReturnError('ALREADY_RESOLVED', '그사이 주문 상태가 바뀌었습니다. 새로 불러와 주세요.');
+    // 손님의 철회와 운영의 반려가 같은 자리를 지난다 — 손님이 보므로 열쇠여야 한다
+    throw new ReturnError('ALREADY_RESOLVED', 'err.return.changedMeanwhile');
   }
 
   await tx.orderItem.updateMany({

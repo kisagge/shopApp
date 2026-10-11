@@ -901,6 +901,7 @@ export const ko = {
   'err.return.itemNotReturnable': '돌려보낼 수 없는 상품이 섞여 있습니다.',
   'err.return.noItems': '돌려보낼 상품이 없습니다.',
   'err.return.alreadyResolved': '이미 처리된 신청입니다. 승인된 뒤에는 고객센터로 문의해 주세요.',
+  'err.return.changedMeanwhile': '그사이 주문 상태가 바뀌었습니다. 새로 불러와 주세요.',
   'err.return.confirmedChangeMind': '구매확정한 주문은 단순 변심으로 반품할 수 없습니다.',
   'err.return.alreadyRequested': '이미 접수된 신청이 있습니다.',
   'err.return.beforeShipment': '아직 출고 전입니다. 주문 취소로 진행해 주세요.',

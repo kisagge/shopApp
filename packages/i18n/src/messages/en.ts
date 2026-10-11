@@ -873,6 +873,7 @@ export const en: Dictionary = {
   'err.return.itemNotReturnable': 'Some of those items cannot be returned.',
   'err.return.noItems': 'There is nothing to return.',
   'err.return.alreadyResolved': 'This request has already been handled. Once approved, please contact support.',
+  'err.return.changedMeanwhile': 'The order changed in the meantime. Please reload.',
   'err.return.confirmedChangeMind': 'A confirmed order cannot be returned as a change of mind.',
   'err.return.alreadyRequested': 'There is already a request in progress.',
   'err.return.beforeShipment': 'This has not shipped yet. Please cancel the order instead.',

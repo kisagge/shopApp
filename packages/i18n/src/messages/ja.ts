@@ -869,6 +869,7 @@ export const ja: Dictionary = {
   'err.return.itemNotReturnable': '返品できない商品が含まれています。',
   'err.return.noItems': '返品する商品がありません。',
   'err.return.alreadyResolved': 'すでに処理されたお申し込みです。承認後はカスタマーサポートへお問い合わせください。',
+  'err.return.changedMeanwhile': 'その間に注文の状態が変わりました。再度読み込んでください。',
   'err.return.confirmedChangeMind': '購入確定したご注文は、お客様都合では返品できません。',
   'err.return.alreadyRequested': 'すでに受け付けたお申し込みがあります。',
   'err.return.beforeShipment': 'まだ発送前です。ご注文のキャンセルをご利用ください。',
