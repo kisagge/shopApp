@@ -25,6 +25,21 @@ describe('checkExchangeOption', () => {
     expect(checkExchangeOption({ ...original, priceOverride: 5_000 }, candidate({ priceOverride: 5_000 }))).toEqual({ ok: true });
   });
 
+  /**
+   * **추가금 없음(null)과 0원(0)은 다른 값이다.** 저장소 전체가 `null` 을 "상품 판매가를 그대로
+   * 쓴다" 로, `0` 을 "이 옵션의 값은 0원" 으로 읽는다(`priceOverride === null ? base : won(...)`).
+   * 그래서 둘을 같다고 보면 **값이 다른 옵션으로 바꿔 주는** 셈이 된다 — 그것이 바로 이 함수가
+   * 막으려는 일이다. 느슨하게 비교하고 싶어지는 자리라 뜻을 못 박아 둔다.
+   */
+  it('추가금 없음과 0원은 다른 값이다', () => {
+    expect(checkExchangeOption(original, candidate({ priceOverride: 0 })))
+      .toEqual({ ok: false, code: 'PRICE_DIFFERS' });
+    expect(checkExchangeOption({ ...original, priceOverride: 0 }, candidate({ priceOverride: null })))
+      .toEqual({ ok: false, code: 'PRICE_DIFFERS' });
+    expect(checkExchangeOption({ ...original, priceOverride: 0 }, candidate({ priceOverride: 0 })))
+      .toEqual({ ok: true });
+  });
+
   it('판매 중지·재고 모자람은 안 된다 — 수량만큼 있어야 한다', () => {
     expect(checkExchangeOption(original, candidate({ isActive: false }))).toEqual({ ok: false, code: 'INACTIVE' });
     expect(checkExchangeOption(original, candidate({ stock: 1 }))).toEqual({ ok: false, code: 'OUT_OF_STOCK' });

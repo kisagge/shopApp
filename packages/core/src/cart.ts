@@ -244,6 +244,18 @@ function couponDiscountOf(coupon: Coupon | undefined, base: Won): Won {
   return min(capped, base);
 }
 
+/**
+ * 실제로 쓸 포인트.
+ *
+ * **하한이 요청에만 걸려 있었다.** 999P 를 가진 사람이 1,000P 를 요청하면 보유한 만큼
+ * 깎여 **999P 가 쓰였다** — 999P 를 그대로 요청하면 거절되는데, 1,000P 라고 적으면 통과하는
+ * 셈이다. 결제 화면은 "1,000P 부터" 라고 적는다(checkout-form). 하한은 요청을 받는 창구의
+ * 규칙이 아니라 **포인트를 쓸 수 있는 조건**이므로 보유에도 걸어야 한다.
+ *
+ * **결제할 금액까지 줄이는 것은 그대로 둔다.** 500원짜리 주문을 500P 로 전액 결제하는 길은
+ * 막지 않는다 — 하한은 "잔돈처럼 쓰지 말라" 는 뜻이고, 낼 돈 전부를 포인트로 내는 것은
+ * 거기에 어긋나지 않는다. 막으면 적은 금액의 주문에서는 포인트를 아예 못 쓴다.
+ */
 function resolvePoints(
   requested: Won | undefined,
   available: Won | undefined,
@@ -252,6 +264,7 @@ function resolvePoints(
   if (requested === undefined || requested <= 0) return ZERO;
   if (requested < MIN_POINTS_USE) return ZERO;
   const owned = available ?? ZERO;
+  if (owned < MIN_POINTS_USE) return ZERO;
   return min(min(requested, owned), base);
 }
 

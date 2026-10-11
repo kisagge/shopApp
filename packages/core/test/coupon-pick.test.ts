@@ -213,6 +213,14 @@ describe('못 쓰는 까닭', () => {
     expect(couponBlocker(percent('P1', 1), tiny)).toEqual({ reason: 'NO_DISCOUNT' });
   });
 
+  /** 가장 작은 금액에서도 같은 답이 나와야 한다 — 반값이어도 1원의 절반은 0원이다 */
+  it('1원짜리에 반값 쿠폰을 대도 깎일 것이 없다', () => {
+    const onewon = [line({ variantId: 'v1', listPrice: won(1), salePrice: won(1) })];
+
+    expect(discountFor(percent('P50', 50), onewon)).toBe(0);
+    expect(couponBlocker(percent('P50', 50), onewon)).toEqual({ reason: 'NO_DISCOUNT' });
+  });
+
   it('쿠폰마다 까닭을 함께 싣는다', () => {
     const offers = couponOffers([cand(amount('OK', 5_000)), cand(amount('NO', 10_000, 250_000))], cart);
     expect(offers.find((o) => o.ref === 'OK')?.blocker).toBeNull();

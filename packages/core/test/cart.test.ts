@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { won, MoneyError } from '../src/money';
 import { calculateCart, MIN_POINTS_USE, type CartLine, type Coupon } from '../src/cart';
+import { couponBlocker, discountFor } from '../src/coupon-pick';
+import { DEFAULT_SHIPPING } from '../src/shipping';
 
 const coat: CartLine = {
   variantId: 'v-coat-m', productName: '오버사이즈 울 블렌드 코트',
@@ -220,5 +222,161 @@ describe('대상이 정해진 쿠폰', () => {
     });
     expect(r.couponDiscount).toBe(20_000);
     expect(r.payable).toBeGreaterThanOrEqual(200_000);
+  });
+});
+
+/**
+ * **경계가 어디에도 적혀 있지 않았다.**
+ *
+ * 쿠폰은 "못 미치면 안 된다" 만, 포인트는 "최소 단위 미만이면 무시한다" 만 검사했다. 그래서 금액이
+ * 경계와 **꼭 같을 때** 어느 쪽인지는 코드만 알았고, 화면이 "3,000원 더 담으면 됩니다" 라고 말한 그
+ * 금액이 1원 단위까지 맞는지는 아무도 안 봤다. 여기서 틀리면 조용히 돈이 어긋난다 — 손님은 쿠폰이
+ * 왜 안 붙는지 모르고, 운영은 할인이 왜 나갔는지 모른다.
+ */
+describe('쿠폰 최소 주문 금액의 경계', () => {
+  const minimum = won(30_000);
+  const coupon: Coupon = { kind: 'amount', code: 'WELCOME', value: won(10_000), minimumOrder: minimum };
+  const lineOf = (price: number): CartLine => ({
+    ...knit, listPrice: won(price), salePrice: won(price), quantity: 1,
+  });
+
+  it('대상 합계가 최소 주문 금액과 꼭 같으면 적용된다 — 경계는 그 금액을 품는다', () => {
+    const t = calculateCart({ lines: [lineOf(30_000)], coupon });
+
+    expect(t.couponDiscount).toBe(10_000);
+  });
+
+  it('1원 모자라면 한 푼도 깎이지 않는다', () => {
+    const t = calculateCart({ lines: [lineOf(29_999)], coupon });
+
+    expect(t.couponDiscount).toBe(0);
+  });
+
+  /** "1원 더 담으면 됩니다" 가 1원 단위에서도 참말이어야 한다 */
+  it('모자란 금액은 최소 주문 금액과 대상 합계의 차와 정확히 같다', () => {
+    const blocker = couponBlocker(coupon, [lineOf(29_999)]);
+
+    expect(blocker).toEqual({ reason: 'BELOW_MINIMUM', minimum, shortfall: 1 });
+  });
+
+  it('말한 만큼 더 담으면 실제로 깎인다 — 그 양이 1원일 때도', () => {
+    const blocker = couponBlocker(coupon, [lineOf(29_999)]);
+    const shortfall = blocker?.reason === 'BELOW_MINIMUM' ? blocker.shortfall : 0;
+
+    const filled = [lineOf(29_999), lineOf(shortfall)];
+
+    expect(couponBlocker(coupon, filled)).toBeNull();
+    expect(discountFor(coupon, filled)).toBe(10_000);
+  });
+});
+
+/**
+ * **하한이 요청에만 걸려 있었다.**
+ *
+ * 999P 를 가진 사람이 1,000P 를 요청하면 보유한 만큼 깎여 **999P 가 쓰였다** — 999P 를 그대로
+ * 요청하면 거절되는데 1,000P 라고 적으면 통과하는 셈이다. 결제 화면은 "1,000P 부터" 라고 적는다.
+ *
+ * 다만 **낼 돈 전부를 포인트로 내는 길은 막지 않는다.** 하한은 "잔돈처럼 쓰지 말라" 는 뜻이고,
+ * 500원짜리 주문을 500P 로 끝내는 것은 거기에 어긋나지 않는다 — 막으면 적은 금액의 주문에서는
+ * 포인트를 아예 못 쓴다.
+ */
+describe('포인트 사용의 경계', () => {
+  const cheap = (price: number): CartLine => ({
+    ...knit, listPrice: won(price), salePrice: won(price), quantity: 1,
+  });
+
+  it('최소 사용 단위와 꼭 같은 금액은 쓸 수 있다', () => {
+    const t = calculateCart({
+      lines: [coat], pointsToUse: won(MIN_POINTS_USE), pointsAvailable: won(MIN_POINTS_USE),
+    });
+
+    expect(t.pointsUsed).toBe(MIN_POINTS_USE);
+  });
+
+  it('보유가 요청보다 1원 모자라면 보유한 만큼만 쓴다', () => {
+    const t = calculateCart({
+      lines: [coat], pointsToUse: won(5_000), pointsAvailable: won(4_999),
+    });
+
+    expect(t.pointsUsed).toBe(4_999);
+  });
+
+  /** 1,000P 라고 적으면 통과하던 자리 — 보유가 하한에 못 미치면 쓸 수 없다 */
+  it('보유가 최소 사용 단위에 1원 모자라면 한 푼도 못 쓴다', () => {
+    const t = calculateCart({
+      lines: [coat], pointsToUse: won(MIN_POINTS_USE), pointsAvailable: won(MIN_POINTS_USE - 1),
+    });
+
+    expect(t.pointsUsed).toBe(0);
+  });
+
+  it('전액 포인트로 내면 낼 돈은 배송비만 남는다', () => {
+    const t = calculateCart({
+      lines: [cheap(20_000)], pointsToUse: won(20_000), pointsAvailable: won(20_000),
+    });
+
+    expect(t.pointsUsed).toBe(20_000);
+    expect(t.payable).toBe(DEFAULT_SHIPPING.baseFee);
+  });
+
+  it('전액 포인트로 내면 적립이 없다 — 현금이 오간 몫이 없다', () => {
+    const t = calculateCart({
+      lines: [cheap(20_000)], pointsToUse: won(20_000), pointsAvailable: won(20_000),
+    });
+
+    expect(t.rewardPoints).toBe(0);
+  });
+
+  /** 하한은 "잔돈처럼 쓰지 말라" 는 뜻이다 — 낼 돈 전부를 내는 것은 거기에 어긋나지 않는다 */
+  it('낼 돈이 최소 사용 단위보다 적어도 그만큼은 쓸 수 있다', () => {
+    const t = calculateCart({
+      lines: [cheap(500)], pointsToUse: won(MIN_POINTS_USE), pointsAvailable: won(MIN_POINTS_USE),
+    });
+
+    expect(t.pointsUsed).toBe(500);
+  });
+});
+
+/**
+ * **1원 — 가장 작은 금액.**
+ *
+ * 돈 셈은 내림이 쌓이는 자리에서 틀린다. 1원짜리 한 줄은 적립률을 곱해도 0이고, 정액 쿠폰을 대면
+ * 쿠폰이 금액보다 크고, 줄 몫을 나누면 나눌 것이 없다 — 그 어느 쪽도 음수나 NaN 이 되어서는 안 된다.
+ */
+describe('1원 — 가장 작은 금액', () => {
+  const onewon: CartLine = { ...knit, listPrice: won(1), salePrice: won(1), quantity: 1 };
+
+  it('배송비가 붙고 적립은 0이다', () => {
+    const t = calculateCart({ lines: [onewon] });
+
+    expect(t.merchandiseTotal).toBe(1);
+    expect(t.payable).toBe(DEFAULT_SHIPPING.baseFee + 1);
+    expect(t.rewardPoints).toBe(0);
+  });
+
+  it('무료배송까지 남은 금액도 1원 단위로 맞는다', () => {
+    const t = calculateCart({ lines: [onewon] });
+
+    expect(t.shipping.remainingForFree).toBe((DEFAULT_SHIPPING.freeThreshold ?? 0) - 1);
+  });
+
+  it('정액 쿠폰이 1원을 넘겨 깎지 않는다', () => {
+    const t = calculateCart({
+      lines: [onewon],
+      coupon: { kind: 'amount', code: 'BIG', value: won(50_000), minimumOrder: won(0) },
+    });
+
+    expect(t.couponDiscount).toBe(1);
+    expect(t.payable).toBe(DEFAULT_SHIPPING.baseFee);
+  });
+
+  it('줄 몫의 합이 1원에서도 어긋나지 않는다', () => {
+    const t = calculateCart({
+      lines: [onewon, { ...onewon, variantId: 'v-2' }],
+      coupon: { kind: 'amount', code: 'ONE', value: won(1), minimumOrder: won(0) },
+    });
+
+    const sum = t.allocations.reduce((n, a) => n + a.couponShare, 0);
+    expect(sum).toBe(t.couponDiscount);
   });
 });
