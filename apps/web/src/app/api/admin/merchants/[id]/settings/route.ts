@@ -6,7 +6,7 @@ import {
   MerchantSettingsError, updateMerchantBusiness, updateMerchantSettings,
 } from '~/lib/admin/merchant-settings';
 import { recordAudit } from '~/lib/audit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -82,7 +82,7 @@ export async function PATCH(
 
 async function handle(error: unknown): Promise<NextResponse> {
   if (error instanceof MerchantSettingsError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+    return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
   }
   if (error instanceof ForbiddenError) {
     return await forbidden();

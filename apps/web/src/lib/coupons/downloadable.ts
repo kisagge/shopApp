@@ -64,6 +64,6 @@ export async function listDownloadableCoupons(
  */
 export async function downloadCoupon(couponId: string, userId: string, now: Date = new Date()): Promise<IssueResult> {
   const coupon = await prisma.coupon.findUnique({ where: { id: couponId }, select: { downloadable: true } });
-  if (!coupon?.downloadable) throw new CouponError('NOT_FOUND', '받을 수 없는 쿠폰입니다.', 404);
+  if (!coupon?.downloadable) throw new CouponError('NOT_FOUND', 'err.coupon.notDownloadable', 404);
   return issueCouponToUser(couponId, userId, now);
 }

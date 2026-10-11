@@ -9,7 +9,7 @@ import { revalidateCatalog } from '~/lib/cache';
 import { PaymentError } from '@shop/core';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /** 운영진·가맹점의 반품·교환 승인·반려, 회수 확인, 반품 환불, 교환 상품 발송 */
 export async function POST(
@@ -106,11 +106,11 @@ export async function POST(
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ReturnError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     if (error instanceof PaymentError) {
       return NextResponse.json(
-        { code: error.code, message: error.message, retryable: error.retryable },
+        { code: error.code, message: await localizedMessage(error), retryable: error.retryable },
         { status: 502 },
       );
     }

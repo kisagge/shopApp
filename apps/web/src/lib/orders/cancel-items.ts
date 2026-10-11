@@ -2,9 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { prisma } from '@shop/db';
 import {
-  canRefundOrder, isPaidStatus, planPartialCancel, remainingRefund, shippingPolicyFrom, PartialCancelError,
-  ORDER_STATUS_LABEL, PARTIAL_CANCELLABLE_STATUS, UNSHIPPED_LINE_STATUS, won,
-  type Actor, type OrderStatus, type PaymentGateway, type ShippingPolicy, type Won,
+  canRefundOrder, isPaidStatus, planPartialCancel, remainingRefund, shippingPolicyFrom, PartialCancelError, PARTIAL_CANCELLABLE_STATUS, UNSHIPPED_LINE_STATUS, won, type Actor, type OrderStatus, type PaymentGateway, type ShippingPolicy, type Won,
 } from '@shop/core';
 import { getPaymentGateway } from '~/lib/payments';
 import { getShippingPolicy } from '~/lib/shipping-policy';
@@ -34,7 +32,13 @@ import { reportLedgerMismatch } from '~/lib/errors/ledger';
  */
 
 export class CancelItemsError extends Error {
-  constructor(readonly code: string, message: string, readonly status = 409) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly status = 409,
+    /** 문구에 끼워 넣을 값. 그 값도 열쇠일 수 있다(주문 상태 이름) */
+    readonly vars?: Readonly<Record<string, string | number>>,
+  ) {
     super(message);
     this.name = 'CancelItemsError';
   }
@@ -108,22 +112,23 @@ function assertCancellable(loaded: Loaded, itemIds: readonly string[], staff: bo
   if (!allowed.includes(order.status)) {
     throw new CancelItemsError(
       'NOT_CANCELLABLE',
-      staff
-        ? `${ORDER_STATUS_LABEL[order.status]} 주문은 일부만 취소할 수 없습니다. 출고된 상품은 반품으로 진행해 주세요.`
-        : '결제완료 상태에서만 일부 상품을 직접 취소할 수 있습니다. 배송 준비가 시작된 뒤에는 고객센터로 문의해 주세요.',
+      staff ? 'err.cancelItems.staffNotCancellable' : 'err.cancelItems.notCancellable',
+      409,
+      // 상태 이름도 번역거리다 — 값에 열쇠를 실어 보낸다(respond 의 translateVars)
+      staff ? { status: `orderStatus.${order.status}` } : undefined,
     );
   }
 
   const payment = order.payment;
   if (!payment || !isPaidStatus(payment.status) || !payment.pgPaymentKey) {
-    throw new CancelItemsError('NOT_PAID', '결제가 끝난 주문만 일부 취소할 수 있습니다.');
+    throw new CancelItemsError('NOT_PAID', 'err.cancelItems.notPaid');
   }
   /*
    * 가상계좌는 돌려받을 계좌를 따로 받아야 부분 환불이 된다. 그 입력을 만들기 전까지는
    * 일부만 취소하지 못하게 막는다 — 막지 않으면 PG 가 거절하고 손님은 이유를 모른다.
    */
   if (payment.method === 'VIRTUAL_ACCOUNT') {
-    throw new CancelItemsError('VIRTUAL_ACCOUNT', '가상계좌 결제는 일부만 취소할 수 없습니다. 주문 전체를 취소해 주세요.');
+    throw new CancelItemsError('VIRTUAL_ACCOUNT', 'err.cancelItems.virtualAccount');
   }
 
   const byId = new Map(order.items.map((i) => [i.id, i]));
@@ -131,7 +136,7 @@ function assertCancellable(loaded: Loaded, itemIds: readonly string[], staff: bo
     const item = byId.get(id);
     // 줄이 아직 안 나갔는가 — 그 판단은 core 의 목록이 한다(보관 화면의 "아직 보내지 않은 줄" 과 같다)
     if (item && item.canceledAt === null && !(UNSHIPPED_LINE_STATUS as readonly string[]).includes(item.status)) {
-      throw new CancelItemsError('ITEM_SHIPPED', '이미 출고된 상품은 취소할 수 없습니다. 반품으로 진행해 주세요.');
+      throw new CancelItemsError('ITEM_SHIPPED', 'err.cancelItems.itemShipped');
     }
   }
 }
@@ -170,7 +175,7 @@ export async function previewCancelItems(
 ): Promise<CancelItemsPreview> {
   const staff = canRefundOrder(actor);
   const order = await loadOrder(prisma, orderNo, actor, staff);
-  if (!order) throw new CancelItemsError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!order) throw new CancelItemsError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
   const loaded: Loaded = { order, policy: await policyOf(order.shippingPolicy) };
   assertCancellable(loaded, itemIds, staff);
 
@@ -200,7 +205,7 @@ export async function cancelOrderItems(
 ): Promise<CancelItemsResult> {
   const staff = canRefundOrder(actor);
   const first = await loadOrder(prisma, orderNo, actor, staff);
-  if (!first) throw new CancelItemsError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+  if (!first) throw new CancelItemsError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
 
   const wanted = [...new Set(itemIds)].sort();
   const live = first.items.filter((i) => i.canceledAt === null);
@@ -228,7 +233,7 @@ export async function cancelOrderItems(
       await tx.$queryRaw`SELECT id FROM orders WHERE id = ${first.id} FOR UPDATE`;
 
       const order = await loadOrder(tx, orderNo, actor, staff);
-      if (!order) throw new CancelItemsError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
+      if (!order) throw new CancelItemsError('ORDER_NOT_FOUND', 'err.order.notFound', 404);
       const loaded: Loaded = { order, policy };
       assertCancellable(loaded, wanted, staff);
 
@@ -258,7 +263,7 @@ export async function cancelOrderItems(
         data: { status: 'CANCELLED', canceledAt: now },
       });
       if (count !== plan.itemIds.length) {
-        throw new CancelItemsError('ALREADY_PROCESSED', '이미 처리된 상품입니다.');
+        throw new CancelItemsError('ALREADY_PROCESSED', 'err.order.alreadyProcessed');
       }
 
       // ── 재고. 잠긴 재고를 풀지 않으면 팔 수 있는 물건이 묶인다

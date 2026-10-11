@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { revalidateCatalog } from '~/lib/cache';
 import { createOrder, OrderError } from '~/lib/orders/create-order';
 import { getLocale } from '~/lib/i18n/server';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -83,7 +83,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json(
         {
           code: error.code,
-          message: error.message,
+          message: await localizedMessage(error),
           ...(error.variantIds.length > 0 ? { variantIds: error.variantIds } : {}),
         },
         { status: 409 },

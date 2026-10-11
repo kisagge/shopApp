@@ -210,8 +210,9 @@ describe('코드로 직접 받기', () => {
     // 구분해 주면 무작위로 넣어 보며 어떤 코드가 있는지 알아낼 수 있다
     db.coupon.findUnique.mockResolvedValue(null);
 
+    // 문구는 사전 열쇠다 — 손님이 쓰는 창구라 응답을 만드는 자리에서 그 사람의 말로 바뀐다
     await expect(claimCouponByCode('AAAAAA', 'u-1', now)).rejects.toMatchObject({
-      message: '사용할 수 없는 코드입니다.',
+      message: 'err.coupon.notClaimable',
     });
   });
 });

@@ -121,4 +121,38 @@ describe('일부 취소 창구', () => {
     getActor.mockResolvedValue(null);
     expect((await call({ itemIds: ['i-knit'], reason: '변심' })).status).toBe(401);
   });
+
+  /**
+   * **열쇠가 그대로 나가고 있었다.** 도메인 오류의 문구는 사전 열쇠이고(`err.cancelItems.notPaid`)
+   * 번역은 응답을 만드는 자리에서 한다. 그런데 이 창구는 더 실을 것이 있어(결제 오류의
+   * `retryable`) 말미를 손으로 만들었고, 그러면서 `error.message` 를 그대로 내보냈다 —
+   * 화면은 받은 글자를 그대로 띄우므로 손님은 까닭 대신 `err.…` 를 봤다.
+   */
+  it('오류 문구는 열쇠가 아니라 사람의 말로 나간다', async () => {
+    lib.cancelOrderItems.mockRejectedValue(
+      new CancelItemsError('NOT_PAID', 'err.cancelItems.notPaid'),
+    );
+
+    const body = (await (await call({ itemIds: ['i-knit'], reason: '변심' })).json()) as {
+      code: string; message: string;
+    };
+
+    expect(body.code).toBe('NOT_PAID');
+    expect(body.message).not.toContain('err.');
+    expect(body.message).toBe('결제가 끝난 주문만 일부 취소할 수 있습니다.');
+  });
+
+  /** 끼워 넣는 값도 번역거리다 — 주문 상태 이름이 열쇠로 실려 온다 */
+  it('문구에 끼워 넣는 상태 이름도 사람의 말이 된다', async () => {
+    lib.cancelOrderItems.mockRejectedValue(
+      new CancelItemsError('NOT_CANCELLABLE', 'err.cancelItems.staffNotCancellable', 409, {
+        status: 'orderStatus.SHIPPED',
+      }),
+    );
+
+    const body = (await (await call({ itemIds: ['i-knit'], reason: '변심' })).json()) as { message: string };
+
+    expect(body.message).toContain('배송중');
+    expect(body.message).not.toContain('orderStatus.');
+  });
 });

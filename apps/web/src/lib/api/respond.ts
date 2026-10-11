@@ -102,6 +102,23 @@ export async function apiError(error: unknown): Promise<NextResponse> {
 }
 
 /**
+ * 도메인 오류의 문구를 이 요청의 말로 — **말미를 손으로 만드는 창구가 쓴다.**
+ *
+ * `apiError` 가 번역을 맡고 있는데, 더 실을 것이 있어 말미를 직접 만드는 창구들은 그 길을 지나지
+ * 않는다(주문의 `variantIds`, 탈퇴의 `blocks`, 결제의 `retryable`). 그 창구들이 `error.message` 를
+ * 그대로 내보내고 있었고, 그 문구는 **사전 열쇠**다 — 재고가 모자랄 때 결제 화면에 "재고가
+ * 모자랍니다" 대신 `err.order.outOfStock` 이 떴다. 화면은 받은 글자를 그대로 보여 준다.
+ *
+ * 번역을 한 곳에 두고, 손으로 만드는 자리는 이 함수를 지나게 한다.
+ */
+export async function localizedMessage(error: {
+  readonly message: string;
+  readonly vars?: Vars | undefined;
+}): Promise<string> {
+  return localize(await getT(), error.message, error.vars);
+}
+
+/**
  * 도메인 오류의 문구를 이 요청의 말로 바꾼다.
  *
  * **문구 자리에 사전 열쇠를 적는다.** 계약의 Zod 문구(`valid.*`)와 같은 방식이다 — 오류를 던지는 자리는

@@ -7,7 +7,7 @@ import { getActor } from '@shop/auth/session';
 import { transitionOrder, TransitionError } from '~/lib/admin/transition-order';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -81,7 +81,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           orderNo: entry.orderNo,
           lines: [entry.line],
           code: error.code,
-          message: error.message,
+          message: await localizedMessage(error),
         });
         continue;
       }

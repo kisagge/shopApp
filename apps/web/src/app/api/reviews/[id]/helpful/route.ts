@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getSessionUser } from '@shop/auth/session';
 import { enforceRateLimit } from '~/lib/rate-limit';
 import { markHelpful, unmarkHelpful, HelpfulError } from '~/lib/reviews/helpful';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 도움이 됐다.
@@ -32,7 +32,7 @@ async function respond(
   } catch (error) {
     if (error instanceof HelpfulError) {
       return NextResponse.json(
-        { code: error.code, message: error.message },
+        { code: error.code, message: await localizedMessage(error) },
         { status: error.status },
       );
     }

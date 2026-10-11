@@ -394,7 +394,7 @@ export async function claimCouponByCode(
   });
   // 없는 코드와 못 받는 코드를 구분하지 않는다. 구분해 주면 코드를
   // 무작위로 넣어 보며 존재 여부를 알아낼 수 있다.
-  if (!coupon) throw new CouponError('NOT_FOUND', '사용할 수 없는 코드입니다.', 404);
+  if (!coupon) throw new CouponError('NOT_FOUND', 'err.coupon.notClaimable', 404);
 
   return issueCouponToUser(coupon.id, userId, now);
 }

@@ -4,7 +4,7 @@ import { updateMailTemplateSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { checkMailWording, MailTemplateError } from '~/lib/mail/templates';
 import { previewMail } from '~/lib/mail/preview';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -28,7 +28,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   const problems = checkMailWording(kind, trimmed);
   if (Object.keys(problems).length > 0) {
     const error = new MailTemplateError(problems);
-    return NextResponse.json({ code: 'INVALID_TEMPLATE', message: error.message, problems }, { status: 400 });
+    return NextResponse.json({ code: 'INVALID_TEMPLATE', message: await localizedMessage(error), problems }, { status: 400 });
   }
 
   const wording = Object.fromEntries(Object.entries(trimmed).filter(([, v]) => v !== null)) as Record<string, string>;

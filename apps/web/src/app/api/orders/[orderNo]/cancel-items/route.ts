@@ -7,7 +7,7 @@ import { revalidateCatalog } from '~/lib/cache';
 import { cancelOrderItems, previewCancelItems, CancelItemsError } from '~/lib/orders/cancel-items';
 import { CancelError } from '~/lib/orders/cancel-order';
 import { recordAudit } from '~/lib/audit';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -61,11 +61,11 @@ export async function POST(
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof CancelItemsError || error instanceof CancelError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     if (error instanceof PaymentError) {
       return NextResponse.json(
-        { code: error.code, message: error.message, retryable: error.retryable },
+        { code: error.code, message: await localizedMessage(error), retryable: error.retryable },
         { status: 502 },
       );
     }

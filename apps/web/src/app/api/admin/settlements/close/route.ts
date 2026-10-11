@@ -4,7 +4,7 @@ import { ForbiddenError, SettlementError } from '@shop/core';
 import { getActor } from '@shop/auth/session';
 import { closeSettlements, SettlementCloseError } from '~/lib/admin/close-settlement';
 import { recordAudit } from '~/lib/audit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 const bodySchema = z.object({ yearMonth: z.string().regex(/^\d{4}-\d{2}$/) });
@@ -32,10 +32,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof SettlementCloseError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     if (error instanceof SettlementError) {
-      return NextResponse.json({ code: 'INVALID_PERIOD', message: error.message }, { status: 400 });
+      return NextResponse.json({ code: 'INVALID_PERIOD', message: await localizedMessage(error) }, { status: 400 });
     }
     if (error instanceof ForbiddenError) {
       return await forbidden();

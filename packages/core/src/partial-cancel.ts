@@ -188,19 +188,19 @@ export interface PartialCancelPlan {
 
 export function planPartialCancel(input: PartialCancelInput): PartialCancelPlan {
   const wanted = new Set(input.cancelIds);
-  if (wanted.size === 0) throw new PartialCancelError('NO_ITEMS', '취소할 상품을 골라 주세요.');
+  if (wanted.size === 0) throw new PartialCancelError('NO_ITEMS', 'err.partialCancel.noItems');
 
   const byId = new Map(input.lines.map((l) => [l.id, l]));
   for (const id of wanted) {
     const line = byId.get(id);
-    if (!line) throw new PartialCancelError('UNKNOWN_ITEM', '이 주문에 없는 상품입니다.');
-    if (line.canceled) throw new PartialCancelError('ALREADY_CANCELED', '이미 취소된 상품입니다.');
+    if (!line) throw new PartialCancelError('UNKNOWN_ITEM', 'err.partialCancel.unknownItem');
+    if (line.canceled) throw new PartialCancelError('ALREADY_CANCELED', 'err.partialCancel.alreadyCanceled');
   }
 
   const active = input.lines.filter((l) => !l.canceled);
   if (active.every((l) => wanted.has(l.id))) {
     // 남는 줄이 없으면 전액 취소다. 뗀 배송비를 돌려주는 규칙이 달라서 길을 나눈다.
-    throw new PartialCancelError('ALL_ITEMS', '남는 상품이 없어 주문 전체를 취소합니다.');
+    throw new PartialCancelError('ALL_ITEMS', 'err.partialCancel.allItems');
   }
 
   const shares = sharesOf(input.lines, input.order);
@@ -238,7 +238,7 @@ export function planPartialCancel(input: PartialCancelInput): PartialCancelPlan 
   if (fromPoints > points) {
     throw new PartialCancelError(
       'SHIPPING_EXCEEDS_REFUND',
-      '이 상품만 취소하면 돌려받을 금액보다 배송비가 커집니다. 주문 전체를 취소해 주세요.',
+      'err.partialCancel.shippingExceedsRefund',
     );
   }
 

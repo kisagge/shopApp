@@ -14,7 +14,7 @@ import { closeReportsAsRemoved } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, invalidJson, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 리뷰 수정.
@@ -68,7 +68,7 @@ export async function PATCH(
 
     if (error instanceof ImageError) return await apiError(error);
     if (error instanceof ReviewError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     throw error;
   }

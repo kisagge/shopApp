@@ -8,7 +8,7 @@ import { refundOrder, RefundError } from '~/lib/admin/refund-order';
 import { cancelOrder, CancelError } from '~/lib/orders/cancel-order';
 import { revalidateCatalog } from '~/lib/cache';
 import { recordAudit } from '~/lib/audit';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 const bodySchema = z.object({
@@ -124,7 +124,7 @@ export async function POST(
       error instanceof RefundError ||
       error instanceof CancelError
     ) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     throw error;
   }

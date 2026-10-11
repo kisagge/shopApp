@@ -5,7 +5,7 @@ import { exportAdminOrders, ExportTooLargeError } from '~/lib/queries/admin/orde
 import { ScopeError } from '~/lib/queries/admin/scope';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 주문 내려받기(CSV).
@@ -99,7 +99,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     if (error instanceof ExportTooLargeError) {
-      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: error.message }, { status: 413 });
+      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: await localizedMessage(error) }, { status: 413 });
     }
     // 소속 없는 가맹점 계정은 볼 범위가 없다 — 권한 없음과 같게 답한다
     if (error instanceof ForbiddenError || error instanceof ScopeError) {

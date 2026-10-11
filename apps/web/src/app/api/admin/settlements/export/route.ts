@@ -5,7 +5,7 @@ import {
   exportSettlementLines, SettlementExportTooLargeError, SETTLEMENT_CSV_HEADER,
 } from '~/lib/admin/settlement-export';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 정산 내역 내려받기(CSV). `?period=2026-08` 과, 운영진이면 `&merchant=<id>`.
@@ -39,10 +39,10 @@ export async function GET(request: Request): Promise<Response> {
     });
   } catch (error) {
     if (error instanceof SettlementError) {
-      return NextResponse.json({ code: 'INVALID_PERIOD', message: error.message }, { status: 400 });
+      return NextResponse.json({ code: 'INVALID_PERIOD', message: await localizedMessage(error) }, { status: 400 });
     }
     if (error instanceof SettlementExportTooLargeError) {
-      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: error.message }, { status: 413 });
+      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: await localizedMessage(error) }, { status: 413 });
     }
     if (error instanceof ForbiddenError) {
       return await forbidden();

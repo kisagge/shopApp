@@ -461,7 +461,7 @@ export async function cancelOwnReturn(
       where: { id: request.id, status: 'REQUESTED' },
       data: { status: 'CANCELLED', resolvedAt: new Date(), resolvedBy: actor.id },
     });
-    if (count === 0) throw new ReturnError('ALREADY_RESOLVED', '이미 처리된 신청입니다.');
+    if (count === 0) throw new ReturnError('ALREADY_RESOLVED', 'err.return.alreadyResolved');
 
     await revertOrder(tx, {
       order,

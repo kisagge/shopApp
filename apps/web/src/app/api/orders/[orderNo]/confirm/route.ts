@@ -3,7 +3,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { PaymentError } from '@shop/core';
 import { NextResponse } from 'next/server';
 import { confirmPayment, ConfirmError } from '~/lib/orders/confirm-payment';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /** 결제 승인. 결제창이 콜백한 paymentKey 를 받아 PG 에 승인을 요청한다. */
@@ -27,12 +27,12 @@ export async function POST(
     );
   } catch (error) {
     if (error instanceof ConfirmError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     if (error instanceof PaymentError) {
       // 재시도해도 되는 오류인지 화면이 알아야 한다
       return NextResponse.json(
-        { code: error.code, message: error.message, retryable: error.retryable },
+        { code: error.code, message: await localizedMessage(error), retryable: error.retryable },
         { status: 402 },
       );
     }

@@ -4,7 +4,7 @@ import { getActor } from '@shop/auth/session';
 import { exportStock, StockExportTooLargeError, STOCK_CSV_HEADER } from '~/lib/admin/bulk-stock';
 import { ProductError } from '~/lib/admin/manage-product';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 재고 내려받기(CSV).
@@ -37,7 +37,7 @@ export async function GET(request: Request): Promise<Response> {
     });
   } catch (error) {
     if (error instanceof StockExportTooLargeError) {
-      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: error.message }, { status: 413 });
+      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: await localizedMessage(error) }, { status: 413 });
     }
     if (error instanceof ForbiddenError || error instanceof ProductError) {
       return await forbidden();

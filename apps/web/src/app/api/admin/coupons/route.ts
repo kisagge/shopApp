@@ -5,7 +5,7 @@ import { ForbiddenError } from '@shop/core';
 import { listCoupons, createCoupon, CouponError } from '~/lib/admin/manage-coupon';
 import { recordAudit } from '~/lib/audit';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 export async function GET(request: Request): Promise<NextResponse> {
   const actor = await getActor(request.headers);
@@ -16,7 +16,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     return NextResponse.json({ coupons: await listCoupons(actor) });
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: error.message }, { status: 403 });
+      return NextResponse.json({ code: 'FORBIDDEN', message: await localizedMessage(error) }, { status: 403 });
     }
     throw error;
   }
@@ -53,12 +53,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error) {
     if (error instanceof CouponError) {
       return NextResponse.json(
-        { code: error.code, message: error.message, fields: error.fields },
+        { code: error.code, message: await localizedMessage(error), fields: error.fields },
         { status: error.status },
       );
     }
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: error.message }, { status: 403 });
+      return NextResponse.json({ code: 'FORBIDDEN', message: await localizedMessage(error) }, { status: 403 });
     }
     throw error;
   }

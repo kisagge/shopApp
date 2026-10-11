@@ -6,6 +6,7 @@ import { NextResponse } from 'next/server';
 import { getQuoteViewer } from '~/lib/grade/effective';
 import { quoteCart } from '~/lib/queries/cart';
 import { readBody } from '~/lib/api/read-body';
+import { localizedMessage } from '~/lib/api/respond';
 
 /**
  * 장바구니 견적.
@@ -39,7 +40,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json(await quoteCart(parsed.data, viewer));
   } catch (error) {
     if (error instanceof MoneyError) {
-      return NextResponse.json({ code: 'INVALID_AMOUNT', message: error.message }, { status: 400 });
+      return NextResponse.json({ code: 'INVALID_AMOUNT', message: await localizedMessage(error) }, { status: 400 });
     }
     throw error;
   }

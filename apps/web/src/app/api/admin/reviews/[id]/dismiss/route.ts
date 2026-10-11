@@ -3,7 +3,7 @@ import { getActor } from '@shop/auth/session';
 import { assertPermission, ForbiddenError } from '@shop/core';
 import { dismissReports, ReviewReportError } from '~/lib/reviews/report';
 import { recordAudit } from '~/lib/audit';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 신고를 "문제없음" 으로 닫는다. 글은 그대로 둔다.
@@ -37,10 +37,10 @@ export async function POST(
     return NextResponse.json(result);
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: error.message }, { status: 403 });
+      return NextResponse.json({ code: 'FORBIDDEN', message: await localizedMessage(error) }, { status: 403 });
     }
     if (error instanceof ReviewReportError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     throw error;
   }

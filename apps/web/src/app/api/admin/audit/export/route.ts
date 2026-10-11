@@ -5,7 +5,7 @@ import { exportAuditLogs, AuditExportTooLargeError } from '~/lib/queries/audit-l
 import { actionLabel, targetLabel } from '~/lib/admin/audit-labels';
 import { recordAudit } from '~/lib/audit';
 import { enforceRateLimit } from '~/lib/rate-limit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 감사 로그 내려받기(CSV).
@@ -89,10 +89,10 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch (error) {
     if (error instanceof AuditExportTooLargeError) {
-      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: error.message }, { status: 413 });
+      return NextResponse.json({ code: 'EXPORT_TOO_LARGE', message: await localizedMessage(error) }, { status: 413 });
     }
     if (error instanceof OrderSearchError) {
-      return NextResponse.json({ code: 'INVALID_RANGE', message: error.message }, { status: 400 });
+      return NextResponse.json({ code: 'INVALID_RANGE', message: await localizedMessage(error) }, { status: 400 });
     }
     if (error instanceof ForbiddenError) {
       return await forbidden();

@@ -4,7 +4,7 @@ import { updateMailTemplateSchema } from '@shop/contract';
 import { getActor } from '@shop/auth/session';
 import { saveMailTemplate, MailTemplateError } from '~/lib/mail/templates';
 import { recordAudit } from '~/lib/audit';
-import { forbidden, unauthorized } from '~/lib/api/respond';
+import { forbidden, localizedMessage, unauthorized } from '~/lib/api/respond';
 import { readBody } from '~/lib/api/read-body';
 
 /**
@@ -35,7 +35,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     return NextResponse.json(after);
   } catch (error) {
     if (error instanceof MailTemplateError) {
-      return NextResponse.json({ code: 'INVALID_TEMPLATE', message: error.message, problems: error.problems }, { status: 400 });
+      return NextResponse.json({ code: 'INVALID_TEMPLATE', message: await localizedMessage(error), problems: error.problems }, { status: 400 });
     }
     if (error instanceof ForbiddenError) {
       return await forbidden();

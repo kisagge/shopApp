@@ -12,6 +12,17 @@ import { DICTIONARIES } from '@shop/i18n/all';
  *
  * 되돌아오기 쉽다. 새 오류를 더할 때 옆줄을 복사하는 것이 가장 손쉬운 길이고, **한국어로 보면 멀쩡하다.**
  *
+ * ── 이 목록이 손 목록이라는 것 ───────────────────────────────
+ * **그래서 셋이 빠져 있었다.** 일부 취소(손님이 누른다)·쿠폰 받기·부분 취소 셈이 목록 밖에
+ * 있었고, 거기서 나간 문구는 한국어였다 — 일본어로 일부 취소를 눌렀다가 막힌 사람은 한국어
+ * 문장을 봤다. 저장소는 다른 훑기에서 "손 목록은 늘 늦게 자란다" 를 이미 배웠는데
+ * (`rate-limit-coverage`), 이 자리는 여전히 손 목록이다.
+ *
+ * 폴더에서 찾는 쪽으로 뒤집으려면 "손님이 닿는 파일" 을 기계가 알아야 하고, 그것은 창구에서
+ * import 를 따라가야 아는 값이다(운영과 같은 파일을 공유하는 자리도 있다 — manage-coupon 은
+ * 손님의 코드 등록과 운영의 쿠폰 관리를 함께 담는다). **그 추적을 검사에 넣는 것이 다음 일이다.**
+ * 지금은 목록을 메우고, 빠졌었다는 사실을 여기 적어 둔다.
+ *
  * ── 운영 화면은 한국어다 ─────────────────────────────────────
  * 운영진이 쓰는 화면은 한국어라고 정해 두었다(api/respond 의 주석). 그래서 여기서 보는 것은 **손님이
  * 닿는 자리**뿐이다 — 아래 목록이 그 자리다. 운영 전용 문구는 한국어로 남아 있어도 된다.
@@ -30,6 +41,10 @@ const CUSTOMER_FACING = [
   'apps/web/src/lib/restock/notify.ts',
   'apps/web/src/lib/account/close-account.ts',
   'apps/web/src/lib/reviews/helpful.ts',
+  // 전수조사로 뒤늦게 찾은 자리 — 손님이 직접 부르는데 목록에 없었다
+  'apps/web/src/lib/orders/cancel-items.ts',
+  'apps/web/src/lib/coupons/downloadable.ts',
+  'packages/core/src/partial-cancel.ts',
   'packages/core/src/image.ts',
   'packages/core/src/restock.ts',
   'packages/core/src/exchange.ts',

@@ -10,7 +10,7 @@ import { readJsonWithImages } from '~/lib/images/read-body';
 import type { UploadedImage } from '~/lib/images/upload-files';
 import { StorageError } from '~/lib/storage';
 import { validationFailed } from '~/lib/i18n/validation';
-import { apiError, failWith, invalidJson, unauthorized } from '~/lib/api/respond';
+import { apiError, failWith, invalidJson, localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 문의 작성 — 상품 문의와 1:1 문의.
@@ -46,7 +46,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   if (files.length > 0 && parsed.data.productId != null) {
     const error = new InquiryError('IMAGES_SUPPORT_ONLY', 400);
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+    return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
   }
 
   let uploaded: UploadedImage[] = [];

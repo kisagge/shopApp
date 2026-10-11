@@ -4,7 +4,7 @@ import { assertPermission, ForbiddenError } from '@shop/core';
 import { restoreReview, ReviewError } from '~/lib/reviews/write-review';
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /** 내린 글을 되돌린다. 잘못 내린 것을 고칠 수 있어야 한다. */
 export async function POST(
@@ -30,10 +30,10 @@ export async function POST(
     return NextResponse.json({ restored: true });
   } catch (error) {
     if (error instanceof ForbiddenError) {
-      return NextResponse.json({ code: 'FORBIDDEN', message: error.message }, { status: 403 });
+      return NextResponse.json({ code: 'FORBIDDEN', message: await localizedMessage(error) }, { status: 403 });
     }
     if (error instanceof ReviewError) {
-      return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+      return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
     }
     throw error;
   }

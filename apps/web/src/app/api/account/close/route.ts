@@ -5,7 +5,7 @@ import { getSessionUser } from '@shop/auth/session';
 import { closeAccount, ClosureError } from '~/lib/account/close-account';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 /**
  * 회원 탈퇴.
@@ -48,7 +48,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (error) {
     if (error instanceof ClosureError) {
       return NextResponse.json(
-        { code: error.code, message: error.message, blocks: error.blocks },
+        { code: error.code, message: await localizedMessage(error), blocks: error.blocks },
         { status: error.status },
       );
     }

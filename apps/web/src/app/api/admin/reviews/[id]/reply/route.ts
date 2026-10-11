@@ -5,7 +5,7 @@ import { replyToReview, deleteReviewReply, ReviewReplyError } from '~/lib/review
 import { recordAudit } from '~/lib/audit';
 import { revalidateReviews } from '~/lib/cache';
 import { validationFailed } from '~/lib/i18n/validation';
-import { unauthorized } from '~/lib/api/respond';
+import { localizedMessage, unauthorized } from '~/lib/api/respond';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -32,7 +32,7 @@ export async function PUT(request: Request, { params }: Params): Promise<NextRes
     await recordAudit({ actor, action: 'review.reply', targetType: 'review', targetId: id, before, after, request });
     return NextResponse.json(after);
   } catch (error) {
-    return failed(error);
+    return await failed(error);
   }
 }
 
@@ -49,13 +49,13 @@ export async function DELETE(request: Request, { params }: Params): Promise<Next
     await recordAudit({ actor, action: 'review.reply.delete', targetType: 'review', targetId: id, before, request });
     return NextResponse.json({ deleted: true });
   } catch (error) {
-    return failed(error);
+    return await failed(error);
   }
 }
 
-function failed(error: unknown): NextResponse {
+async function failed(error: unknown): Promise<NextResponse> {
   if (error instanceof ReviewReplyError) {
-    return NextResponse.json({ code: error.code, message: error.message }, { status: error.status });
+    return NextResponse.json({ code: error.code, message: await localizedMessage(error) }, { status: error.status });
   }
   throw error;
 }
