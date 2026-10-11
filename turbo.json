@@ -5,6 +5,11 @@
     "NODE_ENV"
   ],
   "globalPassThroughEnv": [
+    // **문지기가 믿는 조건이 실제로 닿아야 한다.** `GATE=1` 을 ci-local.sh 가 내보내는데
+    // 여기 없어서 Playwright 까지 가지 못했다 — 그동안 로컬 문지기의 retries 는 0, forbidOnly 는
+    // off 였다. "재시도로 통과한 검사가 있습니다" 를 말해 주는 그물도 같이 꺼져 있던 셈이다.
+    "GATE",
+    "CI",
     "DATABASE_URL",
     "BETTER_AUTH_SECRET",
     "BETTER_AUTH_URL",

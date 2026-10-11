@@ -39,7 +39,19 @@ test('보관하면 매대에서 빠지고 보관함에 모이며, 되돌리면 �
     expect(listed.ok(), `사본을 판매중으로 못 올렸다 (${listed.status()}) ${await listed.text()}`).toBe(true);
     const { slug } = (await listed.json()) as { slug: string };
 
-    expect((await gp.goto(`/product/${slug}`))?.status(), '판매중으로 올린 사본이 안 열린다').toBe(200);
+    /*
+     * **매대 반영은 그 즉시가 아니다.** 상품 상세는 태그로 묶은 캐시를 읽고(`TAG.catalog`),
+     * 올리거나 보관하는 창구가 그 태그를 턴다 — 터는 것과 다음 요청이 새로 읽는 것 사이에는
+     * 틈이 있다. 한 번만 찔러 보고 단정하면 그 틈에서 산발로 진다(실제로 한 번 그렇게 졌고,
+     * 그때는 재시도마저 꺼져 있어 깜빡임인지 고장인지 가릴 수도 없었다).
+     * 그래서 **상태가 바뀌기를 기다린다** — 기다려도 안 바뀌면 그때는 진짜 고장이다.
+     */
+    await expect
+      .poll(async () => (await gp.goto(`/product/${slug}`))?.status(), {
+        timeout: 15_000,
+        message: '판매중으로 올린 사본이 안 열린다',
+      })
+      .toBe(200);
 
     // ── 보관: 누르기 전에 무엇이 멈추고 남는지 듣는다
     await page.goto(`/admin/products/${copyId}`);
@@ -61,7 +73,12 @@ test('보관하면 매대에서 빠지고 보관함에 모이며, 되돌리면 �
     await expect(row.getByText('판매중')).toBeVisible();
 
     // 손님에게는 없는 상품이고, 운영 수정 화면도 없다
-    expect((await gp.goto(`/product/${slug}`))?.status(), '보관한 상품이 매대에 남았다').toBe(404);
+    await expect
+      .poll(async () => (await gp.goto(`/product/${slug}`))?.status(), {
+        timeout: 15_000,
+        message: '보관한 상품이 매대에 남았다',
+      })
+      .toBe(404);
     expect((await page.request.get(`/admin/products/${copyId}`))?.status()).toBe(404);
 
     // ── 되돌리기: 한 번에, 결과는 목록 위에서
@@ -71,7 +88,12 @@ test('보관하면 매대에서 빠지고 보관함에 모이며, 되돌리면 �
     await expect(row).toHaveCount(0, { timeout: 15_000 });
 
     // 보관 전 상태(판매중)로 돌아와 같은 주소가 다시 열린다
-    expect((await gp.goto(`/product/${slug}`))?.status(), '되돌렸는데 매대에 안 돌아왔다').toBe(200);
+    await expect
+      .poll(async () => (await gp.goto(`/product/${slug}`))?.status(), {
+        timeout: 15_000,
+        message: '되돌렸는데 매대에 안 돌아왔다',
+      })
+      .toBe(200);
   } finally {
     // 사본은 다시 보관해 둔다 — 매대에 검사용 상품이 남지 않게
     if (copyId) await page.request.patch(`/api/admin/products/${copyId}/archive`, { data: { action: 'ARCHIVE' } });
