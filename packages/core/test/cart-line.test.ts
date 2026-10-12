@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  variantUnavailable, swapLineVariant, planReorder,
-  type VariantState, type ReorderVariant,
+  variantUnavailable, swapLineVariant, planReorder, REORDER_SKIP,
+  type VariantState, type ReorderVariant, type ReorderSkip,
 } from '../src/cart-line';
 import { MAX_CART_LINES, MAX_QUANTITY } from '../src/cart-sync';
 import { PRODUCT_STATUS, isVisibleStatus } from '../src/product-publish';
@@ -212,5 +212,60 @@ describe('다시 담기', () => {
       full,
     );
     expect(plan.add.map((l) => l.variantId)).toEqual(['a']);
+  });
+});
+
+/**
+ * **다시 담지 못한 까닭은 넷뿐이다.**
+ *
+ * 네 값은 각각 검사가 있다(위). 빠진 것은 **값이 하나 늘었을 때 지는 검사**다 — 까닭을 하나
+ * 더하면서 화면에 그 말을 붙이는 것을 잊으면, 손님은 담기지 않은 줄을 보고 까닭을 못 듣는다.
+ * 그래서 까닭마다 "그것이 실제로 나오는 입력" 을 표로 세운다. 값이 늘면 표에 없어 검사가 먼저 진다.
+ */
+describe('다시 담지 못한 까닭 — 넷뿐이다', () => {
+  /** 까닭 → 그 까닭이 나오는 가장 작은 입력 */
+  const CAUSE: Readonly<Record<ReorderSkip, () => ReturnType<typeof planReorder>>> = {
+    CANCELED: () =>
+      planReorder([{ variantId: 'a', quantity: 1, canceled: true }], new Map([['a', stocked(5)]]), new Set()),
+    UNAVAILABLE: () =>
+      planReorder(
+        [{ variantId: 'a', quantity: 1, canceled: false }],
+        new Map([['a', stocked(5, { productStatus: 'DRAFT' })]]),
+        new Set(),
+      ),
+    SOLD_OUT: () =>
+      planReorder([{ variantId: 'a', quantity: 1, canceled: false }], new Map([['a', stocked(0)]]), new Set()),
+    CART_FULL: () =>
+      planReorder(
+        [{ variantId: 'z', quantity: 1, canceled: false }],
+        new Map([['z', stocked(5)]]),
+        new Set(Array.from({ length: MAX_CART_LINES }, (_, i) => `c-${i}`)),
+      ),
+  };
+
+  it.each([...REORDER_SKIP])('%s 는 planReorder 가 실제로 내놓는 까닭이다', (reason) => {
+    const plan = CAUSE[reason]();
+
+    expect(plan.skipped.map((s) => s.reason), reason).toContain(reason);
+  });
+
+  it('표의 열쇠가 REORDER_SKIP 과 같은 집합이다', () => {
+    expect(Object.keys(CAUSE).toSorted()).toEqual([...REORDER_SKIP].toSorted());
+  });
+
+  /** 담지 못했으면 반드시 까닭이 남는다 — 조용히 빠지면 손님은 줄이 사라진 줄 안다 */
+  it('담기지 않은 줄에는 늘 까닭이 붙는다', () => {
+    const plan = planReorder(
+      [
+        { variantId: 'a', quantity: 1, canceled: true },
+        { variantId: 'b', quantity: 1, canceled: false },
+        { variantId: 'c', quantity: 1, canceled: false },
+      ],
+      new Map([['b', stocked(0)], ['c', stocked(3)]]),
+      new Set(),
+    );
+
+    const accounted = plan.add.length + plan.skipped.length;
+    expect(accounted).toBe(3);
   });
 });

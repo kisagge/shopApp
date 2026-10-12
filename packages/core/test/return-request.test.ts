@@ -2,8 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   shippingBorneBy, returnWindowDays, checkReturnEligibility, canRequestReturn,
   availableReturnReasons, isOpenReturn, canCancelOwnReturn, OPEN_RETURN_STATUS,
-  RETURN_REASON, returnDeadline,
+  RETURN_REASON, returnDeadline, isReturnableLine, RETURNABLE_LINE_STATUS,
 } from '../src/return-request';
+import { ORDER_STATUS } from '../src/order-state';
 import { kstDayIndex, kstDayStart } from '../src/kst';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -328,6 +329,54 @@ describe('신청 버튼을 띄울지 — 가장 넉넉한 기한의 경계', () 
         RETURN_REASON.some((reason) =>
           checkReturnEligibility({ status: 'DELIVERED', deliveredAt, reason, now }).ok),
         String(at),
+      ).toBe(true);
+    }
+  });
+});
+
+/**
+ * **돌려보낼 수 있는 줄** — 검사가 한 줄도 없었다.
+ *
+ * 주석은 "신청 창구가 고를 수 있는 줄을 거르고, 화면이 체크박스로 내미는 줄도 이것으로 거른다 —
+ * 둘이 따로 적으면 화면이 내민 줄을 서버가 거절한다" 고 적어 두었는데, 그 약속을 지키는 검사가
+ * 없었다. 거르는 자리는 둘이다: 주문 상세 화면과 신청 창구(`lib/orders/return-request`).
+ *
+ * 상태를 하나 더하면 둘 중 한쪽만 고쳐질 수 있고, 그때 손님은 **고를 수 있는 줄을 골라 제출하고
+ * 나서야** 안 된다는 말을 듣는다.
+ */
+describe('돌려보낼 수 있는 줄', () => {
+  const line = (status: typeof ORDER_STATUS[number], canceledAt: Date | null = null) =>
+    ({ status, canceledAt });
+
+  it.each([...ORDER_STATUS])('%s — 목록과 한 글자도 어긋나지 않는다', (status) => {
+    expect(isReturnableLine(line(status)))
+      .toBe((RETURNABLE_LINE_STATUS as readonly string[]).includes(status));
+  });
+
+  /** 취소된 줄은 이미 돈이 돌아갔다 — 다시 돌려보낼 것이 없다 */
+  it.each([...ORDER_STATUS])('%s — 취소된 줄은 어느 상태에서도 돌려보내지 않는다', (status) => {
+    expect(isReturnableLine(line(status, new Date('2026-09-01T00:00:00+09:00')))).toBe(false);
+  });
+
+  it('받았거나 받는 중인 것만이다', () => {
+    expect([...RETURNABLE_LINE_STATUS]).toEqual(['SHIPPED', 'DELIVERED', 'CONFIRMED']);
+  });
+
+  /**
+   * **줄이 돌려보낼 수 있으면 신청도 받아야 한다.** 화면은 줄 판정으로 체크박스를 내밀고, 창구는
+   * 주문 단위로 다시 본다 — 둘이 갈리면 내민 줄을 서버가 거절한다. 하자 사유(가장 넉넉한 기한)로
+   * 모든 상태를 맞춰 본다.
+   */
+  it('줄을 내밀 수 있는 상태면 신청 창구도 받는다', () => {
+    const deliveredAt = new Date('2026-09-01T10:00:00+09:00');
+    const now = new Date('2026-09-05T10:00:00+09:00');
+
+    for (const status of ORDER_STATUS) {
+      const offered = isReturnableLine(line(status));
+      if (!offered) continue;
+      expect(
+        checkReturnEligibility({ status, deliveredAt, reason: 'DEFECT', now }).ok,
+        `${status} — 화면이 내민 줄을 창구가 거절한다`,
       ).toBe(true);
     }
   });

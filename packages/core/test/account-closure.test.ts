@@ -3,6 +3,8 @@ import {
   checkClosure, closedAccountEmail, isClosedAccountEmail,
   CLOSURE_EFFECT, CLOSURE_CONFIRM_PHRASE,
 } from '../src/account-closure';
+import { ORDER_STATUS, notSentYet, holdsInventory } from '../src/order-state';
+import { canRequestReturn } from '../src/return-request';
 
 const order = (over: Record<string, unknown> = {}) =>
   ({ status: 'CONFIRMED', returnable: false, ...over }) as any;
@@ -117,5 +119,60 @@ describe('안내 표', () => {
 
   it('확인 문구가 비어 있지 않다', () => {
     expect(CLOSURE_CONFIRM_PHRASE.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * **막는 상태를 전수로 본다.**
+ *
+ * 네 값을 손으로 적은 루프가 있었다(위) — 그 목록에 상태를 빠뜨려도 검사는 통과한다. 상태가
+ * 하나 늘면 "아직 배송 중인데 탈퇴가 되는" 자리가 조용히 생기고, 탈퇴는 **되돌릴 수 없다.**
+ *
+ * 여집합도 함께 못 박는다. 막는 쪽만 보면 "전부 막는" 구현도 통과하는데, 그러면 아무도
+ * 탈퇴하지 못한다 — 그것도 고장이다.
+ */
+describe('탈퇴를 막는 상태 — 전수로', () => {
+  const ask = (status: typeof ORDER_STATUS[number], returnable = false) =>
+    checkClosure({ role: 'CUSTOMER', orders: [order({ status, returnable })] });
+
+  /** 아직 보낼 일이 남았거나 가는 중인 주문 = 받기 전이다. 그 사이에 계정이 사라지면 안 된다 */
+  it.each([...ORDER_STATUS])('%s — 가는 중인 주문만 배송으로 막는다', (status) => {
+    const blocked = ask(status).blocks.includes('IN_FLIGHT_ORDER');
+
+    expect(blocked).toBe(notSentYet(status) || status === 'SHIPPED');
+  });
+
+  it.each([...ORDER_STATUS])('%s — 반품 기간이 남아 있으면 무조건 막는다', (status) => {
+    expect(ask(status, true).allowed).toBe(false);
+  });
+
+  /** 막는 이유가 하나도 없는 상태는 이것뿐이다 — 상태가 늘면 이 목록이 먼저 진다 */
+  it('끝난 주문만 탈퇴를 막지 않는다', () => {
+    const free = ORDER_STATUS.filter((status) => ask(status).allowed);
+
+    expect([...free]).toEqual(['DELIVERED', 'CONFIRMED', 'CANCELLED', 'RETURNED', 'REFUNDED']);
+  });
+
+  /**
+   * **반품 신청을 받는 주문은 반드시 탈퇴를 막는다.** 탈퇴하면 신청할 길이 없어지므로, 한쪽이
+   * "아직 신청할 수 있다" 고 하면서 다른 쪽이 계정을 닫으면 손님은 물건을 돌려보낼 수 없다.
+   */
+  it('반품 신청을 받는 주문은 탈퇴를 막는다', () => {
+    const deliveredAt = new Date('2026-09-01T10:00:00+09:00');
+    const now = new Date('2026-09-03T10:00:00+09:00');
+
+    for (const status of ORDER_STATUS) {
+      const canReturn = canRequestReturn({ status, deliveredAt, now });
+      if (!canReturn) continue;
+      expect(ask(status, true).allowed, `${status} — 신청은 받는데 탈퇴가 된다`).toBe(false);
+    }
+  });
+
+  /** 재고를 붙잡고 있다 = 아직 거래가 끝나지 않았다. 그 상태에서 막지 않는 것은 DELIVERED·CONFIRMED 뿐이다 */
+  it('재고를 쥔 주문 중 막지 않는 것은 받은 뒤의 둘뿐이다', () => {
+    const holding = ORDER_STATUS.filter(holdsInventory);
+    const notBlocked = holding.filter((status) => ask(status).allowed);
+
+    expect([...notBlocked]).toEqual(['DELIVERED', 'CONFIRMED']);
   });
 });
