@@ -12,6 +12,12 @@ const strip = 'section[aria-labelledby="rec-heading"]';
 
 test('모든 상품에 추천 줄이 있다', async ({ page }) => {
   await page.goto('/');
+  /*
+   * **홈은 조각마다 흘러온다.** 격자는 자기 조회가 끝난 뒤에 오므로, 바로 읽으면 빈 손이다
+   * (첫 바이트를 데이터에 묶어 두지 않으려고 그렇게 바꿨다 — 홈의 스트리밍 경계).
+   * 여기서 보는 것은 추천 줄이지 홈이 언제 차는가가 아니다. 들어올 때까지 기다린다.
+   */
+  await page.locator('#main a[href^="/product/"]').first().waitFor();
 
   const hrefs = await page.locator('#main a[href^="/product/"]').evaluateAll((els) =>
     [...new Set(els.map((e) => (e as HTMLAnchorElement).getAttribute('href')!))].slice(0, 4),

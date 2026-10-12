@@ -1,9 +1,18 @@
 import type { Metadata } from 'next';
 import { requireAdmin } from '~/lib/admin/guard';
-import { getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
+import { getRouteVitals, getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
 import {
   VITAL_THRESHOLD, formatVital, CLIENT_PLATFORM, CLIENT_PLATFORM_LABEL,
 } from '@shop/core';
+
+/**
+ * 화면별 표에 세울 지표.
+ *
+ * **그리는 데까지 걸린 시간만 본다.** INP 는 누른 뒤의 이야기라 "어느 화면이 늦게 뜨나" 와
+ * 섞이고, CLS 는 단위가 없어 같은 줄에 두면 밀리초로 읽힌다. 다섯을 다 세우면 가로로도 길어져
+ * 폰에서는 아무것도 못 읽는다.
+ */
+const PAINT_VITALS = ['LCP', 'FCP', 'TTFB'] as const;
 
 export const metadata: Metadata = { title: '트래픽 추이' };
 export const dynamic = 'force-dynamic';
@@ -20,9 +29,10 @@ export const dynamic = 'force-dynamic';
  */
 export default async function TrafficPage() {
   const actor = await requireAdmin();
-  const [{ months, rawSince }, { vitals, since }] = await Promise.all([
+  const [{ months, rawSince }, { vitals, since }, { routes, minSamples }] = await Promise.all([
     getTrafficHistory(actor),
     getWebVitals(actor),
+    getRouteVitals(actor),
   ]);
 
   const peak = Math.max(1, ...months.map((m) => m.viewItems));
@@ -172,6 +182,92 @@ export default async function TrafficPage() {
                                   )}
                                 </span>
                                 {/* 색만으로 말하지 않는다 — 위 타일과 같은 규칙 */}
+                                <span className="block text-[10px] text-[var(--fg-muted)]">
+                                  {cell.rating === 'good'
+                                    ? '좋음'
+                                    : cell.rating === 'poor'
+                                      ? '나쁨'
+                                      : '개선 필요'}
+                                  {' · 표본 '}
+                                  {cell.samples.toLocaleString('ko-KR')}
+                                </span>
+                              </>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/*
+            **"느리다" 까지만 말하면 고치러 갈 데가 없다.**
+
+            위의 값들은 전부 섞은 것이라 어느 화면이 끌어내리는지 모른다. 그 값은 이미 모으고
+            있었다 — 이벤트마다 주소가 붙는다. 보여 주지 않았을 뿐이다. 느린 쪽부터 세운다.
+
+            주소는 묶는다. 상품마다 다른 주소를 그대로 세우면 상품 수만큼 줄이 생기고, 줄마다
+            표본이 하나씩이라 아무 말도 못 한다.
+          */}
+          {routes.length > 0 && (
+            <div
+              className="table-scroll mt-6"
+              tabIndex={0}
+              role="region"
+              aria-label="화면별 실사용자 성능"
+            >
+              <table className="data-table border-collapse text-[13px]">
+                <caption className="mb-2 text-left text-[12px] text-[var(--fg-muted)]">
+                  느린 화면부터. 상품·분류처럼 주소가 저마다 다른 화면은 한 칸으로 묶었습니다.
+                  표본이 {minSamples}개가 안 되는 화면은 세우지 않습니다 — 75 백분위는 표본이
+                  적으면 &ldquo;둘째로 느린 값&rdquo; 과 다르지 않고, 그 줄을 먼저 고치게 됩니다.
+                </caption>
+                <thead>
+                  <tr className="border-b border-[var(--border)]">
+                    <th scope="col" className="py-2 text-left font-medium text-[var(--fg-muted)]">
+                      화면
+                    </th>
+                    {PAINT_VITALS.map((metric) => (
+                      <th
+                        key={metric}
+                        scope="col"
+                        className="py-2 text-right font-medium text-[var(--fg-muted)]"
+                      >
+                        {metric}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {routes.map((row) => (
+                    <tr key={row.route} className="border-b border-[var(--border)] last:border-0">
+                      <th scope="row" className="py-2 text-left font-normal">
+                        <span className="tnum">{row.route}</span>
+                      </th>
+                      {PAINT_VITALS.map((metric) => {
+                        const cell = row.cells[metric];
+                        return (
+                          <td key={metric} className="tnum py-2 text-right">
+                            {cell.p75 === null ? (
+                              <span className="text-[var(--fg-muted)]">—</span>
+                            ) : (
+                              <>
+                                <span
+                                  className={
+                                    cell.rating === 'good'
+                                      ? 'text-success'
+                                      : cell.rating === 'poor'
+                                        ? 'text-accent'
+                                        : 'text-warning'
+                                  }
+                                >
+                                  {formatVital(metric, cell.p75)}
+                                  <span className="ml-0.5 text-[11px] font-normal">ms</span>
+                                </span>
+                                {/* 색만으로 말하지 않는다 — 위 표와 같은 규칙 */}
                                 <span className="block text-[10px] text-[var(--fg-muted)]">
                                   {cell.rating === 'good'
                                     ? '좋음'

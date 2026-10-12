@@ -7,7 +7,8 @@ const requireAdmin = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/guard', () => ({ requireAdmin }));
 const getWebVitals = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const getTrafficHistory = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
-vi.mock('~/lib/queries/admin/traffic', () => ({ getWebVitals, getTrafficHistory }));
+const getRouteVitals = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/queries/admin/traffic', () => ({ getWebVitals, getTrafficHistory, getRouteVitals }));
 vi.mock('@shop/db', () => ({ prisma: {} }));
 
 const Page = (await import('~/app/admin/traffic/page')).default;
@@ -51,6 +52,7 @@ beforeEach(() => {
   requireAdmin.mockResolvedValue(admin);
   getTrafficHistory.mockResolvedValue({ months: [], rawSince: '2026-06-18' });
   getWebVitals.mockResolvedValue({ vitals: EMPTY, since: new Date('2026-08-19T00:00:00Z') });
+  getRouteVitals.mockResolvedValue({ routes: [], since: new Date('2026-08-19T00:00:00Z'), minSamples: 10 });
 });
 
 const renderPage = async () => render(await Page());
@@ -142,5 +144,101 @@ describe('플랫폼별 성능 표', () => {
     const { container } = await renderPage();
 
     expect(container.querySelector('caption')?.textContent).toMatch(/앱 웹뷰/);
+  });
+});
+
+/**
+ * **"느리다" 까지만 말하면 고치러 갈 데가 없다.**
+ *
+ * 프로덕션에서 FCP 3.7초를 보고도 어디를 고칠지는 코드를 읽어 짐작해야 했다 — 지표 다섯 칸은
+ * 전부 섞은 값이라 어느 화면이 끌어내리는지 말하지 않는다. 그 값은 이미 모으고 있었다.
+ */
+describe('화면별 성능 표', () => {
+  const route = (name: string, lcp: number, rating: VitalRating, samples = 40) => ({
+    route: name,
+    cells: Object.fromEntries(
+      WEB_VITAL.map((metric) => [
+        metric,
+        metric === 'LCP' ? cell(lcp, rating, samples) : cell(null, null, 0),
+      ]),
+    ),
+  });
+
+  const withRoutes = (...routes: ReturnType<typeof route>[]) =>
+    getRouteVitals.mockResolvedValue({
+      routes, since: new Date('2026-08-19T00:00:00Z'), minSamples: 10,
+    });
+
+  it('모인 줄이 없으면 표를 그리지 않는다 — 빈 표는 없는 것만 못하다', async () => {
+    await renderPage();
+
+    expect(screen.queryByRole('region', { name: '화면별 실사용자 성능' })).toBeNull();
+  });
+
+  it('화면과 값을 적는다', async () => {
+    withRoutes(route('/product/:id', 4200, 'poor'));
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    expect(within(table).getByText('/product/:id')).toBeDefined();
+    expect(within(table).getByText('4200')).toBeDefined();
+  });
+
+  /** 색만으로 말하면 색을 못 보는 사람에게는 같은 숫자다 — 위 표와 같은 규칙 */
+  it('판정과 표본을 글자로 적는다', async () => {
+    withRoutes(route('/product/:id', 4200, 'poor', 37));
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    expect(within(table).getByText(/나쁨 · 표본 37/)).toBeDefined();
+  });
+
+  /** 값이 없는 칸에 0 을 적으면 "아주 빠름" 으로 읽힌다 */
+  it('안 온 지표는 빈 칸으로 둔다', async () => {
+    withRoutes(route('/product/:id', 4200, 'poor'));
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    expect(within(table).getAllByText('—').length).toBeGreaterThan(0);
+  });
+
+  /**
+   * **그리는 데까지 걸린 시간만 세운다.** INP 는 누른 뒤의 이야기라 "어느 화면이 늦게 뜨나" 와
+   * 섞이고, CLS 는 단위가 없어 같은 줄에 두면 밀리초로 읽힌다.
+   */
+  it('LCP·FCP·TTFB 세 칸만 둔다', async () => {
+    withRoutes(route('/', 2000, 'needs-improvement'));
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent);
+    expect(heads).toEqual(['화면', 'LCP', 'FCP', 'TTFB']);
+  });
+
+  /** 표본이 적은 줄을 세우면 그 줄을 먼저 고치게 된다 — 그 기준을 화면이 말한다 */
+  it('표본 기준을 사람에게 말한다', async () => {
+    withRoutes(route('/', 2000, 'needs-improvement'));
+
+    await renderPage();
+
+    expect(screen.getByText(/표본이 10개가 안 되는 화면은 세우지 않습니다/)).toBeDefined();
+  });
+
+  it('줄이 여럿이면 받은 차례대로 세운다 — 느린 쪽부터는 조회가 정한다', async () => {
+    withRoutes(
+      route('/product/:id', 4200, 'poor'),
+      route('/category/:id', 3100, 'needs-improvement'),
+      route('/', 1800, 'good'),
+    );
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    const names = within(table).getAllByRole('rowheader').map((h) => h.textContent);
+    expect(names).toEqual(['/product/:id', '/category/:id', '/']);
   });
 });

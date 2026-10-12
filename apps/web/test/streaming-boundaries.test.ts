@@ -16,6 +16,59 @@ import { appFile } from './app-routes';
 
 const SRC = join(process.cwd(), 'src');
 const page = readFileSync(appFile('/product/[slug]'), 'utf8');
+const home = readFileSync(appFile('/'), 'utf8');
+
+/**
+ * **홈도 같은 고장을 안고 있었다.**
+ *
+ * 프로덕션 실사용자 값(2026-10, 웹 p75)이 그것을 가리켰다 — TTFB 1,302ms 에 FCP 3,702ms 고,
+ * LCP(3,896ms)는 FCP 뒤 200ms 였다. 즉 **LCP 가 나쁜 것이 거의 전부 FCP 때문**이고, 첫 바이트
+ * 뒤 2.4초 동안 아무것도 안 그려졌다. 캐시된 읽기 셋이 빨라도 그것을 다 모을 때까지는 머리글자
+ * 하나 못 그린다.
+ *
+ * 되돌아오기 쉬운 자리라 상품 화면과 같은 그물에 넣는다 — 조회를 화면 몸통의 `Promise.all` 로
+ * 올리는 것이 가장 손쉬운 길이고, 그렇게 하는 순간 경계가 조용히 사라진다.
+ */
+describe('홈의 스트리밍 경계', () => {
+  it('조각마다 Suspense 로 감싼다', () => {
+    for (const component of ['HeroBanners', 'Collections', 'EditorPick']) {
+      expect(home, `${component} 가 Suspense 밖에 있으면 첫 바이트를 붙잡는다`).toMatch(
+        new RegExp(`<Suspense[^>]*>[\\s\\S]{0,400}<${component}`),
+      );
+    }
+  });
+
+  it('화면 몸통이 조회를 직접 하지 않는다 — 하는 순간 경계가 사라진다', () => {
+    const body = home.slice(home.indexOf('export default async function HomePage'), home.indexOf('async function HeroBanners'));
+
+    for (const query of ['getLiveBanners', 'getLiveCollections', 'getFeaturedProducts']) {
+      expect(body, `${query} 를 몸통에서 부르면 첫 바이트가 그만큼 늦는다`).not.toContain(query);
+    }
+  });
+
+  /** 사전은 메모리라 기다려도 I/O 가 없다 — 이것까지 내리면 제목도 못 그린다 */
+  it('사전만 몸통에서 기다린다', () => {
+    const body = home.slice(home.indexOf('export default async function HomePage'), home.indexOf('async function HeroBanners'));
+
+    expect(body).toContain('await getT()');
+    expect([...body.matchAll(/await /g)]).toHaveLength(1);
+  });
+
+  /**
+   * **빈자리 높이를 배너와 똑같이 잡는다.** 어긋나면 배너가 도착하는 순간 아래가 통째로 밀린다 —
+   * 지금 CLS 가 0.001 이고, 스트리밍으로 얻은 것을 레이아웃 이동으로 도로 잃는 일은 하지 않는다.
+   */
+  it('배너 자리는 배너와 같은 높이를 잡는다', () => {
+    const banner = readFileSync(join(SRC, 'components', 'home-banners.tsx'), 'utf8');
+    const heights = [...banner.matchAll(/min-h-\[(\d+)px\]|md:min-h-\[(\d+)px\]/g)]
+      .map((m) => m[1] ?? m[2]);
+
+    expect(heights.length, '배너가 높이를 안 잡으면 맞출 것이 없다').toBeGreaterThan(0);
+    for (const height of heights) {
+      expect(home, `배너는 ${height}px 를 잡는데 빈자리는 안 잡는다`).toContain(`min-h-[${height}px]`);
+    }
+  });
+});
 
 describe('상품 화면의 스트리밍 경계', () => {
   it('첫 화면 밖 조각을 Suspense 로 감싼다', () => {

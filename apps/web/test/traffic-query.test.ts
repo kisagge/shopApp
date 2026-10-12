@@ -7,7 +7,9 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
-const { getTrafficHistory, getWebVitals } = await import('~/lib/queries/admin/traffic');
+const {
+  getTrafficHistory, getWebVitals, getRouteVitals, ROUTE_VITALS_MIN_SAMPLES,
+} = await import('~/lib/queries/admin/traffic');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -221,5 +223,114 @@ describe('실사용자 성능', () => {
   it('구간 시작을 함께 돌려준다', async () => {
     const { since } = await getWebVitals(admin, 7, NOW);
     expect(NOW.getTime() - since.getTime()).toBe(7 * 24 * 60 * 60 * 1000);
+  });
+});
+
+/**
+ * **"느리다" 까지만 말하면 고치러 갈 데가 없다.**
+ *
+ * 지표 다섯 칸은 전부 섞은 값이라 어느 화면이 끌어내리는지 모른다. 그 값은 이미 모으고 있었다 —
+ * 이벤트마다 주소가 붙는다. 보여 주지 않았을 뿐이고, 그래서 프로덕션에서 FCP 3.7초를 보고도
+ * 어디를 고칠지는 코드를 읽어 짐작해야 했다.
+ */
+describe('화면별 실사용자 성능', () => {
+  const row = (route: string, metric: string, p75: number, samples: number) => ({
+    route, metric, p75, samples: BigInt(samples),
+  });
+
+  it('운영진만 볼 수 있다', async () => {
+    await expect(getRouteVitals(merchant, 28, NOW)).rejects.toThrow();
+    await expect(getRouteVitals(customer, 28, NOW)).rejects.toThrow();
+  });
+
+  it('지표마다 칸을 채우고 판정을 붙인다', async () => {
+    db.$queryRaw.mockResolvedValue([
+      row('/product/:id', 'LCP', 4200, 40),
+      row('/product/:id', 'FCP', 3800, 38),
+      row('/product/:id', 'TTFB', 900, 41),
+    ]);
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes).toHaveLength(1);
+    expect(routes[0]!.route).toBe('/product/:id');
+    expect(routes[0]!.cells.LCP).toEqual({ p75: 4200, rating: 'poor', samples: 40 });
+    expect(routes[0]!.cells.TTFB.rating).toBe('needs-improvement');
+  });
+
+  /** 값이 없는 칸에 0 을 넣으면 "아주 빠름" 으로 읽힌다 */
+  it('안 온 지표는 빈 칸이다', async () => {
+    db.$queryRaw.mockResolvedValue([row('/', 'LCP', 2000, 30)]);
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes[0]!.cells.INP).toEqual({ p75: null, rating: null, samples: 0 });
+  });
+
+  /**
+   * **표본이 적은 줄을 세우면 그 줄을 먼저 고치게 된다.** 75 백분위는 표본이 적으면 "둘째로
+   * 느린 값" 과 다르지 않다 — 여섯 개짜리 줄이 1등으로 서면 엉뚱한 데를 판다.
+   */
+  it('표본이 모자란 화면은 세우지 않는다', async () => {
+    db.$queryRaw.mockResolvedValue([
+      row('/slow-but-rare', 'LCP', 9000, ROUTE_VITALS_MIN_SAMPLES - 1),
+      row('/busy', 'LCP', 3000, ROUTE_VITALS_MIN_SAMPLES),
+    ]);
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes.map((r) => r.route)).toEqual(['/busy']);
+  });
+
+  it('느린 화면부터 세운다', async () => {
+    db.$queryRaw.mockResolvedValue([
+      row('/fast', 'LCP', 1200, 50),
+      row('/slow', 'LCP', 5200, 50),
+      row('/middle', 'LCP', 3000, 50),
+    ]);
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes.map((r) => r.route)).toEqual(['/slow', '/middle', '/fast']);
+  });
+
+  it('한 번에 여덟 줄까지만 — 그 아래는 읽히지 않는다', async () => {
+    db.$queryRaw.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => row(`/p-${i}`, 'LCP', 1000 + i, 50)),
+    );
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes).toHaveLength(8);
+  });
+
+  /**
+   * **주소를 그대로 묶으면 상품 수만큼 줄이 생긴다.** 줄마다 표본이 하나씩이면 전부 걸러져
+   * 표가 통째로 비고, 그러면 이 자리는 아무 말도 하지 않는 자리가 된다. 접는 일은 DB 가 한다 —
+   * 값을 전부 읽어 와 코드에서 접으면 이벤트가 쌓일수록 그대로 무거워진다.
+   */
+  it('접는 규칙을 질의가 들고 있다', async () => {
+    await getRouteVitals(admin, 28, NOW);
+
+    const sql = String(db.$queryRaw.mock.calls[0]![0]);
+    expect(sql, '주소를 접지 않으면 상품 수만큼 줄이 생긴다').toContain('regexp_replace');
+    for (const prefix of ['product', 'category', 'brand', 'collection', 'order']) {
+      expect(sql, `${prefix} 는 뒤 조각이 저마다 다르다`).toContain(prefix);
+    }
+  });
+
+  /** 백분위는 DB 가 센다 — 값을 전부 읽어 와 정렬하면 이벤트가 쌓일수록 무거워진다 */
+  it('백분위를 코드가 세지 않는다', async () => {
+    await getRouteVitals(admin, 28, NOW);
+
+    expect(String(db.$queryRaw.mock.calls[0]![0])).toContain('percentile_cont');
+  });
+
+  it('지표 다섯을 모두 칸으로 들고 있다', async () => {
+    db.$queryRaw.mockResolvedValue([row('/', 'LCP', 2000, 30)]);
+
+    const { routes } = await getRouteVitals(admin, 28, NOW);
+
+    expect(Object.keys(routes[0]!.cells).toSorted()).toEqual([...WEB_VITAL].toSorted());
   });
 });

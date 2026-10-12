@@ -76,6 +76,13 @@ test('캐러셀 화살표가 본문 위에 겹치지 않는다', async ({ page }
 for (const path of ['/', '/cart', '/support']) {
   test(`${path} 에서 본문 바로가기가 정말 본문으로 데려간다`, async ({ page }) => {
     await page.goto(path);
+    /*
+     * **본문에 잡을 것이 들어온 뒤에 본다.** 홈은 조각마다 흘러오므로 그 전에는 본문에 뼈대만
+     * 있고 잡을 것이 없다 — 그때 Tab 을 누르면 발로 넘어간다. 사람에게는 눈 깜짝할 사이지만
+     * 기계는 그 틈을 정확히 집는다. 여기서 보는 것은 **초점이 어디로 가는가**이지 본문이 언제
+     * 차는가가 아니다.
+     */
+    await page.locator('#main a, #main button').first().waitFor();
     await page.keyboard.press('Tab');
 
     const first = await page.evaluate(() => document.activeElement?.textContent?.trim() ?? '');
