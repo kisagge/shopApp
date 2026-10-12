@@ -31,6 +31,7 @@ export const STATE_FILE = {
   cartDeposit: 'test-results/.auth/cart-deposit.json',
   cartTotal: 'test-results/.auth/cart-total.json',
   cartCallback: 'test-results/.auth/cart-callback.json',
+  cartLines: 'test-results/.auth/cart-lines.json',
 
   /** 자기 리뷰를 쓰고 고친다 — review-edit */
   reviewEditor: 'test-results/.auth/review-edit.json',
@@ -137,6 +138,14 @@ export const RACE_PRODUCT = {
    * 상품**이어야 한다: 바꿀 다른 옵션이 있어야 하고, 한 개를 사도 가맹점 재고 알림이 생기지 않아야 한다.
    */
   reorder: 'cotton-straight-chino',
+  /**
+   * 줄을 고르고 수량을 바꾸고 지운다 — cart-lines.
+   *
+   * **재고를 흔들지 않는다**(담았다 지울 뿐이다). 그래도 자기 상품을 쓰는 이유는 옆 명세가
+   * 재고를 1 로 내리는 순간 담지 못해 조용히 건너뛰기 때문이다 — 건너뛴 검사는 통과로 보인다.
+   * 색 둘 × 사이즈 넷에 재고가 넉넉하다.
+   */
+  cartLines: 'cotton-twill-wide-pants',
 } as const;
 
 export const REVIEW_PRODUCT = {

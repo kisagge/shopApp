@@ -44,6 +44,8 @@ export const SEED_ACCOUNT = {
   cartDeposit: 'cart-deposit@plain.test',
   cartTotal: 'cart-total@plain.test',
   cartCallback: 'cart-callback@plain.test',
+  /** 줄을 고르고 수량을 바꾸고 지운다 — cart-lines */
+  cartLines: 'cart-lines@plain.test',
 
   /*
    * **마지막 한 개를 두 사람이 동시에 산다.** 이 둘만은 서로를 상대로 쓰는
@@ -136,7 +138,7 @@ export const SEED_ACCOUNT = {
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit', 'cartTotal', 'cartCallback', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
+  'cartDeposit', 'cartTotal', 'cartCallback', 'cartLines', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
   'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
   'purchaseConfirmer', 'reviewEditor', 'reorderer', 'orderPrivacy', 'orderAddressEditor',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];
