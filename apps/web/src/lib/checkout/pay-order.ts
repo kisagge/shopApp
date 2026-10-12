@@ -2,6 +2,7 @@ import type { PaymentMethodInput } from '@shop/contract';
 import type { Translator } from '@shop/i18n';
 import type { PaymentMode } from '@shop/core';
 import { openPaymentWindow } from '~/lib/payments/client';
+import { canOpenWindow } from '~/lib/payments/methods';
 import { getAnonymousId } from '~/lib/analytics/session';
 
 /**
@@ -49,9 +50,11 @@ export async function payOrder(input: PayOrderInput): Promise<PayResult> {
   /*
    * 간편결제는 토스 결제창에서 제공사를 함께 지정해야 하는데 그 연동이 아직
    * 없다. 실제 키가 있는 환경에서 이것만 Mock 으로 빠지면 **결제창도 안 뜨는데
-   * 주문이 결제 완료가 된다.** 그래서 화면이 이 수단을 아예 감춘다.
+   * 주문이 결제 완료가 된다.** 그래서 화면이 이 수단을 아예 감추고(`checkout-form`),
+   * 여기서도 막는다 — **같은 목록을 본다**(`lib/payments/methods`). 둘이 저마다
+   * 'EASY_PAY' 를 적고 있던 동안에는 한쪽만 늘어나는 날 그 불일치가 돌아왔다.
    */
-  if (input.mode === 'window' && clientKey && input.method !== 'EASY_PAY') {
+  if (input.mode === 'window' && clientKey && canOpenWindow(input.method)) {
     input.beforeWindow?.();
     try {
       await openPaymentWindow({

@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { useState, useMemo, type FormEvent } from 'react';
 import { Badge, Button, Field } from '@shop/ui';
-import { MIN_POINTS_USE, PAYMENT_METHOD_CODE, POLICY_PATH, orderBlocker } from '@shop/core';
+import { MIN_POINTS_USE, POLICY_PATH, orderBlocker } from '@shop/core';
+import { DEFAULT_PAYMENT_METHOD, offeredMethods } from '~/lib/payments/methods';
 import type { PaymentMethodInput } from '@shop/contract';
 import { AddressPicker } from '~/components/address-picker';
 import { OrderItems } from '~/components/checkout/order-items';
@@ -81,22 +82,17 @@ export function CheckoutForm({
     [buyNow, buyNowItem, items],
   );
 
-  const [method, setMethod] = useState<PaymentMethodInput>('CARD');
+  const [method, setMethod] = useState<PaymentMethodInput>(DEFAULT_PAYMENT_METHOD);
 
-  /**
-   * 고를 수 있는 결제 수단.
+  /*
+   * 고를 수 있는 결제 수단. **판단은 `lib/payments/methods` 한 곳에 있다.**
    *
-   * 간편결제는 토스 결제창에서 제공사(카카오페이·네이버페이…)를 함께
-   * 지정해야 하는데 아직 그 연동을 하지 않았다. 그대로 두면 실제 키를 넣은
-   * 환경에서 **간편결제만 조용히 Mock 으로 빠진다** — 결제창도 안 뜨는데
-   * 주문은 결제 완료가 되는, 가장 나쁜 종류의 불일치다.
-   * 그래서 실제 결제창을 쓸 때는 아예 보여 주지 않는다.
+   * 감추는 쪽(여기)과 Mock 으로 보내는 쪽(`pay-order`)이 저마다 'EASY_PAY' 를
+   * 적어 두고 있었다. 연동 안 된 수단이 하나 더 생겨 한쪽에만 적히면, 화면은
+   * 멀쩡히 내놓는데 결제창이 안 열린다 — 막으려던 바로 그 일이 돌아온다.
    */
   const realGateway = paymentMode === 'window';
-  const methods = useMemo(
-    () => (realGateway ? PAYMENT_METHOD_CODE.filter((m) => m !== 'EASY_PAY') : PAYMENT_METHOD_CODE),
-    [realGateway],
-  );
+  const methods = useMemo(() => offeredMethods(realGateway), [realGateway]);
 
   const [agreed, setAgreed] = useState(false);
   const [memo, setMemo] = useState('');

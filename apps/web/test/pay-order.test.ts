@@ -6,6 +6,7 @@ vi.mock('~/lib/payments/client', () => ({ openPaymentWindow }));
 vi.mock('~/lib/analytics/session', () => ({ getAnonymousId: () => 'anon_abcdefgh' }));
 
 const { payOrder, orderNameOf } = await import('~/lib/checkout/pay-order');
+const { WINDOW_UNSUPPORTED_METHOD } = await import('~/lib/payments/methods');
 
 /**
  * 이미 만들어진 주문에 결제를 거는 **하나뿐인 자리.**
@@ -60,12 +61,16 @@ describe('결제 걸기', () => {
      * 간편결제는 토스에서 제공사를 함께 지정해야 하는데 그 연동이 아직 없다.
      * 여기서 Mock 으로 새면 **결제창도 안 뜨는데 주문이 결제 완료가 된다** —
      * 가장 나쁜 종류의 불일치다. 화면이 이 수단을 감추지만 여기서도 막는다.
+     *
+     * **목록을 손으로 적지 않는다.** 감추는 쪽과 막는 쪽이 저마다 'EASY_PAY' 를
+     * 적고 있었다 — 연동 안 된 수단이 하나 더 생겨 한쪽에만 적히는 날 그 불일치가
+     * 돌아온다. 같은 목록에서 돌면 새 수단이 이 검사에 저절로 든다.
      */
-    it('window 인데 간편결제면 창을 열지 않는다', async () => {
+    it.each(WINDOW_UNSUPPORTED_METHOD)('window 인데 %s 면 창을 열지 않는다', async (method) => {
       vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', KEY);
       vi.mocked(fetch).mockResolvedValueOnce(new Response('{}', { status: 200 }));
 
-      await payOrder({ ...base, mode: 'window', method: 'EASY_PAY' });
+      await payOrder({ ...base, mode: 'window', method });
       expect(openPaymentWindow).not.toHaveBeenCalled();
     });
 

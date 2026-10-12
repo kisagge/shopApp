@@ -1,3 +1,5 @@
+import type { WindowMethod } from '~/lib/payments/methods';
+
 /**
  * 브라우저에서 토스 결제창을 띄운다.
  *
@@ -65,7 +67,8 @@ export interface OpenPaymentInput {
   readonly orderNo: string;
   readonly orderName: string;
   readonly amount: number;
-  readonly method: 'CARD' | 'TRANSFER' | 'VIRTUAL_ACCOUNT';
+  /* 목록은 `methods.ts` 한 곳에 있다 — 여기 손으로 적으면 세 번째 자리가 된다 */
+  readonly method: WindowMethod;
   readonly origin: string;
 }
 
