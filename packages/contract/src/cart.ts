@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LINE_ISSUE, REORDER_SKIP } from '@shop/core';
+import { LINE_ISSUE, MAX_CART_LINES, REORDER_SKIP } from '@shop/core';
 import { cuidSchema, discountPercentSchema, quantitySchema, wonSchema } from './common';
 
 /**
@@ -16,7 +16,12 @@ export const cartLineInputSchema = z.object({
 });
 
 export const cartQuoteRequestSchema = z.object({
-  lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(100, 'valid.tooManyItems'),
+  /*
+   * **담을 수 없는 장바구니의 견적을 내 주고 있었다.** 여기는 100 줄을 받았는데 저장하는 창구는
+   * 50 줄(`MAX_CART_LINES`)에서 막는다 — 두 배를 받아 셈을 해 주고 저장은 거절하는 셈이다.
+   * 같은 상한을 본다.
+   */
+  lines: z.array(cartLineInputSchema).min(1, 'valid.noItems').max(MAX_CART_LINES, 'valid.tooManyItems'),
   /** 쿠폰도 코드만 받는다. 할인 조건은 서버가 안다. */
   couponCode: z.string().trim().min(1, 'valid.couponCodeRequired').max(64, 'valid.tooLongChars').optional(),
   /**
@@ -168,7 +173,8 @@ export type CartOptionsResponse = z.infer<typeof cartOptionsResponseSchema>;
  * 주문이 정한다 — 요청이 정하면 남의 옵션을 끼워 넣을 수 있다.
  */
 export const reorderRequestSchema = z.object({
-  cartVariantIds: z.array(cuidSchema).max(100, 'valid.tooManyItems').default([]),
+  // 장바구니가 담을 수 있는 줄 수를 넘겨 보내 봐야 서버가 그만큼만 센다
+  cartVariantIds: z.array(cuidSchema).max(MAX_CART_LINES, 'valid.tooManyItems').default([]),
 });
 
 export const reorderResponseSchema = z.object({

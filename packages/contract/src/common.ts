@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { MAX_QUANTITY } from '@shop/core';
 
 /** 원화 금액. 소수점·음수·비정상 값을 경계에서 막는다. */
 export const wonSchema = z
@@ -6,10 +7,18 @@ export const wonSchema = z
   .nonnegative('valid.moneyMin')
   .max(Number.MAX_SAFE_INTEGER, 'valid.tooBig');
 
+/**
+ * 한 줄에 담을 수 있는 수량.
+ *
+ * **상한을 숫자로 적어 두었다.** 옆집(`cart-sync.ts`)은 같은 상한을 `MAX_QUANTITY` 로 가져다
+ * 쓰는데 여기만 99 를 손으로 적고 있었다 — 값이 같아서 조용했지만, core 의 상한을 고치는 날
+ * **동기화 창구만 바뀌고 견적·이벤트 창구는 옛 수로 남는다.** 두 창구가 다른 수를 드는 순간
+ * 손님은 담긴 수량과 받아 주는 수량이 다른 장바구니를 갖게 된다.
+ */
 export const quantitySchema = z
   .int('valid.quantityInteger')
   .min(1, 'valid.quantityMin')
-  .max(99, 'valid.quantityMax');
+  .max(MAX_QUANTITY, 'valid.quantityMax');
 
 export const discountPercentSchema = z
   .number()

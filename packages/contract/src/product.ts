@@ -1,9 +1,6 @@
 import { z } from 'zod';
 import {
-  PRODUCT_STATUS as CORE_PRODUCT_STATUS,
-  PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL,
-  type ProductStatus as CoreProductStatus,
-  PUBLISH_ERROR, ARCHIVE_ACTION, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, VARIANT_SKU_MAX,
+  ARCHIVE_ACTION, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, PRODUCT_STATUS as CORE_PRODUCT_STATUS, PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL, PUBLISH_ERROR, STOCK_MAX, VARIANT_SKU_MAX, type ProductStatus as CoreProductStatus,
 } from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
 
@@ -86,13 +83,13 @@ export const updateStockSchema = z.object({
     .array(
       z.object({
         variantId: cuidSchema,
-        stock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig'),
+        stock: z.int().min(0, 'valid.stockMin').max(STOCK_MAX, 'valid.tooBig'),
         isActive: z.boolean().optional(),
         /**
          * 읽었을 때의 재고. 주면 **지금도 이 값일 때만** 쓴다 — 읽은 뒤 팔린 수량을 덮어써서 없는
          * 물건을 만들지 않게. 안 주면 덮어쓴다(실사 결과를 그대로 넣는 경우).
          */
-        expectedStock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig').optional(),
+        expectedStock: z.int().min(0, 'valid.stockMin').max(STOCK_MAX, 'valid.tooBig').optional(),
       }),
     )
     .min(1, 'valid.tooFewItems')
@@ -116,7 +113,7 @@ export const createVariantSchema = z.object({
     .max(VARIANT_SKU_MAX, 'valid.tooLongChars')
     .regex(/^[A-Z0-9][A-Z0-9-]*$/, 'valid.upperSlugFormat'),
   optionLabel: z.string().trim().min(1, 'valid.optionNameRequired').max(60, 'valid.tooLongChars'),
-  stock: z.int().min(0, 'valid.stockMin').max(999_999, 'valid.tooBig').default(0),
+  stock: z.int().min(0, 'valid.stockMin').max(STOCK_MAX, 'valid.tooBig').default(0),
 });
 
 export const PRODUCT_ERROR = [
