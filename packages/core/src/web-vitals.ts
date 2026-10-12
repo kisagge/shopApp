@@ -65,3 +65,37 @@ export function p75(values: readonly number[]): number | null {
 export function formatVital(metric: WebVital, value: number): string {
   return metric === 'CLS' ? value.toFixed(3) : String(Math.round(value));
 }
+
+/**
+ * 값을 **얼마나 거슬러** 볼 것인가.
+ *
+ * **28일로 고정돼 있었다.** 그래서 오늘 내보낸 고침은 지난 27일치 값에 묻혀
+ * 거의 움직이지 않는다 — 표본이 서른 몇 개인 화면이라면 더 그렇다. 배포가
+ * 값을 바꿨는지 보려면 **배포 뒤만** 볼 수 있어야 하고, 그 사이에 또 손대면
+ * 무엇이 무엇을 바꿨는지 영영 가릴 수 없다.
+ *
+ * 하루·이레·네 주. 네 주가 기본인 것은 구글이 Core Web Vitals 를 28일로
+ * 판정하기 때문이고, 하루는 방금 내보낸 것을 보려고 둔다.
+ */
+export const VITALS_WINDOW_DAYS = [1, 7, 28] as const;
+export type VitalsWindow = (typeof VITALS_WINDOW_DAYS)[number];
+
+export const DEFAULT_VITALS_WINDOW: VitalsWindow = 28;
+
+/**
+ * 주소에 적힌 구간을 읽는다.
+ *
+ * **목록에 없는 수는 기본값으로 돌린다.** 주소는 누구나 적어 보낼 수 있는데
+ * 이 값은 그대로 질의의 구간이 된다 — 거르지 않으면 `?days=100000` 한 줄로
+ * 이벤트 표를 통째로 훑게 할 수 있다. 숫자가 아닌 것, 음수, 소수도 같다.
+ *
+ * 같은 이름이 두 번 오면(`?days=1&days=7`) 주소 표는 배열을 준다. 마지막 것을
+ * 쓴다 — 주소를 손으로 고쳐 붙인 사람이 뜻한 것은 나중에 적은 쪽이다.
+ */
+export function vitalsWindow(raw: string | readonly string[] | undefined): VitalsWindow {
+  const one = Array.isArray(raw) ? raw[raw.length - 1] : (raw as string | undefined);
+  const days = Number(one);
+  return (VITALS_WINDOW_DAYS as readonly number[]).includes(days)
+    ? (days as VitalsWindow)
+    : DEFAULT_VITALS_WINDOW;
+}

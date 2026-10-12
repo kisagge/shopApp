@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { requireAdmin } from '~/lib/admin/guard';
 import { getRouteVitals, getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
 import {
   VITAL_THRESHOLD, formatVital, CLIENT_PLATFORM, CLIENT_PLATFORM_LABEL,
+  VITALS_WINDOW_DAYS, vitalsWindow,
 } from '@shop/core';
 
 /**
@@ -27,13 +29,26 @@ export const dynamic = 'force-dynamic';
  * 더하면 이틀에 걸쳐 온 세션이 두 번 세어진다. 여기서는 더해도 되는
  * 이벤트 수만 쓰고, 그래서 전환율도 세션이 아니라 이벤트 기준이다.
  */
-export default async function TrafficPage() {
+export default async function TrafficPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ days?: string | string[] }>;
+}) {
   const actor = await requireAdmin();
-  const [{ months, rawSince }, { vitals, since }, { routes, minSamples }] = await Promise.all([
-    getTrafficHistory(actor),
-    getWebVitals(actor),
-    getRouteVitals(actor),
-  ]);
+  /*
+   * **구간은 한 번만 정하고 둘에게 같이 준다.**
+   *
+   * 조회 둘이 저마다 28일을 기본으로 들고 있었고, 화면은 그중 하나가 돌려준 날짜
+   * 한 줄만 적었다. 지금은 값이 같아 조용하지만, 한쪽 기본값을 고치는 날 화면은
+   * 아래 표에 대해 **없는 날짜를 말하게 된다.**
+   */
+  const days = vitalsWindow((await searchParams).days);
+  const [{ months, rawSince }, { vitals, since }, { routes, minSamples, hidden }] =
+    await Promise.all([
+      getTrafficHistory(actor),
+      getWebVitals(actor, days),
+      getRouteVitals(actor, days),
+    ]);
 
   const peak = Math.max(1, ...months.map((m) => m.viewItems));
   const empty = months.every((m) => m.viewItems === 0 && m.purchases === 0);
@@ -51,13 +66,48 @@ export default async function TrafficPage() {
           className="rounded-md border border-[var(--border)] bg-[var(--bg)] p-6"
         >
           <div className="mb-5 flex flex-col gap-1">
-            <h2 id="vitals-title" className="text-base font-semibold">실사용자 성능</h2>
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+              <h2 id="vitals-title" className="text-base font-semibold">실사용자 성능</h2>
+              {/*
+                **구간을 좁혀 볼 수 있어야 배포가 값을 바꿨는지 알 수 있다.**
+
+                28일 고정이던 동안, 오늘 내보낸 고침은 지난 27일치에 묻혀 거의
+                움직이지 않았다 — 표본이 서른 몇 개인 화면이라면 더 그렇다.
+
+                평범한 링크다. 구간이 주소에 남아야 다시 열어 보고 남에게 보낼 수
+                있고, 자바스크립트 없이도 동작한다 — 리뷰 정렬과 같은 규칙이다.
+              */}
+              <nav aria-label="보는 구간">
+                <ul className="flex flex-wrap gap-x-1">
+                  {VITALS_WINDOW_DAYS.map((d) => {
+                    const current = d === days;
+                    return (
+                      <li key={d}>
+                        <Link
+                          href={`/admin/traffic?days=${d}`}
+                          // 지금 보고 있는 구간을 색이 아니라 이름으로 알린다
+                          aria-current={current ? 'true' : undefined}
+                          className={`tnum inline-flex h-8 items-center rounded-full px-3 text-[12px] no-underline ${
+                            current
+                              ? 'bg-[var(--surface-2)] font-medium text-[var(--fg)]'
+                              : 'text-[var(--fg-secondary)] hover:text-[var(--fg)]'
+                          }`}
+                        >
+                          {d}일
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            </div>
             <p className="max-w-[70ch] text-xs leading-relaxed text-[var(--fg-muted)]">
               실제 방문에서 브라우저가 잰 값입니다. <b>평균이 아니라 75 백분위</b>로
               봅니다 — 평균은 아주 느린 소수를 빠른 다수에 묻어 버립니다. 75 백분위는 &ldquo;넷 중 셋이
               이보다 빨랐다&rdquo; 는 뜻이라, 느린 쪽이 넷 중 하나를 넘으면 대표값이 그쪽을
               가리킵니다 — 구글이 Core Web Vitals 를 이 값으로 판정하는 것도 같은
-              이유입니다. 기준선은 구글이 정한 값을 그대로 씁니다. {since.toISOString().slice(0, 10)} 이후.
+              이유입니다. 기준선은 구글이 정한 값을 그대로 씁니다. {since.toISOString().slice(0, 10)} 이후
+              {' '}{days}일간.
             </p>
           </div>
 
@@ -211,8 +261,30 @@ export default async function TrafficPage() {
 
             주소는 묶는다. 상품마다 다른 주소를 그대로 세우면 상품 수만큼 줄이 생기고, 줄마다
             표본이 하나씩이라 아무 말도 못 한다.
+
+            **여기 없는 화면이 빠른 것은 아니다.** LCP·FCP·TTFB 는 문서를 새로 받을 때
+            한 번씩 재는 값이고, 이 앱에서 화면 사이를 옮기는 것은 문서를 다시 받지 않는
+            클라이언트 이동이다. 그래서 **처음 들어온 화면만** 쌓인다. 그 말을 표에 적지
+            않으면 읽는 사람은 빠진 화면을 "빠른 화면" 으로 읽는다 — 없는 자료에서
+            결론을 내리게 두는 셈이다.
           */}
-          {routes.length > 0 && (
+          {routes.length === 0 ? (
+            /*
+              **사라진 표는 고장으로 읽힌다.**
+
+              구간을 좁히면 표본도 같이 줄어 이 표가 통째로 없어진다. 그때 아무
+              말도 없으면 읽는 사람은 "하루 치는 아직 없구나" 가 아니라 "표가
+              깨졌구나" 로 읽고, 구간을 넓혀 볼 생각을 하지 않는다.
+
+              방문이 없는 것과 **걸러 낸 것**은 다른 말이라 다르게 적는다.
+            */
+            <p className="mt-6 text-[12px] leading-relaxed text-[var(--fg-muted)]">
+              {hidden > 0
+                ? `이 구간에는 표본 ${minSamples}개를 넘긴 화면이 없습니다 — ${hidden}개 화면이 표본이 모자라 빠졌습니다.`
+                : '이 구간에는 아직 화면별로 모인 값이 없습니다.'}{' '}
+              구간을 넓혀 보세요.
+            </p>
+          ) : (
             <div
               className="table-scroll mt-6"
               tabIndex={0}
@@ -224,6 +296,11 @@ export default async function TrafficPage() {
                   느린 화면부터. 상품·분류처럼 주소가 저마다 다른 화면은 한 칸으로 묶었습니다.
                   표본이 {minSamples}개가 안 되는 화면은 세우지 않습니다 — 75 백분위는 표본이
                   적으면 &ldquo;둘째로 느린 값&rdquo; 과 다르지 않고, 그 줄을 먼저 고치게 됩니다.
+                  <b>여기 없는 화면이 빠른 것은 아닙니다</b> — 이 셋은 문서를 새로 받을 때
+                  한 번씩 재는 값이고 화면 사이 이동은 문서를 다시 받지 않으므로,{' '}
+                  <b>처음 들어온 화면</b>만 쌓입니다.
+                  {/* 몇 개를 걸렀는지 말하지 않으면 짧은 표가 "이게 전부" 로 읽힌다 */}
+                  {hidden > 0 && ` 이 구간에서 ${hidden}개 화면이 그렇게 빠졌습니다.`}
                 </caption>
                 <thead>
                   <tr className="border-b border-[var(--border)]">

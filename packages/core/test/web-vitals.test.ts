@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { rateVital, p75, formatVital, VITAL_THRESHOLD, WEB_VITAL, isWebVital } from '../src/web-vitals';
+import {
+  rateVital, p75, formatVital, VITAL_THRESHOLD, WEB_VITAL, isWebVital,
+  vitalsWindow, VITALS_WINDOW_DAYS, DEFAULT_VITALS_WINDOW,
+} from '../src/web-vitals';
 
 describe('좋고 나쁨의 기준', () => {
   it('구글이 정한 값을 그대로 쓴다 — 우리가 다시 정하면 남의 "좋은 LCP" 와 달라진다', () => {
@@ -66,5 +69,67 @@ describe('화면에 쓸 모양', () => {
   it('CLS 만 소수다', () => {
     expect(formatVital('CLS', 0.1234)).toBe('0.123');
     expect(formatVital('LCP', 2500.7)).toBe('2501');
+  });
+});
+
+/**
+ * **보는 구간은 주소가 정하고, 주소는 누구나 적어 보낸다.**
+ *
+ * 이 수는 거른 뒤 그대로 질의의 구간이 된다 — `?days=100000` 한 줄이 이벤트 표를
+ * 통째로 훑게 하는 길이 되지 않도록, 목록에 없는 것은 전부 기본값으로 돌린다.
+ */
+describe('보는 구간', () => {
+  it.each(VITALS_WINDOW_DAYS)('목록에 있는 %i 일은 그대로 쓴다', (days) => {
+    expect(vitalsWindow(String(days))).toBe(days);
+  });
+
+  /*
+   * 목록 **밖**의 수는 생김새가 멀쩡해도 돌려보낸다. 14 는 그럴듯해 보이지만
+   * 고르개에 없는 값이라, 받아 주면 화면의 "지금 보는 구간" 과 실제가 갈린다.
+   */
+  it.each([
+    ['없는 수', '14'],
+    ['아주 큰 수 — 표를 통째로 훑게 하는 길', '100000'],
+    ['음수', '-7'],
+    ['0 — 아무 구간도 아니다', '0'],
+    ['소수', '7.5'],
+    ['숫자가 아닌 것', 'all'],
+    ['빈 문자열 — Number 가 0 으로 바꾼다', ''],
+    ['공백만', '   '],
+    ['질의에 섞인 SQL', "28; drop table event_logs"],
+    ['안 적음', undefined],
+  ])('%s 은 기본값으로 돌린다', (_why, raw) => {
+    expect(vitalsWindow(raw)).toBe(DEFAULT_VITALS_WINDOW);
+  });
+
+  /*
+   * 주소 표는 같은 이름이 두 번 오면 배열을 준다. 손으로 고쳐 붙인 사람이
+   * 뜻한 것은 나중에 적은 쪽이다.
+   */
+  it('같은 이름이 두 번 오면 마지막 것을 쓴다', () => {
+    expect(vitalsWindow(['1', '7'])).toBe(7);
+    expect(vitalsWindow(['7', 'all'])).toBe(DEFAULT_VITALS_WINDOW);
+    expect(vitalsWindow([])).toBe(DEFAULT_VITALS_WINDOW);
+  });
+
+  it('기본값은 고르개에 실제로 있는 값이다 — 없으면 아무 칸도 지금 구간으로 안 보인다', () => {
+    expect(VITALS_WINDOW_DAYS).toContain(DEFAULT_VITALS_WINDOW);
+  });
+
+  /*
+   * **기본은 구글과 같은 28일이다.** 이 값을 줄이면 화면의 판정이 구글 보고서와
+   * 달라지고, 두 수가 다른 까닭을 아무도 설명할 수 없게 된다.
+   */
+  it('기본은 구글이 Core Web Vitals 를 판정하는 28일이다', () => {
+    expect(DEFAULT_VITALS_WINDOW).toBe(28);
+  });
+
+  it('고르개는 짧은 쪽부터 — 표의 차례가 곧 이 목록이다', () => {
+    expect([...VITALS_WINDOW_DAYS]).toEqual([...VITALS_WINDOW_DAYS].toSorted((a, b) => a - b));
+  });
+
+  /** 배포 직후를 볼 칸이 없으면 이 고르개는 있으나 마나다 */
+  it('하루짜리 칸이 있다 — 방금 내보낸 것을 보는 자리', () => {
+    expect(VITALS_WINDOW_DAYS).toContain(1);
   });
 });

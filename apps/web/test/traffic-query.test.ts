@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { WEB_VITAL, type Actor } from '@shop/core';
+import { WEB_VITAL, DEFAULT_VITALS_WINDOW, type Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   eventDaily: { findMany: vi.fn<(...a: any[]) => any>() },
@@ -332,5 +332,103 @@ describe('화면별 실사용자 성능', () => {
     const { routes } = await getRouteVitals(admin, 28, NOW);
 
     expect(Object.keys(routes[0]!.cells).toSorted()).toEqual([...WEB_VITAL].toSorted());
+  });
+});
+
+/**
+ * **구간은 주소가 정하고, 그 수가 그대로 질의의 경계가 된다.**
+ *
+ * 28일로 고정돼 있던 동안 오늘 내보낸 고침은 지난 27일치에 묻혀 거의 움직이지
+ * 않았다. 좁혀 볼 수 있어야 배포가 값을 바꿨는지 알 수 있다.
+ */
+describe('보는 구간', () => {
+  /** `$queryRaw` 가 받은 보간값들 — 템플릿 조각 뒤에 차례로 온다 */
+  const boundArgs = () => db.$queryRaw.mock.calls[0]!.slice(1);
+
+  it.each([1, 7, 28])('%i 일을 주면 그만큼 거슬러 센다', async (days) => {
+    await getRouteVitals(admin, days, NOW);
+
+    const since = boundArgs()[0] as Date;
+    expect(NOW.getTime() - since.getTime()).toBe(days * 24 * 60 * 60 * 1000);
+  });
+
+  it('구간 경계를 질의가 들고 간다 — 코드가 다 읽어 와 거르지 않는다', async () => {
+    await getRouteVitals(admin, 1, NOW);
+
+    const [sql] = db.$queryRaw.mock.calls[0]!;
+    expect(String((sql as { raw?: string[] }).raw?.join(' '))).toContain('"receivedAt" >=');
+  });
+
+  /*
+   * **두 조회가 저마다 기본값을 들고 있었다.** 화면은 그중 하나가 돌려준 날짜 한 줄만
+   * 적는다 — 한쪽을 고치는 날 화면은 다른 표에 대해 없는 날짜를 말하게 된다.
+   * 기본값은 core 한 곳에서 온다.
+   */
+  it.each([
+    ['전체 성능', getWebVitals],
+    ['화면별 성능', getRouteVitals],
+  ])('%s 의 기본 구간은 core 가 정한 수와 같다', async (_name, query) => {
+    const { since } = await query(admin, undefined, NOW);
+
+    expect(NOW.getTime() - since.getTime()).toBe(
+      DEFAULT_VITALS_WINDOW * 24 * 60 * 60 * 1000,
+    );
+  });
+});
+
+/**
+ * **사라진 표는 고장으로 읽힌다.**
+ *
+ * 구간을 좁히면 표본도 같이 줄어 표가 통째로 없어진다. 그때 화면이 아무 말도 못 하면
+ * 읽는 사람은 "하루 치는 아직 없구나" 가 아니라 "표가 깨졌구나" 로 읽고, 구간을 넓혀
+ * 볼 생각을 하지 않는다. 몇 개를 걸러 냈는지 함께 돌려준다.
+ */
+describe('걸러 낸 화면 수', () => {
+  const row = (route: string, metric: string, p75: number, samples: number) => ({
+    route, metric, p75, samples: BigInt(samples),
+  });
+
+  it('표본이 모자라 뺀 화면 수를 함께 돌려준다', async () => {
+    db.$queryRaw.mockResolvedValue([
+      row('/busy', 'LCP', 3000, ROUTE_VITALS_MIN_SAMPLES),
+      row('/rare-1', 'LCP', 9000, ROUTE_VITALS_MIN_SAMPLES - 1),
+      row('/rare-2', 'LCP', 8000, 1),
+    ]);
+
+    const { routes, hidden } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes.map((r) => r.route)).toEqual(['/busy']);
+    expect(hidden).toBe(2);
+  });
+
+  it('다 세울 수 있으면 0 이다 — 없는 걱정을 적지 않는다', async () => {
+    db.$queryRaw.mockResolvedValue([row('/busy', 'LCP', 3000, 50)]);
+
+    expect((await getRouteVitals(admin, 28, NOW)).hidden).toBe(0);
+  });
+
+  /*
+   * **여덟 줄 상한에 걸린 것은 "걸러 낸 것" 이 아니다.** 그것은 표본이 모자라서가 아니라
+   * 자리가 모자라서 밀린 것이라, 같은 수에 섞으면 화면이 "표본이 모자랍니다" 라고
+   * 거짓을 적는다.
+   */
+  it('자리 때문에 밀린 줄은 세지 않는다 — 표본이 모자란 것과 다른 말이다', async () => {
+    db.$queryRaw.mockResolvedValue(
+      Array.from({ length: 12 }, (_, i) => row(`/p-${i}`, 'LCP', 1000 + i, 50)),
+    );
+
+    const { routes, hidden } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes).toHaveLength(8);
+    expect(hidden).toBe(0);
+  });
+
+  it('아무 줄도 안 왔으면 걸러 낸 것도 없다', async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const { routes, hidden } = await getRouteVitals(admin, 28, NOW);
+
+    expect(routes).toEqual([]);
+    expect(hidden).toBe(0);
   });
 });
