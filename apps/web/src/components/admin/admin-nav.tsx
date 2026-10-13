@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { isCurrentNav } from '~/lib/admin/nav-path';
+import { LinkBusy } from '~/components/link-busy';
+import { NavProgress } from '~/components/nav-progress';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSignOut } from '~/components/admin-sign-out';
@@ -245,6 +247,13 @@ export function AdminNav({
                   }`}
                 >
                   {item.label}
+                  {/*
+                    **누른 자리에서 곧바로 알린다.** 운영 화면은 전부 force-dynamic 이라 이
+                    앱에서 가장 느리다 — 누르고 1초 넘게 아무 변화가 없으면 누른 사람은 안
+                    눌린 줄 알고 다른 칸을 누른다. 매장 쪽은 같은 까닭으로 이미 둘을 단다.
+                  */}
+                  <LinkBusy />
+                  <NavProgress />
                   {item.badge ? (
                     /*
                      * **숫자만 두지 않는다.** 낭독기는 "알림 3" 이라고만 읽어 무엇이
