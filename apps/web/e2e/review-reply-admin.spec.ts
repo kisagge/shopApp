@@ -22,9 +22,22 @@ async function firstReview(page: Page) {
   return article;
 }
 
+/**
+ * 손님 화면의 판매자 답글.
+ *
+ * **리뷰 칸은 Suspense 뒤에서 흘러온다.** `ready` 는 머리글(껍데기)만 보고 돌아오므로, 바로
+ * 세면 아직 도착하지 않은 칸을 **"답글이 없다" 로 읽는다.** 다시 불러 세기를 거듭해도 매번
+ * 같은 경주를 하니, 기다림을 20초로 늘려 둔 것으로는 운에 기대는 것이 그대로다 — 실제로
+ * 게이트 두 판에서 같은 줄이 졌다.
+ *
+ * 그래서 세기 전에 그 칸이 **왔는지부터** 본다. 빈자리(`SectionSkeleton`)는 aria-hidden
+ * 이라 접근성 나무에 없고, 그래서 이 기다림에 걸리지 않는다 — 뼈대를 칸으로 착각하지 않는다.
+ */
 async function publicReply(page: Page) {
   await page.reload();
   await ready(page);
+  // 한 번의 기다림이 폴링의 20초를 통째로 먹지 않게 — 안쪽 상한은 바깥보다 작아야 한다
+  await page.getByRole('region', { name: /^리뷰 / }).waitFor({ state: 'attached', timeout: 10_000 });
   return page.getByRole('region', { name: /판매자 답글/ });
 }
 
