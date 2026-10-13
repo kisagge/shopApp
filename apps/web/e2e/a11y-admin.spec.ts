@@ -1,4 +1,4 @@
-import { test } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { expectNoA11yViolations } from './axe';
 
 /**
@@ -68,7 +68,19 @@ for (const [name, list, link] of [
 
     // 주소를 박아 두면 시드가 바뀔 때 조용히 다른 것을 보게 된다
     const first = page.locator(`#main ${link}`).first();
-    test.skip((await first.count()) === 0, '목록이 비어 있다');
+    /*
+     * **비었으면 건너뛰지 않고 진다.**
+     *
+     * 예전에는 `test.skip` 이었다 — 시드가 그 목록을 안 만들면 이 검사는 **한 번도 안 돌면서
+     * 초록으로 보인다.** 같은 일을 배너 검사에서 이미 겪었다: "예전에는 배너가 없으면 조용히
+     * 넘어갔는데, 시드가 배너를 아예 안 만들어서 이 검사가 CI 에서 한 번도 돌지 않았다 — 매
+     * 실행의 '2 skipped' 가 그것이었다."
+     *
+     * 시드는 주문·상품·회원·가맹점을 만든다. 비어 있다는 것은 시드가 되돌아갔다는 뜻이고,
+     * 그건 조용히 넘길 일이 아니라 알아야 할 일이다. 운영자가 가장 오래 머무는 상세 화면
+     * 일곱 장이 이 한 줄 뒤에 있다.
+     */
+    await expect(first, '목록이 비어 있다 — 시드가 이 자료를 만드는지 보세요').toBeVisible();
     await first.click();
     await page.waitForLoadState('networkidle');
 

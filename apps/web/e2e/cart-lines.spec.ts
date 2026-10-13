@@ -18,6 +18,14 @@ import { STATE_FILE, RACE_PRODUCT, addProductToCart, ready } from './state';
  * 나눠 쓰면 한쪽이 비우는 순간 다른 쪽 장바구니가 사라진다.
  */
 
+/*
+ * **담지 못하면 건너뛰지 않고 진다.**
+ *
+ * 처음에는 `test.skip` 이었다 — 그러면 담기가 실패한 날 이 검사 넷이 **한 번도 안 돌면서
+ * 초록으로 보인다.** 같은 일을 배너 검사에서 이미 겪었다(매 실행의 "2 skipped" 가 그것이었다).
+ * 이 명세는 자기 상품(색 둘 × 사이즈 넷, 재고 넉넉)을 쓰므로 못 담는다는 것은 시드나 재고가
+ * 되돌아갔다는 뜻이고, 그건 알아야 할 일이다.
+ */
 test.use({ storageState: STATE_FILE.cartLines });
 test.describe.configure({ mode: 'serial' });
 
@@ -46,7 +54,7 @@ test('수량을 바꾸면 합계가 따라오고, 새로 고쳐도 그 수량이
   test.setTimeout(90_000);
 
   const variantId = await addProductToCart(page, RACE_PRODUCT.cartLines);
-  test.skip(variantId === null, '담을 수 있는 옵션이 없다');
+  expect(variantId, '담을 수 있는 옵션이 없다 — 이 명세의 상품은 재고가 넉넉해야 한다').not.toBeNull();
   await openCart(page);
 
   /*
@@ -97,7 +105,7 @@ test('고른 줄만 합계와 주문하기에 센다', async ({ page }) => {
   test.setTimeout(90_000);
 
   const first = await addProductToCart(page, RACE_PRODUCT.cartLines);
-  test.skip(first === null, '담을 수 있는 옵션이 없다');
+  expect(first, '담을 수 있는 옵션이 없다 — 이 명세의 상품은 재고가 넉넉해야 한다').not.toBeNull();
   await openCart(page);
 
   await expect(page.getByRole('button', { name: '주문하기 (1)' })).toBeVisible();
@@ -127,7 +135,7 @@ test('줄을 지우면 목록에서 빠지고, 서버에도 남지 않는다', a
   test.setTimeout(90_000);
 
   const variantId = await addProductToCart(page, RACE_PRODUCT.cartLines);
-  test.skip(variantId === null, '담을 수 있는 옵션이 없다');
+  expect(variantId, '담을 수 있는 옵션이 없다 — 이 명세의 상품은 재고가 넉넉해야 한다').not.toBeNull();
   await openCart(page);
 
   const remove = page.getByRole('button', { name: /장바구니에서 삭제$/ }).first();
@@ -153,7 +161,7 @@ test('고른 줄만 한 번에 지운다', async ({ page }) => {
   test.setTimeout(90_000);
 
   const variantId = await addProductToCart(page, RACE_PRODUCT.cartLines);
-  test.skip(variantId === null, '담을 수 있는 옵션이 없다');
+  expect(variantId, '담을 수 있는 옵션이 없다 — 이 명세의 상품은 재고가 넉넉해야 한다').not.toBeNull();
   await openCart(page);
 
   await page.getByRole('button', { name: '선택삭제' }).click();
