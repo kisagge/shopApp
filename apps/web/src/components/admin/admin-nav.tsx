@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { isCurrentNav } from '~/lib/admin/nav-path';
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AdminSignOut } from '~/components/admin-sign-out';
@@ -231,7 +232,17 @@ export function AdminNav({
                 <Link
                   // 목록은 서버가 권한을 보고 만든다 — 타입은 그쪽이 지킨다
                   href={item.href as never}
-                  className="flex min-h-11 items-center justify-between gap-2 rounded-[5px] px-3.5 text-sm text-dark-muted no-underline hover:bg-dark-surface hover:text-n-0"
+                  /*
+                    **색만으로 말하지 않는다.** 지금 보고 있는 칸을 글자(aria-current)로도
+                    알린다 — 낭독기 사용자는 색을 못 듣고, 서른두 장짜리 콘솔에서 "내가
+                    어디인지" 를 메뉴가 한 번도 말해 주지 않고 있었다.
+                  */
+                  aria-current={isCurrentNav(pathname, item.href) ? 'page' : undefined}
+                  className={`flex min-h-11 items-center justify-between gap-2 rounded-[5px] px-3.5 text-sm no-underline ${
+                    isCurrentNav(pathname, item.href)
+                      ? 'bg-dark-surface font-medium text-n-0'
+                      : 'text-dark-muted hover:bg-dark-surface hover:text-n-0'
+                  }`}
                 >
                   {item.label}
                   {item.badge ? (
