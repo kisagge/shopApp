@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { consentSatisfied } from '@shop/core';
@@ -32,8 +32,32 @@ export function SignUpForm() {
     setFieldErrors((prev) => ({ ...prev, [key]: undefined }));
   };
 
+  /*
+   * **눌리는 것을 막지 않으므로 여기서 막는다.** 보내기 단추는 disabled 대신 aria-disabled 를
+   * 쓴다(못 누르는 버튼은 초점을 못 받아 왜 못 누르는지 들리지 않는다) — 대신 눌리기는 하므로
+   * 조건을 핸들러가 지켜야 한다.
+   *
+   * 안 지키고 있었다. 두 번 누르면 가입 요청이 두 번 나가고, 둘째가 `USER_ALREADY_EXISTS`
+   * 를 받아 **방금 가입에 성공한 사람에게 "이미 가입된 주소입니다" 를 보여 준다.** 계정은
+   * 만들어졌는데 화면은 실패라고 적는 셈이다.
+   *
+   * state 가 아니라 ref 로 본다 — 빠른 두 번 누름은 리액트가 다시 그리기 전에 둘 다
+   * `pending === false` 를 읽는다.
+   */
+  const sending = useRef(false);
+
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      await submit();
+    } finally {
+      sending.current = false;
+    }
+  }
+
+  async function submit() {
     setError(null);
 
     /*

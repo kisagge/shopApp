@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
 import { CARRIERS, format, won } from '@shop/core';
@@ -215,7 +215,17 @@ export function CompleteReturnButton({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState('');
 
+  /*
+   * **눌리는 것을 막지 않으므로 여기서 막는다.** `Button` 은 disabled 대신 aria-disabled 를
+   * 쓴다(못 누르는 버튼은 초점을 못 받아 왜 못 누르는지 들리지 않는다) — 대신 눌리기는 하므로
+   * 조건을 핸들러가 지킨다. state 가 아니라 ref 로 본다: 빠른 두 번 누름은 리액트가 다시
+   * 그리기 전에 둘 다 `pending === false` 를 읽는다.
+   */
+  const sending = useRef(false);
+
   async function complete() {
+    if (sending.current) return;
+    sending.current = true;
     setPending(true);
     setError(null);
     try {
@@ -235,6 +245,7 @@ export function CompleteReturnButton({
       setError('네트워크 오류로 처리하지 못했습니다.');
     } finally {
       setPending(false);
+      sending.current = false;
     }
   }
 
@@ -294,7 +305,17 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * **눌리는 것을 막지 않으므로 여기서 막는다.** `Button` 은 disabled 대신 aria-disabled 를
+   * 쓴다(못 누르는 버튼은 초점을 못 받아 왜 못 누르는지 들리지 않는다) — 대신 눌리기는 하므로
+   * 조건을 핸들러가 지킨다. state 가 아니라 ref 로 본다: 빠른 두 번 누름은 리액트가 다시
+   * 그리기 전에 둘 다 `pending === false` 를 읽는다.
+   */
+  const sending = useRef(false);
+
   async function receive() {
+    if (sending.current) return;
+    sending.current = true;
     setPending(true);
     setError(null);
     try {
@@ -319,6 +340,7 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
       setError('네트워크 오류로 처리하지 못했습니다.');
     } finally {
       setPending(false);
+      sending.current = false;
     }
   }
 
