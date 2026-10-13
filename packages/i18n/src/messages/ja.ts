@@ -39,6 +39,7 @@ export const ja: Dictionary = {
   'policy.TERMS': '利用規約',
   'policy.PRIVACY': 'プライバシーポリシー',
   'policy.effectiveOn': '施行日 {date}',
+  'policy.inForceUntil': '{date}まで適用',
   'policy.upcoming': '{days}日後から適用される内容です。それまでは下の過去の方針が有効です。',
   'policy.past': '過去の方針',
   'policy.pastNote': '改定前の内容です。いつ同意したかによって適用される内容が異なります。',

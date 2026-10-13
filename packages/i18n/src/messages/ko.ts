@@ -46,6 +46,8 @@ export const ko = {
   'policy.TERMS': '이용약관',
   'policy.PRIVACY': '개인정보처리방침',
   'policy.effectiveOn': '시행일 {date}',
+  /** 지난 방침이 실제로 효력을 잃은 날. 시행일만으로는 "내가 동의한 날 무엇이 적용됐나" 에 답할 수 없다 */
+  'policy.inForceUntil': '{date}까지 적용',
   'policy.upcoming': '{days}일 뒤부터 적용되는 내용입니다. 그때까지는 아래 지난 방침이 효력을 갖습니다.',
   'policy.past': '지난 방침',
   'policy.pastNote': '바뀌기 전 내용입니다. 언제 동의했는지에 따라 적용되는 글이 다릅니다.',

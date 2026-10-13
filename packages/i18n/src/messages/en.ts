@@ -43,6 +43,7 @@ export const en: Dictionary = {
   'policy.TERMS': 'Terms of Service',
   'policy.PRIVACY': 'Privacy Policy',
   'policy.effectiveOn': 'Effective {date}',
+  'policy.inForceUntil': 'Applied until {date}',
   'policy.upcoming': 'This version takes effect in {days} days. Until then the previous version below applies.',
   'policy.past': 'Previous versions',
   'policy.pastNote': 'Superseded versions. Which one applies depends on when you agreed.',

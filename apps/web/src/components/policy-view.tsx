@@ -94,6 +94,21 @@ export async function PolicyView({
                 >
                   {t('policy.effectiveOn', { date: date(r.effectiveAt) })}
                 </Link>
+                {/*
+                  **언제까지 적용됐는지를 함께 적는다.**
+
+                  바로 위 안내는 "언제 동의했는지에 따라 적용되는 글이 다릅니다" 라고
+                  약속해 놓고, 줄에는 **시작일만** 있었다. 그러면 "2026-05-10 에 동의했는데
+                  어느 글인가" 에 답하려면 다음 판의 시행일과 견주어야 하는데, 그건 틀린
+                  셈법이다 — 새 방침은 앞날로 미리 올릴 수 있어서(그동안 효력은 지난
+                  방침에 있다) 시행일과 실제로 바뀐 시각이 다르다.
+
+                  답하는 값(`replacedAt`)은 이미 여기까지 실려 와 있었고, 그리지만
+                  않았다.
+                */}
+                <span className="ml-1.5 text-[12px] text-[var(--fg-muted)]">
+                  {t('policy.inForceUntil', { date: date(r.replacedAt) })}
+                </span>
               </li>
             ))}
           </ul>

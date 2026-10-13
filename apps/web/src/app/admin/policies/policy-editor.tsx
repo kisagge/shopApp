@@ -85,7 +85,22 @@ export function PolicyEditor({ item }: { item: PolicyItem }) {
           <a href={POLICY_PATH[item.kind]} target="_blank" rel="noreferrer" className="underline underline-offset-2">
             손님 화면에서 보기
           </a>
-          {item.revisionCount > 0 && <span className="ml-2 tnum">지난 방침 {item.revisionCount}개</span>}
+          {/*
+            **수만 적어 두고 그 뒤에 갈 데가 없었다.** 손님 화면에는 지난 판을 펼쳐 둔
+            자리가 이미 있는데(`#past-policies`), 콘솔은 "지난 방침 3개" 라고만 하고
+            끝났다 — 분쟁이 들어와 "그날 무엇에 동의했나" 를 답해야 하는 사람이 보는
+            화면이 바로 여기다. 그 자리로 바로 보낸다.
+          */}
+          {item.revisionCount > 0 && (
+            <a
+              href={`${POLICY_PATH[item.kind]}#past-policies`}
+              target="_blank"
+              rel="noreferrer"
+              className="tnum ml-2 underline underline-offset-2"
+            >
+              지난 방침 {item.revisionCount}개
+            </a>
+          )}
         </p>
       </div>
       {item.lastEdit && <LastEdited at={item.lastEdit.at} by={item.lastEdit.by} />}
