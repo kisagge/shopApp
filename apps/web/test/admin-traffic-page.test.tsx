@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import { render, screen, within } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { WEB_VITAL, VITALS_WINDOW_DAYS, DEFAULT_VITALS_WINDOW, type Actor, type VitalRating } from '@shop/core';
+import {
+  WEB_VITAL, VITALS_WINDOW_DAYS, DEFAULT_VITALS_WINDOW, VITALS_MIN_SAMPLES,
+  type Actor, type VitalRating,
+} from '@shop/core';
 
 const requireAdmin = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/admin/guard', () => ({ requireAdmin }));
@@ -425,5 +428,146 @@ describe('표가 무엇을 안 담고 있는지', () => {
 
     expect(screen.getByText(/여기 없는 화면이 빠른 것은 아닙니다/)).toBeDefined();
     expect(screen.getByText(/처음 들어온 화면/)).toBeDefined();
+  });
+});
+
+/**
+ * **표본이 모자란 값에는 판정을 내리지 않는다.**
+ *
+ * 화면별 표에만 이 규칙이 적혀 있었고 그 표만 지켰다. 그래서 바로 위 플랫폼별 표에서,
+ * 안드로이드 한 사람이 한 번 겪은 레이아웃 이동(표본 1)이 **빨간 "나쁨"** 으로 섰다.
+ * 읽는 사람은 그 줄을 먼저 고치러 간다 — 그 표가 막겠다고 적어 둔 바로 그 일이다.
+ *
+ * **값은 지우지 않는다.** 숫자까지 거두면 "안드로이드는 아예 안 쌓인다" 로 읽힌다 —
+ * 모자란 것과 없는 것은 다른 말이다.
+ */
+describe('판정을 내릴 만한 표본', () => {
+  const thin = (over: Partial<Record<'web' | 'ios' | 'android', ReturnType<typeof cell>>> = {}) =>
+    getWebVitals.mockResolvedValue({
+      since: new Date('2026-08-19T00:00:00Z'),
+      vitals: vitalsWith({
+        web: cell(1900, 'good', 70),
+        ios: cell(null, null, 0),
+        // 실제로 본 값이다: 안드로이드 CLS 0.283 을 표본 하나로 재고 "나쁨" 이라 적었다
+        android: cell(4064, 'poor', 1),
+        ...over,
+      }),
+    });
+
+  const lcpCells = () => within(screen.getByRole('row', { name: /LCP/ })).getAllByRole('cell');
+
+  it('표본이 모자라면 좋고 나쁨을 적지 않는다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(lcpCells()[2]!.textContent).not.toContain('나쁨');
+    expect(lcpCells()[2]!.textContent).toContain('판단하기엔 표본이 모자람');
+  });
+
+  it('그래도 값과 표본 수는 남긴다 — 모자란 것과 없는 것은 다른 말이다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(lcpCells()[2]!.textContent).toContain('4064');
+    expect(lcpCells()[2]!.textContent).toContain('표본 1');
+  });
+
+  /** 판정을 못 내리는 칸에 색을 쓰면 색이 곧 판정이 된다 */
+  it('판정을 못 내리는 칸은 색도 쓰지 않는다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(lcpCells()[2]!.querySelector('.text-accent')).toBeNull();
+    expect(lcpCells()[2]!.querySelector('.text-warning')).toBeNull();
+    expect(lcpCells()[2]!.querySelector('.text-success')).toBeNull();
+  });
+
+  it('표본이 넉넉한 칸은 그대로 판정한다 — 문턱이 표를 통째로 지우지 않는다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(lcpCells()[0]!.textContent).toContain('좋음');
+    expect(lcpCells()[0]!.querySelector('.text-success')).not.toBeNull();
+  });
+
+  it('아예 안 온 칸은 여전히 —— 다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(lcpCells()[1]!.textContent).toContain('—');
+  });
+
+  /** 경계가 "이상" 인지 "초과" 인지로 한 칸이 갈린다 */
+  it.each([
+    [VITALS_MIN_SAMPLES - 1, false],
+    [VITALS_MIN_SAMPLES, true],
+  ])('표본 %i 이면 판정을 내린다: %s', async (samples, judged) => {
+    thin({ android: cell(4064, 'poor', samples) });
+
+    await renderPage();
+
+    expect(lcpCells()[2]!.textContent.includes('나쁨')).toBe(judged);
+  });
+
+  /** 다섯 타일도 같은 규칙을 쓴다 — 머리에 선 숫자가 가장 많이 읽힌다 */
+  it('타일도 표본이 모자라면 판정하지 않는다', async () => {
+    getWebVitals.mockResolvedValue({
+      since: new Date('2026-08-19T00:00:00Z'),
+      vitals: WEB_VITAL.map((metric) => ({
+        metric,
+        ...cell(4064, 'poor' as const, 2),
+        byPlatform: {
+          web: cell(null, null, 0), ios: cell(null, null, 0), android: cell(null, null, 0),
+        },
+      })),
+    });
+
+    await renderPage();
+
+    expect(screen.queryAllByText('나쁨')).toEqual([]);
+    expect(screen.getAllByText('판단하기엔 표본이 모자람').length).toBe(WEB_VITAL.length);
+  });
+
+  /*
+   * **줄이 문턱을 넘었다고 칸마다 넘은 것은 아니다.** 화면별 표는 LCP 로 거르므로, LCP 가
+   * 서른인 줄에 FCP 가 셋일 수 있다 — 그 칸에 "나쁨" 이 붙으면 줄이 통과했다는 이유로
+   * 거짓 판정이 선다.
+   */
+  it('화면별 표도 칸마다 본다 — 줄이 통과했어도 모자란 칸은 판정하지 않는다', async () => {
+    getRouteVitals.mockResolvedValue({
+      routes: [{
+        route: '/',
+        cells: Object.fromEntries(
+          WEB_VITAL.map((m) => [
+            m,
+            m === 'LCP' ? cell(2000, 'good', 30) : cell(4600, 'poor', 3),
+          ]),
+        ),
+      }],
+      since: new Date('2026-08-19T00:00:00Z'),
+      minSamples: VITALS_MIN_SAMPLES,
+      hidden: 0,
+    });
+
+    await renderPage();
+
+    const table = screen.getByRole('region', { name: '화면별 실사용자 성능' });
+    expect(within(table).getByText(/좋음 · 표본 30/)).toBeDefined();
+    expect(within(table).queryByText(/나쁨/)).toBeNull();
+    expect(within(table).getAllByText(/판단하기엔 표본이 모자람 · 표본 3/).length).toBe(2);
+  });
+
+  /** 규칙을 세 표가 함께 쓰므로, 적는 것도 한 번이면 된다 */
+  it('그 규칙을 사람에게 한 번 말한다', async () => {
+    thin();
+
+    await renderPage();
+
+    expect(screen.getByText(/표본이 10개가 안 되는 값에는 좋고 나쁨을 적지 않습니다/)).toBeDefined();
   });
 });

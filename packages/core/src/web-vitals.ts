@@ -99,3 +99,17 @@ export function vitalsWindow(raw: string | readonly string[] | undefined): Vital
     ? (days as VitalsWindow)
     : DEFAULT_VITALS_WINDOW;
 }
+
+/**
+ * **이만큼은 돼야 판정을 내린다.**
+ *
+ * 75 백분위는 표본이 적으면 "둘째로 느린 값" 과 다르지 않다. 표본 하나로 잰 CLS 0.283 에
+ * 빨간 "나쁨" 을 붙이면, 읽는 사람은 **한 사람이 한 번 겪은 일을 회귀로 알고** 그것을 먼저
+ * 고치러 간다 — 없는 것을 쫓는 데 시간을 쓰게 하는 쪽이, 아무것도 안 보여 주는 것보다 나쁘다.
+ *
+ * **값을 감추라는 뜻은 아니다.** 있는 자료를 지우면 "안드로이드는 아예 안 쌓인다" 로 읽힌다.
+ * 숫자는 두되 판정만 거둔다 — 그 둘은 다른 말이다.
+ */
+export const VITALS_MIN_SAMPLES = 10;
+
+export const enoughSamples = (samples: number): boolean => samples >= VITALS_MIN_SAMPLES;

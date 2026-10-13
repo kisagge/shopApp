@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   rateVital, p75, formatVital, VITAL_THRESHOLD, WEB_VITAL, isWebVital,
   vitalsWindow, VITALS_WINDOW_DAYS, DEFAULT_VITALS_WINDOW,
+  enoughSamples, VITALS_MIN_SAMPLES,
 } from '../src/web-vitals';
 
 describe('좋고 나쁨의 기준', () => {
@@ -131,5 +132,33 @@ describe('보는 구간', () => {
   /** 배포 직후를 볼 칸이 없으면 이 고르개는 있으나 마나다 */
   it('하루짜리 칸이 있다 — 방금 내보낸 것을 보는 자리', () => {
     expect(VITALS_WINDOW_DAYS).toContain(1);
+  });
+});
+
+/**
+ * **표본이 모자란 값에는 판정을 내리지 않는다.**
+ *
+ * 75 백분위는 표본이 적으면 "둘째로 느린 값" 과 다르지 않다. 표본 하나로 잰 CLS 0.283 에
+ * 빨간 "나쁨" 이 붙어 있었고, 그것은 읽는 사람을 **한 사람이 한 번 겪은 일**로 보내는 길이다.
+ */
+describe('판정을 내릴 만한 표본', () => {
+  it.each([
+    [0, false],
+    [1, false],
+    [VITALS_MIN_SAMPLES - 1, false],
+    [VITALS_MIN_SAMPLES, true],
+    [VITALS_MIN_SAMPLES + 1, true],
+    [1000, true],
+  ])('표본 %i → %s', (samples, expected) => {
+    expect(enoughSamples(samples)).toBe(expected);
+  });
+
+  /** 경계가 "이상" 인지 "초과" 인지로 한 칸이 갈린다 — 그 한 칸이 화면의 빨간 글씨다 */
+  it('문턱 그 수는 들어간다 — 초과가 아니라 이상이다', () => {
+    expect(enoughSamples(VITALS_MIN_SAMPLES)).toBe(true);
+  });
+
+  it('문턱은 1보다 크다 — 1이면 아무것도 거르지 못한다', () => {
+    expect(VITALS_MIN_SAMPLES).toBeGreaterThan(1);
   });
 });

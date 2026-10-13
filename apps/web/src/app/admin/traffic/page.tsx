@@ -4,7 +4,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getRouteVitals, getTrafficHistory, getWebVitals } from '~/lib/queries/admin/traffic';
 import {
   VITAL_THRESHOLD, formatVital, CLIENT_PLATFORM, CLIENT_PLATFORM_LABEL,
-  VITALS_WINDOW_DAYS, vitalsWindow,
+  VITALS_WINDOW_DAYS, vitalsWindow, enoughSamples, VITALS_MIN_SAMPLES,
+  type VitalRating,
 } from '@shop/core';
 
 /**
@@ -15,6 +16,33 @@ import {
  * 폰에서는 아무것도 못 읽는다.
  */
 const PAINT_VITALS = ['LCP', 'FCP', 'TTFB'] as const;
+
+/**
+ * 한 칸의 **판정**.
+ *
+ * **표본이 모자라면 판정을 내리지 않는다.** 75 백분위는 표본이 적으면 "둘째로 느린 값" 과
+ * 다르지 않다 — 아래 화면별 표는 그 까닭을 적어 두고 지키는데, 위의 타일과 플랫폼별 표는
+ * 안 지키고 있었다. 그래서 안드로이드 한 사람이 한 번 겪은 레이아웃 이동(표본 1)이 빨간
+ * "나쁨" 으로 섰다. 읽는 사람은 **없는 회귀를 쫓아간다.**
+ *
+ * **값은 그대로 둔다.** 숫자까지 지우면 "안드로이드는 아예 안 쌓인다" 로 읽힌다 — 모자란
+ * 것과 없는 것은 다른 말이다. 색과 판정만 거두고, 몇 개로 잰 값인지 적는다.
+ */
+function verdictOf(cell: { rating: VitalRating | null; samples: number }): string {
+  if (cell.rating === null) return '표본 없음';
+  if (!enoughSamples(cell.samples)) return '판단하기엔 표본이 모자람';
+  return cell.rating === 'good' ? '좋음' : cell.rating === 'poor' ? '나쁨' : '개선 필요';
+}
+
+/** 판정을 못 내리는 칸은 색도 쓰지 않는다 — 색이 곧 판정이다 */
+function toneOf(cell: { rating: VitalRating | null; samples: number }): string {
+  if (cell.rating === null || !enoughSamples(cell.samples)) return 'text-[var(--fg-muted)]';
+  return cell.rating === 'good'
+    ? 'text-success'
+    : cell.rating === 'poor'
+      ? 'text-accent'
+      : 'text-warning';
+}
 
 export const metadata: Metadata = { title: '트래픽 추이' };
 export const dynamic = 'force-dynamic';
@@ -108,6 +136,14 @@ export default async function TrafficPage({
               가리킵니다 — 구글이 Core Web Vitals 를 이 값으로 판정하는 것도 같은
               이유입니다. 기준선은 구글이 정한 값을 그대로 씁니다. {since.toISOString().slice(0, 10)} 이후
               {' '}{days}일간.
+              {' '}
+              {/*
+                규칙을 한 번만 적고 세 표가 다 지킨다. 아래 화면별 표에만 적어 두었더니 위의
+                타일과 플랫폼별 표가 표본 하나짜리 값에 "나쁨" 을 붙이고 있었다.
+              */}
+              <b>표본이 {VITALS_MIN_SAMPLES}개가 안 되는 값에는 좋고 나쁨을 적지 않습니다</b> —
+              숫자는 그대로 두되 판정만 거둡니다. 하나로 잰 값에 &ldquo;나쁨&rdquo; 을 붙이면
+              한 사람이 한 번 겪은 일을 회귀로 알고 쫓아가게 됩니다.
             </p>
           </div>
 
@@ -125,32 +161,14 @@ export default async function TrafficPage({
                 <span className="text-[11px] font-medium tracking-[0.08em] text-[var(--fg-muted)]">
                   {v.metric}
                 </span>
-                <span
-                  className={`tnum text-[22px] font-semibold ${
-                    v.rating === 'good'
-                      ? 'text-success'
-                      : v.rating === 'poor'
-                        ? 'text-accent'
-                        : v.rating === 'needs-improvement'
-                          ? 'text-warning'
-                          : 'text-[var(--fg-muted)]'
-                  }`}
-                >
+                <span className={`tnum text-[22px] font-semibold ${toneOf(v)}`}>
                   {v.p75 === null ? '—' : formatVital(v.metric, v.p75)}
                   {v.p75 !== null && v.metric !== 'CLS' && (
                     <span className="ml-0.5 text-[13px] font-normal">ms</span>
                   )}
                 </span>
                 {/* 색만으로 좋고 나쁨을 말하지 않는다 */}
-                <span className="text-[11px] text-[var(--fg-secondary)]">
-                  {v.rating === null
-                    ? '표본 없음'
-                    : v.rating === 'good'
-                      ? '좋음'
-                      : v.rating === 'poor'
-                        ? '나쁨'
-                        : '개선 필요'}
-                </span>
+                <span className="text-[11px] text-[var(--fg-secondary)]">{verdictOf(v)}</span>
                 <span className="tnum text-[10px] text-[var(--fg-muted)]">
                   기준 {formatVital(v.metric, VITAL_THRESHOLD[v.metric].good)} 이하 · 표본{' '}
                   {v.samples.toLocaleString('ko-KR')}
@@ -217,15 +235,7 @@ export default async function TrafficPage({
                               <span className="text-[var(--fg-muted)]">—</span>
                             ) : (
                               <>
-                                <span
-                                  className={
-                                    cell.rating === 'good'
-                                      ? 'text-success'
-                                      : cell.rating === 'poor'
-                                        ? 'text-accent'
-                                        : 'text-warning'
-                                  }
-                                >
+                                <span className={toneOf(cell)}>
                                   {formatVital(v.metric, cell.p75)}
                                   {v.metric !== 'CLS' && (
                                     <span className="ml-0.5 text-[11px] font-normal">ms</span>
@@ -233,11 +243,7 @@ export default async function TrafficPage({
                                 </span>
                                 {/* 색만으로 말하지 않는다 — 위 타일과 같은 규칙 */}
                                 <span className="block text-[10px] text-[var(--fg-muted)]">
-                                  {cell.rating === 'good'
-                                    ? '좋음'
-                                    : cell.rating === 'poor'
-                                      ? '나쁨'
-                                      : '개선 필요'}
+                                  {verdictOf(cell)}
                                   {' · 표본 '}
                                   {cell.samples.toLocaleString('ko-KR')}
                                 </span>
@@ -332,25 +338,17 @@ export default async function TrafficPage({
                               <span className="text-[var(--fg-muted)]">—</span>
                             ) : (
                               <>
-                                <span
-                                  className={
-                                    cell.rating === 'good'
-                                      ? 'text-success'
-                                      : cell.rating === 'poor'
-                                        ? 'text-accent'
-                                        : 'text-warning'
-                                  }
-                                >
+                                <span className={toneOf(cell)}>
                                   {formatVital(metric, cell.p75)}
                                   <span className="ml-0.5 text-[11px] font-normal">ms</span>
                                 </span>
-                                {/* 색만으로 말하지 않는다 — 위 표와 같은 규칙 */}
+                                {/*
+                                  색만으로 말하지 않는다 — 위 표와 같은 규칙. **줄이 문턱을 넘었다고
+                                  칸마다 넘은 것은 아니다**: LCP 로 거르므로 LCP 가 서른인 줄에
+                                  FCP 가 셋일 수 있다.
+                                */}
                                 <span className="block text-[10px] text-[var(--fg-muted)]">
-                                  {cell.rating === 'good'
-                                    ? '좋음'
-                                    : cell.rating === 'poor'
-                                      ? '나쁨'
-                                      : '개선 필요'}
+                                  {verdictOf(cell)}
                                   {' · 표본 '}
                                   {cell.samples.toLocaleString('ko-KR')}
                                 </span>
