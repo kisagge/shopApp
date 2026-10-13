@@ -73,6 +73,9 @@ export const SEED_ACCOUNT = {
   /** 두 줄을 사서 한 줄만 취소한다 — 자기 주문과 자기 장바구니가 있어야 한다 */
   partialCanceler: 'partial-cancel@plain.test',
 
+  /** 한 줄짜리 주문을 통째로 무른다 — order-cancel. 자기 주문과 자기 장바구니가 있어야 한다 */
+  orderCanceler: 'order-cancel@plain.test',
+
   /** 두 줄을 받고 한 줄만 반품한다 */
   partialReturner: 'partial-return@plain.test',
 
@@ -139,6 +142,6 @@ export const SEED_ACCOUNT = {
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
   'cartDeposit', 'cartTotal', 'cartCallback', 'cartLines', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
-  'partialCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
+  'partialCanceler', 'orderCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
   'purchaseConfirmer', 'reviewEditor', 'reorderer', 'orderPrivacy', 'orderAddressEditor',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

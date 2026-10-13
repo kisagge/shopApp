@@ -33,6 +33,9 @@ export const STATE_FILE = {
   cartCallback: 'test-results/.auth/cart-callback.json',
   cartLines: 'test-results/.auth/cart-lines.json',
 
+  /** 한 줄짜리 주문을 통째로 무른다 — order-cancel. 열쇠는 시드 계정 이름과 같아야 한다(auth.setup) */
+  orderCanceler: 'test-results/.auth/order-cancel.json',
+
   /** 자기 리뷰를 쓰고 고친다 — review-edit */
   reviewEditor: 'test-results/.auth/review-edit.json',
 
@@ -146,6 +149,14 @@ export const RACE_PRODUCT = {
    * 색 둘 × 사이즈 넷에 재고가 넉넉하다.
    */
   cartLines: 'cotton-twill-wide-pants',
+  /**
+   * 한 줄을 사서 주문째로 무른다 — order-cancel.
+   *
+   * 사는 동안 재고 하나를 물었다가 취소로 돌려준다. **자사 브랜드(PLAIN LABEL)여야 한다** —
+   * 가맹점 상품이면 그 하나가 재고 알림을 흔들어 low-stock-alert 가 엉뚱하게 진다. 세 옵션 다
+   * 재고가 기준(5)보다 넉넉해 하나를 빼도 새 알림이 생기지 않는다.
+   */
+  orderCancel: 'fine-gauge-cardigan',
 } as const;
 
 export const REVIEW_PRODUCT = {
