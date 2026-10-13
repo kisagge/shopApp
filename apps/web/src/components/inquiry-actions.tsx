@@ -31,21 +31,47 @@ export function InquiryActions({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(url: string, init: RequestInit) {
+  /** 해냈으면 true. 부른 쪽이 뒷정리를 할지 정한다. */
+  async function run(url: string, init: RequestInit): Promise<boolean> {
     setPending(true);
     setError(null);
     try {
       const response = await fetch(url, init);
       if (!response.ok) {
         setError(await failureMessage(response, t('common.failed')));
-        return;
+        return false;
       }
       router.refresh();
+      return true;
     } catch {
       setError(t('common.networkError'));
+      return false;
     } finally {
       setPending(false);
     }
+  }
+
+  /**
+   * **답을 올리고 나서 폼이 그대로 열려 있었다.**
+   *
+   * 새로고침으로 답변이 위에 나타나는데, 그 바로 아래 쓰던 칸이 같은 글을 그대로
+   * 쥔 채 남았다. 올라간 건지 아닌지 알 수 없으니 한 번 더 누르게 되고, 서버는
+   * 이미 답한 문의라 409 를 준다 — **방금 성공한 사람에게 "이미 답변한
+   * 문의입니다" 를 보여 주는 셈**이다.
+   *
+   * 폼 갈래는 `canAnswer` 를 보지 않으므로, 새로고침 뒤 답할 수 없게 되어도
+   * 저 혼자 열려 있다. 해냈으면 여기서 닫는다.
+   */
+  async function postAnswer() {
+    const done = await run(`/api/inquiries/${inquiryId}/answer`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ answer: answer.trim() }),
+    });
+    if (!done) return;
+
+    setAnswering(false);
+    setAnswer('');
   }
 
   if (answering) {
@@ -65,13 +91,7 @@ export function InquiryActions({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() =>
-              void run(`/api/inquiries/${inquiryId}/answer`, {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ answer: answer.trim() }),
-              })
-            }
+            onClick={() => void postAnswer()}
             disabled={answer.trim().length === 0 || pending}
             className="h-9 rounded-sm bg-[var(--brand)] px-3.5 text-[12px] font-medium text-[var(--bg)] disabled:opacity-40"
           >
