@@ -5,7 +5,13 @@ import { useId, useRef, useState } from 'react';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import { Badge, Button, Field } from '@shop/ui';
-import { BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, type BannerTone } from '@shop/core';
+import {
+  BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, MAX_IMAGE_BYTES, type BannerTone,
+} from '@shop/core';
+import { failureMessage } from '~/lib/client/failure-message';
+
+/** 화면에 적는 상한. 서버가 거절하는 기준과 같은 값에서 나온다 */
+const MAX_IMAGE_MB = MAX_IMAGE_BYTES / 1024 / 1024;
 
 export interface BannerItem {
   readonly id: string;
@@ -70,16 +76,15 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
     setError(null);
     try {
       const response = await fetch(url, init);
-      const data: unknown = await response.json();
+      /*
+       * 앞단이 502 HTML 을 주면 `json()` 이 던진다. 그대로 두면 아래 catch 가 받아
+       * **서버가 답했는데 "네트워크 오류" 라고 적는다** — `failureMessage` 가 겪고 생긴 일이다.
+       */
       if (!response.ok) {
-        const message =
-          typeof data === 'object' && data !== null && 'message' in data
-            ? (data as { message?: unknown }).message
-            : undefined;
-        setError(typeof message === 'string' ? message : '처리하지 못했습니다.');
+        setError(await failureMessage(response, '처리하지 못했습니다.'));
         return null;
       }
-      return data as T;
+      return (await response.json()) as T;
     } catch {
       setError('네트워크 오류로 처리하지 못했습니다.');
       return null;
@@ -239,6 +244,16 @@ function BannerCard({
       setUploadError('이미지 파일을 선택해 주세요.');
       return;
     }
+    /*
+     * **올리기 전에 잰다.** 서버는 `MAX_IMAGE_BYTES` 로 거절하는데 화면은 재지 않아서,
+     * 20MB 짜리를 고르면 그것을 통째로 올린 뒤에야 거절당했다 — 느린 회선에서는 몇 분을
+     * 기다렸다가 거절을 보는 셈이고, 그동안 화면은 '올리는 중…' 이다. 상한은 core 가 쥔다.
+     */
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError(`이미지는 ${MAX_IMAGE_MB}MB 를 넘을 수 없습니다. 고른 파일은 ${(file.size / 1024 / 1024).toFixed(1)}MB 입니다.`);
+      return;
+    }
+
     setUploading(true);
     setUploadError(null);
     try {
@@ -246,13 +261,12 @@ function BannerCard({
       body.append('file', file);
       body.append('alt', form.headline);
       const response = await fetch(`/api/admin/banners/${banner.id}/image`, { method: 'POST', body });
-      const data = await response.json();
       if (!response.ok) {
-        setUploadError(typeof data?.message === 'string' ? data.message : '올리지 못했습니다.');
+        setUploadError(await failureMessage(response, '올리지 못했습니다.'));
         return;
       }
       if (fileRef.current) fileRef.current.value = '';
-      onUploaded(data);
+      onUploaded(await response.json());
     } catch {
       setUploadError('네트워크 오류로 올리지 못했습니다.');
     } finally {
@@ -313,14 +327,12 @@ function BannerCard({
             >
               {banner.isActive ? '노출 중지' : '노출 시작'}
             </Button>
-            <Button
-              type="button" size="sm" variant="danger"
-              aria-label={`${index + 1}번째 배너 삭제`}
-              data-remove-row=""
-              disabled={busy} onClick={onDelete}
-            >
-              삭제
-            </Button>
+            <RemoveBanner
+              headline={banner.headline}
+              position={index + 1}
+              busy={busy}
+              onConfirm={onDelete}
+            />
           </div>
         </div>
 
@@ -398,6 +410,10 @@ function BannerCard({
             <input ref={fileRef} id={fileId} type="file"
               accept="image/jpeg,image/png,image/webp,image/avif"
               className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--bg)] file:px-3 file:text-[12px]" />
+            {/* 상한을 고르기 전에 말한다 — 올리고 나서 거절당하면 그 시간이 그대로 버려진다 */}
+            <p className="text-[11px] text-[var(--fg-muted)]">
+              JPEG · PNG · WebP · AVIF, {MAX_IMAGE_MB}MB 이하
+            </p>
           </div>
           <Button type="button" size="md" variant="secondary" disabled={uploading} onClick={() => upload()}>
             {uploading ? '올리는 중…' : '이미지 교체'}
@@ -426,5 +442,59 @@ function BannerCard({
         {uploadError && <p role="alert" className="text-[12px] text-accent">{uploadError}</p>}
       </div>
     </div>
+  );
+}
+
+
+/**
+ * 배너 지우기 — **한 번 더 묻는다.**
+ *
+ * 첫 누름에 바로 지우고 있었다. 지워지는 것은 **홈 최상단에 떠 있는 것**이고, 바로 옆이
+ * '노출 중지' 와 위·아래 단추라 손이 미끄러지기 쉬운 자리다. 이 저장소의 다른 지우기들
+ * (갈래·상품 사진·주문 취소·문의·리뷰)은 전부 한 번 더 묻는다.
+ *
+ * **무엇을 지우는지도 말한다.** 이름표가 "3번째 배너 삭제" 뿐이라, 낭독기로 듣는 사람은
+ * 순번만 알고 눌렀다.
+ */
+function RemoveBanner({
+  headline, position, busy, onConfirm,
+}: {
+  headline: string;
+  position: number;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const what = headline.trim() === '' ? `${position}번째 배너` : headline;
+
+  if (!asking) {
+    return (
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제`}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+      >
+        삭제
+      </Button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px]">
+      <span>지울까요?</span>
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제 확인`}
+        data-remove-row=""
+        disabled={busy}
+        onClick={onConfirm}
+      >
+        지웁니다
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setAsking(false)}>
+        취소
+      </Button>
+    </span>
   );
 }
