@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from 'react';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
+import { failureMessage } from '~/lib/client/failure-message';
 import { Button, Field } from '@shop/ui';
 import { generateCouponCode, COUPON_KIND, COUPON_KIND_LABEL } from '@shop/core';
 import type { CouponRow, NamedOption, Target } from './types';
@@ -49,6 +50,21 @@ export function CouponForm({
   const [productQuery, setProductQuery] = useState('');
   const [productHits, setProductHits] = useState<NamedOption[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFailure, setSearchFailure] = useState<string | null>(null);
+  /** 한 번이라도 찾아봤는가. "아직 안 찾음" 과 "찾았는데 없음" 은 다른 말이다 */
+  const [searched, setSearched] = useState(false);
+
+  /**
+   * 고른 상품의 이름.
+   *
+   * **이름을 검색 결과에서만 읽고 있었다.** 그런데 그 목록은 다음 검색에 통째로 갈린다 —
+   * "코트" 로 찾아 하나 고르고 "니트" 로 다시 찾는 순간, 앞서 고른 칩이 `clx8…` 이라는
+   * 날것의 id 로 바뀌었다. 지우는 단추의 이름표까지 "clx8… 대상에서 빼기" 가 된다.
+   *
+   * 쿠폰이 어디에 붙는지 정하는 화면이다. 무엇을 골랐는지 못 읽으면 엉뚱한 상품에 할인이
+   * 붙고, 그건 돈이다. 고르는 순간 이름을 함께 적어 둔다.
+   */
+  const [pickedNames, setPickedNames] = useState<Record<string, string>>({});
 
   const has = (t: Target) =>
     targets.some((x) => x.targetType === t.targetType && x.targetId === t.targetId);
@@ -64,18 +80,34 @@ export function CouponForm({
     if (t.targetType === 'CATEGORY') {
       return categories.find((c) => c.id === t.targetId)?.name ?? t.targetId;
     }
-    return productHits.find((p) => p.id === t.targetId)?.name ?? t.targetId;
+    return pickedNames[t.targetId] ?? productHits.find((p) => p.id === t.targetId)?.name ?? t.targetId;
   };
 
+  /**
+   * 상품 찾기.
+   *
+   * **셋을 똑같은 침묵으로 답하고 있었다** — 결과가 없을 때, 서버가 거절할 때, 길이 끊길 때.
+   * 결과 칸은 하나라도 있어야 그려지므로(`productHits.length > 0`) 어느 쪽이든 화면이 그대로다.
+   * 누른 사람은 "그런 상품이 없구나" 와 "검색이 고장났구나" 를 가릴 방법이 없었다. 게다가
+   * catch 가 없어 망이 끊기면 처리되지 않은 거절로 조용히 샜다.
+   */
   async function searchProducts() {
     const q = productQuery.trim();
     if (!q) return;
     setSearching(true);
+    setSearchFailure(null);
     try {
       const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
-      if (!response.ok) return;
+      if (!response.ok) {
+        // 서버가 한 말을 먼저 쓴다 — 502 가 HTML 을 주면 json() 이 터지는 것도 그쪽이 받아 낸다
+        setSearchFailure(await failureMessage(response, '상품을 찾지 못했습니다.'));
+        return;
+      }
       const data = (await response.json()) as { products: NamedOption[] };
       setProductHits(data.products);
+      setSearched(true);
+    } catch {
+      setSearchFailure('네트워크 오류로 상품을 찾지 못했습니다.');
     } finally {
       setSearching(false);
     }
@@ -115,7 +147,11 @@ export function CouponForm({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as {
+      /*
+       * 앞단이 502 HTML 을 주면 `json()` 이 던진다. 그대로 두면 아래 catch 가 받아
+       * **서버가 답했는데 "네트워크 오류" 라고 적는다** — `failureMessage` 가 겪고 생긴 일이다.
+       */
+      const result = (await response.json().catch(() => ({}))) as {
         coupon?: CouponRow;
         message?: string;
         fields?: Record<string, string>;
@@ -334,6 +370,15 @@ export function CouponForm({
               {searching ? '찾는 중…' : '검색'}
             </Button>
           </div>
+          {searchFailure && (
+            <p role="alert" className="text-[12px] text-accent">{searchFailure}</p>
+          )}
+          {/* 찾았는데 없는 것과 아직 안 찾은 것은 다른 말이다 */}
+          {searched && !searchFailure && productHits.length === 0 && (
+            <p className="text-[12px] text-[var(--fg-muted)]">
+              그 이름으로 찾은 상품이 없습니다. 다른 말로 찾아 보세요.
+            </p>
+          )}
           {productHits.length > 0 && (
             <ul className="flex flex-wrap gap-1.5">
               {productHits.map((p) => (
@@ -342,7 +387,11 @@ export function CouponForm({
                     <input
                       type="checkbox"
                       checked={has({ targetType: 'PRODUCT', targetId: p.id })}
-                      onChange={() => toggleTarget({ targetType: 'PRODUCT', targetId: p.id })}
+                      onChange={() => {
+                        // 다음 검색이 이 이름을 지운다 — 고르는 순간 적어 둔다
+                        setPickedNames((names) => ({ ...names, [p.id]: p.name }));
+                        toggleTarget({ targetType: 'PRODUCT', targetId: p.id });
+                      }}
                       className="accent-[var(--brand)]"
                     />
                     {p.name}
