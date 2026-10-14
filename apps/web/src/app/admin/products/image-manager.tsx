@@ -5,7 +5,8 @@ import { useId, useRef, useState } from 'react';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
-import { MAX_IMAGES_PER_PRODUCT } from '@shop/core';
+import { MAX_IMAGE_BYTES, MAX_IMAGES_PER_PRODUCT } from '@shop/core';
+import { failureMessage } from '~/lib/client/failure-message';
 
 export interface ImageRow {
   readonly id: string;
@@ -21,6 +22,9 @@ export interface ImageRow {
  * 쓸 수 없고 터치에서도 스크롤과 싸운다. 버튼이면 탭으로 짚어 엔터로 옮길 수
  * 있고, 옮긴 결과를 aria-live 로 알려 줄 수 있다.
  */
+/** 화면에 적는 상한. 서버가 거절하는 기준과 같은 값에서 나온다 */
+const MAX_IMAGE_MB = MAX_IMAGE_BYTES / 1024 / 1024;
+
 export function ImageManager({
   productId,
   initial,
@@ -62,12 +66,15 @@ export function ImageManager({
     setError(null);
     try {
       const response = await fetch(url, init);
-      const data = (await response.json()) as Record<string, unknown>;
+      /*
+       * 앞단이 502 HTML 을 주면 `json()` 이 던진다. 그대로 두면 아래 catch 가 받아
+       * **서버가 답했는데 "네트워크 오류" 라고 적는다** — `failureMessage` 가 겪고 생긴 일이다.
+       */
       if (!response.ok) {
-        setError(typeof data['message'] === 'string' ? data['message'] : '처리하지 못했습니다.');
+        setError(await failureMessage(response, '처리하지 못했습니다.'));
         return null;
       }
-      return data;
+      return (await response.json().catch(() => ({}))) as Record<string, unknown>;
     } catch {
       setError('네트워크 오류로 처리하지 못했습니다.');
       return null;
@@ -81,6 +88,21 @@ export function ImageManager({
     const file = fileRef.current?.files?.[0];
     if (!file) {
       setError('이미지 파일을 선택해 주세요.');
+      return;
+    }
+
+    /*
+     * **적어 둔 상한을 여기서도 잰다.**
+     *
+     * 바로 아래 안내가 "5MB 이하" 라고 약속하는데 재는 곳이 없었다. 20MB 짜리를 고르면 그것을
+     * **통째로 올린 뒤** 서버가 거절한다 — 느린 회선에서는 몇 분을 기다렸다가 "넘을 수 없습니다"
+     * 를 보는 셈이고, 그동안 화면은 '올리는 중…' 이다.
+     *
+     * 숫자도 손으로 적혀 있었다. 상한은 core 가 쥔다(`MAX_IMAGE_BYTES`) — 서버가 거절하는
+     * 기준과 화면이 적는 말이 한 값에서 나와야 둘이 갈리지 않는다.
+     */
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError(`이미지는 ${MAX_IMAGE_MB}MB 를 넘을 수 없습니다. 고른 파일은 ${(file.size / 1024 / 1024).toFixed(1)}MB 입니다.`);
       return;
     }
 
@@ -217,18 +239,15 @@ export function ImageManager({
                   >
                     <span aria-hidden="true">↓</span>
                   </Button>
-                  <Button
-                    type="button" size="sm" variant="danger"
-                    aria-label={`${index + 1}번째 이미지 삭제`}
-                    disabled={busy !== null}
-                    data-remove-row=""
-                    onClick={() => {
+                  <RemoveImage
+                    image={image}
+                    position={index + 1}
+                    busy={busy !== null}
+                    onConfirm={() => {
                       rememberRemoval(index);
                       void remove(image);
                     }}
-                  >
-                    삭제
-                  </Button>
+                  />
                 </div>
               </div>
             </li>
@@ -249,7 +268,7 @@ export function ImageManager({
           className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--bg)] file:px-3 file:text-[12px]"
         />
         <p className="text-[11px] text-[var(--fg-muted)]">
-          JPEG · PNG · WebP · AVIF, 5MB 이하. 상품당 {MAX_IMAGES_PER_PRODUCT}장까지
+          JPEG · PNG · WebP · AVIF, {MAX_IMAGE_MB}MB 이하. 상품당 {MAX_IMAGES_PER_PRODUCT}장까지
           {full && ' — 한도에 도달했습니다'}
         </p>
         <div>
@@ -263,5 +282,59 @@ export function ImageManager({
       {/* 순서 변경처럼 화면이 조용히 바뀌는 동작은 읽어 줘야 한다 */}
       <p aria-live="polite" className="sr-only">{status}</p>
     </div>
+  );
+}
+
+
+/**
+ * 사진 지우기 — **한 번 더 묻는다.**
+ *
+ * 첫 누름에 바로 지우고 있었다. 저장소에서 사라지고 되돌릴 길이 없는데, 옆의 위·아래 단추와
+ * 같은 줄에 붙어 있어 손이 미끄러지기 쉬운 자리다. 이 저장소의 다른 지우기들(갈래·주문 취소·
+ * 문의·리뷰)은 전부 한 번 더 묻는다.
+ *
+ * **무엇을 지우는지도 말한다.** 이름표가 "3번째 이미지 삭제" 뿐이라, 낭독기로 듣는 사람은
+ * 순번만 알고 누른다 — 대체 텍스트가 있으면 그것이 어떤 사진인지 말해 준다.
+ */
+function RemoveImage({
+  image, position, busy, onConfirm,
+}: {
+  image: ImageRow;
+  position: number;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const what = image.alt.trim() === '' ? `${position}번째 이미지` : image.alt;
+
+  if (!asking) {
+    return (
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제`}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+      >
+        삭제
+      </Button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px]">
+      <span>지울까요?</span>
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제 확인`}
+        disabled={busy}
+        data-remove-row=""
+        onClick={onConfirm}
+      >
+        지웁니다
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setAsking(false)}>
+        취소
+      </Button>
+    </span>
   );
 }
