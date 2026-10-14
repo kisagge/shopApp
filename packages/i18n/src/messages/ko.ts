@@ -533,6 +533,10 @@ export const ko = {
   'addr.makeDefault': '기본으로',
   'addr.delete': '삭제',
   'addr.deleteNamed': '{name} 님의 배송지 삭제',
+  /** 지우면 우편번호부터 다시 찾아 넣어야 한다 — 한 번 더 묻는다 */
+  'addr.deleteAsk': '이 배송지를 지울까요?',
+  'addr.deleteYes': '지웁니다',
+  'addr.deleteConfirmNamed': '{name} 님의 배송지 삭제 확인',
   'addr.new': '새 배송지',
   'addr.save': '배송지 저장',
   'addr.addNew': '새 배송지 추가',

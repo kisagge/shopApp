@@ -143,13 +143,7 @@ export function CollectionCard({
               >
                 {item.isActive ? '노출 중지' : '노출 시작'}
               </Button>
-              <Button
-                type="button" size="sm" variant="danger"
-                aria-label={`${item.title} 기획전 삭제`}
-                disabled={busy} onClick={onDelete}
-              >
-                삭제
-              </Button>
+              <RemoveCollection title={item.title} busy={busy} onConfirm={onDelete} />
             </div>
           </div>
 
@@ -245,3 +239,52 @@ export function CollectionCard({
   );
 }
 
+
+
+/**
+ * 기획전 지우기 — **한 번 더 묻는다.**
+ *
+ * 첫 누름에 바로 지우고 있었다. 담아 둔 상품 목록과 문구·사진이 함께 사라지고 되돌릴 길이
+ * 없는데, 바로 옆이 '노출 중지' 다 — 내리려다 지우기 쉬운 자리다. 이 저장소의 다른 지우기들
+ * (갈래·상품 사진·배너·배송지·주문 취소·문의·리뷰)은 전부 묻는다.
+ */
+function RemoveCollection({
+  title, busy, onConfirm,
+}: {
+  title: string;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const what = title.trim() === '' ? '이 기획전' : `${title} 기획전`;
+
+  if (!asking) {
+    return (
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제`}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+      >
+        삭제
+      </Button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[11px]">
+      <span>지울까요?</span>
+      <Button
+        type="button" size="sm" variant="danger"
+        aria-label={`${what} 삭제 확인`}
+        disabled={busy}
+        onClick={onConfirm}
+      >
+        지웁니다
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={() => setAsking(false)}>
+        취소
+      </Button>
+    </span>
+  );
+}

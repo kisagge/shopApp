@@ -198,20 +198,14 @@ export function AddressBook({
                   버튼 이름에 누구의 주소인지 넣는다. "삭제" 만 있으면
                   스크린리더로는 어느 줄의 삭제인지 알 수 없다.
                 */}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  disabled={busy !== null}
-                  aria-label={t('addr.deleteNamed', { name: a.recipient })}
-                  data-remove-row=""
-                  onClick={() => {
+                <DeleteAddress
+                  name={a.recipient}
+                  busy={busy !== null}
+                  onConfirm={() => {
                     rememberRemoval(index);
                     void remove(a);
                   }}
-                >
-                  {t('addr.delete')}
-                </Button>
+                />
               </div>
             </li>
           ))}
@@ -245,5 +239,59 @@ export function AddressBook({
         </div>
       )}
     </div>
+  );
+}
+
+
+/**
+ * 배송지 지우기 — **한 번 더 묻는다.**
+ *
+ * 첫 누름에 바로 지우고 있었다. 되돌리려면 우편번호부터 다시 찾아 상세 주소까지 새로
+ * 넣어야 한다 — 되돌릴 수 있다고 하기엔 치르는 품이 크고, 고치기 단추 바로 옆자리다.
+ * 이 저장소의 다른 지우기들(갈래·상품 사진·배너·주문 취소·문의·리뷰)은 전부 묻는다.
+ */
+function DeleteAddress({
+  name, busy, onConfirm,
+}: {
+  name: string;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const t = useT();
+  const [asking, setAsking] = useState(false);
+
+  if (!asking) {
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={busy}
+        aria-label={t('addr.deleteNamed', { name })}
+        onClick={() => setAsking(true)}
+      >
+        {t('addr.delete')}
+      </Button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[12px]">
+      <span>{t('addr.deleteAsk')}</span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        disabled={busy}
+        aria-label={t('addr.deleteConfirmNamed', { name })}
+        data-remove-row=""
+        onClick={onConfirm}
+      >
+        {t('addr.deleteYes')}
+      </Button>
+      <Button type="button" variant="ghost" size="sm" onClick={() => setAsking(false)}>
+        {t('common.cancel')}
+      </Button>
+    </span>
   );
 }

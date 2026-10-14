@@ -222,3 +222,63 @@ describe('실패한 응답을 읽는 차례', () => {
     },
   );
 });
+
+/**
+ * **되돌릴 수 없는 것은 한 번 더 묻는다.**
+ *
+ * 이 저장소가 거듭 적어 둔 말이다 — "지우기는 한 번 더 묻는다 — 되돌릴 수 없다"(갈래),
+ * "되돌릴 수 없는 동작이라 한 번 더 묻는다"(주문 취소). 그런데 적어 둔 곳에서만 지켜졌다:
+ * 상품 사진, 홈 배너, 기획전, 배송지가 **첫 누름에 바로** 지워지고 있었다. 넷 다 옆자리가
+ * '노출 중지' 나 위·아래 단추라 손이 미끄러지기 좋은 줄이었다.
+ *
+ * 묻는 모양은 하나로 정해 두지 않는다 — 자리마다 생김새가 다르다. 묻는다는 **사실**만 본다:
+ * 한 번 누르면 "지울까요?" 가 서고, 거기서 한 번 더 눌러야 나간다.
+ */
+const DELETE_WITHOUT_ASK_EXEMPT: Readonly<Record<string, { why: string; askedBy?: string }>> = {
+  '/components/restock-list.tsx': {
+    why: '재입고 알림 해제다. 상품 화면에서 한 번 눌러 그대로 되돌릴 수 있고, 지워지는 것은 "알려 달라" 는 뜻 하나뿐이다.',
+  },
+  '/app/admin/brands/brand-logo-form.tsx': {
+    why: '로고 떼기다. 떼는 폼이 곧 다시 올리는 폼이고(바로 위 칸), 뗀 뒤 무엇이 보이는지도 그 자리에서 말한다("매장에는 이름만 뜹니다").',
+  },
+  '/app/admin/collections/collection-editor.tsx': {
+    why: '보내는 것은 여기가 하지만 **단추는 기획전 카드가 쥔다** — 여기 눌리는 자리는 기획전을 더하는 것뿐이다.',
+    askedBy: '/app/admin/collections/collection-card.tsx',
+  },
+};
+
+/** 묻는 자리가 있는가 — 이름은 자리마다 다르므로 "묻는다는 사실" 만 본다 */
+const asksFirst = (code: string): boolean =>
+  /\b(asking|confirming|confirm)\b/.test(code) || /지울까요|삭제할까요|deleteAsk/.test(code);
+
+describe('지우기는 한 번 더 묻는다', () => {
+  const DELETERS = FETCHERS.filter((f) => /method:\s*'DELETE'/.test(f.code));
+
+  it('지우는 조각이 실제로 있다', () => {
+    expect(DELETERS.length).toBeGreaterThan(8);
+  });
+
+  it('면제 목록에 사라진 파일이 없다', () => {
+    const paths = new Set(DELETERS.map((f) => f.path));
+    for (const path of Object.keys(DELETE_WITHOUT_ASK_EXEMPT)) expect(paths, path).toContain(path);
+  });
+
+  it.each(DELETERS.filter((f) => !(f.path in DELETE_WITHOUT_ASK_EXEMPT)).map((f) => [f.path, f.code]))(
+    '%s 는 지우기 전에 한 번 더 묻는다',
+    (_path, code) => {
+      expect(asksFirst(code), '첫 누름에 바로 지운다 — 되돌릴 수 없으면 한 번 더 물어야 한다').toBe(true);
+    },
+  );
+
+  /** 면제를 증명한다 — "단추는 저쪽이 쥔다" 고 적었으면 저쪽이 실제로 물어야 한다 */
+  it.each(
+    Object.entries(DELETE_WITHOUT_ASK_EXEMPT)
+      .filter(([, v]) => v.askedBy)
+      .map(([path, v]) => [path, v.askedBy!]),
+  )('%s 의 단추를 쥔 %s 가 실제로 묻는다', (_path, askedBy) => {
+    const owner = FETCHERS.find((f) => f.path === askedBy)
+      ?? { code: readFileSync(join(SRC, askedBy.slice(1)), 'utf8') };
+
+    expect(asksFirst(owner.code), `${askedBy} 가 묻지 않으면 면제는 그냥 구멍이다`).toBe(true);
+  });
+});

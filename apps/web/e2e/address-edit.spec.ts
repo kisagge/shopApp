@@ -60,7 +60,8 @@ test('수정을 누르면 채워진 폼이 되고, 우편번호를 고치면 도
   await expect(page.getByRole('button', { name: /님의 배송지 수정$/ })).toHaveCount(1);
   await expect(page.getByText('제주 제주시 첨단로 1 202호')).toBeVisible();
 
-  // 뒷정리
+  // 뒷정리 — 지우기는 한 번 더 묻는다(되돌리려면 우편번호부터 다시 찾아야 한다)
   await page.getByRole('button', { name: '주소 검사 님의 배송지 삭제' }).click();
+  await page.getByRole('button', { name: '주소 검사 님의 배송지 삭제 확인' }).click();
   await expect(edit).toHaveCount(0, { timeout: 15_000 });
 });

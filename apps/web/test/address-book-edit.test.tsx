@@ -78,3 +78,53 @@ describe('배송지 고치기', () => {
     expect(form).toHaveTextContent('휴대폰 번호 형식이 아닙니다');
   });
 });
+
+/**
+ * **배송지 지우기는 한 번 더 묻는다.**
+ *
+ * 첫 누름에 바로 지우고 있었다. 되돌리려면 우편번호부터 다시 찾아 상세 주소까지 새로 넣어야
+ * 한다 — 되돌릴 수 있다고 하기엔 품이 크고, **고치기 단추 바로 옆자리**다.
+ */
+describe('배송지 지우기', () => {
+  it('첫 누름으로는 지우지 않는다', async () => {
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '장보영 님의 배송지 삭제' }));
+
+    expect(screen.getByText('이 배송지를 지울까요?')).toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('한 번 더 눌러야 지운다', async () => {
+    fetchMock.mockResolvedValue(Response.json({ ok: true }));
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '장보영 님의 배송지 삭제' }));
+    await user.click(screen.getByRole('button', { name: '장보영 님의 배송지 삭제 확인' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/addresses/a-1',
+      expect.objectContaining({ method: 'DELETE' }),
+    ));
+  });
+
+  it('물었다가 그만두면 아무 일도 없다', async () => {
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '장보영 님의 배송지 삭제' }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: '장보영 님의 배송지 삭제' })).toBeDefined();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  /** 묻는 것은 누른 줄 하나다 — 옆 줄까지 물음으로 바뀌면 어느 것을 지우는지 모른다 */
+  it('묻는 자리는 누른 줄에만 선다', async () => {
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '장보영 님의 배송지 삭제' }));
+
+    expect(screen.getAllByText('이 배송지를 지울까요?')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: '김회사 님의 배송지 삭제' })).toBeDefined();
+  });
+});
