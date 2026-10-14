@@ -51,7 +51,7 @@ export function MerchantStatusForm({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ status: next, reason }),
       });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(data.message ?? '상태를 바꾸지 못했습니다.');
         return;

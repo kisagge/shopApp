@@ -72,7 +72,7 @@ export function ShipmentForm({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(shipment),
       });
-      const result = (await response.json()) as {
+      const result = (await response.json().catch(() => ({}))) as {
         message?: string;
         waitingForOthers?: boolean;
       };

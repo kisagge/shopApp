@@ -15,7 +15,7 @@ export function ReconcileButton({ mismatchCount }: { mismatchCount: number }) {
     setMessage(null);
     try {
       const response = await fetch('/api/admin/points/reconcile', { method: 'POST' });
-      const data = (await response.json()) as { message?: string; fixed?: number };
+      const data = (await response.json().catch(() => ({}))) as { message?: string; fixed?: number };
       if (!response.ok) {
         setMessage({ tone: 'error', text: data.message ?? '대사를 실행하지 못했습니다.' });
         return;

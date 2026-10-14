@@ -24,7 +24,7 @@ export function VariantForm({ productId }: { productId: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ sku, optionLabel, stock: Number(stock) || 0 }),
       });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(data.message ?? '옵션을 추가하지 못했습니다.');
         return;

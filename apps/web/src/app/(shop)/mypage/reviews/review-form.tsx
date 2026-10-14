@@ -71,7 +71,7 @@ export function ReviewForm({ target }: { target: ReviewTarget }) {
               return form;
             })(),
           });
-      const data = (await response.json()) as { message?: string; earnedPoints?: number };
+      const data = (await response.json().catch(() => ({}))) as { message?: string; earnedPoints?: number };
       if (!response.ok) {
         setError(data.message ?? t('review.saveFailed'));
         return;

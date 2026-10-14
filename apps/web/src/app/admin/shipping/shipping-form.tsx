@@ -43,7 +43,7 @@ export function ShippingPolicyForm({
           remoteSurcharge: Number(remote),
         }),
       });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
 
       if (!response.ok) {
         setMessage({ tone: 'error', text: data.message ?? '저장하지 못했습니다.' });

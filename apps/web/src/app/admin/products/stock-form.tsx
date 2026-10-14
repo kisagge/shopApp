@@ -65,7 +65,7 @@ export function StockForm({ productId, variants }: { productId: string; variants
             })),
         }),
       });
-      const data = (await response.json()) as { message?: string; updated?: number };
+      const data = (await response.json().catch(() => ({}))) as { message?: string; updated?: number };
       if (!response.ok) {
         setMessage({ tone: 'error', text: data.message ?? '재고를 저장하지 못했습니다.' });
         // 그사이 바뀐 재고를 다시 읽어 온다 — 고친 값은 표가 새 숫자로 다시 그려지며 사라진다

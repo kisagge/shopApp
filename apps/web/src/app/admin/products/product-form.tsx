@@ -134,7 +134,7 @@ export function ProductForm({
           body: JSON.stringify(payload),
         },
       );
-      const data: unknown = await response.json();
+      const data: unknown = await response.json().catch(() => ({}));
 
       if (!response.ok) {
         const body = data as {

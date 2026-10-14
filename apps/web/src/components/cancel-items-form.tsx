@@ -80,7 +80,7 @@ export function CancelItemsForm({
         body: JSON.stringify({ itemIds: next, reason: t('cancel.defaultReason'), preview: true }),
       })
         .then(async (res) => {
-          const body = (await res.json()) as CancelItemsPreviewResponse & { message?: string };
+          const body = (await res.json().catch(() => ({}))) as CancelItemsPreviewResponse & { message?: string };
           if (ticket !== asked.current) return;
           if (!res.ok) {
             setError(body.message ?? t('cancel.failed'));

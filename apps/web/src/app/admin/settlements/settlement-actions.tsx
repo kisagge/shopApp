@@ -19,7 +19,7 @@ export function CloseButton({ yearMonth }: { yearMonth: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ yearMonth }),
       });
-      const data = (await response.json()) as {
+      const data = (await response.json().catch(() => ({}))) as {
         message?: string; created?: number; updated?: number; skipped?: string[];
       };
       if (!response.ok) {
@@ -100,7 +100,7 @@ export function PayButton({
     setError(null);
     try {
       const response = await fetch(`/api/admin/settlements/${settlementId}/pay`, { method: 'POST' });
-      const data = (await response.json()) as { message?: string };
+      const data = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(data.message ?? '지급 처리하지 못했습니다.');
         return;

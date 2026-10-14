@@ -45,7 +45,7 @@ export function CouponBoard({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as { coupon?: CouponRow; message?: string };
+      const result = (await response.json().catch(() => ({}))) as { coupon?: CouponRow; message?: string };
       if (!response.ok || !result.coupon) {
         setError(result.message ?? '바꾸지 못했습니다.');
         return;

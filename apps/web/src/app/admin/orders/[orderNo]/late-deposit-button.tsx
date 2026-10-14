@@ -22,7 +22,7 @@ export function LateDepositButton({ orderNo }: { orderNo: string }) {
     setError(null);
     try {
       const response = await fetch(`/api/admin/orders/${orderNo}/late-deposit`, { method: 'POST' });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? '처리하지 못했습니다.');
         return;

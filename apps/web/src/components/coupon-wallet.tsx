@@ -70,7 +70,7 @@ export function CouponWallet({ initial }: { initial: readonly WalletCoupon[] }) 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ code }),
       });
-      const result = (await response.json()) as { name?: string; message?: string };
+      const result = (await response.json().catch(() => ({}))) as { name?: string; message?: string };
       if (!response.ok) {
         setError(result.message ?? t('coupon.claimFailed'));
         return;

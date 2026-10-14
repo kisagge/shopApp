@@ -19,7 +19,7 @@ export function CollectionEditor({ initial }: { initial: readonly CollectionItem
     try {
       const response = await fetch(url, init);
       if (response.status === 204) return {} as T;
-      const data: unknown = await response.json();
+      const data: unknown = await response.json().catch(() => ({}));
       if (!response.ok) {
         const message =
           typeof data === 'object' && data !== null && 'message' in data

@@ -6,6 +6,7 @@ import { Badge, Button, Field } from '@shop/ui';
 import {
   BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, type BannerTone,
 } from '@shop/core';
+import { failureMessage } from '~/lib/client/failure-message';
 import { ProductPicker } from './product-picker';
 import type { CollectionItem, PickedProduct } from './types';
 
@@ -77,13 +78,13 @@ export function CollectionCard({
         method: 'POST',
         body,
       });
-      const data = await response.json();
+      // 실패한 응답은 먼저 가린다 — 502 가 HTML 을 주면 json() 이 던져 "네트워크 오류" 로 샌다
       if (!response.ok) {
-        setUploadError(typeof data?.message === 'string' ? data.message : '올리지 못했습니다.');
+        setUploadError(await failureMessage(response, '올리지 못했습니다.'));
         return;
       }
       if (fileRef.current) fileRef.current.value = '';
-      onUploaded(data);
+      onUploaded(await response.json());
     } catch {
       setUploadError('네트워크 오류로 올리지 못했습니다.');
     } finally {

@@ -181,3 +181,44 @@ describe('두 번 눌러도 한 번만 나간다', () => {
     },
   );
 });
+
+/**
+ * **서버가 답한 실패를 "네트워크 오류" 로 적지 않는다.**
+ *
+ * catch 가 있어도 틀릴 수 있다. `await response.json()` 을 `!response.ok` 보다 **먼저** 부르면,
+ * 앞단이 502 HTML 이나 빈 본문을 돌려줄 때 그 줄이 던지고 **아래 catch 가 받아 "네트워크 오류"**
+ * 라고 적는다 — 서버는 멀쩡히 답했는데.
+ *
+ * `failure-message.ts` 가 그 일을 겪고 생겼다: "앞단이 502 HTML 을 주거나 본문이 비면
+ * `response.json()` 이 던지고, 그걸 잡지 않으면 서버가 한 말 대신 '네트워크 오류' 가 뜬다
+ * (실제로 이용 정지 폼이 그랬다)." **그런데 그 교훈이 스무 곳에 안 닿아 있었다** — 쿠폰 폼,
+ * 상태 전이, 상품 사진, 배너를 하나씩 고치다 세어 보고 알았다.
+ *
+ * 받아 내는 길은 둘 중 아무거나다: `ok` 를 먼저 보고 그 뒤에 읽거나, `.json().catch(...)`.
+ */
+describe('실패한 응답을 읽는 차례', () => {
+  /** `.catch` 가 안 붙은 `.json()` 들의 자리 */
+  const unguarded = (code: string) => [...code.matchAll(/\.json\(\)(?!\s*\.catch)/g)].map((m) => m.index);
+  /** `response.ok` 를 보는 자리 — `!res.ok` 도 `r.ok ? …` 도 센다 */
+  const okCheck = (code: string) => [...code.matchAll(/\w+\.ok\b/g)].map((m) => m.index);
+
+  const READS_BODY = FETCHERS.filter((f) => /\.json\(\)/.test(f.code));
+
+  it('본문을 읽는 조각이 실제로 있다', () => {
+    expect(READS_BODY.length).toBeGreaterThan(30);
+  });
+
+  it.each(READS_BODY.map((f) => [f.path, f.code]))(
+    '%s 는 ok 를 보고 나서 본문을 읽는다',
+    (_path, code) => {
+      const bare = unguarded(code);
+      if (bare.length === 0) return;
+
+      const checks = okCheck(code);
+      expect(
+        checks.length > 0 && Math.min(...checks) < Math.min(...bare),
+        'ok 를 보기 전에 무방비로 json() 을 읽는다 — 502 가 HTML 을 주면 서버가 한 말 대신 "네트워크 오류" 가 뜬다',
+      ).toBe(true);
+    },
+  );
+});

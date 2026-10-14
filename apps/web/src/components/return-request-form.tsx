@@ -110,7 +110,7 @@ export function ReturnRequestForm({
             : {}),
         }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? t('ret.failed'));
         return;

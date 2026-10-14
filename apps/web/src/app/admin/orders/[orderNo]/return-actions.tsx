@@ -42,7 +42,7 @@ export function WithdrawReturnButton({ orderNo, exchange = false }: { orderNo: s
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'WITHDRAW', rejectReason: reason }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? '처리하지 못했습니다.');
         return;
@@ -115,7 +115,7 @@ export function ReturnActions({ orderNo, exchange = false }: { orderNo: string; 
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? '처리하지 못했습니다.');
         return;
@@ -234,7 +234,7 @@ export function CompleteReturnButton({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'COMPLETE' }),
       });
-      const result = (await response.json()) as { message?: string; refunded?: number };
+      const result = (await response.json().catch(() => ({}))) as { message?: string; refunded?: number };
       if (!response.ok) {
         setError(result.message ?? '환불하지 못했습니다.');
         return;
@@ -324,7 +324,7 @@ export function ReceiveReturnButton({ orderNo }: { orderNo: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'RECEIVE' }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? '확인하지 못했습니다.');
         return;
@@ -392,7 +392,7 @@ export function ShipExchangeForm({ orderNo }: { orderNo: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'SHIP_EXCHANGE', carrier: value('carrier'), trackingNumber: value('trackingNumber') }),
       });
-      const result = (await response.json()) as { message?: string };
+      const result = (await response.json().catch(() => ({}))) as { message?: string };
       if (!response.ok) {
         setError(result.message ?? '교환 상품을 보내지 못했습니다.');
         return;
