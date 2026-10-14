@@ -195,6 +195,7 @@ export const en: Dictionary = {
   'review.helpfulCount': { one: 'Helpful {count}', other: 'Helpful {count}' },
   'review.helpfulOn': 'Marked helpful, {count} so far',
   'review.helpfulOff': 'Mark as helpful, {count} so far',
+  'review.helpfulFailed': "Couldn't send your vote.",
   'review.sort': 'Sort reviews',
   'review.sortRecent': 'Newest',
   'review.sortHelpful': 'Most helpful',

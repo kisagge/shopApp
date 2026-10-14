@@ -203,6 +203,8 @@ export const ko = {
   'review.helpfulCount': { one: '도움돼요 {count}', other: '도움돼요 {count}' },
   'review.helpfulOn': '도움됐다고 표시함, 지금 {count}명',
   'review.helpfulOff': '도움됐다고 표시하기, 지금 {count}명',
+  /** 실패를 알리는 자리에 단추 이름('도움돼요')이 들어가 있었다 — 빨간 글씨로 '도움돼요' 는 아무 말도 아니다 */
+  'review.helpfulFailed': '도움돼요를 보내지 못했습니다.',
   'review.sort': '리뷰 정렬',
   'review.sortRecent': '최신순',
   'review.sortHelpful': '도움순',

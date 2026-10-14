@@ -54,14 +54,22 @@ export function ReviewHelpful({
         method: next ? 'PUT' : 'DELETE',
       });
       if (!response.ok) {
-        setError(await failureMessage(response, t('review.helpful')));
+        setError(await failureMessage(response, t('review.helpfulFailed')));
         return;
       }
       const data = (await response.json()) as { helpfulCount: number };
       setCount(data.helpfulCount);
       setPressed(next);
     } catch {
-      setError(t('review.helpful'));
+      /*
+       * **실패 자리에 단추 이름이 들어가 있었다.**
+       *
+       * `review.helpful` 은 '도움돼요' — 이 단추가 자기를 부르는 말이다. 그래서 보내기가
+       * 실패하면 '도움돼요' 라고 적힌 단추 옆에 **빨간 글씨로 '도움돼요'** 가 떴다. 낭독기는
+       * 그것을 경고로 읽는데, 무엇이 잘못됐는지도 다시 누르면 되는지도 말하지 않는다.
+       * 서버가 준 말이 없을 때 쓰는 기본값도 같은 열쇠였다.
+       */
+      setError(t('review.helpfulFailed'));
     } finally {
       setPending(false);
     }

@@ -191,6 +191,7 @@ export const ja: Dictionary = {
   'review.helpfulCount': { one: '役に立った {count}', other: '役に立った {count}' },
   'review.helpfulOn': '役に立ったと表示済み、現在{count}人',
   'review.helpfulOff': '役に立ったと表示する、現在{count}人',
+  'review.helpfulFailed': '「役に立った」を送れませんでした。',
   'review.sort': 'レビューの並び替え',
   'review.sortRecent': '新着順',
   'review.sortHelpful': '役に立った順',
