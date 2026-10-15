@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from './render';
+import { fireEvent, render, screen, waitFor } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { MAX_IMAGE_BYTES } from '@shop/core';
@@ -234,5 +234,79 @@ describe('순서와 노출', () => {
     await userEvent.click(screen.getByRole('button', { name: '노출 시작' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('네트워크 오류');
+  });
+});
+
+/**
+ * **계약이 막는 것을 화면이 먼저 말한다.**
+ *
+ * 둘 다 서버가 거절한다. 그런데 눌러 본 뒤에야 알려 줬다 — 이 저장소는 반대로 한다.
+ */
+describe('저장하기 전에 거르는 것', () => {
+  const card = () => screen.getAllByLabelText('버튼 문구 (선택)')[0]!;
+  const saveButton = () => screen.getAllByRole('button', { name: '내용 저장' })[0]!;
+
+  /** 링크 없는 버튼은 눌러도 아무 데도 안 가는 단추가 손님 화면 맨 위에 서는 것이다 */
+  it('버튼 문구만 적고 링크를 비우면 저장할 수 없다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    await userEvent.type(card(), '지금 보기');
+
+    expect(saveButton()).toBeDisabled();
+    expect(screen.getByText('버튼 문구를 적었으면 링크도 적어 주세요.')).toBeDefined();
+  });
+
+  it('링크까지 적으면 저장할 수 있다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    await userEvent.type(card(), '지금 보기');
+    await userEvent.type(screen.getAllByLabelText('링크')[0]!, '/collections/autumn');
+
+    expect(saveButton()).toBeEnabled();
+  });
+
+  it('둘 다 비우면 아무 말도 하지 않는다 — 버튼은 선택이다', () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    expect(saveButton()).toBeEnabled();
+    expect(screen.queryByText('버튼 문구를 적었으면 링크도 적어 주세요.')).toBeNull();
+  });
+
+  /** 거꾸로 적으면 영영 안 뜨는 배너가 된다 */
+  it('종료가 시작보다 앞서면 저장할 수 없다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    fireEvent.change(screen.getAllByLabelText(/^시작/)[0]!, { target: { value: '2026-12-01T00:00' } });
+    fireEvent.change(screen.getAllByLabelText(/^종료/)[0]!, { target: { value: '2026-11-01T00:00' } });
+
+    expect(saveButton()).toBeDisabled();
+    expect(screen.getByText('종료는 시작보다 뒤여야 합니다.')).toBeDefined();
+  });
+
+  it('같은 시각이어도 저장할 수 없다 — 한순간도 안 뜬다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    fireEvent.change(screen.getAllByLabelText(/^시작/)[0]!, { target: { value: '2026-12-01T00:00' } });
+    fireEvent.change(screen.getAllByLabelText(/^종료/)[0]!, { target: { value: '2026-12-01T00:00' } });
+
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('차례가 맞으면 저장할 수 있다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    fireEvent.change(screen.getAllByLabelText(/^시작/)[0]!, { target: { value: '2026-11-01T00:00' } });
+    fireEvent.change(screen.getAllByLabelText(/^종료/)[0]!, { target: { value: '2026-12-01T00:00' } });
+
+    expect(saveButton()).toBeEnabled();
+  });
+
+  /** 기간은 대개 비워 둔다 — 비운 것을 거르면 정상 입력이 막힌다 */
+  it('한쪽만 적은 것은 막지 않는다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    fireEvent.change(screen.getAllByLabelText(/^종료/)[0]!, { target: { value: '2026-11-01T00:00' } });
+
+    expect(saveButton()).toBeEnabled();
   });
 });

@@ -301,3 +301,74 @@ describe('반품지가 없는 브랜드', () => {
     expect(statusValues()).toContain('ACTIVE');
   });
 });
+
+/**
+ * **판매가는 정가보다 클 수 없다.**
+ *
+ * 계약이 막는다(`createProductSchema` 의 priceRule). 그런데 화면은 눌러 본 뒤에야 알려 줬고,
+ * 그 사이 **엉뚱한 말을 적고 있었다** — 할인율은 이 경우 0 으로 떨어지므로 칸 아래에 "비워
+ * 두면 정가로 판매합니다" 가 뜬다. 90,000 을 적어 둔 칸 밑에서 비우라는 말을 하는 셈이고,
+ * 정작 무엇이 잘못됐는지는 어디에도 없었다.
+ */
+describe('판매가와 정가', () => {
+  const salePrice = () => screen.getByLabelText(/판매가/);
+  const submit = () => screen.getByRole('button', { name: '변경 사항 저장' });
+
+  const typeSale = async (value: string) => {
+    await userEvent.clear(salePrice());
+    if (value) await userEvent.type(salePrice(), value);
+  };
+
+  it('정가보다 크면 까닭을 적고 저장을 막는다', async () => {
+    setup();
+
+    await typeSale('500000');
+
+    expect(screen.getByText('판매가는 정가보다 클 수 없습니다.')).toBeDefined();
+    expect(submit()).toBeDisabled();
+  });
+
+  /** 정가와 같은 것은 할인이 없을 뿐 잘못이 아니다 */
+  it('정가와 같으면 저장할 수 있다', async () => {
+    setup();
+
+    await typeSale('413000');
+
+    expect(screen.queryByText('판매가는 정가보다 클 수 없습니다.')).toBeNull();
+    expect(submit()).toBeEnabled();
+  });
+
+  it('비워 두면 막지 않는다 — 정가로 판다는 뜻이다', async () => {
+    setup();
+
+    await typeSale('');
+
+    expect(screen.queryByText('판매가는 정가보다 클 수 없습니다.')).toBeNull();
+    expect(submit()).toBeEnabled();
+  });
+
+  /*
+   * 할인율이 0 으로 떨어지면서 "비워 두면 정가로 판매합니다" 가 뜨던 자리다. 값이 들어 있는
+   * 칸 아래에서 비우라는 말을 하면, 무엇이 잘못됐는지는 어디에도 없다.
+   */
+  it('정가보다 클 때 비우라는 말만 하고 끝내지 않는다', async () => {
+    setup();
+
+    await typeSale('500000');
+
+    expect(screen.getByText('판매가는 정가보다 클 수 없습니다.')).toBeDefined();
+  });
+
+  it('정가를 올리면 다시 셈한다', async () => {
+    setup();
+
+    await typeSale('500000');
+    expect(submit()).toBeDisabled();
+
+    const listPrice = screen.getByLabelText(/정가/);
+    await userEvent.clear(listPrice);
+    await userEvent.type(listPrice, '600000');
+
+    expect(submit()).toBeEnabled();
+  });
+});

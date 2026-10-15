@@ -225,6 +225,18 @@ function BannerCard({
     startsAt: toLocalInput(banner.startsAt),
     endsAt: toLocalInput(banner.endsAt),
   });
+  /**
+   * **계약이 막는 둘을 화면이 먼저 말한다.**
+   *
+   * 버튼 문구만 적고 링크를 비우면 눌러도 아무 데도 안 가는 단추가 손님 화면 맨 위에 선다
+   * (`valid.ctaNeedsHref`). 기간을 거꾸로 적으면 영영 안 뜨는 배너가 된다
+   * (`valid.endBeforeStart`). 둘 다 서버가 거절하지만, 이 저장소는 눌러 보고 나서 알게 하지
+   * 않는다.
+   */
+  const ctaUnpaired = form.ctaLabel.trim() !== '' && form.href.trim() === '';
+  const windowReversed =
+    form.startsAt !== '' && form.endsAt !== '' && form.endsAt <= form.startsAt;
+
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -364,6 +376,7 @@ function BannerCard({
             onChange={(e) => set('ctaLabel', e.target.value)} maxLength={20}
             placeholder="기획전 보기" />
           <Field label="링크" value={form.href}
+            error={ctaUnpaired ? '버튼 문구를 적었으면 링크도 적어 주세요.' : undefined}
             onChange={(e) => set('href', e.target.value)} maxLength={200}
             placeholder="/category/outer"
             hint="내부 경로만 넣을 수 있습니다" />
@@ -398,7 +411,15 @@ function BannerCard({
             </label>
             <input id={endId} type="datetime-local" value={form.endsAt}
               onChange={(e) => set('endsAt', e.target.value)}
+              aria-invalid={windowReversed ? true : undefined}
+              aria-describedby={windowReversed ? `${endId}-error` : undefined}
               className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm" />
+            {/* 거꾸로 적으면 영영 안 뜨는 배너가 된다 — 저장하기 전에 말한다 */}
+            {windowReversed && (
+              <p id={`${endId}-error`} className="text-[11px] text-accent">
+                종료는 시작보다 뒤여야 합니다.
+              </p>
+            )}
           </div>
         </div>
 
@@ -420,7 +441,7 @@ function BannerCard({
           </Button>
 
           <Button
-            type="button" size="md" disabled={busy}
+            type="button" size="md" disabled={busy || ctaUnpaired || windowReversed}
             className="ml-auto"
             onClick={() =>
               onSave({

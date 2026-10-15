@@ -53,6 +53,13 @@ export function CollectionCard({
     startsAt: toLocalInput(item.startsAt),
     endsAt: toLocalInput(item.endsAt),
   });
+  /**
+   * **기간을 거꾸로 적으면 영영 안 뜨는 기획전이 된다.** 계약이 막지만
+   * (`valid.endBeforeStart`), 이 저장소는 눌러 보고 나서 알게 하지 않는다.
+   */
+  const windowReversed =
+    form.startsAt !== '' && form.endsAt !== '' && form.endsAt <= form.startsAt;
+
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -205,7 +212,14 @@ export function CollectionCard({
               </label>
               <input id={endId} type="datetime-local" value={form.endsAt}
                 onChange={(e) => set('endsAt', e.target.value)}
+                aria-invalid={windowReversed ? true : undefined}
+                aria-describedby={windowReversed ? `${endId}-error` : undefined}
                 className="h-12 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-3 text-sm" />
+              {windowReversed && (
+                <p id={`${endId}-error`} className="text-[11px] text-accent">
+                  종료는 시작보다 뒤여야 합니다.
+                </p>
+              )}
             </div>
           </div>
 
@@ -227,7 +241,7 @@ export function CollectionCard({
             </Button>
 
             <Button
-              type="button" size="md" disabled={busy} className="ml-auto"
+              type="button" size="md" disabled={busy || windowReversed} className="ml-auto"
               onClick={() =>
                 onSave({
                   slug: form.slug.trim(),

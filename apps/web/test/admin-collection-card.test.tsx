@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from './render';
+import { fireEvent, render, screen, waitFor } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { MAX_IMAGE_BYTES } from '@shop/core';
@@ -193,5 +193,52 @@ describe('노출과 저장', () => {
     open({}, true);
 
     expect(screen.getByRole('button', { name: '노출 중지' })).toBeDisabled();
+  });
+});
+
+/**
+ * **계약이 막는 것을 화면이 먼저 말한다.** 기간을 거꾸로 적으면 영영 안 뜨는 기획전이
+ * 된다(`valid.endBeforeStart`). 서버도 막지만 눌러 보고 나서 알게 하지 않는다.
+ */
+describe('저장하기 전에 거르는 것', () => {
+  const saveButton = () => screen.getByRole('button', { name: '내용 저장' });
+  const setWindow = (start: string, end: string) => {
+    if (start) fireEvent.change(screen.getByLabelText(/^시작/), { target: { value: start } });
+    if (end) fireEvent.change(screen.getByLabelText(/^종료/), { target: { value: end } });
+  };
+
+  it('종료가 시작보다 앞서면 저장할 수 없다', () => {
+    open();
+
+    setWindow('2026-12-01T00:00', '2026-11-01T00:00');
+
+    expect(saveButton()).toBeDisabled();
+    expect(screen.getByText('종료는 시작보다 뒤여야 합니다.')).toBeDefined();
+  });
+
+  it('같은 시각이어도 저장할 수 없다 — 한순간도 안 뜬다', () => {
+    open();
+
+    setWindow('2026-12-01T00:00', '2026-12-01T00:00');
+
+    expect(saveButton()).toBeDisabled();
+  });
+
+  it('차례가 맞으면 저장할 수 있다', () => {
+    open();
+
+    setWindow('2026-11-01T00:00', '2026-12-01T00:00');
+
+    expect(saveButton()).toBeEnabled();
+    expect(screen.queryByText('종료는 시작보다 뒤여야 합니다.')).toBeNull();
+  });
+
+  /** 기간은 대개 비워 둔다 — 비운 것을 거르면 정상 입력이 막힌다 */
+  it('한쪽만 적은 것은 막지 않는다', () => {
+    open();
+
+    setWindow('', '2026-11-01T00:00');
+
+    expect(saveButton()).toBeEnabled();
   });
 });

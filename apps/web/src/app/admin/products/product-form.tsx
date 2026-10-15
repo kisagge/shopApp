@@ -91,6 +91,16 @@ export function ProductForm({
       ? discountRateOf(won(list), won(sale))
       : 0;
 
+  /**
+   * **판매가는 정가보다 클 수 없다.**
+   *
+   * 계약이 막는다(`createProductSchema` 의 priceRule). 그런데 화면은 눌러 본 뒤에야 알려
+   * 줬고, 그 사이에 **엉뚱한 말을 적고 있었다** — 할인율은 이 경우 0 으로 떨어지므로 칸 아래에
+   * "비워 두면 정가로 판매합니다" 가 뜬다. 90,000 을 적어 둔 칸 밑에서 비우라는 말을 하는 셈이고,
+   * 정작 무엇이 잘못됐는지는 어디에도 없다.
+   */
+  const saleOverList = sale !== null && Number.isFinite(sale) && Number.isFinite(list) && sale > list;
+
   /*
    * **고른 브랜드에 돌려받을 곳이 있는가.**
    *
@@ -315,7 +325,7 @@ export function ProductForm({
             step={1}
             value={values.salePrice}
             onChange={(e) => set('salePrice', e.target.value)}
-            error={errors.salePrice}
+            error={saleOverList ? '판매가는 정가보다 클 수 없습니다.' : errors.salePrice}
             hint={rate > 0 ? `${rate}% 할인으로 표시됩니다` : '비워 두면 정가로 판매합니다'}
             className="tnum"
           />
@@ -361,7 +371,7 @@ export function ProductForm({
       </fieldset>
 
       <div className="flex gap-3">
-        <Button type="submit" disabled={pending}>
+        <Button type="submit" disabled={pending || saleOverList}>
           {pending ? '저장 중…' : mode === 'create' ? '상품 등록' : '변경 사항 저장'}
         </Button>
         <Button type="button" variant="ghost" onClick={() => router.back()}>
