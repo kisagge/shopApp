@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { Badge, Button } from '@shop/ui';
 import { MAX_COLLECTION_ITEMS } from '@shop/core';
+import { failureMessage } from '~/lib/client/failure-message';
 import type { PickedProduct } from './types';
 
 /**
@@ -29,21 +30,44 @@ export function ProductPicker({
   const [term, setTerm] = useState('');
   const [found, setFound] = useState<readonly PickedProduct[]>([]);
   const [searching, setSearching] = useState(false);
+  const [searchFailure, setSearchFailure] = useState<string | null>(null);
+  /** 한 번이라도 찾아봤는가. "아직 안 찾음" 과 "찾았는데 없음" 은 다른 말이다 */
+  const [searched, setSearched] = useState(false);
   const searchId = useId();
 
   const dirty =
     list.length !== picked.length || list.some((p, i) => p.id !== picked[i]?.id);
 
+  /**
+   * 상품 찾기.
+   *
+   * **셋을 똑같은 침묵으로 답하고 있었다** — 찾은 것이 없을 때, 서버가 거절할 때, 길이 끊길
+   * 때. 후보 칸은 하나라도 있어야 그려지므로 어느 쪽이든 화면이 그대로다. 끊긴 자리에는
+   * "후보를 못 받아도 이미 담긴 것은 편집할 수 있다" 고 적어 두었는데, 그건 맞지만 **누른
+   * 사람이 왜 아무 일도 안 일어났는지 모른다는 문제에는 답하지 않는다.**
+   *
+   * **빈 말로는 찾지 않는다.** 같은 창구를 쓰는 다른 두 화면(쿠폰 대상·쿠폰 지급)은 그렇게
+   * 하고 까닭도 적어 두었다 — 열자마자 전체 명단이 뜨면 고르는 화면이 아니라 명단을 훑는
+   * 화면이 된다. 여기만 빈 말을 그대로 보내고 있었다.
+   */
   async function search() {
+    const q = term.trim();
+    if (!q) return;
     setSearching(true);
+    setSearchFailure(null);
     try {
       // 쿠폰 대상 지정과 같은 창구를 쓴다 — 같은 일이라 두 벌로 두지 않는다
-      const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(term)}`);
-      if (!response.ok) return;
+      const response = await fetch(`/api/admin/products/search?q=${encodeURIComponent(q)}`);
+      if (!response.ok) {
+        setSearchFailure(await failureMessage(response, '상품을 찾지 못했습니다.'));
+        return;
+      }
       const data: { products: PickedProduct[] } = await response.json();
       setFound(data.products);
+      setSearched(true);
     } catch {
-      // 후보를 못 받아도 이미 담긴 것은 그대로 편집할 수 있다
+      // 못 받아도 이미 담긴 것은 그대로 편집할 수 있다 — 다만 왜 안 됐는지는 말한다
+      setSearchFailure('네트워크 오류로 상품을 찾지 못했습니다.');
     } finally {
       setSearching(false);
     }
@@ -163,6 +187,16 @@ export function ProductPicker({
         </Button>
       </div>
 
+      {searchFailure && (
+        <p role="alert" className="text-[12px] text-accent">{searchFailure}</p>
+      )}
+      {/* 찾았는데 없는 것과 아직 안 찾은 것은 다른 말이다 */}
+      {searched && !searchFailure && found.length === 0 && (
+        <p className="text-[12px] text-[var(--fg-muted)]">
+          그 이름으로 찾은 상품이 없습니다. 다른 말로 찾아 보세요.
+        </p>
+      )}
+
       {found.length > 0 && (
         <ul className="flex flex-col gap-1">
           {found.map((p) => {
@@ -174,8 +208,13 @@ export function ProductPicker({
                   <span className="ml-2 text-[11px] text-[var(--fg-muted)]">{p.brandName}</span>
                 </span>
                 {!p.onDisplay && <Badge tone="neutral">내려감</Badge>}
+                {/*
+                  **어느 상품의 단추인지 이름에 넣는다.** 후보가 스물이면 낭독기에는 "담기" 가
+                  스무 번 들린다 — 위의 ↑↓·빼기는 이미 이름을 넣고 있었고 여기만 빠져 있었다.
+                */}
                 <Button
                   type="button" size="sm" variant="ghost"
+                  aria-label={already ? `${p.name} 담김` : `${p.name} 담기`}
                   disabled={already || list.length >= MAX_COLLECTION_ITEMS}
                   onClick={() => add(p)}
                 >
