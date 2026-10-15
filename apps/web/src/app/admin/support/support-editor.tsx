@@ -179,8 +179,16 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
     router.refresh();
   }
 
+  /**
+   * **브라우저 대화상자로 묻지 않는다.**
+   *
+   * `window.confirm` 을 쓰고 있었다. 묻기는 묻지만, 브라우저가 "이 페이지가 추가 대화상자를
+   * 만들지 못하게 차단" 을 띄우고 운영자가 한 번 누르면 **그 뒤로는 조용히 false 를 돌려준다**
+   * — 내리기 단추가 아무 일도 안 하게 되고, 화면에는 그 까닭이 어디에도 없다.
+   *
+   * 게다가 이 저장소의 다른 지우기들은 전부 자리 안에서 묻는다. 같은 모양으로 맞춘다.
+   */
   async function remove(post: SupportPostItem) {
-    if (!window.confirm(`"${post.title}" 을(를) 내릴까요?`)) return;
     if (!(await send(`/api/admin/support/${post.id}`, 'DELETE'))) return;
     setNotice('내렸습니다.');
     if (editing === post.id) startNew();
@@ -369,26 +377,27 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                     </span>
                   </p>
                 </div>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {/*
+                    **어느 글의 단추인지 이름에 넣는다.** 글이 스물이면 낭독기에는 "수정" 이
+                    스무 번 들리고, 그중 어느 것인지는 어디에도 없었다.
+                  */}
                   <button
                     type="button"
+                    aria-label={`${post.title} 수정`}
                     onClick={() => startEdit(post)}
                     className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px]"
                   >
                     수정
                   </button>
-                  <button
-                    type="button"
-                    data-remove-row=""
-                    onClick={() => {
+                  <RemovePost
+                    title={post.title}
+                    busy={pending}
+                    onConfirm={() => {
                       rememberRemoval(index);
                       void remove(post);
                     }}
-                    disabled={pending}
-                    className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px] text-accent disabled:opacity-40"
-                  >
-                    내리기
-                  </button>
+                  />
                 </div>
               </li>
             ))}
@@ -396,5 +405,60 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
         )}
       </div>
     </div>
+  );
+}
+
+
+/**
+ * 글 내리기 — **한 번 더 묻는다.**
+ *
+ * 손님이 읽는 글이고, 되돌리려면 본문을 다시 써야 한다. 바로 옆이 '수정' 이라 손이
+ * 미끄러지기 좋은 자리이기도 하다.
+ */
+function RemovePost({
+  title, busy, onConfirm,
+}: {
+  title: string;
+  busy: boolean;
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  const what = title.trim() === '' ? '이 글' : title;
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        aria-label={`${what} 내리기`}
+        disabled={busy}
+        onClick={() => setAsking(true)}
+        className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px] text-accent disabled:opacity-40"
+      >
+        내리기
+      </button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 text-[12px]">
+      <span>내릴까요?</span>
+      <button
+        type="button"
+        aria-label={`${what} 내리기 확인`}
+        data-remove-row=""
+        disabled={busy}
+        onClick={onConfirm}
+        className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px] text-accent disabled:opacity-40"
+      >
+        내립니다
+      </button>
+      <button
+        type="button"
+        onClick={() => setAsking(false)}
+        className="h-9 rounded-sm px-2 text-[12px] underline"
+      >
+        취소
+      </button>
+    </span>
   );
 }
