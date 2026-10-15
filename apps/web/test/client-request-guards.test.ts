@@ -197,10 +197,23 @@ describe('두 번 눌러도 한 번만 나간다', () => {
  * 받아 내는 길은 둘 중 아무거나다: `ok` 를 먼저 보고 그 뒤에 읽거나, `.json().catch(...)`.
  */
 describe('실패한 응답을 읽는 차례', () => {
-  /** `.catch` 가 안 붙은 `.json()` 들의 자리 */
-  const unguarded = (code: string) => [...code.matchAll(/\.json\(\)(?!\s*\.catch)/g)].map((m) => m.index);
-  /** `response.ok` 를 보는 자리 — `!res.ok` 도 `r.ok ? …` 도 센다 */
-  const okCheck = (code: string) => [...code.matchAll(/\w+\.ok\b/g)].map((m) => m.index);
+  /**
+   * **호출 하나씩 본다.**
+   *
+   * 처음에는 파일 단위로 "첫 ok 가 첫 json 보다 앞이냐" 만 보았다. 그랬더니 한 파일에 창구가
+   * 둘인 조각을 통째로 놓쳤다 — 쿠폰 지급 화면의 `search()` 는 ok 를 먼저 보고, 바로 아래
+   * `grant()` 는 json 을 먼저 읽는데, 앞엣것 하나로 파일 전체가 통과했다.
+   *
+   * 그래서 **고장의 모양을 바로 집는다**: 무방비로 읽은 `json()` **바로 뒤**에 ok 검사가 오면,
+   * 그 자리는 "먼저 읽고 나중에 가린다" 는 뜻이다.
+   */
+  const AFTER = 320;
+
+  /** `.catch` 가 안 붙은 `.json()` 뒤에 곧바로 ok 검사가 오는 자리들 */
+  const readsBeforeChecking = (code: string): number[] =>
+    [...code.matchAll(/\.json\(\)(?!\s*\.catch)/g)]
+      .map((m) => m.index)
+      .filter((at) => /\w+\.ok\b/.test(code.slice(at, at + AFTER)));
 
   const READS_BODY = FETCHERS.filter((f) => /\.json\(\)/.test(f.code));
 
@@ -211,14 +224,10 @@ describe('실패한 응답을 읽는 차례', () => {
   it.each(READS_BODY.map((f) => [f.path, f.code]))(
     '%s 는 ok 를 보고 나서 본문을 읽는다',
     (_path, code) => {
-      const bare = unguarded(code);
-      if (bare.length === 0) return;
-
-      const checks = okCheck(code);
       expect(
-        checks.length > 0 && Math.min(...checks) < Math.min(...bare),
+        readsBeforeChecking(code),
         'ok 를 보기 전에 무방비로 json() 을 읽는다 — 502 가 HTML 을 주면 서버가 한 말 대신 "네트워크 오류" 가 뜬다',
-      ).toBe(true);
+      ).toEqual([]);
     },
   );
 });
