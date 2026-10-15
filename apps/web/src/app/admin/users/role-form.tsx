@@ -45,6 +45,21 @@ export function RoleForm({
 
   const changed = next !== role || (next === 'MERCHANT' && nextMerchant !== (merchantId ?? ''));
 
+  /**
+   * **가맹점으로 올리려면 소속을 골라야 한다.**
+   *
+   * 계약이 이미 막고 있고(`assignRoleSchema`), 그 까닭도 거기 적혀 있다 — "소속 없는 가맹점
+   * 계정은 아무것도 볼 수 없다. 만들어 봐야 로그인만 되는 계정이 된다." 그런데 **화면은 그
+   * 사실을 눌러 본 뒤에야 알려 줬다.** 이 저장소는 반대로 한다: 서버도 막지만 눌러 보고 나서
+   * 알게 하지 않는다(카테고리 나무가 같은 말을 적어 두었다).
+   *
+   * 사유도 같다. 계약은 다듬은 뒤 한 글자를 요구하는데, 화면의 `required` 는 공백만 적은 것을
+   * 그대로 통과시킨다.
+   */
+  const missingScope = next === 'MERCHANT' && nextMerchant === '';
+  const missingReason = reason.trim() === '';
+  const ready = changed && !missingScope && !missingReason;
+
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setPending(true);
@@ -56,7 +71,7 @@ export function RoleForm({
         body: JSON.stringify({
           role: next,
           merchantId: next === 'MERCHANT' ? nextMerchant || null : null,
-          reason,
+          reason: reason.trim(),
         }),
       });
       const data = (await response.json().catch(() => ({}))) as { message?: string };
@@ -105,10 +120,17 @@ export function RoleForm({
           </>
         )}
 
-        <Button type="submit" size="sm" variant="secondary" disabled={pending || !changed}>
+        <Button type="submit" size="sm" variant="secondary" disabled={pending || !ready}>
           {pending ? '적용 중…' : '적용'}
         </Button>
       </div>
+
+      {/* 무엇이 모자라 못 누르는지 말한다 — 흐려진 단추만 두면 까닭을 알 수 없다 */}
+      {changed && missingScope && (
+        <p className="text-[11px] text-[var(--fg-muted)]">
+          가맹점으로 올리려면 소속을 골라 주세요. 소속이 없으면 로그인만 되는 계정이 됩니다.
+        </p>
+      )}
 
       {changed && (
         <>
