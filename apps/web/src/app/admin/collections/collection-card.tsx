@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useId, useRef, useState } from 'react';
 import { Badge, Button, Field } from '@shop/ui';
 import {
-  BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, type BannerTone,
+  BANNER_TONE, BANNER_TONE_LABEL, BANNER_STATUS_LABEL, MAX_IMAGE_BYTES, type BannerTone,
 } from '@shop/core';
 import { failureMessage } from '~/lib/client/failure-message';
 import { ProductPicker } from './product-picker';
@@ -30,6 +30,9 @@ function toLocalInput(iso: string | null): string {
 function fromLocalInput(value: string): string | null {
   return value ? new Date(`${value}:00+09:00`).toISOString() : null;
 }
+
+/** 화면에 적는 상한. 서버가 거절하는 기준과 같은 값에서 나온다 */
+const MAX_IMAGE_MB = MAX_IMAGE_BYTES / 1024 / 1024;
 
 export function CollectionCard({
   item, busy, onSave, onSaveProducts, onDelete, onUploaded,
@@ -68,6 +71,17 @@ export function CollectionCard({
       setUploadError('이미지 파일을 선택해 주세요.');
       return;
     }
+    /*
+     * **올리기 전에 잰다.** 서버는 `MAX_IMAGE_BYTES` 로 거절하는데 화면은 재지 않아서,
+     * 20MB 짜리를 고르면 그것을 통째로 올린 뒤에야 거절당했다 — 느린 회선에서는 몇 분을
+     * 기다렸다가 거절을 보는 셈이고, 그동안 화면은 '올리는 중…' 이다. 상품 사진·홈 배너가
+     * 같은 처방을 받았다.
+     */
+    if (file.size > MAX_IMAGE_BYTES) {
+      setUploadError(`이미지는 ${MAX_IMAGE_MB}MB 를 넘을 수 없습니다. 고른 파일은 ${(file.size / 1024 / 1024).toFixed(1)}MB 입니다.`);
+      return;
+    }
+
     setUploading(true);
     setUploadError(null);
     try {
@@ -203,6 +217,10 @@ export function CollectionCard({
               <input ref={fileRef} id={fileId} type="file"
                 accept="image/jpeg,image/png,image/webp,image/avif"
                 className="text-[12px] file:mr-3 file:h-9 file:rounded-sm file:border file:border-[var(--border-strong)] file:bg-[var(--bg)] file:px-3 file:text-[12px]" />
+              {/* 상한을 고르기 전에 말한다 — 올리고 나서 거절당하면 그 시간이 그대로 버려진다 */}
+              <p className="text-[11px] text-[var(--fg-muted)]">
+                JPEG · PNG · WebP · AVIF, {MAX_IMAGE_MB}MB 이하
+              </p>
             </div>
             <Button type="button" size="md" variant="secondary" disabled={uploading} onClick={() => upload()}>
               {uploading ? '올리는 중…' : '이미지 교체'}
