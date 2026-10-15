@@ -4,7 +4,21 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@shop/ui';
+import {
+  BRAND_NAME_MAX, BRAND_SLUG_MAX, BRAND_SLUG_MIN, BRAND_SLUG_PATTERN,
+} from '@shop/core';
 import { failureMessage } from '~/lib/client/failure-message';
+
+/*
+ * **상한과 모양은 core 가 쥔다.** 계약이 그 값으로 거절하는데(`createBrandSchema`), 화면이
+ * 숫자와 정규식을 따로 적어 두면 한쪽을 고치는 날 둘이 갈린다 — 그때 화면은 받아 주고 서버는
+ * 거절한다. 이미지 상한이 같은 까닭으로 core 에서 뽑도록 바뀌었다.
+ *
+ * **최소 두 자도 화면이 말한다.** `a` 한 자는 `pattern` 과 `required` 를 통과해 서버까지 갔다가
+ * 거절당했다 — 서버도 막지만 눌러 보고 나서 알게 하지 않는다.
+ */
+/** `pattern` 속성은 정규식 객체가 아니라 글자를 받는다 — core 의 것을 그대로 쓴다 */
+const SLUG_PATTERN = BRAND_SLUG_PATTERN.source;
 
 /**
  * 브랜드 한 줄 고치기.
@@ -83,7 +97,7 @@ export function BrandRowForm({
             id={nameId}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            maxLength={60}
+            maxLength={BRAND_NAME_MAX}
             required
             className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[13px]"
           />
@@ -97,10 +111,11 @@ export function BrandRowForm({
             id={slugId}
             value={slug}
             onChange={(e) => setSlug(e.target.value)}
-            maxLength={60}
+            maxLength={BRAND_SLUG_MAX}
+            minLength={BRAND_SLUG_MIN}
             required
             /* 주소는 소문자·숫자·붙임표뿐이다. 한글은 인코딩되면 공유될 때 알아볼 수 없다. */
-            pattern="[a-z0-9]+(-[a-z0-9]+)*"
+            pattern={SLUG_PATTERN}
             className="tnum h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[13px]"
           />
         </div>
