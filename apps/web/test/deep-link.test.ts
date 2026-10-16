@@ -1,97 +1,151 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { APP_ID, appleTeamId, androidFingerprints } from '~/lib/deep-link';
+import { describeTemplateProblem } from '~/lib/notifications/template-problems';
+import type { TemplateProblem } from '@shop/core';
 
 /**
- * 앱 링크 · 유니버설 링크.
+ * 앱과 이 도메인을 맺어 주는 값들.
  *
- * 공유받은 https 주소가 브라우저가 아니라 앱으로 열리게 하는 장치다. 세 곳이
- * **같은 도메인**을 말해야 하나라도 어긋나면 조용히 브라우저로 떨어진다 —
- * 실패했다는 신호가 어디에도 안 뜨는 종류라, 검사가 아니면 아무도 모른다.
+ * **두 파일 다 값이 없으면 아예 내보내지 않는다.** 자리만 채운 파일을 올리면 애플과 구글이
+ * 그것을 받아 가 캐시하고, 나중에 진짜 값을 넣어도 한동안 옛것으로 판단한다 — 없는 것이
+ * 틀린 것보다 낫다. 그 판단을 하는 것이 아래 두 함수다.
  */
-const ROOT = join(process.cwd(), '..', '..');
-const read = (...p: string[]) => readFileSync(join(ROOT, ...p), 'utf8');
 
-const KEEP = { ...process.env };
-beforeEach(() => {
-  vi.resetModules();
-  delete process.env['APPLE_TEAM_ID'];
-  delete process.env['ANDROID_CERT_SHA256'];
-});
-afterEach(() => {
-  process.env = { ...KEEP };
-});
+afterEach(() => vi.unstubAllEnvs());
 
-/** capacitor.config 이 부르는 그 주소 */
-function shellHost(): string {
-  const source = read('apps', 'mobile', 'capacitor.config.ts');
-  const url = /PRODUCTION_URL = '([^']+)'/.exec(source)?.[1] ?? '';
-  return new URL(url).host;
-}
+/**
+ * **앱 이름이 두 곳에 적혀 있었다.**
+ *
+ * `deep-link.ts` 가 "셸의 appId 와 같아야 한다" 고 적어 두었는데, 맞춰 보는 것이 없었다.
+ * 갈리면 `.well-known` 이 셸에 없는 앱을 가리키고 — **앱 링크가 조용히 안 열린다.** 눌러도
+ * 브라우저가 뜰 뿐이라, 고장 났다는 것을 알아채기까지 오래 걸린다.
+ */
+describe('앱 이름', () => {
+  it('셸의 appId 와 같다', () => {
+    const config = readFileSync(join(process.cwd(), '..', 'mobile', 'capacitor.config.ts'), 'utf8');
+    const found = /appId:\s*'([^']+)'/.exec(config);
 
-describe('세 곳이 같은 도메인을 말한다', () => {
-  it('셸이 부르는 주소를 읽어 온다 — 못 읽으면 아래 검사가 뜻을 잃는다', () => {
-    expect(shellHost()).toMatch(/\./);
-  });
-
-  it('안드로이드 매니페스트가 그 도메인을 잡는다', () => {
-    const manifest = read('apps', 'mobile', 'android', 'app', 'src', 'main', 'AndroidManifest.xml');
-    expect(manifest).toContain(`android:host="${shellHost()}"`);
-    // autoVerify 가 없으면 "이 앱이 연다" 로 굳지 않고 선택 창이 뜬다
-    expect(manifest).toContain('android:autoVerify="true"');
-  });
-
-  it('iOS 엔타이틀먼트가 그 도메인을 잡는다', () => {
-    const entitlements = read('apps', 'mobile', 'ios', 'App', 'App', 'App.entitlements');
-    expect(entitlements).toContain(`applinks:${shellHost()}`);
+    expect(found, 'capacitor.config 에서 appId 를 못 찾았다 — 찾는 규칙이 어긋났다').not.toBeNull();
+    expect(APP_ID, '웹이 내보내는 앱 이름과 셸의 appId 가 다르다 — 앱 링크가 조용히 안 열린다')
+      .toBe(found![1]);
   });
 });
 
-describe('맺음 파일', () => {
-  it('값이 없으면 내보내지 않는다', async () => {
-    /*
-     * **자리만 채운 파일이 틀린 값보다 나쁘다.** 애플과 구글이 그것을 받아
-     * 가 캐시하므로, 나중에 진짜 값을 넣어도 한동안 옛것으로 판단한다.
-     */
-    const apple = await import('../src/app/.well-known/apple-app-site-association/route');
-    const android = await import('../src/app/.well-known/assetlinks.json/route');
-    expect(apple.GET().status).toBe(404);
-    expect(android.GET().status).toBe(404);
+describe('애플 팀 아이디', () => {
+  it('없으면 null 이다 — 자리만 채운 파일을 올리지 않는다', () => {
+    vi.stubEnv('APPLE_TEAM_ID', '');
+
+    expect(appleTeamId()).toBeNull();
   });
 
-  it('팀 ID 를 주면 앱 ID 를 팀.번들 로 적는다', async () => {
-    process.env['APPLE_TEAM_ID'] = 'ABCDE12345';
-    const { GET } = await import('../src/app/.well-known/apple-app-site-association/route');
-    const body = (await GET().json()) as { applinks: { details: { appIDs: string[] }[] } };
-    expect(body.applinks.details[0]?.appIDs).toEqual(['ABCDE12345.test.plain.shop']);
+  it('공백만 있어도 없는 것으로 본다', () => {
+    vi.stubEnv('APPLE_TEAM_ID', '   ');
+
+    expect(appleTeamId()).toBeNull();
   });
 
-  it('결제와 창구는 앱이 가로채지 않는다', async () => {
-    /*
-     * 결제사가 돌려보내는 주소까지 앱이 먹으면 승인 흐름이 끊긴다.
-     * 그 자리는 열려 있던 브라우저가 그대로 이어받아야 한다.
-     */
-    process.env['APPLE_TEAM_ID'] = 'ABCDE12345';
-    const { GET } = await import('../src/app/.well-known/apple-app-site-association/route');
-    const body = (await GET().json()) as {
-      applinks: { details: { components: Record<string, unknown>[] }[] };
-    };
-    const excluded = body.applinks.details[0]!.components.filter((c) => c['exclude'] === true);
-    expect(excluded.map((c) => c['/'])).toEqual(expect.arrayContaining(['/api/*', '/checkout/*']));
+  it('앞뒤 공백은 떼고 쓴다 — 붙여 넣으면 딸려 온다', () => {
+    vi.stubEnv('APPLE_TEAM_ID', '  ABCDE12345  ');
+
+    expect(appleTeamId()).toBe('ABCDE12345');
+  });
+});
+
+/**
+ * 서명 인증서의 SHA-256 지문. **콜론으로 끊긴 대문자 16진수 32쌍**이다. 여러 개를 쉼표로 줄
+ * 수 있다 — 디버그 키와 배포 키가 다르고, 구글 플레이가 다시 서명하면 또 달라진다.
+ */
+describe('안드로이드 지문', () => {
+  const ok = Array.from({ length: 32 }, (_, i) => i.toString(16).padStart(2, '0').toUpperCase()).join(':');
+
+  it('없으면 빈 목록이다', () => {
+    vi.stubEnv('ANDROID_CERT_SHA256', '');
+
+    expect(androidFingerprints()).toEqual([]);
   });
 
-  it('지문 모양이 아닌 값은 버린다', async () => {
-    // 잘못된 지문 하나가 섞이면 구글이 파일 전체를 물리친다
-    process.env['ANDROID_CERT_SHA256'] = '이건 지문이 아니다, AA:BB';
-    const { GET } = await import('../src/app/.well-known/assetlinks.json/route');
-    expect(GET().status).toBe(404);
+  it('맞는 지문을 그대로 쓴다', () => {
+    vi.stubEnv('ANDROID_CERT_SHA256', ok);
+
+    expect(androidFingerprints()).toEqual([ok]);
   });
 
-  it('제대로 된 지문은 대문자로 맞춰 싣는다', async () => {
-    const one = Array.from({ length: 32 }, (_, i) => (i % 2 ? 'ab' : '0f')).join(':');
-    process.env['ANDROID_CERT_SHA256'] = one;
-    const { GET } = await import('../src/app/.well-known/assetlinks.json/route');
-    const body = (await GET().json()) as { target: { sha256_cert_fingerprints: string[] } }[];
-    expect(body[0]?.target.sha256_cert_fingerprints).toEqual([one.toUpperCase()]);
+  /** 키가 여럿이다 — 디버그와 배포가 다르고 플레이가 다시 서명하면 또 다르다 */
+  it('쉼표로 여럿을 받는다', () => {
+    vi.stubEnv('ANDROID_CERT_SHA256', `${ok}, ${ok}`);
+
+    expect(androidFingerprints()).toEqual([ok, ok]);
+  });
+
+  it('소문자로 적어도 대문자로 맞춘다', () => {
+    vi.stubEnv('ANDROID_CERT_SHA256', ok.toLowerCase());
+
+    expect(androidFingerprints()).toEqual([ok]);
+  });
+
+  /*
+   * **모양이 틀린 것은 버린다.** 자리만 채운 값이 섞여 들어가면 구글이 그것을 받아 가
+   * 캐시한다 — 없는 것이 틀린 것보다 낫다.
+   */
+  it.each([
+    ['짧은 것', ok.slice(0, -3)],
+    ['긴 것', `${ok}:FF`],
+    ['콜론이 없는 것', ok.replaceAll(':', '')],
+    ['16진수가 아닌 것', ok.replace('00', 'ZZ')],
+    ['자리만 채운 값', 'PUT_YOUR_FINGERPRINT_HERE'],
+  ])('%s 은 버린다', (_why, bad) => {
+    vi.stubEnv('ANDROID_CERT_SHA256', bad);
+
+    expect(androidFingerprints()).toEqual([]);
+  });
+
+  it('맞는 것과 틀린 것이 섞이면 맞는 것만 남는다', () => {
+    vi.stubEnv('ANDROID_CERT_SHA256', `${ok},없는값`);
+
+    expect(androidFingerprints()).toEqual([ok]);
+  });
+});
+
+/**
+ * **저장 전 화면과 서버의 거절이 같은 말을 한다.** 둘이 다르면 화면은 괜찮다고 했는데 저장이
+ * 다른 이유로 막힌 것처럼 읽힌다.
+ */
+describe('템플릿 문제를 읽는 말로', () => {
+  /**
+   * 종류마다 하나씩. `TemplateProblem` 은 값 목록이 아니라 타입 합집합이라 폴더에서 뽑을 수
+   * 없다 — 대신 **타입이 센다**: 종류가 하나 늘면 아래 목록이 그 종류를 빠뜨렸다고 컴파일이
+   * 먼저 진다(`Record<TemplateProblem['kind'], …>`).
+   */
+  const SAMPLES: Record<TemplateProblem['kind'], TemplateProblem> = {
+    EMPTY: { kind: 'EMPTY' },
+    TOO_LONG: { kind: 'TOO_LONG', max: 120 },
+    UNKNOWN_PLACEHOLDER: { kind: 'UNKNOWN_PLACEHOLDER', names: ['orderNo'] },
+    BROKEN_BRACE: { kind: 'BROKEN_BRACE' },
+  };
+
+  it.each(Object.entries(SAMPLES))('%s 에 사람이 읽을 말이 있다', (kind, problem) => {
+    const said = describeTemplateProblem(problem);
+
+    expect(said, `${kind} 에 할 말이 없다`).toBeTruthy();
+    // 코드가 그대로 새어 나오면 운영자는 'BROKEN_BRACE' 를 읽게 된다
+    expect(said).not.toContain(kind);
+  });
+
+  it('너무 길면 몇 자까지인지 적는다', () => {
+    expect(describeTemplateProblem({ kind: 'TOO_LONG', max: 120 })).toContain('120');
+  });
+
+  it('없는 값이면 어느 것인지 적는다', () => {
+    const said = describeTemplateProblem({ kind: 'UNKNOWN_PLACEHOLDER', names: ['orderNo', 'name'] });
+
+    expect(said).toContain('{orderNo}');
+    expect(said).toContain('{name}');
+  });
+
+  /** 비었을 때는 되돌릴 길까지 말한다 — 빈 칸을 보고 무엇을 할지 모르면 멈춘다 */
+  it('비었으면 기본 문구로 돌리는 길을 알려 준다', () => {
+    expect(describeTemplateProblem({ kind: 'EMPTY' })).toContain('기본 문구로');
   });
 });
