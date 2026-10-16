@@ -42,17 +42,25 @@ export function ResolveButton({
     }
   }
 
-  if (failure) return <span role="alert" className="text-[11px] text-accent">{failure}</span>;
-
+  /*
+   * **실패하면 단추가 사라지고 있었다.**
+   *
+   * 까닭을 적는 것까지는 맞는데, 단추 **대신** 적었다. 망이 한 번 끊기면 그 줄의 단추가
+   * 통째로 없어져 다시 눌러 볼 수도, 그 말을 치울 수도 없다 — 화면을 새로 받기 전까지.
+   * 까닭은 곁에 적고 단추는 그 자리에 둔다. 다시 누르면 지난 말은 사라진다.
+   */
   return (
-    <Button
-      type="button"
-      size="sm"
-      variant={resolved ? 'secondary' : 'primary'}
-      disabled={pending}
-      onClick={() => void toggle()}
-    >
-      {pending ? '보내는 중…' : resolved ? '다시 열기' : '처리함'}
-    </Button>
+    <span className="inline-flex items-center gap-2">
+      <Button
+        type="button"
+        size="sm"
+        variant={resolved ? 'secondary' : 'primary'}
+        disabled={pending}
+        onClick={() => void toggle()}
+      >
+        {pending ? '보내는 중…' : resolved ? '다시 열기' : '처리함'}
+      </Button>
+      {failure && <span role="alert" className="text-[11px] text-accent">{failure}</span>}
+    </span>
   );
 }

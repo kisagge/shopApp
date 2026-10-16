@@ -34,8 +34,12 @@ export function ReconcileButton({ mismatchCount }: { mismatchCount: number }) {
       <Button type="button" size="md" variant="secondary" disabled={pending || mismatchCount === 0} onClick={() => run()}>
         {pending ? '대사 중…' : '원장에 맞추기'}
       </Button>
+      {/* 실패는 경고로 알린다 — 공손한 알림은 낭독기가 뒤로 미루거나 지나친다 */}
       {message && (
-        <p role="status" className={`text-[12px] ${message.tone === 'ok' ? 'text-success' : 'text-accent'}`}>
+        <p
+          role={message.tone === 'ok' ? 'status' : 'alert'}
+          className={`text-[12px] ${message.tone === 'ok' ? 'text-success' : 'text-accent'}`}
+        >
           {message.text}
         </p>
       )}
