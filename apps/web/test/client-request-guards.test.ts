@@ -230,6 +230,31 @@ describe('실패한 응답을 읽는 차례', () => {
       ).toEqual([]);
     },
   );
+
+  /**
+   * **차례만 맞으면 되는 것이 아니다.**
+   *
+   * 위 규칙은 "json 먼저, ok 나중" 한 모양만 집는다. 그런데 `!ok` **안에서** 무방비로 읽어도
+   * 같은 일이 난다 — 502 가 HTML 을 주면 그 줄이 던지고, 서버가 한 말 대신 "네트워크 오류" 가
+   * 뜬다. 실제로 리뷰 지우기·재입고 알림·찜하기 셋이 그 모양이었고 위 규칙은 전부 통과시켰다.
+   *
+   * 그래서 **서버가 한 말을 꺼내 쓰는 자리**를 본다: 무방비로 읽은 본문에서 `message` 를
+   * 읽으면 진다. 받아 내는 길은 `failureMessage` 거나 `.json().catch(...)` 다.
+   */
+  const readsMessageUnguarded = (code: string): number[] =>
+    [...code.matchAll(/\.json\(\)(?!\s*\.catch)/g)]
+      .map((m) => m.index)
+      .filter((at) => /\bmessage\b/.test(code.slice(at, at + 260)));
+
+  it.each(READS_BODY.map((f) => [f.path, f.code]))(
+    '%s 는 서버가 한 말을 받아 내고 읽는다',
+    (_path, code) => {
+      expect(
+        readsMessageUnguarded(code),
+        '무방비로 읽은 본문에서 message 를 꺼낸다 — 502 가 HTML 이면 그 줄이 던지고 "네트워크 오류" 가 대신 뜬다',
+      ).toEqual([]);
+    },
+  );
 });
 
 /**

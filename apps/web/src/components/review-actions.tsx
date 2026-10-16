@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { useT } from '~/lib/i18n/client';
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 내 리뷰에만 붙는 고치기·지우기.
@@ -30,8 +31,12 @@ export function ReviewActions({
     try {
       const response = await fetch(`/api/reviews/${reviewId}`, { method: 'DELETE' });
       if (!response.ok) {
-        const data = (await response.json()) as { message?: string };
-        setError(data.message ?? t('review.deleteFailed'));
+        /*
+         * 서버가 한 말을 `failureMessage` 로 읽는다. 앞단이 502 HTML 이나 빈 본문을 주면
+         * `json()` 이 던지고, 그대로 두면 아래 catch 가 받아 **서버가 답했는데 "네트워크
+         * 오류" 라고 적는다** — 그 함수가 겪고 생긴 일이다.
+         */
+        setError(await failureMessage(response, t('review.deleteFailed')));
         return;
       }
       router.refresh();
@@ -42,7 +47,16 @@ export function ReviewActions({
     }
   }
 
-  if (error) return <span role="alert" className="text-[11px] text-accent">{error}</span>;
+  /*
+   * **실패하면 단추가 모두 사라지고 있었다.**
+   *
+   * 까닭을 적는 것까지는 맞는데 단추 **대신** 적었다 — 지우기가 한 번 실패하면 고치기까지
+   * 함께 없어져, 다시 눌러 볼 수도 그 말을 치울 수도 없다. 화면을 새로 받기 전까지.
+   * 운영 화면의 오류 처리 단추가 같은 모양이었다. 까닭은 곁에 적고 단추는 그 자리에 둔다.
+   */
+  const failure = error && (
+    <span role="alert" className="text-[11px] text-accent">{error}</span>
+  );
 
   return confirming ? (
     /* 지우기를 묻는 동안에는 고치기를 감춘다 — 물음 옆에 다른 길을 늘어놓으면 무엇을 누르는지 흐려진다 */
@@ -54,6 +68,7 @@ export function ReviewActions({
       <button type="button" onClick={() => setConfirming(false)} className="text-[var(--fg-muted)] underline">
         {t('common.cancel')}
       </button>
+      {failure}
     </span>
   ) : (
     <>
@@ -76,6 +91,7 @@ export function ReviewActions({
       >
         {t('review.deleteMine')}
       </button>
+      {failure}
     </>
   );
 }

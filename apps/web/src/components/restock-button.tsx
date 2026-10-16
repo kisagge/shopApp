@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { useT } from '~/lib/i18n/client';
+// 502 가 HTML 을 주면 json() 이 던진다 — 그대로 두면 서버가 답했는데 "네트워크 오류" 가 뜬다
+import { failureMessage } from '~/lib/client/failure-message';
 
 /**
  * 재입고 알림 신청.
@@ -45,8 +47,7 @@ export function RestockButton({
         method: next ? 'PUT' : 'DELETE',
       });
       if (!response.ok) {
-        const body = (await response.json()) as { message?: string };
-        setMessage(body.message ?? t('restock.failed'));
+        setMessage(await failureMessage(response, t('restock.failed')));
         return;
       }
       setOn(next);

@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { track } from '~/lib/analytics/client';
 import { useT } from '~/lib/i18n/client';
+// 502 가 HTML 을 주면 json() 이 던진다 — 그대로 두면 서버가 답했는데 "네트워크 오류" 가 뜬다
+import { failureMessage } from '~/lib/client/failure-message';
 import { HeartIcon } from './heart-icon';
 
 /**
@@ -80,9 +82,8 @@ export function WishlistButton({
         method: next ? 'PUT' : 'DELETE',
       });
       if (!response.ok) {
-        const data = (await response.json()) as { message?: string };
         setWishlisted(!next);
-        setError(data.message ?? t('common.failed'));
+        setError(await failureMessage(response, t('common.failed')));
         return;
       }
       if (next) track('add_to_wishlist', { productId });
