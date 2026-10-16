@@ -4,7 +4,9 @@ import dynamic from 'next/dynamic';
 import { useId, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Field } from '@shop/ui';
-import { POLICY_KIND_LABEL, POLICY_PATH, type PolicyKind, type RichTextDoc } from '@shop/core';
+import {
+  POLICY_KIND_LABEL, POLICY_PATH, isRichTextEmpty, type PolicyKind, type RichTextDoc,
+} from '@shop/core';
 import { failureMessage } from '~/lib/client/failure-message';
 import { LastEdited } from '~/components/admin/last-edited';
 
@@ -47,6 +49,19 @@ export function PolicyEditor({ item }: { item: PolicyItem }) {
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState('');
   const [failure, setFailure] = useState<string | null>(null);
+
+  /**
+   * **계약이 막는 둘을 화면이 먼저 말한다.**
+   *
+   * 본문이 비면 거절하고(`valid.bodyRequired`), 제목은 다듬어 두 자를 요구한다
+   * (`valid.titleRequired`). 그런데 저장 단추는 그대로 눌렸다 — 아직 한 번도 안 쓴 방침을
+   * 열면 편집기가 빈 문서로 시작하므로, **처음 쓰러 온 사람이 가장 먼저 만나는 거절**이었다.
+   *
+   * 비어 있는지는 core 가 판단한다(`isRichTextEmpty`) — 계약이 쓰는 바로 그 함수다. 화면이
+   * 따로 세면 "빈 문단 하나" 같은 자리에서 둘이 갈린다.
+   */
+  const bodyEmpty = isRichTextEmpty(body);
+  const titleTooShort = title.trim().length < 2;
 
   async function submit(e: FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
@@ -126,10 +141,16 @@ export function PolicyEditor({ item }: { item: PolicyItem }) {
         <div className="flex flex-col gap-2">
           <span id={bodyId} className="text-xs font-medium text-[var(--fg-secondary)]">본문</span>
           <RichEditor value={body} onChange={setBody} labelledBy={bodyId} />
+          {/* 흐려진 단추만 두면 무엇이 모자라 못 누르는지 알 수 없다 */}
+          {bodyEmpty && (
+            <p className="text-[11px] text-[var(--fg-muted)]">
+              본문을 적어야 저장할 수 있습니다.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" size="md" disabled={pending}>
+          <Button type="submit" size="md" disabled={pending || bodyEmpty || titleTooShort}>
             {pending ? '저장 중…' : '새 판으로 저장'}
           </Button>
           <p className="text-[12px] text-[var(--fg-muted)]">
