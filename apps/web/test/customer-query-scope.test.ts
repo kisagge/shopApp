@@ -135,6 +135,7 @@ describe('빠진 조회가 없다', () => {
     getAdminReviews: '운영 조회 — 권한 검사는 query-authz 가 본다',
     getAdminInquiries: '운영 조회 — 권한 검사는 query-authz 가 본다',
     getAdminSupportPosts: '운영 조회 — 권한 검사는 query-authz 가 본다',
+    getAdminSupportPost: '운영 조회 — 권한 검사는 query-authz 가 본다',
     getAuditLogs: '운영 조회 — 권한 검사는 query-authz 가 본다',
     exportAuditLogs: '운영 조회 — 권한 검사는 query-authz 가 본다',
     countPendingInquiries: '운영 조회 — 권한 검사는 query-authz 가 본다',

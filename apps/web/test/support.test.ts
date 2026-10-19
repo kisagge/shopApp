@@ -15,7 +15,9 @@ vi.mock('~/lib/audit', () => ({ recordAudit: vi.fn(async () => {}) }));
 const cache = await vi.hoisted(async () => (await import('./support/cache-mock')).cacheMock());
 vi.mock('~/lib/cache', () => cache);
 
-const { getFaq, getNotices, getAdminSupportPosts } = await import('~/lib/queries/support');
+const {
+  getFaq, getNotices, getAdminSupportPosts, getAdminSupportPost,
+} = await import('~/lib/queries/support');
 const { createSupportPost, updateSupportPost } = await import('~/lib/admin/manage-support');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
@@ -130,6 +132,71 @@ describe('운영진만 쓴다', () => {
     const where = db.supportPost.findMany.mock.calls[0]![0].where;
     expect(where.publishedAt).toBeUndefined();
     expect(where.deletedAt).toBeNull();
+  });
+
+  it('한 건도 운영 권한을 요구하고, 막히면 DB 를 건드리지 않는다', async () => {
+    await expect(getAdminSupportPost(merchant, 'p-1')).rejects.toThrow(ForbiddenError);
+    await expect(getAdminSupportPost(customer, 'p-1')).rejects.toThrow(ForbiddenError);
+    expect(db.supportPost.findFirst).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **운영 목록이 본문을 들고 오지 않는다.**
+ *
+ * 전에는 글마다 `body` 와 `bodyRich` 를 함께 읽어 화면으로 내려보냈다. 목록이 그리는 것은
+ * 갈래·제목·고정·상태뿐이고, 본문이 필요한 때는 고칠 한 건뿐인데 — 그 한 건을 위해 모든
+ * 글의 서식 나무가 응답에 실렸고, 글이 쌓이는 만큼 **상한도 페이징도 없이** 자랐다.
+ *
+ * 손님 쪽 공지 목록은 진작 그 교훈을 적어 두었다("목록은 나무를 싣지 않는다 … 캐시 한 칸이
+ * 글 수만큼 커진다"). 운영 목록만 비켜 가 있었다.
+ */
+describe('운영 목록과 한 건', () => {
+  it('목록은 본문을 읽지 않는다', async () => {
+    await getAdminSupportPosts(admin);
+
+    const select = db.supportPost.findMany.mock.calls[0]![0].select;
+    expect(select.body).toBeUndefined();
+    expect(select.bodyRich).toBeUndefined();
+    // 그리는 것은 다 읽는다
+    for (const field of ['id', 'kind', 'title', 'topic', 'pinned', 'sortOrder', 'publishedAt', 'updatedAt']) {
+      expect(select[field], field).toBe(true);
+    }
+  });
+
+  it('목록에 상한을 두지 않는다 — 자리 순서를 손으로 매기는 화면이다', async () => {
+    /*
+     * 이웃이 안 보이면 `sortOrder` 를 정할 수 없어서 페이징을 안 쓴다. 본문을 안 읽으니
+     * 전부 줘도 가볍다 — 본문을 다시 읽기 시작하면 그때 상한이 필요해진다.
+     */
+    await getAdminSupportPosts(admin);
+
+    const args = db.supportPost.findMany.mock.calls[0]![0];
+    expect(args).not.toHaveProperty('take');
+    expect(args).not.toHaveProperty('skip');
+  });
+
+  it('한 건은 본문까지 읽는다', async () => {
+    db.supportPost.findFirst.mockResolvedValue({
+      id: 'p-1', kind: 'NOTICE', title: '제목', body: '본문', bodyRich: null,
+      topic: null, pinned: false, sortOrder: 0, publishedAt: null,
+    });
+
+    const post = await getAdminSupportPost(admin, 'p-1');
+
+    expect(db.supportPost.findFirst.mock.calls[0]![0].select.bodyRich).toBe(true);
+    expect(post?.body).toBe('본문');
+  });
+
+  it('지운 글은 한 건으로도 안 열린다', async () => {
+    // 목록에 없는 글의 주소를 들고 와도 열리지 않아야, 고칠 수 없는 것을 내밀지 않는다
+    await getAdminSupportPost(admin, 'p-1');
+
+    expect(db.supportPost.findFirst.mock.calls[0]![0].where).toEqual({ id: 'p-1', deletedAt: null });
+  });
+
+  it('없는 글이면 null 이다 — 창구가 404 로 옮긴다', async () => {
+    expect(await getAdminSupportPost(admin, 'p-없음')).toBeNull();
   });
 });
 

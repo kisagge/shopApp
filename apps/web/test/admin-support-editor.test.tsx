@@ -26,8 +26,6 @@ const { SupportEditor } = await import('~/app/admin/support/support-editor');
 
 const post = (over: Partial<SupportPostItem> & { id: string; title: string }): SupportPostItem => ({
   kind: 'NOTICE',
-  body: '본문',
-  bodyRich: null,
   topic: null,
   pinned: false,
   sortOrder: 0,
@@ -44,9 +42,28 @@ const POSTS: SupportPostItem[] = [
 
 const open = (initial: SupportPostItem[] = POSTS) => render(<SupportEditor initial={initial} />);
 
-const ok = () => vi.fn(async () => new Response('{}', { status: 200 }));
+/**
+ * **고치기는 본문을 받아 와서 폼을 채운다.** 목록이 본문을 안 들고 오기 때문이다.
+ * 그래서 모의 응답은 주소를 보고 갈린다 — GET 한 건이면 그 글, 나머지는 그냥 성공.
+ */
+const detail = (over: Record<string, unknown> = {}) => ({
+  id: 's-1', kind: 'NOTICE', title: '추석 배송 안내', body: '본문', bodyRich: null,
+  topic: null, pinned: false, sortOrder: 0, publishedAt: '2026-10-01T00:00:00.000Z',
+  ...over,
+});
+
+const ok = () =>
+  vi.fn(async (url: string, init?: RequestInit) =>
+    (init?.method ?? 'GET') === 'GET'
+      ? new Response(JSON.stringify({ post: detail({ id: String(url).split('/').pop() }) }), { status: 200 })
+      : new Response('{}', { status: 200 }));
+
 const fails = (message: string, status = 409) =>
   vi.fn(async () => new Response(JSON.stringify({ message }), { status }));
+
+/** 쓰기 요청만 — 고치기 전에 끼는 GET 을 빼고 본다 */
+const writes = () =>
+  vi.mocked(fetch).mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -246,10 +263,55 @@ describe('고치기', () => {
     await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
     await userEvent.click(screen.getByRole('button', { name: '수정' }));
 
-    await waitFor(() => expect(fetch).toHaveBeenCalled());
-    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    await waitFor(() => expect(writes().length).toBe(1));
+    const [url, init] = writes()[0]!;
     expect(url).toBe('/api/admin/support/s-1');
     expect((init as RequestInit).method).toBe('PUT');
+  });
+
+  it('그 글의 본문을 받아 와서 채운다 — 목록은 본문을 안 들고 온다', async () => {
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+    expect(url).toBe('/api/admin/support/s-1');
+    expect(init?.method ?? 'GET').toBe('GET');
+  });
+
+  it('받아 오지 못하면 폼을 열지 않고 까닭을 말한다', async () => {
+    /*
+     * **빈 폼을 열면 그것을 저장하는 순간 본문이 날아간다.** 조용히 글을 비우는 길이라,
+     * 못 받아 왔으면 아예 열지 않는다.
+     */
+    vi.stubGlobal('fetch', fails('글을 찾을 수 없습니다.', 404));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    expect(await screen.findByText('글을 찾을 수 없습니다.')).toBeDefined();
+    expect(screen.getByRole('heading', { name: '새 글' })).toBeDefined();
+  });
+
+  it('망이 끊겨도 폼을 열지 않는다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    expect(await screen.findByText(/네트워크 오류/)).toBeDefined();
+    expect(screen.getByRole('heading', { name: '새 글' })).toBeDefined();
+  });
+
+  it('같은 글을 다시 열 때 또 묻지 않는다', async () => {
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+    await userEvent.click(screen.getByRole('button', { name: '교환은 어떻게 하나요? 수정' }));
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    // 세 번 눌렀지만 받아 온 것은 두 글뿐이다
+    expect(vi.mocked(fetch).mock.calls.length).toBe(2);
   });
 
   it('고치고 나면 새 글 폼으로 돌아간다', async () => {

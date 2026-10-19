@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useRemovalFocus } from '~/lib/a11y/use-removal-focus';
 import { useRouter } from 'next/navigation';
@@ -54,18 +54,28 @@ const docFrom = (bodyRich: RichTextDoc | null, body: string): RichTextDoc => {
   return { type: 'doc', content: paragraphs.length > 0 ? paragraphs : [{ type: 'paragraph' }] };
 };
 
+/**
+ * 목록 한 줄. **본문이 없다.**
+ *
+ * 전에는 글마다 서식 나무까지 실려 왔다 — 목록이 그리지도 않는 것을, 글이 쌓이는 만큼
+ * 영구히. 본문이 필요한 때는 고칠 한 건뿐이라 그때 받아 온다.
+ */
 export interface SupportPostItem {
   readonly id: string;
   readonly kind: SupportPostKind;
   readonly title: string;
-  readonly body: string;
-  readonly bodyRich: RichTextDoc | null;
   readonly topic: InquiryTopic | null;
   readonly pinned: boolean;
   readonly sortOrder: number;
   readonly publishedAt: string | null;
   readonly updatedAt: string;
   readonly authorName: string | null;
+}
+
+/** 고칠 때 창구가 주는 한 건 */
+interface SupportPostDetail extends Omit<SupportPostItem, 'updatedAt' | 'authorName'> {
+  readonly body: string;
+  readonly bodyRich: RichTextDoc | null;
 }
 
 const KIND_LABEL: Record<SupportPostKind, string> = { NOTICE: '공지', FAQ: 'FAQ' };
@@ -90,7 +100,7 @@ const emptyDraft = (): Draft => ({
   published: false,
 });
 
-const draftOf = (post: SupportPostItem): Draft => ({
+const draftOf = (post: SupportPostDetail): Draft => ({
   kind: post.kind,
   title: post.title,
   bodyRich: docFrom(post.bodyRich, post.body),
@@ -120,6 +130,12 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
   const { listRef, emptyRef, rememberRemoval } = useRemovalFocus(initial.length);
 
   const [editing, setEditing] = useState<string | null>(null);
+  /** 본문을 받아 오는 중인 줄. 그 줄만 바쁘다고 알린다 */
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  /** 두 번 눌러도 한 번만 간다 — 상태로 막으면 같은 틱의 두 번째 클릭이 지나간다 */
+  const loadingBody = useRef(false);
+  /** 한 번 받아 온 본문. 같은 글을 다시 열 때 또 묻지 않는다 */
+  const bodies = useRef(new Map<string, SupportPostDetail>());
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,10 +149,50 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
     setError(null);
   }
 
-  function startEdit(post: SupportPostItem) {
-    setEditing(post.id);
-    setDraft(draftOf(post));
+  /**
+   * 고칠 글을 연다 — **본문을 받아 와서** 채운다.
+   *
+   * 목록은 본문을 들고 있지 않다. 그래서 여기서 한 건을 받아 오는데, 그 왕복이 실패하는
+   * 길을 다 그린다:
+   * - 거절이면 서버가 한 말을 띄우고 **폼을 열지 않는다.** 빈 폼을 열어 두면 그걸 저장하는
+   *   순간 본문이 날아간다 — 조용히 글을 비우는 길이다
+   * - 두 번 눌러도 한 번만 간다. `Button` 이 아니라 맨 단추라 `disabled` 가 듣지만,
+   *   누른 뒤 응답 사이에 다른 줄을 누르는 길이 남는다
+   * - 받아 온 것은 기억해 둔다. 같은 글을 다시 열 때 또 묻지 않는다
+   *
+   * **값은 받아 온 것으로 채운다.** 목록의 값으로 채우면 다른 사람이 그사이 고친 글을
+   * 옛 값으로 덮어쓴다.
+   */
+  async function startEdit(post: SupportPostItem) {
+    if (loadingBody.current) return;
+
+    const known = bodies.current.get(post.id);
+    if (known) {
+      setEditing(post.id);
+      setDraft(draftOf(known));
+      setError(null);
+      return;
+    }
+
+    loadingBody.current = true;
+    setLoadingId(post.id);
     setError(null);
+    try {
+      const response = await fetch(`/api/admin/support/${post.id}`);
+      if (!response.ok) {
+        setError(await failureMessage(response, '글을 불러오지 못했습니다.'));
+        return;
+      }
+      const data = (await response.json()) as { post: SupportPostDetail };
+      bodies.current.set(post.id, data.post);
+      setEditing(post.id);
+      setDraft(draftOf(data.post));
+    } catch {
+      setError('네트워크 오류로 글을 불러오지 못했습니다.');
+    } finally {
+      loadingBody.current = false;
+      setLoadingId(null);
+    }
   }
 
   async function send(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown) {
@@ -191,6 +247,7 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
   async function remove(post: SupportPostItem) {
     if (!(await send(`/api/admin/support/${post.id}`, 'DELETE'))) return;
     setNotice('내렸습니다.');
+    bodies.current.delete(post.id);
     if (editing === post.id) startNew();
     router.refresh();
   }
@@ -385,10 +442,11 @@ export function SupportEditor({ initial }: { initial: readonly SupportPostItem[]
                   <button
                     type="button"
                     aria-label={`${post.title} 수정`}
-                    onClick={() => startEdit(post)}
+                    aria-busy={loadingId === post.id}
+                    onClick={() => void startEdit(post)}
                     className="h-9 rounded-sm border border-[var(--border-strong)] px-3 text-[12px]"
                   >
-                    수정
+                    {loadingId === post.id ? '불러오는 중…' : '수정'}
                   </button>
                   <RemovePost
                     title={post.title}

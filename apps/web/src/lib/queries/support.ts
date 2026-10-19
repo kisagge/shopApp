@@ -132,15 +132,40 @@ export async function getFaq(): Promise<FaqGroup[]> {
   return [...byTopic].map(([topic, items]) => ({ topic, items }));
 }
 
-export interface AdminSupportPost extends SupportPostView {
+/**
+ * 운영 목록이 그리는 것 — **본문은 없다.**
+ *
+ * 전에는 글마다 `body` 와 `bodyRich` 를 함께 읽어 화면으로 내려보냈다. 목록이 그리는 것은
+ * 갈래·제목·고정·상태뿐이고, 본문이 필요한 때는 **고칠 글 한 건**뿐이다. 그런데 그 한 건을
+ * 위해 모든 글의 서식 나무가 응답에 실렸고, 글이 쌓이는 만큼 영구히 자랐다 — 상한도
+ * 페이징도 없는 자리다.
+ *
+ * 손님 쪽 공지 목록은 진작 이 교훈을 적어 두었다("목록은 나무를 싣지 않는다 … 캐시 한 칸이
+ * 글 수만큼 커진다"). 운영 목록만 그것을 비켜 가 있었다.
+ */
+export interface AdminSupportPost {
+  readonly id: string;
   readonly kind: SupportPostKind;
+  readonly title: string;
+  readonly topic: InquiryTopic | null;
+  readonly pinned: boolean;
   readonly sortOrder: number;
-  readonly authorName: string | null;
+  readonly publishedAt: Date | null;
   readonly updatedAt: Date;
+  readonly authorName: string | null;
+}
+
+/** 고칠 때 받아 가는 한 건. 본문이 여기 있다. */
+export interface AdminSupportPostDetail extends Omit<AdminSupportPost, 'updatedAt' | 'authorName'> {
+  readonly body: string;
+  readonly bodyRich: RichTextDoc | null;
 }
 
 /**
  * 운영진의 목록. **내보내지 않은 글도 보인다** — 초안을 못 보면 고칠 수 없다.
+ *
+ * 전부 준다. 자리 순서(`sortOrder`)를 손으로 매기는 화면이라 이웃이 안 보이면 순서를 정할
+ * 수 없어서, 페이징 대신 **본문을 안 읽는 쪽**으로 가볍게 만들었다.
  */
 export async function getAdminSupportPosts(actor: Actor): Promise<AdminSupportPost[]> {
   assertAdminQuery(actor, 'support:write');
@@ -149,7 +174,7 @@ export async function getAdminSupportPosts(actor: Actor): Promise<AdminSupportPo
     where: { deletedAt: null },
     orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'desc' }],
     select: {
-      id: true, kind: true, title: true, body: true, bodyRich: true, topic: true,
+      id: true, kind: true, title: true, topic: true,
       pinned: true, sortOrder: true, publishedAt: true, updatedAt: true,
       author: { select: { name: true } },
     },
@@ -159,8 +184,6 @@ export async function getAdminSupportPosts(actor: Actor): Promise<AdminSupportPo
     id: row.id,
     kind: row.kind,
     title: row.title,
-    body: row.body,
-    bodyRich: asRichTextDoc(row.bodyRich),
     topic: row.topic,
     pinned: row.pinned,
     sortOrder: row.sortOrder,
@@ -168,4 +191,28 @@ export async function getAdminSupportPosts(actor: Actor): Promise<AdminSupportPo
     updatedAt: row.updatedAt,
     authorName: row.author?.name ?? null,
   }));
+}
+
+/**
+ * 고칠 글 한 건 — 본문까지.
+ *
+ * **지운 글은 안 준다.** 목록에 없는 글의 주소를 들고 와도 열리지 않아야, 화면이 고칠 수
+ * 없는 것을 고칠 수 있는 것처럼 내밀지 않는다(저장 쪽도 같은 조건으로 막는다).
+ */
+export async function getAdminSupportPost(
+  actor: Actor,
+  id: string,
+): Promise<AdminSupportPostDetail | null> {
+  assertAdminQuery(actor, 'support:write');
+
+  const row = await prisma.supportPost.findFirst({
+    where: { id, deletedAt: null },
+    select: {
+      id: true, kind: true, title: true, body: true, bodyRich: true,
+      topic: true, pinned: true, sortOrder: true, publishedAt: true,
+    },
+  });
+  if (!row) return null;
+
+  return { ...row, bodyRich: asRichTextDoc(row.bodyRich) };
 }

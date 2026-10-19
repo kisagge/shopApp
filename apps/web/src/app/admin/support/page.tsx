@@ -10,7 +10,12 @@ export default async function AdminSupportPage() {
   const actor = await requireAdmin('support:write');
   const posts = await getAdminSupportPosts(actor);
 
-  // 폼이 문자열을 다루므로 경계에서 한 번만 바꿔 둔다
+  /*
+   * 폼이 문자열을 다루므로 경계에서 한 번만 바꿔 둔다.
+   *
+   * **본문은 여기 없다.** 고칠 글을 누르면 그 한 건만 받아 온다 — 목록에 본문을 실으면
+   * 응답이 글 수만큼 자라고, 그 자리에는 상한도 페이징도 없다.
+   */
   const items: SupportPostItem[] = posts.map((p) => ({
     ...p,
     publishedAt: p.publishedAt?.toISOString() ?? null,
