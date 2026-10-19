@@ -88,6 +88,23 @@ function resolveTrustedOrigins(): string[] {
  * 들어가므로, 화면에는 이 불리언만 서버가 넘겨준다.
  */
 /**
+ * 환경에서 받은 글자 — 다듬어서, 비면 없는 것으로 본다.
+ *
+ * **공백만 든 값이 "있는 값" 으로 세어졌다.** 이 값들은 사람이 구글 콘솔에서
+ * 복사해 대시보드 칸에 붙이는 종류라 앞뒤 공백이 딸려 온다. 그러면
+ * `googleEnabled()` 는 켜졌다고 하고, 화면에는 구글 단추가 서고, 누른 사람은
+ * 구글 쪽 오류 화면까지 갔다 온다 — "반쯤 설정된 상태가 가장 나쁘다" 고
+ * 적어 둔 바로 그 상태인데 그 판단이 공백을 못 걸렀다.
+ *
+ * iOS 는 더 조용하다. 공백이 섞인 ID 로 플러그인을 시작하면 계정 선택이
+ * 아예 뜨지 않고, 화면은 까닭을 모르는 일반 오류를 보여 준다.
+ *
+ * 같은 종류의 값인 애플 팀 ID 는 이미 이렇게 다룬다 — `apps/web` 의
+ * `lib/deep-link` 에 "붙여 넣으면 딸려 온다" 고 적힌 그 자리다.
+ */
+const envText = (value: string | undefined): string | null => value?.trim() || null;
+
+/**
  * 네이티브 셸에 넘겨줄 구글 클라이언트 ID.
  *
  * **비밀이 아니다.** 앱 바이너리에 그대로 박히는 값이라 누구나 꺼낼 수 있고,
@@ -98,16 +115,16 @@ function resolveTrustedOrigins(): string[] {
  * 되는데 굳이 모든 번들에 상수로 박을 이유가 없다.
  */
 export function googleNativeClientIds(): { webClientId: string; iosClientId: string } | null {
-  const webClientId = process.env.GOOGLE_CLIENT_ID;
-  const iosClientId = process.env.GOOGLE_IOS_CLIENT_ID;
+  const webClientId = envText(process.env.GOOGLE_CLIENT_ID);
+  const iosClientId = envText(process.env.GOOGLE_IOS_CLIENT_ID);
   // 안드로이드는 웹 클라이언트 ID 로 동작한다(서명 지문으로 앱을 알아본다).
   // iOS 는 전용 ID 가 없으면 뜨지 않으므로 둘 다 있을 때만 넘긴다.
-  if (!webClientId || !iosClientId) return null;
+  if (webClientId === null || iosClientId === null) return null;
   return { webClientId, iosClientId };
 }
 
 export const googleEnabled = (): boolean =>
-  Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
+  envText(process.env.GOOGLE_CLIENT_ID) !== null && envText(process.env.GOOGLE_CLIENT_SECRET) !== null;
 
 export const rateLimitEnabled = (): boolean => process.env.AUTH_RATE_LIMIT !== 'off';
 
@@ -223,8 +240,9 @@ const options = {
     ? {
         socialProviders: {
           google: {
-            clientId: process.env.GOOGLE_CLIENT_ID as string,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+            // 다듬은 값을 넘긴다 — 공백이 붙은 채로 보내면 구글이 클라이언트를 못 찾는다
+            clientId: envText(process.env.GOOGLE_CLIENT_ID) as string,
+            clientSecret: envText(process.env.GOOGLE_CLIENT_SECRET) as string,
           },
         },
       }

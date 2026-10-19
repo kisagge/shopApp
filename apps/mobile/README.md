@@ -145,6 +145,15 @@ APPLE_TEAM_ID=ABCDE12345
 Associated Domains 를 켠다. `App/App.entitlements` 는 이미 있지만, 그 자리를
 켜야 서명에 실려 간다. 유료 개발자 계정이 필요하다.
 
+### 구글 로그인 (iOS)
+
+`GOOGLE_IOS_CLIENT_ID` 를 웹앱 환경에 넣는다. 이 값은 **`App/Info.plist` 의
+`GIDClientID` 와 같아야 한다** — 돌아올 주소의 스킴이 그 ID 를 뒤집어 만든
+값이기 때문이다. 어긋나면 계정 선택을 마치고 앱으로 못 돌아오고, 오류 화면도
+없이 그냥 멈춘다. plist 안에서 ID 와 스킴이 맞는지는
+`apps/web/test/native-identity.test.ts` 가 보지만, 환경에 넣는 값은 거기서
+볼 수 없다. 클라이언트를 새로 발급하면 **plist 와 환경을 같이** 고친다.
+
 ### 확인
 
 ```bash
