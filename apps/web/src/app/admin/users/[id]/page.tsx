@@ -2,10 +2,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Badge } from '@shop/ui';
-import { format, formatWithUnit, hasPermission, won, ORDER_STATUS_LABEL, USER_ROLE_LABEL } from '@shop/core';
+import {
+  format, formatWithUnit, hasPermission, won,
+  ORDER_STATUS_LABEL, POLICY_KIND, POLICY_KIND_LABEL, POLICY_PATH, USER_ROLE_LABEL,
+} from '@shop/core';
 import { requireAdmin } from '~/lib/admin/guard';
 import { actionLabel } from '~/lib/admin/audit-labels';
 import { getAdminUserDetail } from '~/lib/queries/admin/users';
+import { getPolicyInForceAt } from '~/lib/policies/policy';
 import { GRADE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { SuspendForm } from '../suspend-form';
@@ -36,6 +40,29 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
   const canSuspend = hasPermission(actor, 'user:write');
   const canAdjust = hasPermission(actor, 'point:adjust') && user.closedAt === null;
 
+  /**
+   * **동의한 시각 옆에 그때의 문서를 놓는다.**
+   *
+   * 동의 기록은 시각 하나만 남긴다 — 사람마다 약관 한 벌을 안고 있게 하지 않으려는 선택이고,
+   * 그 대신 "무엇에 동의했는지는 그때 효력이 있던 방침이 말한다" 가 설계의 전제다(core 의
+   * `ConsentRecord`). **그 되짚기를 하는 자리가 없었다.** 분쟁이 들어오면 이 화면의 시각을
+   * 적어 두고 손님 화면의 지난 방침 목록과 눈으로 맞춰야 했다 — 새 방침을 앞날로 미리 올릴
+   * 수 있어서 시행일로 맞추면 틀리는, 사람이 틀리기 쉬운 셈이다.
+   *
+   * 필수 동의는 약관과 개인정보처리방침 둘이라(core 의 `REQUIRED_CONSENT`), 목록을 손으로
+   * 적지 않고 종류를 돌린다.
+   */
+  const agreedAt = user.termsAgreedAt;
+  const policiesThen = agreedAt
+    ? await Promise.all(
+        POLICY_KIND.map(async (kind) => {
+          const revision = await getPolicyInForceAt(kind, agreedAt);
+          // 그 뒤로 바뀐 적이 없으면 지금 올라와 있는 것이 그때 것이다
+          return { kind, href: revision ? `${POLICY_PATH[kind]}?v=${revision.id}` : POLICY_PATH[kind] };
+        }),
+      )
+    : [];
+
   const profile: [string, React.ReactNode][] = [
     ['이메일', <>{user.email}{!user.emailVerified && <span className="ml-1.5 text-[11px] text-warning">미인증</span>}</>],
     ['연락처', user.phone ?? '—'],
@@ -43,8 +70,23 @@ export default async function AdminUserDetailPage({ params }: { params: Promise<
     ['소속 가맹점', user.merchantName ?? '—'],
     ['로그인 방식', user.signInMethods.length ? user.signInMethods.map((m) => SIGN_IN_LABEL[m] ?? m).join(', ') : '—'],
     ['가입', <time key="joined" dateTime={user.createdAt.toISOString()}>{adminDate.format(user.createdAt)}</time>],
-    ['약관 동의', user.termsAgreedAt
-      ? <time key="terms" dateTime={user.termsAgreedAt.toISOString()}>{adminTimestamp.format(user.termsAgreedAt)}</time>
+    ['약관 동의', agreedAt
+      ? (
+        <span key="terms" className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <time dateTime={agreedAt.toISOString()}>{adminTimestamp.format(agreedAt)}</time>
+          {policiesThen.map(({ kind, href }) => (
+            <a
+              key={kind}
+              href={href}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[12px] underline underline-offset-2"
+            >
+              그때의 {POLICY_KIND_LABEL[kind]}
+            </a>
+          ))}
+        </span>
+      )
       : '기록 없음'],
   ];
 

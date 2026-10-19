@@ -10,6 +10,8 @@ vi.mock('~/lib/admin/guard', () => ({ requireAdmin }));
 const getAdminUserDetail = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/queries/admin/users', () => ({ getAdminUserDetail, USER_DETAIL_RECENT: 10 }));
 vi.mock('~/lib/i18n/server', () => ({ getT: () => Promise.resolve(createTranslator('ko')) }));
+const getPolicyInForceAt = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/policies/policy', () => ({ getPolicyInForceAt }));
 const notFound = vi.hoisted(() => vi.fn(() => { throw new Error('NEXT_NOT_FOUND'); }));
 vi.mock('next/navigation', () => ({ notFound, useRouter: () => ({ refresh: vi.fn(), push: vi.fn(), replace: vi.fn() }) }));
 
@@ -36,6 +38,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   requireAdmin.mockResolvedValue(admin);
   getAdminUserDetail.mockResolvedValue(detail());
+  getPolicyInForceAt.mockResolvedValue(null);
 });
 
 describe('회원 상세 화면', () => {
@@ -68,6 +71,62 @@ describe('회원 상세 화면', () => {
     getAdminUserDetail.mockResolvedValue(detail({ termsAgreedAt: null }));
     await renderPage();
     expect(within(screen.getByRole('region', { name: '기본 정보' })).getByText('기록 없음')).toBeInTheDocument();
+  });
+
+  /**
+   * **동의한 시각 옆에 그때의 문서를 놓는다.**
+   *
+   * 동의 기록은 시각 하나만 남긴다 — 무엇에 동의했는지는 그때 효력이 있던 방침이 말한다는
+   * 것이 설계의 전제다(core 의 `ConsentRecord`). 그런데 그 되짚기를 하는 자리가 없어서,
+   * 분쟁이 들어오면 이 화면의 시각을 적어 두고 손님 화면의 지난 방침 목록과 눈으로 맞춰야
+   * 했다 — 새 방침을 앞날로 미리 올릴 수 있으니 시행일로 맞추면 틀리는 셈이다.
+   */
+  describe('그때의 방침으로 가는 길', () => {
+    const links = async () => {
+      await renderPage();
+      const profile = screen.getByRole('region', { name: '기본 정보' });
+      return within(profile).getAllByRole('link', { name: /^그때의 / });
+    };
+
+    it('필수 동의 두 가지를 각각 가리킨다 — 목록을 손으로 적지 않는다', async () => {
+      expect((await links()).map((a) => a.textContent)).toEqual([
+        '그때의 이용약관',
+        '그때의 개인정보처리방침',
+      ]);
+    });
+
+    it('그 시각으로 묻는다 — 지금 시각이 아니다', async () => {
+      await renderPage();
+      expect(getPolicyInForceAt).toHaveBeenCalledTimes(2);
+      for (const [, at] of getPolicyInForceAt.mock.calls) {
+        expect(at).toEqual(new Date('2026-01-01T00:05:00Z'));
+      }
+    });
+
+    it('그때의 판이 따로 있으면 그 판을 연다', async () => {
+      getPolicyInForceAt.mockImplementation(async (kind: string) =>
+        kind === 'TERMS' ? { id: 'rev-7' } : null,
+      );
+      const [terms, privacy] = await links();
+      expect(terms).toHaveAttribute('href', '/terms?v=rev-7');
+      // 그 뒤로 바뀐 적이 없으면 지금 올라와 있는 것이 그때 것이다
+      expect(privacy).toHaveAttribute('href', '/privacy');
+    });
+
+    it('손님 화면이라 새 창으로 연다 — 보던 회원 화면을 잃지 않는다', async () => {
+      for (const link of await links()) {
+        expect(link).toHaveAttribute('target', '_blank');
+        expect(link).toHaveAttribute('rel', 'noreferrer');
+      }
+    });
+
+    it('동의 기록이 없으면 묻지도 않는다', async () => {
+      // 가리킬 시각이 없으면 "그때" 가 없다. 조회를 부르면 아무 뜻 없는 값으로 묻게 된다.
+      getAdminUserDetail.mockResolvedValue(detail({ termsAgreedAt: null }));
+      await renderPage();
+      expect(getPolicyInForceAt).not.toHaveBeenCalled();
+      expect(screen.queryByRole('link', { name: /^그때의 / })).not.toBeInTheDocument();
+    });
   });
 
   it('최근 주문은 주문 상세로 가고, 누적액·등급을 함께 말한다', async () => {

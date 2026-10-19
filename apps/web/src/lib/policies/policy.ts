@@ -83,6 +83,42 @@ export async function getPolicyRevisions(kind: PolicyKind, take = 20): Promise<P
   }));
 }
 
+/**
+ * **그 시각에 효력을 갖던 판.** 없으면 null — 지금 올라와 있는 것이 그때 것이다.
+ *
+ * core 의 `ConsentRecord` 가 이 되짚기를 전제로 설계돼 있다 — "동의한 시각으로 남긴다,
+ * 무엇에 동의했는지는 그때 효력이 있던 방침이 말한다. 시각 하나면 되짚을 수 있다."
+ * **그 되짚기를 하는 코드가 없었다.** 분쟁이 들어왔을 때 운영자가 보는 화면에는 동의한
+ * 시각만 있어서, 이력 목록과 눈으로 맞춰 보는 수밖에 없었다.
+ *
+ * **기준은 `replacedAt` 이다. `effectiveAt` 으로 재면 틀린다.** 새 방침은 "며칠 뒤부터
+ * 이렇게 바뀝니다" 로 미리 올릴 수 있어서, 올라와 있는 동안에도 효력은 지난 방침에 있다
+ * (`policyInEffect` 가 적어 둔 그 사정이다). 지난 판이 현재 방침이던 기간의 끝이
+ * `replacedAt` 이므로, 그 시각이 `at` 보다 **뒤인 것들 중 가장 이른 것**이 답이다.
+ *
+ * **이미 불러 둔 목록에서 고르지 않는다.** `getPolicyRevisions` 는 최근 스무 개만
+ * 가져오므로, 오래전에 동의한 사람을 그 목록에서 찾으면 가장 오래된 판이 답으로 나온다 —
+ * 틀린 답인데 그럴듯해 보인다. 색인이 있으니(`@@index([kind, replacedAt])`) 데이터베이스에
+ * 직접 묻는다.
+ */
+export async function getPolicyInForceAt(kind: PolicyKind, at: Date): Promise<PolicyRevisionDoc | null> {
+  const row = await prisma.policyRevision.findFirst({
+    where: { kind, replacedAt: { gt: at } },
+    orderBy: { replacedAt: 'asc' },
+    select: { id: true, kind: true, title: true, body: true, bodyRich: true, effectiveAt: true, replacedAt: true },
+  });
+  if (!row) return null;
+  return {
+    id: row.id,
+    kind: row.kind,
+    title: row.title,
+    body: row.body,
+    bodyRich: (row.bodyRich as RichTextDoc | null) ?? null,
+    effectiveAt: row.effectiveAt,
+    replacedAt: row.replacedAt,
+  };
+}
+
 /** 지난 방침 하나. 다른 종류의 id 를 주소에 넣어도 열리지 않는다 */
 export async function getPolicyRevision(kind: PolicyKind, id: string): Promise<PolicyRevisionDoc | null> {
   const row = await prisma.policyRevision.findFirst({
