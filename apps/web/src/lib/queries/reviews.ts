@@ -188,10 +188,15 @@ const reviewAggregates = cachedRead(
       where: { productId, deletedAt: null },
       _count: { _all: true },
     }),
-    prisma.review.findMany({
+    /*
+     * **세는 일은 데이터베이스에 맡긴다.** 전에는 답변 행을 500개까지 끌어와 세었다 —
+     * 그 수를 넘는 상품은 아무 표시 없이 500개분의 비율을 보여 줬고, 정렬이 없어서 어느
+     * 500개인지도 정해져 있지 않았다. 세어 달라고 하면 상한이 필요 없다.
+     */
+    prisma.review.groupBy({
+      by: ['sizeFit'],
       where: { productId, deletedAt: null, sizeFit: { not: null } },
-      select: { sizeFit: true },
-      take: 500,
+      _count: { _all: true },
     }),
     ]),
   { key: ['review-summary'], tags: [TAG.catalog], revalidate: TTL.catalog },
@@ -209,11 +214,25 @@ export async function getReviewSummary(productId: string): Promise<ReviewSummary
     total += row._count._all;
   }
 
+  /*
+   * `isSizeFit` 은 **방어가 아니라 좁히기다.** 묶어 센 결과의 `sizeFit` 은 타입이 그냥
+   * `string` 으로 온다. 이 가드를 빼고 `as SizeFit` 로 눌러 둘 수도 있지만, 그건 확인하지
+   * 않은 것을 확인했다고 적는 일이다. 가드는 실제로 확인한다.
+   *
+   * 모르는 값이 들어와도 비율은 흔들리지 않는다 — `sizeFitSummary` 가 아는 갈래를 하나씩
+   * 꺼내 세기 때문이다. 그래서 이 줄을 지워도 지는 검사가 없다(돌연변이로 확인했다).
+   * 남겨 두는 까닭은 위의 한 가지, 타입을 솔직하게 지나가는 것뿐이다.
+   */
+  const fitCounts: Partial<Record<SizeFit, number>> = {};
+  for (const row of fits) {
+    if (row.sizeFit !== null && isSizeFit(row.sizeFit)) fitCounts[row.sizeFit] = row._count._all;
+  }
+
   return {
     average: averageRating(sum, total),
     total,
     breakdown: ratingBreakdown(counts),
-    sizeFit: sizeFitSummary(fits.map((f) => f.sizeFit)),
+    sizeFit: sizeFitSummary(fitCounts),
   };
 }
 

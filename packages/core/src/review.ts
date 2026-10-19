@@ -124,13 +124,22 @@ export interface SizeFitSummary {
  *
  * 옷을 살 때 별점보다 실질적으로 쓸모 있는 정보다. 답하지 않은 리뷰는
  * 분모에서도 뺀다 — 무응답을 "정사이즈"로 세면 분포가 거짓이 된다.
+ *
+ * **센 것을 받는다. 행을 받지 않는다.** 예전에는 답변 목록을 그대로 받아 여기서 셌는데,
+ * 그러려면 부르는 쪽이 리뷰 행을 전부 끌어와야 했다. 그래서 조회에 상한(500개)이 붙어
+ * 있었고, 그 상한을 넘는 상품은 **아무 표시 없이 500개분의 비율**을 보여 줬다. 어느 500개
+ * 인지도 정해져 있지 않았다(정렬이 없었다). 세는 일은 데이터베이스가 가장 잘한다.
+ *
+ * 모르는 갈래는 애초에 들어올 자리가 없다 — 목록을 받는 쪽이 아니라 아는 갈래를 하나씩
+ * 꺼내 세므로, 표에 엉뚱한 키가 섞여 있어도 분모에 들지 않는다.
  */
-export function sizeFitSummary(fits: readonly (string | null)[]): SizeFitSummary[] {
-  const answered = fits.filter((f): f is SizeFit => f !== null && isSizeFit(f));
-  const total = answered.length;
+export function sizeFitSummary(
+  counts: Readonly<Partial<Record<SizeFit, number>>>,
+): SizeFitSummary[] {
+  const total = SIZE_FIT.reduce((sum, fit) => sum + (counts[fit] ?? 0), 0);
 
   return SIZE_FIT.map((fit) => {
-    const count = answered.filter((f) => f === fit).length;
+    const count = counts[fit] ?? 0;
     return { fit, count, percent: total === 0 ? 0 : Math.round((count / total) * 100) };
   });
 }

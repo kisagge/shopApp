@@ -26,7 +26,7 @@ const summary = (over: Record<string, unknown> = {}) => ({
   average: 4.0,
   total: 1,
   breakdown: ratingBreakdown({ 4: 1 }),
-  sizeFit: sizeFitSummary(['TRUE']),
+  sizeFit: sizeFitSummary({ TRUE: 1 }),
   ...over,
 });
 
@@ -67,7 +67,7 @@ describe('요약', () => {
   });
 
   it('아무도 사이즈를 답하지 않으면 그 영역을 그리지 않는다', () => {
-    render(<ReviewSection t={ko} summary={summary({ sizeFit: sizeFitSummary([null]) })} reviews={[]} />);
+    render(<ReviewSection t={ko} summary={summary({ sizeFit: sizeFitSummary({}) })} reviews={[]} />);
     expect(screen.queryByText('사이즈')).toBeNull();
   });
 });

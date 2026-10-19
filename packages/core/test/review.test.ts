@@ -81,24 +81,45 @@ describe('별점 분포', () => {
   });
 });
 
+/**
+ * **센 것을 받는다. 행을 받지 않는다.**
+ *
+ * 전에는 답변 목록을 그대로 받아 여기서 셌고, 그러려면 부르는 쪽이 리뷰 행을 전부 끌어와야
+ * 했다. 그래서 조회에 상한(500개)이 붙어 있었고 그 수를 넘는 상품은 아무 표시 없이 500개분
+ * 비율을 보여 줬다 — 정렬도 없어서 어느 500개인지조차 정해져 있지 않았다.
+ */
 describe('사이즈 분포', () => {
   it('세 항목을 항상 준다', () => {
-    expect(sizeFitSummary(['TRUE']).map((s) => s.fit)).toEqual(['SMALL', 'TRUE', 'LARGE']);
+    expect(sizeFitSummary({ TRUE: 1 }).map((s) => s.fit)).toEqual(['SMALL', 'TRUE', 'LARGE']);
   });
 
-  it('무응답은 분모에서도 뺀다 — 정사이즈로 세면 분포가 거짓이 된다', () => {
-    const rows = sizeFitSummary(['TRUE', null, null, 'LARGE']);
+  it('답한 것만으로 비율을 낸다 — 무응답은 분모에 없다', () => {
+    // 무응답은 애초에 표에 들어오지 않는다(조회가 sizeFit 있는 것만 센다)
+    const rows = sizeFitSummary({ TRUE: 1, LARGE: 1 });
     expect(rows.find((r) => r.fit === 'TRUE')?.percent).toBe(50);
     expect(rows.find((r) => r.fit === 'LARGE')?.percent).toBe(50);
   });
 
-  it('모르는 값도 무시한다', () => {
-    const rows = sizeFitSummary(['TRUE', 'HUGE']);
+  it('센 수를 그대로 들고 있다 — 화면이 "답이 있는가" 를 그것으로 가린다', () => {
+    const rows = sizeFitSummary({ SMALL: 7, TRUE: 3 });
+    expect(rows.find((r) => r.fit === 'SMALL')?.count).toBe(7);
+    expect(rows.find((r) => r.fit === 'LARGE')?.count).toBe(0);
+    expect(rows.find((r) => r.fit === 'SMALL')?.percent).toBe(70);
+  });
+
+  it('모르는 갈래는 분모에 들지 않는다', () => {
+    // 아는 갈래를 하나씩 꺼내 세므로 표에 엉뚱한 키가 섞여도 비율이 흔들리지 않는다
+    const rows = sizeFitSummary({ TRUE: 1, HUGE: 9 } as Record<string, number>);
     expect(rows.find((r) => r.fit === 'TRUE')?.percent).toBe(100);
   });
 
   it('아무도 답하지 않으면 전부 0%', () => {
-    expect(sizeFitSummary([null, null]).every((r) => r.percent === 0)).toBe(true);
+    expect(sizeFitSummary({}).every((r) => r.percent === 0)).toBe(true);
+  });
+
+  it('많아도 상한이 없다 — 수가 그대로 비율이 된다', () => {
+    const rows = sizeFitSummary({ SMALL: 1_200, TRUE: 2_400, LARGE: 400 });
+    expect(rows.map((r) => r.percent)).toEqual([30, 60, 10]);
   });
 });
 
