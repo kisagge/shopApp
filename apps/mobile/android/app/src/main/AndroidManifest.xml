@@ -1,8 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      **백업에 세션 토큰이 딸려 간다.**
+
+      셸은 로그인 응답의 토큰을 Preferences 에 넣어 두는데(@shop/native), 안드로이드에서
+      그것은 SharedPreferences 파일이다. allowBackup 이 켜져 있으면 그 파일이 구글 백업에
+      올라가고, 복원하는 기기로 함께 내려간다 — 남의 기기에서 되살아나는 자격증명이다.
+      디버그 빌드에서는 adb 로도 꺼낼 수 있다.
+
+      이 앱이 기기에 남겨 두는 것은 그 토큰뿐이다. 나머지는 전부 서버에 있어서, 백업을
+      껐을 때 잃는 것이 없다. 다시 설치하면 다시 로그인한다 — 그것이 맞는 동작이다.
+
+      안드로이드 12 부터는 기기 간 직접 전송이 dataExtractionRules 로 따로 갈린다는 말이
+      있는데, 그 파일은 여기서 빌드해 확인할 수가 없어 넣지 않았다. 이 한 줄이 적어도
+      클라우드 백업은 막는다.
+    -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

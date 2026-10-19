@@ -53,4 +53,13 @@ export async function signOutEverywhere(): Promise<void> {
   }
 }
 
-export const { signIn, signUp, signOut, useSession, getSession } = authClient;
+/*
+ * **이름으로 다시 내보내지 않는다.**
+ *
+ * `export const { signIn, signUp, signOut, useSession, getSession } = authClient` 가 있었고,
+ * 들여오는 곳은 한 군데도 없었다 — 다들 `authClient` 를 그대로 쓴다. 쓰지 않는 수출이
+ * 그냥 군살이기만 하면 두어도 되지만, 그 안에 `signOut` 이 있다. 그것을 부르면 서버
+ * 세션만 끊기고 **기기에 저장된 토큰은 남는다** — 다음에 앱을 켠 사람은 서버가 거절할
+ * 때까지 로그인한 것처럼 보인다. 바로 옆에 `signOutEverywhere` 가 있는데도 한 글자
+ * 짧은 쪽이 손에 먼저 닿는다. 문을 하나만 남긴다.
+ */

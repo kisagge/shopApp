@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { hydrateSessionToken, isNativeShell } from '@shop/native';
+import { clearSessionToken, hydrateSessionToken, isNativeShell } from '@shop/native';
 
 /**
  * 네이티브 셸에서 저장해 둔 세션 토큰으로 **서버 세션까지 되살린다.**
@@ -37,7 +37,23 @@ export function NativeSession({ signedIn }: { signedIn: boolean }) {
         headers: { authorization: `Bearer ${token}` },
       }).catch(() => null);
 
-      // 토큰이 낡았으면 서버가 401 을 준다. 그때는 로그인 화면이 맞다.
+      /*
+       * **거절당한 토큰은 지운다.**
+       *
+       * 서버가 401 을 주는 것은 그 토큰으로는 아무것도 안 된다는 뜻이다. 그런데 지우지
+       * 않으면 그 글자가 기기에 그대로 남아, 앱을 켤 때마다 여기서 한 번 거절당하고
+       * 창구를 부를 때마다 Bearer 로 따라간다 — 다음 로그인이 덮어쓸 때까지 죽은
+       * 자격증명을 들고 다니는 셈이다. 화면은 로그인 화면이 맞고, 저장소도 그래야 한다.
+       *
+       * **끊긴 것과 거절당한 것을 가른다.** 망이 없으면 `res` 가 null 이다. 그걸 거절로
+       * 보고 지우면, 지하철에서 앱을 켠 사람이 로그아웃된다.
+       *
+       * 지우는 일은 화면이 떠났어도 한다 — 저장소 정리라 그려진 것과 상관이 없다.
+       */
+      if (res?.status === 401) {
+        await clearSessionToken();
+        return;
+      }
       if (alive && res?.ok) router.refresh();
     })();
 

@@ -186,6 +186,38 @@ describe('웹뷰가 망 변화를 알아챌 수 있는가', () => {
 });
 
 /**
+ * 기기에 남는 것.
+ *
+ * 셸은 로그인 응답의 토큰을 Preferences 에 넣어 둔다 — 웹뷰가 쿠키를 잃어도 로그인이
+ * 유지되게 하려고 만든 길이다(@shop/native). 안드로이드에서 그것은 SharedPreferences
+ * 파일이고, **백업이 켜져 있으면 그 파일이 구글 백업에 올라간다.** 복원하는 기기로
+ * 함께 내려가니, 남의 기기에서 되살아나는 자격증명이 된다.
+ *
+ * Capacitor 의 기본 manifest 가 `allowBackup="true"` 로 시작하고, 이 앱은 그것을 그대로
+ * 두고 있었다. 이 앱이 기기에 남기는 것은 그 토큰뿐이라 백업을 껐을 때 잃는 것이 없다.
+ */
+describe('기기에 남는 것', () => {
+  const manifestText = () =>
+    read(join(ROOT, 'apps', 'mobile', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'));
+
+  it('백업에 앱 데이터를 올리지 않는다', () => {
+    expect(manifestText()).toContain('android:allowBackup="false"');
+    expect(manifestText()).not.toContain('android:allowBackup="true"');
+  });
+
+  it('백업을 끄는 까닭이 아직 남아 있다 — 토큰을 기기에 둔다', () => {
+    /*
+     * 이 쌍이 깨지는 길은 둘이다. 토큰을 더 이상 기기에 두지 않게 되면 이 설정의 까닭이
+     * 없어지고(그래도 끈 채로 두면 되지만 주석이 거짓이 된다), 반대로 저장소를 바꾸면
+     * 끈 것이 모자랄 수 있다. 둘 다 사람이 다시 생각해야 하는 자리라 여기서 묶어 둔다.
+     */
+    const bridge = read(join(ROOT, 'packages', 'native', 'src', 'index.ts'));
+    expect(bridge).toContain('Preferences');
+    expect(bridge).toMatch(/const TOKEN_KEY = '[^']+'/);
+  });
+});
+
+/**
  * iOS 에서 가장자리를 밀어 뒤로 가기.
  *
  * **시뮬레이터에서 아무 일도 안 했다.** 상품 상세를 열고 왼쪽 끝에서 밀어도
