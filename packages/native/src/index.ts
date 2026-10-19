@@ -23,6 +23,26 @@ interface CapacitorBridge {
       remove(options: { key: string }): Promise<void>;
     };
     /**
+     * 안전 저장소 — iOS 키체인, 안드로이드 EncryptedSharedPreferences.
+     *
+     * **Preferences 는 평문이다.** iOS 에서는 `UserDefaults.standard`(플러그인 소스에
+     * 그렇게 적혀 있다)라 앱 백업에 그대로 딸려 가고, 그 안에 든 것이 세션 토큰 —
+     * **서명된 쿠키 값 그 자체**다. 안드로이드는 백업을 껐지만(allowBackup) 파일은
+     * 여전히 평문이다. iOS 에는 백업에서 빼는 스위치가 아예 없어서 자리를 옮기는 것
+     * 말고는 길이 없다.
+     *
+     * **셸이 아직 이 플러그인을 싣지 않는다.** 여기 분기를 먼저 둔 까닭은, 플러그인을
+     * 붙이는 일은 네이티브 프로젝트를 건드리고 기기에서 한 번 확인해야 하는 일이라
+     * 따로 떼어 놓은 것이다 — 그동안 동작은 지금과 똑같다(없으면 Preferences 를 쓴다).
+     * 플러그인을 고를 때 이 모양에 맞춰 싣는다. 모양이 다르면 `secureStore()` 한 곳만
+     * 고치면 된다.
+     */
+    SecureStorage?: {
+      get(options: { key: string }): Promise<{ value: string | null }>;
+      set(options: { key: string; value: string }): Promise<void>;
+      remove(options: { key: string }): Promise<void>;
+    };
+    /**
      * @capgo/capacitor-social-login. 셸이 등록해 주는 것만 쓴다.
      *
      * 타입을 여기 손으로 적는다. 패키지를 import 하면 이 패키지의 "의존성
@@ -252,7 +272,53 @@ const TOKEN_KEY = 'shop.session-token';
  */
 let cached: string | null = null;
 
-const store = () => bridge()?.Plugins?.Preferences ?? null;
+/** 토큰 한 개를 두는 자리. 어느 플러그인이든 이 모양으로 감싸서 쓴다. */
+interface TokenStore {
+  get(): Promise<string | null>;
+  set(value: string): Promise<void>;
+  remove(): Promise<void>;
+}
+
+/** 지금까지 쓴 자리 — 평문이다 */
+const plainStore = (): TokenStore | null => {
+  const plugin = bridge()?.Plugins?.Preferences;
+  if (!plugin) return null;
+  return {
+    get: async () => (await plugin.get({ key: TOKEN_KEY })).value ?? null,
+    set: async (value) => { await plugin.set({ key: TOKEN_KEY, value }); },
+    remove: async () => { await plugin.remove({ key: TOKEN_KEY }); },
+  };
+};
+
+/**
+ * 안전 저장소. 셸이 싣지 않았으면 null.
+ *
+ * **없는 키를 오류로 알리는 플러그인이 많다.** 키체인 API 가 그렇게 생겼고, 감싸는
+ * 플러그인들도 대개 그대로 던진다. 여기서는 "없음" 과 "고장" 을 가리지 않고 없음으로
+ * 본다 — 가린다고 할 수 있는 일이 다르지 않고(둘 다 로그인 화면이다), 가리려 들면
+ * 플러그인마다 다른 오류 모양에 코드가 매인다.
+ */
+const secureStore = (): TokenStore | null => {
+  const plugin = bridge()?.Plugins?.SecureStorage;
+  if (!plugin) return null;
+  return {
+    get: async () => {
+      try {
+        return (await plugin.get({ key: TOKEN_KEY })).value ?? null;
+      } catch {
+        return null;
+      }
+    },
+    set: async (value) => { await plugin.set({ key: TOKEN_KEY, value }); },
+    remove: async () => {
+      try {
+        await plugin.remove({ key: TOKEN_KEY });
+      } catch {
+        // 없는 것을 지우라는 요청은 이룬 셈이다
+      }
+    },
+  };
+};
 
 /**
  * 저장해 둔 토큰을 메모리로 올린다. 앱이 뜰 때 한 번 부른다.
@@ -261,9 +327,33 @@ const store = () => bridge()?.Plugins?.Preferences ?? null;
  */
 export async function hydrateSessionToken(): Promise<string | null> {
   if (!isNativeShell()) return null;
+  const safe = secureStore();
   try {
-    const result = await store()?.get({ key: TOKEN_KEY });
-    cached = result?.value ?? null;
+    if (safe === null) {
+      cached = (await plainStore()?.get()) ?? null;
+      return cached;
+    }
+
+    cached = await safe.get();
+    if (cached !== null) return cached;
+
+    /*
+     * **옛 자리에 있던 것을 한 번 옮긴다.** 안전 저장소가 생긴 뒤에도 이미 로그인해 둔
+     * 사람의 토큰은 평문 자리에 있다. 옮기지 않으면 그 사람들은 앱을 켤 때 로그아웃되고,
+     * 평문 사본은 그대로 남는다 — 가장 나쁜 쪽이다.
+     *
+     * 메모리를 **먼저** 채운다. 옮기다 실패해도 이번 실행에서는 로그인이 유지되고,
+     * 다음 실행에 다시 옮겨 본다. 옮기기 전에 옛 자리를 지우는 일은 없다.
+     */
+    const legacy = (await plainStore()?.get()) ?? null;
+    if (legacy === null) return null;
+    cached = legacy;
+    try {
+      await safe.set(legacy);
+      await plainStore()?.remove();
+    } catch {
+      // 다음 실행에 다시 옮긴다. 평문 사본은 아직 거기 있어야 한다.
+    }
   } catch {
     // 저장소를 못 읽어도 앱은 떠야 한다. 로그인 화면으로 가면 그만이다.
     cached = null;
@@ -283,21 +373,32 @@ export const sessionToken = (): string | null => cached;
 export async function saveSessionToken(token: string): Promise<void> {
   if (!isNativeShell()) return;
   cached = token;
+  const safe = secureStore();
   try {
-    await store()?.set({ key: TOKEN_KEY, value: token });
+    await (safe ?? plainStore())?.set(token);
+    // 안전 저장소에 넣었으면 평문 자리에 사본을 남기지 않는다
+    if (safe !== null) await plainStore()?.remove();
   } catch {
     // 다음 실행에 다시 로그인하게 된다. 지금 동작을 막지는 않는다.
   }
 }
 
-/** 로그아웃. 메모리와 저장소 양쪽에서 지운다. */
+/**
+ * 로그아웃. 메모리와 저장소에서 지운다.
+ *
+ * **저장소 두 자리를 다 지운다.** 안전 저장소로 옮기기 전에 로그인해 둔 사람은 평문 자리에
+ * 토큰이 있는데, 지금 쓰는 자리만 지우면 그 사본이 로그아웃 뒤에도 남는다 — 그리고 그
+ * 글자는 서버 세션이 끊길 때까지 실제로 쓸 수 있는 값이다.
+ */
 export async function clearSessionToken(): Promise<void> {
   cached = null;
   if (!isNativeShell()) return;
-  try {
-    await store()?.remove({ key: TOKEN_KEY });
-  } catch {
-    // 메모리에서는 이미 지웠다. 다음 실행에 남은 토큰은 서버가 거절한다.
+  for (const target of [secureStore(), plainStore()]) {
+    try {
+      await target?.remove();
+    } catch {
+      // 메모리에서는 이미 지웠다. 다음 실행에 남은 토큰은 서버가 거절한다.
+    }
   }
 }
 

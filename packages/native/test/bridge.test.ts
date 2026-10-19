@@ -22,6 +22,18 @@ function installBridge(over: Record<string, unknown> = {}) {
   return prefs;
 }
 
+/** 셸이 안전 저장소까지 실어 준 경우 */
+function installWithSecure() {
+  const secure = {
+    get: vi.fn(async () => ({ value: null as string | null })),
+    set: vi.fn(async () => {}),
+    remove: vi.fn(async () => {}),
+  };
+  const prefs = installBridge();
+  (window as unknown as { Capacitor: { Plugins: Record<string, unknown> } }).Capacitor.Plugins['SecureStorage'] = secure;
+  return { prefs, secure };
+}
+
 beforeEach(() => {
   delete (window as unknown as { Capacitor?: unknown }).Capacitor;
   resetSessionTokenForTest();
@@ -120,6 +132,114 @@ describe('토큰 — 셸 안', () => {
 
     await expect(saveSessionToken('t-1')).resolves.toBeUndefined();
     await expect(hydrateSessionToken()).resolves.toBeNull();
+  });
+});
+
+/**
+ * 안전 저장소가 있으면 그쪽에 둔다.
+ *
+ * **Preferences 는 평문이다.** iOS 에서는 `UserDefaults.standard` 라 앱 백업에 그대로
+ * 딸려 가고, 그 안에 든 것이 세션 토큰 — 서명된 쿠키 값 그 자체다. iOS 에는 백업에서
+ * 빼는 스위치가 없어서 자리를 옮기는 것 말고는 길이 없다.
+ *
+ * 플러그인을 싣는 일은 네이티브 프로젝트를 건드리고 기기에서 확인해야 하는 일이라 따로
+ * 떼어 놓았다. 그래서 여기 검사가 보는 것은 **실릴 때와 아직 안 실렸을 때 둘 다 맞게
+ * 도는가** 다.
+ */
+describe('토큰 — 안전 저장소', () => {
+  it('실려 있으면 그쪽에 쓰고 평문 자리에는 남기지 않는다', async () => {
+    const { prefs, secure } = installWithSecure();
+
+    await saveSessionToken('t-1');
+
+    expect(secure.set).toHaveBeenCalledWith({ key: 'shop.session-token', value: 't-1' });
+    expect(prefs.set).not.toHaveBeenCalled();
+    // 옛 판에서 온 사본이 있을 수 있다 — 쓰는 길에서 함께 치운다
+    expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+  });
+
+  it('안 실려 있으면 지금처럼 평문 자리를 쓴다 — 동작이 바뀌지 않는다', async () => {
+    const prefs = installBridge();
+
+    await saveSessionToken('t-1');
+
+    expect(prefs.set).toHaveBeenCalledWith({ key: 'shop.session-token', value: 't-1' });
+    expect(sessionToken()).toBe('t-1');
+  });
+
+  it('이미 로그인해 둔 사람의 토큰을 한 번 옮기고 옛 자리를 지운다', async () => {
+    /*
+     * 옮기지 않으면 그 사람들은 앱을 켤 때 로그아웃되고 평문 사본은 그대로 남는다 —
+     * 가장 나쁜 쪽이다.
+     */
+    const { prefs, secure } = installWithSecure();
+    prefs.get.mockResolvedValue({ value: 't-옛자리' });
+
+    await hydrateSessionToken();
+
+    expect(sessionToken()).toBe('t-옛자리');
+    expect(secure.set).toHaveBeenCalledWith({ key: 'shop.session-token', value: 't-옛자리' });
+    expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+  });
+
+  it('옮기다 실패하면 이번 실행은 로그인을 유지하고 옛 자리를 지우지 않는다', async () => {
+    // 지우고 나서 쓰다 실패하면 토큰이 어디에도 없게 된다. 순서가 뜻이다.
+    const { prefs, secure } = installWithSecure();
+    prefs.get.mockResolvedValue({ value: 't-옛자리' });
+    secure.set.mockRejectedValue(new Error('키체인 잠김'));
+
+    await hydrateSessionToken();
+
+    expect(sessionToken()).toBe('t-옛자리');
+    expect(prefs.remove).not.toHaveBeenCalled();
+  });
+
+  it('안전 저장소에 있으면 옛 자리를 들여다보지 않는다', async () => {
+    const { prefs, secure } = installWithSecure();
+    secure.get.mockResolvedValue({ value: 't-안전' });
+
+    await hydrateSessionToken();
+
+    expect(sessionToken()).toBe('t-안전');
+    expect(prefs.get).not.toHaveBeenCalled();
+  });
+
+  it('없는 키에 오류를 던지는 플러그인도 받는다', async () => {
+    /*
+     * 키체인 API 가 그렇게 생겼고, 감싸는 플러그인들도 대개 그대로 던진다. 그것을 고장으로
+     * 읽으면 이관이 아예 안 돌아, 옛 사람들이 켤 때마다 로그아웃된다.
+     */
+    const { prefs, secure } = installWithSecure();
+    secure.get.mockRejectedValue(new Error('item not found'));
+    prefs.get.mockResolvedValue({ value: 't-옛자리' });
+
+    await hydrateSessionToken();
+
+    expect(sessionToken()).toBe('t-옛자리');
+    expect(secure.set).toHaveBeenCalled();
+  });
+
+  it('로그아웃하면 두 자리를 다 지운다', async () => {
+    /*
+     * 옮기기 전에 로그인해 둔 사람은 평문 자리에 토큰이 있다. 지금 쓰는 자리만 지우면 그
+     * 사본이 로그아웃 뒤에도 남고, 그 글자는 서버 세션이 끊길 때까지 실제로 쓸 수 있다.
+     */
+    const { prefs, secure } = installWithSecure();
+
+    await clearSessionToken();
+
+    expect(secure.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+    expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+  });
+
+  it('한쪽 삭제가 실패해도 다른 쪽은 지운다', async () => {
+    const { prefs, secure } = installWithSecure();
+    secure.remove.mockRejectedValue(new Error('키체인 잠김'));
+
+    await clearSessionToken();
+
+    expect(prefs.remove).toHaveBeenCalled();
+    expect(sessionToken()).toBeNull();
   });
 });
 

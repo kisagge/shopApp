@@ -102,6 +102,35 @@ Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다�
 `cap sync` 가 매번 새로 만드는 것들 — 웹 자산 사본, Pods, Gradle 캐시 — 은
 `.gitignore` 에 둔다.
 
+## 세션 토큰을 안전 저장소로 옮기기 — 남은 한 걸음
+
+셸은 로그인 응답의 토큰을 `@capacitor/preferences` 에 넣어 둔다. 그것은 **평문이다** —
+iOS 에서는 `UserDefaults.standard`(플러그인 소스에 그렇게 적혀 있다)라 앱 백업에 그대로
+딸려 간다. 안드로이드는 `allowBackup="false"` 로 클라우드 백업을 막았지만 파일 자체는
+평문이고, iOS 에는 백업에서 빼는 스위치가 아예 없다. 그 안에 든 것은 세션 토큰 —
+**서명된 쿠키 값 그 자체**라, 꺼내면 그대로 쓸 수 있다.
+
+웹 쪽 준비는 끝나 있다. 브릿지(`@shop/native`)가 `window.Capacitor.Plugins.SecureStorage`
+를 먼저 찾고, 없으면 지금처럼 Preferences 를 쓴다. 이미 로그인해 둔 사람의 토큰은 앱이 뜰
+때 한 번 옮기고 옛 자리를 지운다. 로그아웃은 두 자리를 다 지운다.
+
+남은 것은 **플러그인을 싣는 일**이다.
+
+1. 키체인·EncryptedSharedPreferences 를 주는 플러그인을 고른다. Capacitor 8 호환과 최근
+   갱신을 먼저 보고, 판은 이 저장소 방식대로 정확히 박는다(`pnpm-workspace.yaml` 의
+   `minimumReleaseAge` 와 `allowBuilds` 도 함께 본다)
+2. 브릿지가 기대하는 모양은 `get({key}) → {value}` · `set({key, value})` · `remove({key})`
+   세 개다. 고른 플러그인이 다르면 `packages/native/src/index.ts` 의 `secureStore()`
+   한 곳만 고친다. 없는 키에 오류를 던지는 플러그인도 받게 되어 있다
+3. iOS 는 기기에서만 쓰도록 둔다 — 키체인 접근성을 `WhenUnlockedThisDeviceOnly` 로 두면
+   백업과 기기 전송에서 빠진다. 플러그인이 그 선택지를 주는지 확인한다
+4. `pnpm --filter @shop/mobile sync` 를 돌리고, 바뀌는 추적 파일 셋을 커밋한다 —
+   `ios/App/CapApp-SPM/Package.swift`, `android/app/capacitor.build.gradle`,
+   `android/capacitor.settings.gradle`
+5. **기기나 시뮬레이터에서 한 번 확인한다.** 로그인 → 앱 종료 → 다시 켜기로 로그인이
+   유지되는지, 그리고 옛 판에서 올라온 경우(Preferences 에 토큰이 있는 상태)도 한 번.
+   여기는 게이트가 봐 주지 않는다 — 게이트는 앱을 빌드하지 않는다
+
 ## 딥링크를 실제로 켜려면
 
 파일은 다 들어 있지만 **사람이 넣어야 하는 값이 둘** 남아 있다. 둘 다 없으면
