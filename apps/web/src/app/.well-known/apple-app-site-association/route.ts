@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { APP_ID, appleTeamId } from '~/lib/deep-link';
+import { APP_ID, appleTeamId, DEEP_LINK_PATHS, DEEP_LINK_BLOCKED } from '~/lib/deep-link';
 
 /**
  * iOS 유니버설 링크.
@@ -25,17 +25,16 @@ export function GET(): NextResponse {
             /*
              * 앱으로 보낼 주소와 보내지 않을 주소.
              *
-             * 결제창은 앱으로 가로채면 안 된다 — 결제사가 돌려보내는
-             * 주소까지 앱이 먹으면 승인 흐름이 끊긴다. 인증 창구도 같다.
+             * **막을 것을 먼저 적는다.** 애플은 위에서부터 보다가 처음
+             * 맞는 것에서 멈추므로, 순서가 뒤집히면 `/checkout/...` 이
+             * `/` 에 걸려 앱으로 가 버린다.
+             *
+             * 목록은 `~/lib/deep-link` 가 쥔다 — 같은 규칙을 안드로이드
+             * manifest 도 적어야 하고, 둘을 맞춰 보는 검사가 거기 있다.
              */
             components: [
-              { '/': '/api/*', exclude: true },
-              { '/': '/checkout/*', exclude: true },
-              { '/': '/product/*' },
-              { '/': '/category/*' },
-              { '/': '/brand/*' },
-              { '/': '/collection/*' },
-              { '/': '/' },
+              ...DEEP_LINK_BLOCKED.map((path) => ({ '/': `${path}*`, exclude: true })),
+              ...DEEP_LINK_PATHS.map((path) => ({ '/': path === '/' ? '/' : `${path}*` })),
             ],
           },
         ],

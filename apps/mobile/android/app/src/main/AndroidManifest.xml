@@ -33,13 +33,30 @@
 
                 지문이 안 맞거나 파일이 없으면 조용히 브라우저로 간다.
                 호스트는 capacitor.config 의 PRODUCTION_URL 과 같아야 하고,
-                apps/web 의 검사가 그것을 지킨다.
+                apps/web/test/app-links.test.ts 가 그것을 지킨다.
+
+                **길을 적지 않으면 그 도메인의 모든 주소를 이 앱이 가져간다.**
+                그래서 iOS 쪽 문서에만 있던 규칙이 여기서는 빠져 있었다 —
+                결제사가 돌려보내는 주소와 /api/auth/... 로 돌아오는 소셜
+                로그인 응답까지 앱이 먹는다. 그걸 받으면 셸은 라우터 이동으로
+                바꾸는데(components/native-deep-link.tsx), 그 길에는 화면이
+                없고 쿠키도 안 구워진다. 로그인이 끝나지 않는 것으로 보인다.
+
+                받을 길은 apps/web 의 ~/lib/deep-link 가 쥔다. 여기에 손으로
+                옮겨 적는 것은 안드로이드가 설정 파일을 안 읽기 때문이고,
+                같은 검사가 두 목록을 맞춰 본다. 호스트를 줄마다 다시 적는
+                것은 <data> 를 섞어 적었을 때의 짝짓기 규칙에 기대지 않기
+                위해서다 — 잘못 걸리면 앱 링크가 통째로 조용히 죽는다.
             -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" />
+                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" android:pathPrefix="/product/" />
+                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" android:pathPrefix="/category/" />
+                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" android:pathPrefix="/brand/" />
+                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" android:pathPrefix="/collection/" />
+                <data android:scheme="https" android:host="plain-shop-byjang.vercel.app" android:path="/" />
             </intent-filter>
 
         </activity>
