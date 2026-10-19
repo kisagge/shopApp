@@ -218,6 +218,86 @@ describe('기기에 남는 것', () => {
 });
 
 /**
+ * 안전 저장소 — 바깥에서 온 사실 셋을 못 박는다.
+ *
+ * 세션 토큰을 평문(`UserDefaults`·SharedPreferences)에서 키체인으로 옮겼다. 그 길은 우리
+ * 코드가 아니라 **플러그인과의 약속** 위에 서 있고, 약속이 어긋나면 셋 다 조용하다.
+ *
+ * 1. 셸이 플러그인을 싣지 않으면 브릿지는 말없이 평문 자리로 돌아간다(그게 설계다)
+ * 2. 등록 이름이 다르면 브릿지가 영원히 못 찾는다 — 역시 평문 자리로 돌아간다
+ * 3. 키체인 접근성 숫자가 틀리면 **동작은 멀쩡한데 백업으로 토큰이 새 기기에 따라간다**
+ *
+ * 셋 중 어느 것도 화면에 나타나지 않는다. 그래서 여기서 본다.
+ */
+describe('안전 저장소', () => {
+  const PLUGIN = '@aparajita/capacitor-secure-storage';
+  const installed = (...parts: string[]) =>
+    read(join(ROOT, 'apps', 'mobile', 'node_modules', ...PLUGIN.split('/'), ...parts));
+  const bridgeSource = () => read(join(ROOT, 'packages', 'native', 'src', 'index.ts'));
+
+  it('셸이 플러그인을 싣는다', () => {
+    const manifest = JSON.parse(read(join(ROOT, 'apps', 'mobile', 'package.json'))) as {
+      dependencies: Record<string, string>;
+    };
+    // 판을 정확히 박는다 — 이 저장소의 방식이고, 바뀌면 아래 숫자도 다시 봐야 한다
+    expect(manifest.dependencies[PLUGIN]).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('브릿지가 찾는 이름으로 등록된다', () => {
+    // 플러그인이 스스로 붙이는 이름이다. 우리가 고를 수 없고, 다르면 못 찾는다.
+    expect(installed('dist', 'esm', 'index.js')).toContain("registerPlugin('SecureStorage'");
+    expect(bridgeSource()).toContain('Plugins?.SecureStorage');
+  });
+
+  it('이 기기에서만 쓰는 접근성 값을 쓴다', () => {
+    /*
+     * **여기가 틀려도 앱은 잘 돈다.** 로그인도 되고 재실행에도 유지된다 — 다만 암호화 백업
+     * 으로 토큰이 새 기기에 따라간다. 자리를 옮긴 뜻이 반만 남는 것이고, 기기를 둘 꺼내
+     * 복원해 보기 전에는 알 수가 없다.
+     *
+     * 열거형을 들여오려면 패키지를 import 해야 해서(브릿지는 의존성 0개다) 숫자로 적는다.
+     * 그 숫자를 설치된 타입 선언에서 읽어 와 맞춘다.
+     */
+    const declared = /whenUnlockedThisDeviceOnly = (\d+)/.exec(installed('dist', 'esm', 'definitions.d.ts'));
+    expect(declared, '플러그인이 그 선택지를 더 이상 주지 않는다').not.toBeNull();
+
+    const used = /const KEYCHAIN_THIS_DEVICE_ONLY = (\d+);/.exec(bridgeSource());
+    expect(used, '브릿지가 그 값을 쓰지 않는다').not.toBeNull();
+    expect(used![1]).toBe(declared![1]);
+  });
+
+  it('iCloud 키체인으로 내보내지 않는다', () => {
+    // 동기화를 켜면 같은 계정의 다른 기기에서 토큰이 되살아난다
+    expect(bridgeSource()).toContain('const NO_ICLOUD_SYNC = false');
+  });
+
+  it('네이티브 프로젝트 셋에 등록돼 있다', () => {
+    /*
+     * `cap sync` 가 쓰는 파일들이다. 의존성만 올리고 sync 를 안 돌리면 **웹은 플러그인이
+     * 있다고 믿는데 앱에는 없는** 상태가 된다 — 브릿지가 못 찾아 평문 자리로 돌아가므로
+     * 오류 하나 없이 조용히 예전으로 간다.
+     */
+    expect(read(join(ROOT, 'apps', 'mobile', 'ios', 'App', 'CapApp-SPM', 'Package.swift')))
+      .toContain('AparajitaCapacitorSecureStorage');
+    for (const file of [
+      ['android', 'app', 'capacitor.build.gradle'],
+      ['android', 'capacitor.settings.gradle'],
+    ]) {
+      expect(read(join(ROOT, 'apps', 'mobile', ...file)), file.join('/'))
+        .toContain('aparajita-capacitor-secure-storage');
+    }
+  });
+
+  it('평문 자리도 아직 쓴다 — 옮기고 지우기 위해서다', () => {
+    /*
+     * 이미 로그인해 둔 사람의 토큰이 거기 있다. 평문 쪽을 통째로 지우면 그 사람들은 플러그인
+     * 이 실린 날 로그아웃되고 사본은 남는다.
+     */
+    expect(bridgeSource()).toContain('Plugins?.Preferences');
+  });
+});
+
+/**
  * iOS 에서 가장자리를 밀어 뒤로 가기.
  *
  * **시뮬레이터에서 아무 일도 안 했다.** 상품 상세를 열고 왼쪽 끝에서 밀어도

@@ -24,10 +24,11 @@ function installBridge(over: Record<string, unknown> = {}) {
 
 /** 셸이 안전 저장소까지 실어 준 경우 */
 function installWithSecure() {
+  // 실제 플러그인 모양 — getItem/set/removeItem, set 은 위치 인자 다섯
   const secure = {
-    get: vi.fn(async () => ({ value: null as string | null })),
-    set: vi.fn(async () => {}),
-    remove: vi.fn(async () => {}),
+    getItem: vi.fn(async (_key: string) => null as string | null),
+    set: vi.fn(async (..._args: unknown[]) => {}),
+    removeItem: vi.fn(async (_key: string) => {}),
   };
   const prefs = installBridge();
   (window as unknown as { Capacitor: { Plugins: Record<string, unknown> } }).Capacitor.Plugins['SecureStorage'] = secure;
@@ -152,7 +153,8 @@ describe('토큰 — 안전 저장소', () => {
 
     await saveSessionToken('t-1');
 
-    expect(secure.set).toHaveBeenCalledWith({ key: 'shop.session-token', value: 't-1' });
+    // (키, 값, 날짜변환, iCloud동기화, 키체인접근성) — 뒤의 셋을 기본값에 맡기지 않는다
+    expect(secure.set).toHaveBeenCalledWith('shop.session-token', 't-1', false, false, 1);
     expect(prefs.set).not.toHaveBeenCalled();
     // 옛 판에서 온 사본이 있을 수 있다 — 쓰는 길에서 함께 치운다
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
@@ -178,7 +180,7 @@ describe('토큰 — 안전 저장소', () => {
     await hydrateSessionToken();
 
     expect(sessionToken()).toBe('t-옛자리');
-    expect(secure.set).toHaveBeenCalledWith({ key: 'shop.session-token', value: 't-옛자리' });
+    expect(secure.set).toHaveBeenCalledWith('shop.session-token', 't-옛자리', false, false, 1);
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
   });
 
@@ -196,7 +198,7 @@ describe('토큰 — 안전 저장소', () => {
 
   it('안전 저장소에 있으면 옛 자리를 들여다보지 않는다', async () => {
     const { prefs, secure } = installWithSecure();
-    secure.get.mockResolvedValue({ value: 't-안전' });
+    secure.getItem.mockResolvedValue('t-안전');
 
     await hydrateSessionToken();
 
@@ -204,13 +206,13 @@ describe('토큰 — 안전 저장소', () => {
     expect(prefs.get).not.toHaveBeenCalled();
   });
 
-  it('없는 키에 오류를 던지는 플러그인도 받는다', async () => {
+  it('읽기가 던져도 이관은 돈다', async () => {
     /*
-     * 키체인 API 가 그렇게 생겼고, 감싸는 플러그인들도 대개 그대로 던진다. 그것을 고장으로
-     * 읽으면 이관이 아예 안 돌아, 옛 사람들이 켤 때마다 로그아웃된다.
+     * 지금 플러그인은 없는 키에 null 을 주지만 키체인이 잠겨 읽히지 않는 경우가 있다.
+     * 그것을 고장으로 읽고 멈추면 옛 사람들이 켤 때마다 로그아웃된다.
      */
     const { prefs, secure } = installWithSecure();
-    secure.get.mockRejectedValue(new Error('item not found'));
+    secure.getItem.mockRejectedValue(new Error('키체인 잠김'));
     prefs.get.mockResolvedValue({ value: 't-옛자리' });
 
     await hydrateSessionToken();
@@ -228,13 +230,13 @@ describe('토큰 — 안전 저장소', () => {
 
     await clearSessionToken();
 
-    expect(secure.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+    expect(secure.removeItem).toHaveBeenCalledWith('shop.session-token');
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
   });
 
   it('한쪽 삭제가 실패해도 다른 쪽은 지운다', async () => {
     const { prefs, secure } = installWithSecure();
-    secure.remove.mockRejectedValue(new Error('키체인 잠김'));
+    secure.removeItem.mockRejectedValue(new Error('키체인 잠김'));
 
     await clearSessionToken();
 

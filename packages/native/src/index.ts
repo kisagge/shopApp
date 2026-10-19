@@ -23,7 +23,8 @@ interface CapacitorBridge {
       remove(options: { key: string }): Promise<void>;
     };
     /**
-     * 안전 저장소 — iOS 키체인, 안드로이드 EncryptedSharedPreferences.
+     * 안전 저장소 — iOS 키체인, 안드로이드 KeyStore 로 암호화한 SharedPreferences.
+     * (`@aparajita/capacitor-secure-storage`, 셸이 `SecureStorage` 이름으로 싣는다)
      *
      * **Preferences 는 평문이다.** iOS 에서는 `UserDefaults.standard`(플러그인 소스에
      * 그렇게 적혀 있다)라 앱 백업에 그대로 딸려 가고, 그 안에 든 것이 세션 토큰 —
@@ -31,16 +32,26 @@ interface CapacitorBridge {
      * 여전히 평문이다. iOS 에는 백업에서 빼는 스위치가 아예 없어서 자리를 옮기는 것
      * 말고는 길이 없다.
      *
-     * **셸이 아직 이 플러그인을 싣지 않는다.** 여기 분기를 먼저 둔 까닭은, 플러그인을
-     * 붙이는 일은 네이티브 프로젝트를 건드리고 기기에서 한 번 확인해야 하는 일이라
-     * 따로 떼어 놓은 것이다 — 그동안 동작은 지금과 똑같다(없으면 Preferences 를 쓴다).
-     * 플러그인을 고를 때 이 모양에 맞춰 싣는다. 모양이 다르면 `secureStore()` 한 곳만
-     * 고치면 된다.
+     * 여기 적는 것은 **우리가 쓰는 세 메서드뿐**이다. 패키지를 import 하면 이 꾸러미의
+     * "의존성 0개" 가 깨지고, 브라우저로 들어온 사람에게까지 그 코드가 나간다.
      */
     SecureStorage?: {
-      get(options: { key: string }): Promise<{ value: string | null }>;
-      set(options: { key: string; value: string }): Promise<void>;
-      remove(options: { key: string }): Promise<void>;
+      /** 없으면 null 을 준다. 정말 고장일 때만 던진다. */
+      getItem(key: string): Promise<string | null>;
+      /**
+       * `(키, 값, 날짜변환, iCloud동기화, 키체인접근성)`.
+       *
+       * 뒤의 셋을 다 넘긴다 — 기본값에 기대면 전역 설정(`setSynchronize`,
+       * `setDefaultKeychainAccess`)을 누가 바꾸는 날 조용히 달라진다.
+       */
+      set(
+        key: string,
+        data: string,
+        convertDate?: boolean,
+        sync?: boolean,
+        access?: number,
+      ): Promise<void>;
+      removeItem(key: string): Promise<void>;
     };
     /**
      * @capgo/capacitor-social-login. 셸이 등록해 주는 것만 쓴다.
@@ -293,26 +304,44 @@ const plainStore = (): TokenStore | null => {
 /**
  * 안전 저장소. 셸이 싣지 않았으면 null.
  *
- * **없는 키를 오류로 알리는 플러그인이 많다.** 키체인 API 가 그렇게 생겼고, 감싸는
- * 플러그인들도 대개 그대로 던진다. 여기서는 "없음" 과 "고장" 을 가리지 않고 없음으로
- * 본다 — 가린다고 할 수 있는 일이 다르지 않고(둘 다 로그인 화면이다), 가리려 들면
- * 플러그인마다 다른 오류 모양에 코드가 매인다.
+ * 지금 플러그인은 없는 키에 null 을 주지만, **고장도 없음으로 본다.** 키체인이 잠겨
+ * 읽히지 않는 경우가 있고, 그때 할 수 있는 일이 다르지 않다 — 둘 다 로그인 화면이다.
+ * 가리려 들면 플러그인마다 다른 오류 모양에 코드가 매인다.
  */
+/**
+ * 이 기기에서만, 잠금이 풀린 동안만.
+ *
+ * `KeychainAccess.whenUnlockedThisDeviceOnly` — 이 속성이 붙은 항목은 **암호화 백업으로도
+ * 새 기기에 따라가지 않는다.** 기본값(`whenUnlocked`)은 따라가고, 그러면 자리를 옮긴 뜻이
+ * 반만 남는다. 백업에서 토큰이 복원되는 것을 막는 것이 이 작업의 요점이었다.
+ *
+ * 숫자로 적는 까닭은 열거형을 들여오려면 패키지를 import 해야 하기 때문이다(의존성 0개).
+ * 그 숫자가 맞는지는 설치된 타입 선언을 읽어서 확인한다 —
+ * `apps/web/test/native-shell-config.test.ts` 의 '안전 저장소' 가 그 일을 한다.
+ */
+const KEYCHAIN_THIS_DEVICE_ONLY = 1;
+
+/** iCloud 키체인으로 내보내지 않는다 — 다른 기기에서 되살아나면 안 된다 */
+const NO_ICLOUD_SYNC = false;
+
 const secureStore = (): TokenStore | null => {
   const plugin = bridge()?.Plugins?.SecureStorage;
   if (!plugin) return null;
   return {
     get: async () => {
       try {
-        return (await plugin.get({ key: TOKEN_KEY })).value ?? null;
+        return await plugin.getItem(TOKEN_KEY);
       } catch {
         return null;
       }
     },
-    set: async (value) => { await plugin.set({ key: TOKEN_KEY, value }); },
+    set: async (value) => {
+      // 날짜 변환은 끈다 — 우리가 넣는 것은 토큰 글자이고, 날짜처럼 보일 이유가 없다
+      await plugin.set(TOKEN_KEY, value, false, NO_ICLOUD_SYNC, KEYCHAIN_THIS_DEVICE_ONLY);
+    },
     remove: async () => {
       try {
-        await plugin.remove({ key: TOKEN_KEY });
+        await plugin.removeItem(TOKEN_KEY);
       } catch {
         // 없는 것을 지우라는 요청은 이룬 셈이다
       }
