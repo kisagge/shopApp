@@ -9,6 +9,8 @@ import { requireAdmin } from '~/lib/admin/guard';
 import { getMerchants } from '~/lib/queries/admin/merchants';
 import { MerchantStatusForm } from './status-form';
 import { adminDate } from '~/lib/admin/date-format';
+// 주소를 손으로 적으면 알림과 폼이 서로 다른 화면으로 보낸다 — 한 곳에서 만든다
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 
 export const metadata: Metadata = { title: '가맹점' };
 export const dynamic = 'force-dynamic';
@@ -122,7 +124,7 @@ export default async function AdminMerchantsPage() {
                       )}
                       {canEditReturnAddress(actor, m.id) && (
                         <Link
-                          href={`/admin/merchants/${m.id}/return-address`}
+                          href={returnAddressPath(m.id) as never}
                           aria-label={`${m.name} 반품지 ${m.hasReturnAddress ? '수정' : '등록'}`}
                           className="mt-1 block text-[12px] underline underline-offset-2"
                         >

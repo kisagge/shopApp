@@ -8,6 +8,8 @@ import { getReturnQueue, isReturnQueueView, RETURN_QUEUE_VIEW, type ReturnQueueV
 import { RETURN_REASON_KEY, RETURN_TYPE_KEY } from '~/lib/i18n/enum-labels';
 import { getT } from '~/lib/i18n/server';
 import { getReturnAddress } from '~/lib/orders/return-address';
+// 주소를 손으로 적으면 알림과 폼이 서로 다른 화면으로 보낸다 — 한 곳에서 만든다
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 import { PageNav } from '~/components/page-nav';
 import { PAGE_SIZE } from '~/lib/queries/admin/scope';
 
@@ -79,7 +81,7 @@ export default async function AdminReturnsPage({
         {actor.merchantId && !myReturnAddress && (
           <p className="rounded-sm bg-[var(--accent-soft)] px-4 py-3 text-[13px] leading-relaxed text-accent">
             반품지를 등록하지 않아 신청을 승인할 수 없습니다.{' '}
-            <Link href={`/admin/merchants/${actor.merchantId}/return-address`} className="underline underline-offset-2">
+            <Link href={returnAddressPath(actor.merchantId) as never} className="underline underline-offset-2">
               반품지 등록하기
             </Link>
           </p>

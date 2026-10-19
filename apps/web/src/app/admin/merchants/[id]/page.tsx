@@ -12,6 +12,8 @@ import { getAuditLogs } from '~/lib/queries/audit-log';
 import { actionLabel } from '~/lib/admin/audit-labels';
 import { MerchantStatusForm } from '../status-form';
 import { adminDate, adminDateTime } from '~/lib/admin/date-format';
+// 주소를 손으로 적으면 알림과 폼이 서로 다른 화면으로 보낸다 — 한 곳에서 만든다
+import { returnAddressPath } from '~/lib/admin/return-address-path';
 
 export const metadata: Metadata = { title: '가맹점 상세' };
 export const dynamic = 'force-dynamic';
@@ -197,7 +199,7 @@ export default async function MerchantDetailPage({ params }: { params: Promise<{
 
           <div className="mt-4 flex flex-wrap gap-3 text-[13px]">
             {canEditReturnAddress(actor, merchant.id) && (
-              <Link href={`/admin/merchants/${merchant.id}/return-address`} className="underline">
+              <Link href={returnAddressPath(merchant.id) as never} className="underline">
                 반품지
               </Link>
             )}
