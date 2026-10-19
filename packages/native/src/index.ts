@@ -34,24 +34,33 @@ interface CapacitorBridge {
      *
      * 여기 적는 것은 **우리가 쓰는 세 메서드뿐**이다. 패키지를 import 하면 이 꾸러미의
      * "의존성 0개" 가 깨지고, 브라우저로 들어온 사람에게까지 그 코드가 나간다.
+     *
+     * **셸이 주입하는 것은 네이티브 메서드뿐이다.** 처음에 그 패키지의 문서에 적힌
+     * `getItem`·`set`·`removeItem` 을 불렀는데, 그것들은 패키지의 **JS 층**에 있고 우리
+     * 번들에는 그 층이 없다 — `window.Capacitor.Plugins.SecureStorage` 에는 네이티브가
+     * `@PluginMethod` 로 내놓은 `internal*` 다섯 개만 있다. 그래서 호출이 조용히 실패하고
+     * 평문 자리로 돌아갔다(기기에서 확인했다). 다른 플러그인들이 멀쩡했던 것은 그쪽
+     * 네이티브 메서드 이름이 마침 문서와 같아서였을 뿐이다.
+     *
+     * 키에 붙는 접두사(`capacitor-storage_`)도 JS 층이 하던 일이라 여기서 붙인다. 같은
+     * 접두사를 쓰면 나중에 누가 패키지를 제대로 들여와도 같은 값을 찾는다.
      */
     SecureStorage?: {
-      /** 없으면 null 을 준다. 정말 고장일 때만 던진다. */
-      getItem(key: string): Promise<string | null>;
+      /** 없는 키에는 네이티브가 거절한다 — 그 거절을 없음으로 읽는다 */
+      internalGetItem(options: { prefixedKey: string; sync?: boolean }): Promise<{ data: string | null }>;
       /**
-       * `(키, 값, 날짜변환, iCloud동기화, 키체인접근성)`.
+       * `access` 는 키체인 접근성(iOS), `sync` 는 iCloud 동기화다.
        *
-       * 뒤의 셋을 다 넘긴다 — 기본값에 기대면 전역 설정(`setSynchronize`,
-       * `setDefaultKeychainAccess`)을 누가 바꾸는 날 조용히 달라진다.
+       * 둘을 명시로 넘긴다 — 기본값은 패키지의 JS 층이 들고 있는 값이고, 그 층은 우리
+       * 번들에 없다. 즉 넘기지 않으면 네이티브의 기본값에 맡기는 셈이 된다.
        */
-      set(
-        key: string,
-        data: string,
-        convertDate?: boolean,
-        sync?: boolean,
-        access?: number,
-      ): Promise<void>;
-      removeItem(key: string): Promise<void>;
+      internalSetItem(options: {
+        prefixedKey: string;
+        data: string;
+        sync?: boolean;
+        access?: number;
+      }): Promise<void>;
+      internalRemoveItem(options: { prefixedKey: string; sync?: boolean }): Promise<{ success: boolean }>;
     };
     /**
      * @capgo/capacitor-social-login. 셸이 등록해 주는 것만 쓴다.
@@ -324,24 +333,38 @@ const KEYCHAIN_THIS_DEVICE_ONLY = 1;
 /** iCloud 키체인으로 내보내지 않는다 — 다른 기기에서 되살아나면 안 된다 */
 const NO_ICLOUD_SYNC = false;
 
+/**
+ * 안전 저장소의 키.
+ *
+ * 패키지의 JS 층이 모든 키에 붙이는 접두사다(`capacitor-storage_`). 그 층은 우리 번들에
+ * 없으니 여기서 붙인다 — 같은 접두사를 쓰면 나중에 누가 패키지를 제대로 들여와도 같은
+ * 값을 찾는다.
+ */
+const SECURE_KEY = `capacitor-storage_${TOKEN_KEY}`;
+
 const secureStore = (): TokenStore | null => {
   const plugin = bridge()?.Plugins?.SecureStorage;
   if (!plugin) return null;
   return {
     get: async () => {
       try {
-        return await plugin.getItem(TOKEN_KEY);
+        return (await plugin.internalGetItem({ prefixedKey: SECURE_KEY, sync: NO_ICLOUD_SYNC })).data;
       } catch {
         return null;
       }
     },
     set: async (value) => {
-      // 날짜 변환은 끈다 — 우리가 넣는 것은 토큰 글자이고, 날짜처럼 보일 이유가 없다
-      await plugin.set(TOKEN_KEY, value, false, NO_ICLOUD_SYNC, KEYCHAIN_THIS_DEVICE_ONLY);
+      await plugin.internalSetItem({
+        prefixedKey: SECURE_KEY,
+        // 글자를 그대로 넣는다 — 패키지의 `setItem` 도 이 자리에 날것을 넣는다
+        data: value,
+        sync: NO_ICLOUD_SYNC,
+        access: KEYCHAIN_THIS_DEVICE_ONLY,
+      });
     },
     remove: async () => {
       try {
-        await plugin.removeItem(TOKEN_KEY);
+        await plugin.internalRemoveItem({ prefixedKey: SECURE_KEY, sync: NO_ICLOUD_SYNC });
       } catch {
         // 없는 것을 지우라는 요청은 이룬 셈이다
       }

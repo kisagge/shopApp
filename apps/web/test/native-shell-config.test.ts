@@ -288,6 +288,59 @@ describe('안전 저장소', () => {
     }
   });
 
+  it('셸이 실제로 내놓는 메서드를 부른다', () => {
+    /*
+     * **기기에 넣어 보고 나서야 알았다.** 패키지 문서의 `getItem`·`set`·`removeItem` 은
+     * 그 패키지의 **JS 층**에 있고, 우리 번들에는 그 층이 없다(브릿지는 의존성 0개다).
+     * 셸이 웹뷰에 주입하는 것은 네이티브가 `@PluginMethod` 로 내놓은 `internal*` 뿐이다.
+     *
+     * 없는 함수를 부르면 우리 try/catch 가 삼키고 **평문 자리로 되돌아간다** — 로그인은
+     * 그대로 되므로 눌러 보는 것으로는 알 수 없다. 실제로 그랬고, 기기의 평문 파일에
+     * 토큰 키가 그대로 남아 있는 것으로 드러났다.
+     *
+     * 다른 플러그인들이 멀쩡했던 것은 그쪽 네이티브 이름이 마침 문서와 같아서였다.
+     */
+    const android = read(
+      join(ROOT, 'apps', 'mobile', 'node_modules', PLUGIN.split('/')[0]!, PLUGIN.split('/')[1]!,
+        'android', 'src', 'main', 'java', 'com', 'aparajita', 'capacitor', 'securestorage', 'SecureStorage.java'),
+    );
+    const bridge = bridgeSource();
+
+    /*
+     * 안전 저장소를 감싸는 자리만 본다. 평문 쪽(`plainStore`)은 Capacitor Preferences 를
+     * 쓰는데 그쪽 네이티브 이름은 마침 `get`·`set`·`remove` 다 — 파일 전체를 보면 그것이
+     * 걸려서, 고장이 아닌 곳에서 진다(처음에 그렇게 졌다).
+     */
+    const body = /const secureStore = \(\)[\s\S]*?\n\};/.exec(bridge)?.[0] ?? '';
+    expect(body, 'secureStore 를 못 찾았다').not.toBe('');
+
+    for (const method of ['internalGetItem', 'internalSetItem', 'internalRemoveItem']) {
+      expect(android, `네이티브가 ${method} 를 더 이상 내놓지 않는다`).toContain(method);
+      expect(body, `브릿지가 ${method} 를 부르지 않는다`).toContain(`plugin.${method}(`);
+    }
+    // JS 층의 이름을 다시 부르면 조용히 평문으로 돌아간다
+    for (const sugar of ['plugin.getItem(', 'plugin.set(', 'plugin.removeItem(']) {
+      expect(body, `${sugar} 는 웹 번들에 없는 층이다`).not.toContain(sugar);
+    }
+  });
+
+  it('키 접두사가 패키지가 쓰는 것과 같다', () => {
+    /*
+     * 접두사도 JS 층이 하던 일이다. 다른 접두사를 쓰면 저장은 되지만 나중에 누가 패키지를
+     * 제대로 들여왔을 때 **같은 값을 못 찾는다** — 그때도 조용히 로그아웃으로 보인다.
+     */
+    const base = read(
+      join(ROOT, 'apps', 'mobile', 'node_modules', PLUGIN.split('/')[0]!, PLUGIN.split('/')[1]!,
+        'dist', 'esm', 'base.js'),
+    );
+    const declared = /this\.prefix = '([^']+)'/.exec(base);
+    expect(declared, '패키지가 접두사를 더 이상 그렇게 두지 않는다').not.toBeNull();
+
+    const used = /const SECURE_KEY = `([^$]*)\$\{TOKEN_KEY\}`/.exec(bridgeSource());
+    expect(used, '브릿지가 접두사를 붙이지 않는다').not.toBeNull();
+    expect(used![1]).toBe(declared![1]);
+  });
+
   it('평문 자리도 아직 쓴다 — 옮기고 지우기 위해서다', () => {
     /*
      * 이미 로그인해 둔 사람의 토큰이 거기 있다. 평문 쪽을 통째로 지우면 그 사람들은 플러그인

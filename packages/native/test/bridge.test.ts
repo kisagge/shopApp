@@ -24,11 +24,14 @@ function installBridge(over: Record<string, unknown> = {}) {
 
 /** 셸이 안전 저장소까지 실어 준 경우 */
 function installWithSecure() {
-  // 실제 플러그인 모양 — getItem/set/removeItem, set 은 위치 인자 다섯
+  /*
+   * **셸이 주입하는 것은 네이티브 메서드뿐이다.** 패키지 문서의 `getItem`·`set` 은 JS 층에
+   * 있고 우리 번들에는 그 층이 없다 — 처음에 그것을 불렀다가 기기에서 조용히 실패했다.
+   */
   const secure = {
-    getItem: vi.fn(async (_key: string) => null as string | null),
-    set: vi.fn(async (..._args: unknown[]) => {}),
-    removeItem: vi.fn(async (_key: string) => {}),
+    internalGetItem: vi.fn(async (_o: { prefixedKey: string }) => ({ data: null as string | null })),
+    internalSetItem: vi.fn(async (_o: Record<string, unknown>) => {}),
+    internalRemoveItem: vi.fn(async (_o: { prefixedKey: string }) => ({ success: true })),
   };
   const prefs = installBridge();
   (window as unknown as { Capacitor: { Plugins: Record<string, unknown> } }).Capacitor.Plugins['SecureStorage'] = secure;
@@ -153,8 +156,10 @@ describe('토큰 — 안전 저장소', () => {
 
     await saveSessionToken('t-1');
 
-    // (키, 값, 날짜변환, iCloud동기화, 키체인접근성) — 뒤의 셋을 기본값에 맡기지 않는다
-    expect(secure.set).toHaveBeenCalledWith('shop.session-token', 't-1', false, false, 1);
+    // 접두사는 JS 층이 하던 일이다. 동기화·접근성은 기본값에 맡기지 않는다.
+    expect(secure.internalSetItem).toHaveBeenCalledWith({
+      prefixedKey: 'capacitor-storage_shop.session-token', data: 't-1', sync: false, access: 1,
+    });
     expect(prefs.set).not.toHaveBeenCalled();
     // 옛 판에서 온 사본이 있을 수 있다 — 쓰는 길에서 함께 치운다
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
@@ -180,7 +185,9 @@ describe('토큰 — 안전 저장소', () => {
     await hydrateSessionToken();
 
     expect(sessionToken()).toBe('t-옛자리');
-    expect(secure.set).toHaveBeenCalledWith('shop.session-token', 't-옛자리', false, false, 1);
+    expect(secure.internalSetItem).toHaveBeenCalledWith({
+      prefixedKey: 'capacitor-storage_shop.session-token', data: 't-옛자리', sync: false, access: 1,
+    });
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
   });
 
@@ -188,7 +195,7 @@ describe('토큰 — 안전 저장소', () => {
     // 지우고 나서 쓰다 실패하면 토큰이 어디에도 없게 된다. 순서가 뜻이다.
     const { prefs, secure } = installWithSecure();
     prefs.get.mockResolvedValue({ value: 't-옛자리' });
-    secure.set.mockRejectedValue(new Error('키체인 잠김'));
+    secure.internalSetItem.mockRejectedValue(new Error('키체인 잠김'));
 
     await hydrateSessionToken();
 
@@ -198,7 +205,7 @@ describe('토큰 — 안전 저장소', () => {
 
   it('안전 저장소에 있으면 옛 자리를 들여다보지 않는다', async () => {
     const { prefs, secure } = installWithSecure();
-    secure.getItem.mockResolvedValue('t-안전');
+    secure.internalGetItem.mockResolvedValue({ data: 't-안전' });
 
     await hydrateSessionToken();
 
@@ -212,13 +219,13 @@ describe('토큰 — 안전 저장소', () => {
      * 그것을 고장으로 읽고 멈추면 옛 사람들이 켤 때마다 로그아웃된다.
      */
     const { prefs, secure } = installWithSecure();
-    secure.getItem.mockRejectedValue(new Error('키체인 잠김'));
+    secure.internalGetItem.mockRejectedValue(new Error('키체인 잠김'));
     prefs.get.mockResolvedValue({ value: 't-옛자리' });
 
     await hydrateSessionToken();
 
     expect(sessionToken()).toBe('t-옛자리');
-    expect(secure.set).toHaveBeenCalled();
+    expect(secure.internalSetItem).toHaveBeenCalled();
   });
 
   it('로그아웃하면 두 자리를 다 지운다', async () => {
@@ -230,13 +237,32 @@ describe('토큰 — 안전 저장소', () => {
 
     await clearSessionToken();
 
-    expect(secure.removeItem).toHaveBeenCalledWith('shop.session-token');
+    expect(secure.internalRemoveItem).toHaveBeenCalledWith({ prefixedKey: 'capacitor-storage_shop.session-token', sync: false });
     expect(prefs.remove).toHaveBeenCalledWith({ key: 'shop.session-token' });
+  });
+
+  it('패키지 문서의 이름이 아니라 네이티브 메서드를 부른다', async () => {
+    /*
+     * **기기에서 이것 때문에 한 번 조용히 실패했다.** 문서의 `getItem`·`set`·`removeItem`
+     * 은 패키지의 JS 층에 있고, 셸이 웹뷰에 주입하는 것은 네이티브가 내놓은 `internal*`
+     * 뿐이다. 없는 함수를 부르면 우리 try/catch 가 삼켜서 평문 자리로 되돌아간다 —
+     * 로그인은 되므로 눌러 보는 것만으로는 알 수 없다.
+     */
+    const { secure } = installWithSecure();
+    const asRecord = secure as unknown as Record<string, unknown>;
+    expect(asRecord['getItem']).toBeUndefined();
+    expect(asRecord['set']).toBeUndefined();
+
+    await saveSessionToken('t-1');
+    await clearSessionToken();
+
+    expect(secure.internalSetItem).toHaveBeenCalled();
+    expect(secure.internalRemoveItem).toHaveBeenCalled();
   });
 
   it('한쪽 삭제가 실패해도 다른 쪽은 지운다', async () => {
     const { prefs, secure } = installWithSecure();
-    secure.removeItem.mockRejectedValue(new Error('키체인 잠김'));
+    secure.internalRemoveItem.mockRejectedValue(new Error('키체인 잠김'));
 
     await clearSessionToken();
 
