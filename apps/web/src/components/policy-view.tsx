@@ -3,7 +3,7 @@ import { daysUntilEffective, POLICY_PATH, type PolicyKind } from '@shop/core';
 import { formatDate } from '@shop/i18n';
 import { RichText } from '~/components/rich-text';
 import { getLocale, getT } from '~/lib/i18n/server';
-import type { PolicyDoc, PolicyRevisionDoc } from '~/lib/policies/policy';
+import type { PolicyDoc, PolicyRevisionDoc, PolicyRevisionSummary } from '~/lib/policies/policy';
 
 /**
  * 약관·개인정보처리방침 본문.
@@ -23,7 +23,8 @@ export async function PolicyView({
 }: {
   kind: PolicyKind;
   doc: PolicyDoc | null;
-  revisions: readonly PolicyRevisionDoc[];
+  /** 날짜와 id 만 온다 — 목록은 본문을 그리지 않는다 */
+  revisions: readonly PolicyRevisionSummary[];
   /** 지난 방침을 보고 있으면 그 판. 현재 방침이면 null */
   viewing: PolicyRevisionDoc | null;
 }) {

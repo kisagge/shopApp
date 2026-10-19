@@ -28,6 +28,19 @@ export interface PolicyRevisionDoc extends Omit<PolicyDoc, 'updatedAt'> {
   readonly replacedAt: Date;
 }
 
+/**
+ * 목록이 그리는 것만 — 날짜 둘과 그 글로 가는 id.
+ *
+ * **목록은 본문을 쓰지 않는다.** 그런데 조회는 판마다 `body` 와 `bodyRich` 를 함께
+ * 끌어오고 있었다 — 약관 전문을, 판 수만큼, 날짜 몇 개를 그리려고. 그래서 목록에 상한이
+ * 필요해 보였고 스무 개에서 잘렸다.
+ */
+export interface PolicyRevisionSummary {
+  readonly id: string;
+  readonly effectiveAt: Date;
+  readonly replacedAt: Date;
+}
+
 const asDoc = (row: {
   kind: PolicyKind; title: string; body: string; bodyRich: unknown; effectiveAt: Date; updatedAt: Date;
 }): PolicyDoc => ({
@@ -64,23 +77,23 @@ export async function getPolicies(): Promise<PolicyDoc[]> {
   return rows.map(asDoc);
 }
 
-/** 지난 방침 목록. 최근에 바뀐 것부터 */
-export async function getPolicyRevisions(kind: PolicyKind, take = 20): Promise<PolicyRevisionDoc[]> {
-  const rows = await prisma.policyRevision.findMany({
+/**
+ * 지난 방침 목록. 최근에 바뀐 것부터, **전부**.
+ *
+ * **스무 개에서 조용히 잘렸다.** 손님 화면은 이 목록 위에 "언제 동의했는지에 따라 적용되는
+ * 글이 다릅니다" 라고 적어 두는데, 스물한 번째 판부터는 목록에 없고 "더 보기" 도 없었다.
+ * 그래서 가장 오래전에 동의한 사람 — 분쟁에서 그 글을 가장 필요로 하는 사람 — 이 자기
+ * 판을 찾을 길이 없었다. 주소로 열면(`?v=`) 보이기는 하는데, 그 주소를 알 길이 목록뿐이다.
+ *
+ * 상한이 필요해 보였던 까닭은 조회가 판마다 **약관 전문**을 함께 끌어왔기 때문이다. 목록은
+ * 날짜 둘과 id 만 그린다. 그 셋만 읽으면 이력 전체가 가벼워서 감출 이유가 없다.
+ */
+export async function getPolicyRevisions(kind: PolicyKind): Promise<PolicyRevisionSummary[]> {
+  return await prisma.policyRevision.findMany({
     where: { kind },
     orderBy: { replacedAt: 'desc' },
-    take,
-    select: { id: true, kind: true, title: true, body: true, bodyRich: true, effectiveAt: true, replacedAt: true },
+    select: { id: true, effectiveAt: true, replacedAt: true },
   });
-  return rows.map((r) => ({
-    id: r.id,
-    kind: r.kind,
-    title: r.title,
-    body: r.body,
-    bodyRich: (r.bodyRich as RichTextDoc | null) ?? null,
-    effectiveAt: r.effectiveAt,
-    replacedAt: r.replacedAt,
-  }));
 }
 
 /**
@@ -96,10 +109,10 @@ export async function getPolicyRevisions(kind: PolicyKind, take = 20): Promise<P
  * (`policyInEffect` 가 적어 둔 그 사정이다). 지난 판이 현재 방침이던 기간의 끝이
  * `replacedAt` 이므로, 그 시각이 `at` 보다 **뒤인 것들 중 가장 이른 것**이 답이다.
  *
- * **이미 불러 둔 목록에서 고르지 않는다.** `getPolicyRevisions` 는 최근 스무 개만
- * 가져오므로, 오래전에 동의한 사람을 그 목록에서 찾으면 가장 오래된 판이 답으로 나온다 —
- * 틀린 답인데 그럴듯해 보인다. 색인이 있으니(`@@index([kind, replacedAt])`) 데이터베이스에
- * 직접 묻는다.
+ * **이미 불러 둔 목록에서 고르지 않는다.** 한 가지를 묻는 데 이력 전체를 끌어와 고르면,
+ * 판이 늘수록 비용이 늘고 규칙이 두 군데로 갈린다. 색인이 있으니
+ * (`@@index([kind, replacedAt])`) 데이터베이스에 그 한 줄만 묻는다 — 이 화면은 목록을
+ * 그리는 자리가 아니라 "그때 것 하나" 를 가리키는 자리다.
  */
 export async function getPolicyInForceAt(kind: PolicyKind, at: Date): Promise<PolicyRevisionDoc | null> {
   const row = await prisma.policyRevision.findFirst({
