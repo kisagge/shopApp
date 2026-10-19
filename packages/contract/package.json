@@ -12,11 +12,11 @@
     "test": "vitest run --testTimeout=20000 --hookTimeout=60000"
   },
   "dependencies": {
+    "@shop/core": "workspace:*",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@shop/config": "workspace:*",
-    "@shop/core": "workspace:*",
     "eslint": "10.9.1",
     "typescript": "6.0.3",
     "vitest": "4.1.11"
