@@ -15,11 +15,23 @@ export const onRequestError: Instrumentation.onRequestError = async (
   context,
 ) => {
   /**
-   * 동적 임포트를 쓴다.
+   * **엣지에서는 아무것도 하지 않는다.**
    *
-   * 이 파일은 엣지 런타임에서도 불릴 수 있는데, 보고 코드는 server-only 와
-   * 노드 API 에 묶여 있다. 위에서 정적으로 가져오면 그쪽 번들이 깨진다.
+   * 보고 코드는 server-only 와 노드 API 에 묶여 있어 엣지에서는 돌 수가 없다. 그래서 동적
+   * 임포트로 미뤄 두었는데, **미루는 것만으로는 번들에서 빠지지 않았다** — 묶는 쪽은 부를
+   * 수도 있는 길을 다 싣는다. 그 결과 엣지 묶음에 Prisma 의 WASM 질의 컴파일러가
+   * base64 로 4.4MB 실렸고(`.next/server/edge/chunks/…wasm-base64…`), 빌드 로그에는
+   * "Ecmascript file had an error … Edge Instrumentation" 이 세 번 찍혔다.
+   *
+   * 이 저장소의 엣지 런타임은 `proxy.ts`(CSP nonce)가 쓰고, 그것은 **모든 요청**을
+   * 지난다. 거기 실리는 무게는 조용히 비싸다.
+   *
+   * `NEXT_RUNTIME` 은 런타임마다 빌드 때 박히는 값이라, 이 줄 하나로 엣지 묶음에서는
+   * 아래가 통째로 떨어져 나간다. 엣지에서 난 오류는 Vercel 로그에 남는다 — 여기서
+   * 삼키는 것이 아니라 애초에 이 자리가 그것을 받을 수 없다.
    */
+  if (process.env['NEXT_RUNTIME'] !== 'nodejs') return;
+
   const { reportError } = await import('~/lib/errors');
 
   await reportError({
