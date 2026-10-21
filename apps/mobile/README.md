@@ -78,14 +78,30 @@ CAP_SERVER_URL=http://192.168.0.10:3000 pnpm mobile:sync   # 내 컴퓨터를 �
 
 **Android** — Pixel 3a 에뮬레이터(API 34)에서 빌드·설치·실행까지 됐다.
 
-Android 빌드에는 **JDK 21** 이 필요하다. Capacitor 8 이 `source release 21` 로
-컴파일한다. 낮은 JDK 로는 `invalid source release: 21` 에서 멈춘다.
+Android 빌드에는 **JDK 21 이상**이 필요하다. Capacitor 8 이 `source release 21` 로
+컴파일한다. 낮은 JDK 로는 여기서 멈춘다:
+
+```
+> Task :capacitor-android:compileDebugJavaWithJavac FAILED
+error: invalid source release: 21
+```
 
 ```bash
 export JAVA_HOME=/opt/homebrew/opt/openjdk@21
 ```
 
-Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다르다.
+**JDK 21 이 안 깔려 있어도 하나는 이미 있다.** Android Studio 가 JBR 을 들고 온다 —
+이 글을 쓴 기계에는 21 이 없고 17·18·19 뿐이었는데, 번들 JBR(25)로 빌드·설치가 그대로
+됐다. Gradle 8.14.3 + AGP 8.13 이 25 를 받는다.
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+cd apps/mobile/android && ./gradlew assembleDebug
+adb -s <기기> install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다르다. `local.properties`
+(SDK 경로)는 Android Studio 가 만들고 커밋하지 않는다.
 
 ## 실행에서 찾은 것
 
@@ -131,6 +147,23 @@ Gradle 에 절대 경로를 박지 않았다 — 사람마다 JDK 위치가 다�
    생긴다) 새 빌드로 바꿔 띄운다. 로그아웃되지 않아야 한다
 4. 앱을 지우고 다시 설치. iOS 키체인 항목은 앱을 지워도 남아서 옛 토큰이 되살아날 수
    있는데, 서버가 거절하면(401) 셸이 그것을 지운다(`components/native-session.tsx`)
+
+안드로이드는 눈으로 안 보고도 볼 수 있다. 디버그 빌드라 `run-as` 가 열린다 —
+**값은 찍지 않는다. 살아 있는 자격증명이다.**
+
+```bash
+adb shell run-as test.plain.shop ls -l /data/data/test.plain.shop/shared_prefs/
+# 옮겨졌으면: CapacitorStorage.xml 은 <map/> 이고
+#             WSSecureStorageSharedPreferences.xml 이 새로 생긴다
+adb shell run-as test.plain.shop grep -c 'capacitor-storage_shop.session-token' \
+  /data/data/test.plain.shop/shared_prefs/WSSecureStorageSharedPreferences.xml
+
+adb logcat -d --pid=$(adb shell pidof test.plain.shop) | grep -i capacitor
+#   "Registering plugin instance: SecureStorage" 가 있어야 플러그인이 실린 것이다
+adb shell dumpsys package test.plain.shop | grep 'flags=\['   # ALLOW_BACKUP 이 없어야 한다
+adb shell pm get-app-links test.plain.shop                    # 1 이면 앱 링크가 걸렸다
+unzip -p app-debug.apk assets/capacitor.plugins.json          # APK 에 실린 플러그인 목록
+```
 
 ## 딥링크를 실제로 켜려면
 
