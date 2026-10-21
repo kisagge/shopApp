@@ -152,6 +152,7 @@ export const ko = {
   'product.inquiries': '상품 문의',
   'product.notFound': '상품을 찾을 수 없습니다',
   'pager.label': '쪽 이동',
+  'pager.labelOf': '{section} 쪽 이동',
   'pager.first': '첫 쪽',
   'pager.prev': '이전 쪽',
   'pager.next': '다음 쪽',

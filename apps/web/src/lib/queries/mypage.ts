@@ -2,8 +2,10 @@ import 'server-only';
 import { prisma } from '@shop/db';
 import { getEffectiveGrade } from '~/lib/grade/effective';
 import { clampToLastPage } from './paged';
+// 뱃지와 목록이 같은 조건을 봐야 숫자가 맞는다 — 조건은 목록 쪽이 쥔다
+import { reviewableWhere } from './reviews';
 import {
-  gradeProgress, won, ORDER_STATUS, offsetOf, expiringSoonAmount, pointExpirySchedule, REVIEWABLE_STATUS,
+  gradeProgress, won, ORDER_STATUS, offsetOf, expiringSoonAmount, pointExpirySchedule,
   canWriteReview,
   type Actor, type PointExpiryDay,
   type DateRange, type MemberGrade, type MyOrderSearchTerm, type OrderStatus, type Won,
@@ -69,16 +71,11 @@ export async function getMyPageSummary(actor: Actor): Promise<MyPageSummary | nu
      * **파는 사람에게는 세지 않는다.** 목록(getReviewableItems)과 같은 조건이어야
      * 숫자가 맞는데, 그 목록은 파는 사람에게 비어 있다 — 뱃지에 3 이 떠서 들어가면
      * 아무것도 없는 화면을 만난다. 취소·반품된 줄을 빼는 것도 같은 이유다.
+     *
+     * **그래서 조건을 그쪽에서 가져온다.** 같아야 한다고 적어 두고 두 벌을 따로 적어
+     * 두었던 자리다 — 한쪽만 고치는 날 뱃지와 목록이 다른 말을 한다.
      */
-    canWriteReview(actor)
-      ? prisma.orderItem.count({
-        where: {
-          order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
-          review: null,
-          canceledAt: null,
-        },
-      })
-      : 0,
+    canWriteReview(actor) ? prisma.orderItem.count({ where: reviewableWhere(userId) }) : 0,
   ]);
 
   if (!user) return null;

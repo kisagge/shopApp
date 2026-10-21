@@ -5,7 +5,9 @@ import { redirect } from 'next/navigation';
 import { TrackedLink as Link } from '~/components/tracked-link';
 import { REVIEW_REWARD, canWriteReview } from '@shop/core';
 import { formatNumber } from '@shop/i18n';
-import { getMyReviews, getReviewableItems, MY_REVIEW_PAGE_SIZE } from '~/lib/queries/reviews';
+import {
+  getMyReviews, getReviewableItems, MY_REVIEW_PAGE_SIZE, MY_REVIEWABLE_PAGE_SIZE,
+} from '~/lib/queries/reviews';
 import { PageNav, pageNavLabels } from '~/components/page-nav';
 import { ReviewForm } from './review-form';
 import { ReviewStars } from '~/components/review-stars';
@@ -29,18 +31,37 @@ const dateFormat = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium', timeZ
 export default async function MyReviewsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ saved?: string; edited?: string; earned?: string; page?: string }>;
+  searchParams: Promise<{
+    saved?: string; edited?: string; earned?: string; page?: string; writing?: string;
+  }>;
 }) {
   const user = await getViewer();
   if (!user) redirect('/login?next=/mypage/reviews');
 
   const params = await searchParams;
+  /*
+   * **목록이 둘이라 쪽도 둘이다.** 한 칸을 같이 쓰면 쓴 후기를 넘길 때 쓸 후기도 함께
+   * 넘어가 버린다 — 쓰려고 열어 둔 폼이 사라지는 자리다.
+   */
   const pageNo = Math.max(Number.parseInt(params.page ?? '1', 10) || 1, 1);
-  const [items, mine, t] = await Promise.all([
-    getReviewableItems(user),
+  const writingNo = Math.max(Number.parseInt(params.writing ?? '1', 10) || 1, 1);
+  const [writable, mine, t] = await Promise.all([
+    getReviewableItems(user, writingNo),
     getMyReviews(user.id, pageNo),
     getT(),
   ]);
+  const items = writable.items;
+
+  /** 한쪽을 넘길 때 다른 쪽은 보던 자리에 둔다 */
+  const hrefWith = (next: { page?: number; writing?: number }) => {
+    const page = next.page ?? pageNo;
+    const writing = next.writing ?? writingNo;
+    const query = {
+      ...(page === 1 ? {} : { page: String(page) }),
+      ...(writing === 1 ? {} : { writing: String(writing) }),
+    };
+    return { pathname: '/mypage/reviews' as const, ...(Object.keys(query).length === 0 ? {} : { query }) };
+  };
   // 방금 등록한 뒤 — 폼은 목록에서 빠져 사라지므로 결과는 화면이 남긴다(review-form)
   const saved = params.saved === '1';
   // 고치고 돌아온 뒤. 고친 화면은 떠나고 없으므로 여기서 말한다
@@ -85,8 +106,14 @@ export default async function MyReviewsPage({
       )}
 
       <section aria-labelledby="reviews-to-write">
+        {/*
+          **전체 수를 적는다.** 마이페이지 뱃지가 세는 수가 이 수다 — 한 쪽에 열 개씩
+          보여 주므로, 수를 안 적으면 "쓸 수 있는 후기 63" 을 누르고 들어온 사람이 열 개만
+          보고 나머지가 없어진 줄 안다.
+        */}
         <h2 id="reviews-to-write" className="mb-5 text-[15px] font-semibold">
-          {t('my.reviewToWrite')}
+          {t('my.reviewToWrite')}{' '}
+          {writable.total > 0 && <span className="tnum text-[var(--fg-muted)]">{writable.total}</span>}
         </h2>
 
         {items.length === 0 ? (
@@ -150,6 +177,18 @@ export default async function MyReviewsPage({
             ))}
           </ul>
         )}
+
+        <div className="mt-8">
+          <PageNav
+            page={writingNo}
+            total={writable.total}
+            pageSize={MY_REVIEWABLE_PAGE_SIZE}
+            /* 한 화면에 쪽 이동이 둘이다 — 이름이 같으면 낭독기에는 어느 목록의 것인지 없다 */
+            label={t('pager.labelOf', { section: t('my.reviewToWrite') })}
+            labels={pageNavLabels(t)}
+            hrefOf={(n) => hrefWith({ writing: n })}
+          />
+        </div>
       </section>
 
       <section aria-labelledby="reviews-written" className="mt-14">
@@ -220,9 +259,9 @@ export default async function MyReviewsPage({
             page={pageNo}
             total={mine.total}
             pageSize={MY_REVIEW_PAGE_SIZE}
-            label={t('pager.label')}
+            label={t('pager.labelOf', { section: t('my.reviewsWritten') })}
             labels={pageNavLabels(t)}
-            hrefOf={(n) => ({ pathname: '/mypage/reviews', ...(n === 1 ? {} : { query: { page: String(n) } }) })}
+            hrefOf={(n) => hrefWith({ page: n })}
           />
         </div>
       </section>

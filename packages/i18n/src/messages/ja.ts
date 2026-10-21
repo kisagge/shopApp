@@ -141,6 +141,7 @@ export const ja: Dictionary = {
   'product.inquiries': '商品への問い合わせ',
   'product.notFound': '商品が見つかりません',
   'pager.label': 'ページ移動',
+  'pager.labelOf': '{section}のページ移動',
   'pager.first': '最初のページ',
   'pager.prev': '前のページ',
   'pager.next': '次のページ',

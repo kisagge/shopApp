@@ -341,41 +341,80 @@ export interface ReviewableItem {
 }
 
 /**
+ * 리뷰를 쓸 수 있는 줄을 고르는 조건.
+ *
+ * **목록과 뱃지가 같은 조건을 봐야 한다.** 마이페이지는 이 수를 세어 "쓸 수 있는 후기 N" 을
+ * 적는데, 두 곳에 조건을 따로 적어 두면 어느 날 갈리고 그 숫자를 누르고 들어온 사람이 다른
+ * 목록을 만난다. 그 걱정이 `getMyPageSummary` 주석에 적혀 있었는데, 조건은 여전히 두 벌이었다.
+ */
+export const reviewableWhere = (userId: string) => ({
+  order: { userId, status: { in: [...REVIEWABLE_STATUS] } },
+  review: null,
+  /*
+   * 돈이 돌아간 줄은 산 것이 아니다. 주문은 배송완료여도 그 줄은 출고 전에 취소됐거나 받은 뒤
+   * 반품·환불됐다 — 거르지 않으면 돌려보낸 니트에 후기를 쓰게 된다.
+   */
+  canceledAt: null,
+});
+
+/**
+ * 쓸 후기 한 쪽의 줄 수.
+ *
+ * 쓴 후기(20)보다 적다 — 이쪽은 줄마다 **폼 하나**가 붙는다(별점·글·사진 올리기). 쉰 개를
+ * 한 번에 그리던 것이 상한을 두게 한 까닭이기도 하다.
+ */
+export const MY_REVIEWABLE_PAGE_SIZE = 10;
+
+/**
  * 리뷰를 쓸 수 있는 주문 항목 — 배송이 끝났고 아직 안 쓴 것.
  *
  * **파는 사람에게는 빈 목록이다.** 서버가 막는 것(assertCanReview)을 화면이 권하면,
  * 폼을 채워 보내고 나서야 403 을 본다. 목록을 비우는 김에 조회도 하지 않는다.
+ *
+ * **50개에서 잘렸고 그 뒤가 있다는 표시가 없었다.** 마이페이지 뱃지는 상한 없이 세어
+ * "쓸 수 있는 후기 63" 이라 적는데, 눌러 들어오면 50개만 있고 나머지 13개는 어디에도
+ * 없었다 — 화면이 거짓을 말하는 자리다. 바로 아래 '내가 쓴 리뷰' 는 같은 고장을 이미
+ * 고쳤는데(그 주석에 "예전에는 50건에서 잘렸고" 라고 적혀 있다) 이쪽만 남아 있었다.
  */
-export async function getReviewableItems(actor: Actor): Promise<ReviewableItem[]> {
-  if (!canWriteReview(actor)) return [];
+export async function getReviewableItems(
+  actor: Actor,
+  page = 1,
+): Promise<{ items: ReviewableItem[]; total: number }> {
+  if (!canWriteReview(actor)) return { items: [], total: 0 };
 
-  const items = await prisma.orderItem.findMany({
-    where: {
-      order: { userId: actor.id, status: { in: [...REVIEWABLE_STATUS] } },
-      review: null,
+  const where = reviewableWhere(actor.id);
+  const read = (at: number) =>
+    prisma.orderItem.findMany({
+      where,
       /*
-       * 돈이 돌아간 줄은 산 것이 아니다. 주문은 배송완료여도 그 줄은 출고 전에 취소됐거나 받은 뒤
-       * 반품·환불됐다 — 거르지 않으면 돌려보낸 니트에 후기를 쓰게 된다.
+       * **id 로 한 번 더 가른다.** 한 주문의 여러 줄은 배송완료 시각이 **같다** — 그것만으로
+       * 줄을 세우면 쪽을 넘길 때 순서가 흔들려 같은 줄이 두 쪽에 나오거나 아예 빠진다.
        */
-      canceledAt: null,
-    },
-    orderBy: { order: { deliveredAt: 'desc' } },
-    take: 50,
-    select: {
-      id: true, productName: true, brandName: true, optionLabel: true, imageUrl: true,
-      order: { select: { orderNo: true, deliveredAt: true } },
-      variant: { select: { product: { select: { slug: true } } } },
-    },
-  });
+      orderBy: [{ order: { deliveredAt: 'desc' } }, { id: 'desc' }],
+      skip: offsetOf(at, MY_REVIEWABLE_PAGE_SIZE),
+      take: MY_REVIEWABLE_PAGE_SIZE,
+      select: {
+        id: true, productName: true, brandName: true, optionLabel: true, imageUrl: true,
+        order: { select: { orderNo: true, deliveredAt: true } },
+        variant: { select: { product: { select: { slug: true } } } },
+      },
+    });
 
-  return items.map((i) => ({
-    orderItemId: i.id,
-    orderNo: i.order.orderNo,
-    productSlug: i.variant.product.slug,
-    productName: i.productName,
-    brandName: i.brandName,
-    optionLabel: i.optionLabel,
-    imageUrl: i.imageUrl,
-    deliveredAt: i.order.deliveredAt,
-  }));
+  const [first, total] = await Promise.all([read(page), prisma.orderItem.count({ where })]);
+  // 마지막 쪽을 보던 중에 그 줄들을 다 써 버리면 빈 쪽에 남는다 — 쓴 후기 쪽과 같은 손질이다
+  const items = await clampToLastPage(first, { page, pageSize: MY_REVIEWABLE_PAGE_SIZE, total }, read);
+
+  return {
+    total,
+    items: items.map((i) => ({
+      orderItemId: i.id,
+      orderNo: i.order.orderNo,
+      productSlug: i.variant.product.slug,
+      productName: i.productName,
+      brandName: i.brandName,
+      optionLabel: i.optionLabel,
+      imageUrl: i.imageUrl,
+      deliveredAt: i.order.deliveredAt,
+    })),
+  };
 }

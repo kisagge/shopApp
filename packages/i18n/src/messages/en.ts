@@ -145,6 +145,7 @@ export const en: Dictionary = {
   'product.inquiries': 'Questions',
   'product.notFound': 'Product not found',
   'pager.label': 'Pages',
+  'pager.labelOf': '{section} pages',
   'pager.first': 'First page',
   'pager.prev': 'Previous page',
   'pager.next': 'Next page',
