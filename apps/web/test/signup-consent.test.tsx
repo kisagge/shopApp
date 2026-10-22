@@ -2,6 +2,8 @@
 import { render, screen, waitFor } from './render';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { CONSENT, CONSENT_REQUIRED, REQUIRED_CONSENT } from '@shop/core';
+import { createTranslator } from '@shop/i18n/all';
 
 const push = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 const refresh = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
@@ -118,5 +120,107 @@ describe('가입 동의', () => {
     await user.click(screen.getByRole('button', { name: '가입하기' }));
 
     await waitFor(() => expect(push).toHaveBeenCalledWith('/'));
+  });
+});
+
+/**
+ * 같은 화면의 **칸과 묶음**.
+ *
+ * 위 검사들은 가입이 어떻게 흘러가는지를 본다. 여기서 보는 것은 그 앞, **동의가 성립하는
+ * 모양**이다 — 어느 칸이 필수인지 적혀 있는가, 전체 동의를 켠 뒤에도 선택을 끌 수 있는가,
+ * 못 보냈을 때 낭독기가 어느 묶음의 문제인지 아는가.
+ *
+ * 셋 다 위 검사들을 통과한 채로 깨질 수 있다. 표시를 통째로 지워도(`(필수)` 가 사라져도)
+ * 칸은 그대로 찾아지고, 선택 동의를 못 끄게 만들어도 전체 동의를 두 번 누르는 길에서는
+ * 안 드러난다.
+ *
+ * 목록은 손으로 적지 않는다 — `CONSENT` 를 돌린다. 동의 항목이 느는 날 함께 자란다.
+ */
+describe('가입 동의 — 칸과 묶음', () => {
+  const t = createTranslator('ko');
+  const label = (name: (typeof CONSENT)[number]) => new RegExp(t(`auth.consent.${name}` as const));
+  /*
+   * **이름표는 형제다.** 이 화면의 label 은 `htmlFor` 로 이어져 있어서 `closest('label')` 은
+   * 아무것도 못 찾는다(그걸로 읽으면 빈 글자가 나와 어떤 단정이든 통과한다). 입력이 들고 있는
+   * 이름표 목록을 쓴다.
+   */
+  const labelText = (name: (typeof CONSENT)[number]) =>
+    screen.getByLabelText<HTMLInputElement>(label(name)).labels?.[0]?.textContent ?? '';
+
+  it.each(CONSENT)('%s 칸이 필수인지 선택인지 적는다', (name) => {
+    /*
+     * **필수와 선택을 눈으로 가른다.** 마케팅 수신까지 묶어 "전부 동의해야 가입" 으로 받으면
+     * 그건 동의가 아니라 대가다(core 의 REQUIRED_CONSENT 가 그 선을 긋는다).
+     */
+    render(<SignUpForm />);
+
+    const mark = CONSENT_REQUIRED[name] ? '(필수)' : '(선택)';
+
+    expect(labelText(name), `${name} 칸에 ${mark} 가 없다`).toContain(mark);
+  });
+
+  it('필수는 둘, 선택은 하나다 — core 가 그은 선 그대로', () => {
+    render(<SignUpForm />);
+
+    const marks = CONSENT.map((name) => labelText(name));
+    expect(marks.filter((text) => text.includes('(필수)'))).toHaveLength(REQUIRED_CONSENT.length);
+    expect(marks.filter((text) => text.includes('(선택)'))).toHaveLength(
+      CONSENT.length - REQUIRED_CONSENT.length,
+    );
+  });
+
+  it('전체 동의를 켠 뒤에도 선택만 끌 수 있다', async () => {
+    /*
+     * **여기가 요점이다.** 끌 수 없으면 "혜택 소식을 받아야 가입되는" 꼴이고, 전체 동의라는
+     * 편의가 선택을 필수로 바꿔 버린다.
+     */
+    const user = userEvent.setup();
+    render(<SignUpForm />);
+
+    await user.click(screen.getByLabelText('전체 동의'));
+    await user.click(screen.getByLabelText(/혜택 소식/));
+
+    expect(screen.getByLabelText(/혜택 소식/)).not.toBeChecked();
+    // 끈 것은 그 칸 하나뿐이다
+    expect(screen.getByLabelText(/이용약관에 동의합니다/)).toBeChecked();
+    expect(screen.getByLabelText(/개인정보 수집/)).toBeChecked();
+    // 전부가 아니므로 전체 동의도 풀린다
+    expect(screen.getByLabelText('전체 동의')).not.toBeChecked();
+  });
+
+  it('필수만 켜면 전체 동의는 아직 꺼져 있다', async () => {
+    // 필수만 보고 판단하면 선택을 안 골랐는데도 "전부 동의" 로 보인다
+    const user = userEvent.setup();
+    render(<SignUpForm />);
+
+    await user.click(screen.getByLabelText(/이용약관에 동의합니다/));
+    await user.click(screen.getByLabelText(/개인정보 수집/));
+
+    expect(screen.getByLabelText('전체 동의')).not.toBeChecked();
+  });
+
+  it('못 보냈을 때 묶음이 그 문구를 가리킨다', async () => {
+    /*
+     * 문구가 화면 어딘가에 뜨는 것만으로는 모자라다 — 낭독기가 체크박스에 와서 "무엇이
+     * 잘못됐는지" 를 들으려면 묶음이 그 문구를 가리키고 있어야 한다.
+     */
+    const user = userEvent.setup();
+    render(<SignUpForm />);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: '가입하기' }));
+
+    const alert = await screen.findByRole('alert');
+    const group = screen.getByRole('group', { name: '약관 동의' });
+
+    expect(group).toHaveAttribute('aria-invalid', 'true');
+    expect(group.getAttribute('aria-describedby')).toBe(alert.id);
+  });
+
+  it('보내기 전에는 묶음이 아무것도 가리키지 않는다', () => {
+    render(<SignUpForm />);
+
+    const group = screen.getByRole('group', { name: '약관 동의' });
+    expect(group).not.toHaveAttribute('aria-invalid');
+    expect(group).not.toHaveAttribute('aria-describedby');
   });
 });
