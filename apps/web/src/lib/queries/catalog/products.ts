@@ -235,6 +235,62 @@ export async function getAllProductSlugs(): Promise<
   });
 }
 
+export interface CategoryBranch {
+  readonly slug: string;
+  readonly name: string;
+  /** 이 갈래로 들어가면 보이는 상품 수 — 자기 것과 자식 것을 합한다 */
+  readonly count: number;
+}
+
+export interface CategoryNode extends CategoryBranch {
+  readonly children: readonly CategoryBranch[];
+}
+
+/**
+ * 갈래 전체 — `/categories` 가 쓴다.
+ *
+ * **머리와 발은 최상위만 보여 준다.** 그래서 `아우터 > 코트` 같은 하위 갈래는 상품 화면의
+ * 이동 경로나 검색으로 들어가야만 만난다 — 사이트맵에는 진작 넣어 두었으면서(아래
+ * `getIndexableCategorySlugs`) 사람이 모아 볼 자리는 없었다.
+ *
+ * **상품이 없는 갈래는 뺀다.** 눌러서 들어갔더니 빈 화면인 길을 만들지 않는다 — 사이트맵이
+ * 쓰는 규칙과 같다. 상품은 잎 갈래에 달리므로 자기 것과 자식 것을 함께 센다.
+ */
+export const getCategoryTree = cachedRead(
+  async (): Promise<CategoryNode[]> => {
+    const rows = await prisma.category.findMany({
+      where: { parentId: null },
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        slug: true, name: true,
+        _count: { select: { products: { where: onDisplay() } } },
+        children: {
+          orderBy: { sortOrder: 'asc' },
+          select: {
+            slug: true, name: true,
+            _count: { select: { products: { where: onDisplay() } } },
+          },
+        },
+      },
+    });
+
+    return rows
+      .map((row) => {
+        const children = row.children
+          .filter((child) => child._count.products > 0)
+          .map((child) => ({ slug: child.slug, name: child.name, count: child._count.products }));
+        return {
+          slug: row.slug,
+          name: row.name,
+          count: row._count.products + children.reduce((n, child) => n + child.count, 0),
+          children,
+        };
+      })
+      .filter((node) => node.count > 0);
+  },
+  { key: ['category-tree'], tags: [TAG.catalog], revalidate: TTL.catalog },
+);
+
 /**
  * 색인에 넣을 갈래.
  *

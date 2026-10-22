@@ -73,6 +73,8 @@ export const en: Dictionary = {
 
   'price.listPrice': 'List price',
   'price.discount': 'off',
+  'category.index': 'All categories',
+  'category.empty': 'No categories to show yet',
   'category.subcategories': 'Subcategories',
   'category.all': 'All',
   'catalog.productList': 'Product list',

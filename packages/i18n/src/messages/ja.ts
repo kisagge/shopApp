@@ -69,6 +69,8 @@ export const ja: Dictionary = {
 
   'price.listPrice': '定価',
   'price.discount': '割引',
+  'category.index': 'すべてのカテゴリ',
+  'category.empty': 'まだ表示できるカテゴリがありません',
   'category.subcategories': 'サブカテゴリー',
   'category.all': 'すべて',
   'catalog.productList': '商品一覧',

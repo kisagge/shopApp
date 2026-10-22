@@ -78,6 +78,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     })),
     {
+      // 갈래를 모아 보는 자리. 하위 갈래까지 한 화면에서 이어진다.
+      url: absoluteUrl('/categories'),
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
+    {
       url: absoluteUrl('/collections'),
       lastModified: now,
       changeFrequency: 'weekly',

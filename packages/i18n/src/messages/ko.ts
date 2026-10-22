@@ -79,6 +79,8 @@ export const ko = {
   // ── 목록·검색 ────────────────────────────────────────────
   'price.listPrice': '정가',
   'price.discount': '할인',
+  'category.index': '전체 카테고리',
+  'category.empty': '아직 보여 줄 카테고리가 없습니다',
   'category.subcategories': '하위 카테고리',
   'category.all': '전체',
   'catalog.productList': '상품 목록',

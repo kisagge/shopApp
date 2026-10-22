@@ -43,6 +43,19 @@ export async function SiteFooter() {
                 </Link>
               </li>
             ))}
+            {/*
+              **전체를 보는 길을 여기 둔다.** 이 줄에 뜨는 것은 최상위 갈래뿐이라,
+              `아우터 > 코트` 같은 하위 갈래는 상품 화면의 이동 경로로만 만났다.
+            */}
+            <li>
+              <Link
+                href="/categories"
+                prefetch={false}
+                className="inline-flex h-9 items-center text-sm font-medium text-[var(--fg)] no-underline hover:underline"
+              >
+                {t('category.index')}
+              </Link>
+            </li>
           </ul>
         </nav>
 

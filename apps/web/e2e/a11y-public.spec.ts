@@ -15,6 +15,7 @@ const PAGES: readonly (readonly [string, string])[] = [
   ['상품 상세', '/product/oversized-wool-coat'],
   ['검색 결과', '/search?q=코트'],
   ['검색 결과 없음', '/search?q=zzzznothing'],
+  ['갈래 전체', '/categories'],
   ['기획전 목록', '/collections'],
   ['쿠폰 받기', '/coupons'],
   ['장바구니', '/cart'],
