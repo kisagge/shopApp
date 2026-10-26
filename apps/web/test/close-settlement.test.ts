@@ -272,6 +272,8 @@ describe('마감을 알린다', () => {
 
     expect(result.created, '장부에는 두 줄 다 쓴다').toBe(2);
     expect(db.notification.createMany).not.toHaveBeenCalled();
+    // 알릴 것이 없으면 받는 사람을 찾으러 가지도 않는다 — 쉬는 가맹점마다 매달 헛도는 조회다
+    expect(db.user.findMany, '알릴 것이 없는데 소속 계정을 찾았다').not.toHaveBeenCalled();
   });
 
   it('환불만 있어 지급액이 음수인 달은 알린다', async () => {
