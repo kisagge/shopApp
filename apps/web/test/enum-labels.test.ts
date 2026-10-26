@@ -29,10 +29,10 @@ import { CLOSURE_BLOCK_KEY } from '~/lib/i18n/closure';
  * 늘 늦게 자란다. 그래서 목록을 만들지 않고 모듈에서 모은다 — 새 표를
  * 더하면 이름이 `_KEY` 로 끝나는 것만으로 검사에 들어온다.
  */
-const modules = import.meta.glob('../src/lib/i18n/*.ts', { eager: true }) as Record<
-  string,
-  Record<string, unknown>
->;
+/* next 16.4 가 `import.meta.glob` 에 타입을 붙였다 — 뒤에 적던 단정이 군더더기가 되어 lint 가 진다. */
+const modules = import.meta.glob<Record<string, unknown>>('../src/lib/i18n/*.ts', {
+  eager: true,
+});
 
 /** 이름이 _KEY 로 끝나고 값이 전부 문자열인 것 = 이름표 표 */
 function labelMaps(): [string, Record<string, string>][] {
