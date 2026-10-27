@@ -89,6 +89,13 @@ export default async function MyPage() {
               percent: formatPercent(locale, GRADE_REWARD_PERCENT[summary.grade]),
             })}
           </p>
+          {/*
+            **여기까지 보고 나면 다음 질문이 "그래서 VIP 는 얼마냐" 다.** 그 답(등급별 기준액과 적립률)은
+            core 에 있지만 이 화면에는 내 등급과 다음 한 칸만 있다 — 사다리 전체는 안내 화면이 보여 준다.
+          */}
+          <p className="mt-2 text-[11px]">
+            <Link href="/grades">{t('grade.guide')}</Link>
+          </p>
         </div>
 
         <ul className="grid grid-cols-3 rounded-sm border border-[var(--border)]">

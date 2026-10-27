@@ -85,6 +85,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
     },
     {
+      // 등급별 기준액과 적립률. 로그인 없이 읽을 수 있어야 하는 안내다.
+      url: absoluteUrl('/grades'),
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.4,
+    },
+    {
       url: absoluteUrl('/collections'),
       lastModified: now,
       changeFrequency: 'weekly',

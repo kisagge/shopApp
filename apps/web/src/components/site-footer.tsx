@@ -71,6 +71,14 @@ export async function SiteFooter() {
           >
             {t('support.heading')}
           </Link>
+          {/* 등급에는 적립률이 붙어 있다 — 돈에 대한 약속이라 어느 화면에서든 찾을 수 있어야 한다 */}
+          <Link
+            href="/grades"
+            prefetch={false}
+            className="inline-flex h-9 items-center text-sm text-[var(--fg-secondary)] no-underline hover:text-[var(--fg)]"
+          >
+            {t('grade.guide')}
+          </Link>
           <Link
             href="/merchant/apply"
             prefetch={false}
