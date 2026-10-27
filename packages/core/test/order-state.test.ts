@@ -6,8 +6,9 @@ import {
   adminStatusActions, OrderTransitionError, type OrderStatus,
   statusBeforeReturn, isRepayable, canRegisterShipment, showsOldestFirst,
   notSentYet, waitingDays, shipmentLate, lateShippingBefore,
-  LATE_SHIPPING_DAYS, LATE_SHIPPING_STATUS,
+  LATE_SHIPPING_DAYS, LATE_SHIPPING_STATUS, PARTIAL_CANCELLABLE_STATUS,
 } from '../src/order-state';
+import { UNSHIPPED_LINE_STATUS } from '../src/product-archive';
 
 describe('주문 상태 전이', () => {
   it('정상 배송 흐름을 끝까지 통과한다', () => {
@@ -518,5 +519,88 @@ describe('발송이 늦었는가', () => {
     for (const status of ORDER_STATUS) {
       expect(notSentYet(status), status).toBe(showsOldestFirst(status));
     }
+  });
+});
+
+/**
+ * 일부만 취소할 수 있는 구간.
+ *
+ * **넓히는 쪽이 위험한데 그쪽이 비어 있었다.** 목록에 `SHIPPED` 나 `DELIVERED` 를 넣고 돌려 보니
+ * core 1,574 개와 web 6,140 개가 **전부 초록이었다.** 좁히는 쪽(`PREPARING` 을 빼는 것)은 두 검사가
+ * 잡는데, 넓히는 쪽은 아무도 안 봤다.
+ *
+ * 넓어지면 조용히 이렇게 된다. 나간 주문에 일부 취소 단추가 뜨고, 창구도 통과시킨다 — 이미 보낸 물건이
+ * **반품 흐름을 건너뛰고 "취소" 로 처리된다.** 반품 접수도 회수 확인도 없이 환불이 나가고, 재고는 애초에
+ * 안 나간 것처럼 돌아온다.
+ *
+ * 그리고 더 나쁜 길이 있다. 남는 줄이 없게 고르면 **주문 전체 취소로 넘기는데**, 전체 취소는 상태를
+ * `CANCELLED` 로 옮긴다. 출고 뒤 상태에서는 그 전이가 없으므로 전이 오류가 터진다 — 돈이 오간 뒤에.
+ *
+ * 이 목록은 **화면과 창구가 함께 본다**(`admin/orders/[orderNo]/page`·`lib/orders/cancel-items`).
+ * 그렇게 모은 까닭이 README 에 적혀 있다: 예전에는 화면이 서버 목록을 베껴 적어 두어 둘이 갈렸다.
+ * 베끼지 않는지는 web 쪽 `partial-cancel-gate` 가 본다.
+ */
+describe('일부만 취소할 수 있는 구간', () => {
+  /** 상태마다 드는지와 **까닭**. 표가 명세다 — 목록을 고치면 여기도 고치게 된다 */
+  const EXPECTED: Readonly<Record<OrderStatus, boolean>> = {
+    // 아직 받은 돈이 없다. 돌려줄 것이 없으니 일부가 아니라 전액 취소로 간다
+    PENDING: false,
+    PAID: true,
+    PREPARING: true,
+    // 나간 물건은 반품이다 — 회수를 확인하고 돌려준다
+    SHIPPED: false,
+    DELIVERED: false,
+    // 확정은 적립까지 끝난 자리다
+    CONFIRMED: false,
+    // 이미 끝난 주문들 — 되돌릴 것이 남아 있지 않다
+    CANCELLED: false,
+    RETURN_REQUESTED: false,
+    RETURNED: false,
+    REFUNDED: false,
+  };
+
+  it.each(ORDER_STATUS)('%s', (status) => {
+    expect(PARTIAL_CANCELLABLE_STATUS.includes(status)).toBe(EXPECTED[status]);
+  });
+
+  it('출고된 뒤로는 하나도 들지 않는다', () => {
+    const shipped: readonly OrderStatus[] = ['SHIPPED', 'DELIVERED', 'CONFIRMED'];
+    expect(PARTIAL_CANCELLABLE_STATUS.filter((s) => shipped.includes(s))).toEqual([]);
+  });
+
+  it('전부 취소로 올라갈 수 있는 상태뿐이다', () => {
+    /*
+     * 남는 줄이 없게 고르면 주문 전체 취소로 넘긴다. 그 길이 막힌 상태를 이 목록에 넣으면
+     * **PG 에서 돈이 나간 뒤에** 전이 오류가 터진다.
+     */
+    for (const status of PARTIAL_CANCELLABLE_STATUS) {
+      expect(canTransition(status, 'CANCELLED'), status).toBe(true);
+    }
+  });
+
+  it('재고를 붙잡고 있는 상태뿐이다 — 취소는 재고를 돌려주는 일이다', () => {
+    // 이미 놓아 준 재고를 또 돌려주면 없는 물건이 매대에 선다
+    for (const status of PARTIAL_CANCELLABLE_STATUS) {
+      expect(holdsInventory(status), status).toBe(true);
+    }
+  });
+
+  it('비어 있지 않다 — 비면 위의 단정들이 전부 헛돈다', () => {
+    expect(PARTIAL_CANCELLABLE_STATUS.length).toBeGreaterThan(0);
+  });
+
+  it('입금대기는 전액 취소는 되지만 일부 취소는 아니다', () => {
+    // 손님이 스스로 취소할 수 있는 구간과 **같지 않다**. 낼 돈이 아직 안 들어왔다
+    expect(isCancellableByCustomer('PENDING')).toBe(true);
+    expect(PARTIAL_CANCELLABLE_STATUS.includes('PENDING')).toBe(false);
+  });
+
+  it('아직 안 나간 줄의 상태와 지금은 값이 같다 — 다른 축이지만 갈리면 알아야 한다', () => {
+    /*
+     * 주석이 적어 둔 약속이다. 줄이 안 나갔는지는 `UNSHIPPED_LINE_STATUS` 가, 주문이 그 구간인지는
+     * 이 목록이 답한다 — 주문은 줄들을 합쳐 본 상태라 줄 하나가 먼저 나가는 일이 생기면 갈린다.
+     * 지금은 값이 같다는 것을 못 박아, 갈리는 날 이 검사가 그 사실을 말하게 한다.
+     */
+    expect([...PARTIAL_CANCELLABLE_STATUS].sort()).toEqual([...UNSHIPPED_LINE_STATUS].sort());
   });
 });
