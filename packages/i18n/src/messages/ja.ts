@@ -227,6 +227,12 @@ export const ja: Dictionary = {
   'notif.INQUIRY_ANSWERED_GENERIC': 'お問い合わせに回答がつきました。',
   'notif.RESTOCKED': '{productName}（{optionLabel}）が再入荷しました。',
 
+  'recentSearch.heading': '最近の検索',
+  'recentSearch.clearAll': 'すべて削除',
+  'recentSearch.cleared': '最近の検索をすべて削除しました',
+  'recentSearch.remove': '最近の検索から {term} を削除',
+  'recentSearch.removed': '{term} を最近の検索から削除しました',
+  'recentSearch.note': 'この一覧はこの端末にのみ残り、サーバーには送信されません。',
   'recent.heading': '最近見た商品',
   'recent.clear': '履歴を消す',
   'recent.cleared': '最近見た商品を消しました',

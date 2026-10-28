@@ -241,6 +241,12 @@ export const ko = {
   'notif.INQUIRY_ANSWERED_GENERIC': '문의에 답변이 달렸습니다.',
   'notif.RESTOCKED': '{productName} ({optionLabel}) 이(가) 다시 들어왔습니다.',
 
+  'recentSearch.heading': '최근 검색어',
+  'recentSearch.clearAll': '전체 지우기',
+  'recentSearch.cleared': '최근 검색어를 모두 지웠습니다',
+  'recentSearch.remove': '최근 검색어에서 {term} 지우기',
+  'recentSearch.removed': '{term}을 최근 검색어에서 지웠습니다',
+  'recentSearch.note': '이 목록은 이 기기에만 남고 서버로 보내지 않습니다.',
   'recent.heading': '최근 본 상품',
   'recent.clear': '기록 지우기',
   'recent.cleared': '최근 본 상품을 지웠습니다',

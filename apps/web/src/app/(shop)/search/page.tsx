@@ -7,6 +7,8 @@ import { getPopularSearches } from '~/lib/queries/catalog/suggest';
 import { ProductGrid } from '~/components/product-grid';
 import { TrackedProductList } from '~/components/tracked-product-list';
 import { TrackedSearch } from '~/components/tracked-search';
+import { RecentSearches } from '~/components/recent-searches';
+import { RecordRecentSearch } from '~/components/record-recent-search';
 import { CatalogControls } from '~/components/catalog-controls';
 import { CatalogPager } from '~/components/catalog-pager';
 import { NO_INDEX } from '~/lib/no-index';
@@ -96,6 +98,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
             기준을 못 넘으면 조회가 빈 목록을 준다 — 그때는 이 자리도
             통째로 비운다. 없는 인기를 지어내 보여 줄 이유가 없다.
           */}
+          {/*
+            **인기보다 먼저 둔다.** 방금 내가 찾던 것이 남이 많이 찾는 것보다 지금 쓰려는 말에 가깝다.
+            기기에만 남는 값이라 서버는 이 자리를 모른다 — 조각이 스스로 읽고, 없으면 그리지 않는다.
+          */}
+          <RecentSearches />
+
           {popular.length > 0 && (
             <nav aria-label={t('popular.heading')} className="mt-8">
               <h2 className="text-[11px] font-medium tracking-[0.08em] text-[var(--fg-muted)]">
@@ -120,6 +128,12 @@ export default async function SearchPage({ searchParams }: { searchParams: Searc
         <>
           {/* 결과 수까지 남긴다 — 0건 검색이 가장 값진 신호다 */}
           <TrackedSearch term={term} resultCount={page?.total ?? page?.items.length ?? 0} />
+
+          {/*
+            **0건이어도 적는다.** 못 찾은 말일수록 고쳐 다시 치려고 되짚는다 — 거기서 지우면
+            정작 필요한 자리에서 비어 있다. 분석(TrackedSearch)과 달리 이것은 기기에만 남는다.
+          */}
+          <RecordRecentSearch term={term} />
 
           <CatalogControls
             action="/search"

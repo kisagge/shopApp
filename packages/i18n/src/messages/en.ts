@@ -231,6 +231,12 @@ export const en: Dictionary = {
   'notif.INQUIRY_ANSWERED_GENERIC': 'Your question has a reply.',
   'notif.RESTOCKED': '{productName} ({optionLabel}) is back in stock.',
 
+  'recentSearch.heading': 'Recent searches',
+  'recentSearch.clearAll': 'Clear all',
+  'recentSearch.cleared': 'Cleared all recent searches',
+  'recentSearch.remove': 'Remove {term} from recent searches',
+  'recentSearch.removed': 'Removed {term} from recent searches',
+  'recentSearch.note': 'This list stays on this device and is never sent to our servers.',
   'recent.heading': 'Recently viewed',
   'recent.clear': 'Clear history',
   'recent.cleared': 'Recently viewed items cleared',

@@ -120,3 +120,26 @@ test('빈 검색 화면은 인기 검색어가 없어도 막다른 길이 아니
   await expect(page).toHaveURL(new RegExp(`/search\\?q=${encodeURIComponent(term)}`));
   await expect(page.locator('#main a[href^="/product/"]').first()).toBeVisible();
 });
+
+/**
+ * 최근 검색어.
+ *
+ * **화면을 옮겨도 남는 것이 이 기능의 전부다.** 단위 검사는 스토어와 칩을 따로 보지만, 적는 쪽(결과 화면)과
+ * 보여 주는 쪽(빈 검색 화면)이 실제로 같은 자리를 쓰는지는 브라우저에서만 드러난다 — 열쇠가 어긋나거나
+ * 하이드레이션 전에 적으면 둘 다 멀쩡해 보이는데 목록만 늘 비어 있다.
+ */
+test('찾은 말이 남고, 하나만 지울 수 있다', async ({ page }) => {
+  await page.goto('/search?q=코트');
+  // 적는 것은 결과 화면의 조각이다. 떠야 적힌다
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  await page.goto('/search');
+
+  const recent = page.getByRole('navigation', { name: '최근 검색어' });
+  await expect(recent.getByRole('link', { name: '코트' })).toBeVisible();
+
+  await recent.getByRole('button', { name: '최근 검색어에서 코트 지우기' }).click();
+
+  // 마지막 줄을 지우면 묶음이 통째로 사라진다
+  await expect(recent).toHaveCount(0);
+});
