@@ -50,7 +50,11 @@ test('홈에서 상품을 골라 장바구니에 담는다', async ({ page }) =>
   );
 
   // 헤더의 개수도 따라 올라간다
-  await expect(page.getByRole('link', { name: /장바구니, 상품 \d+개/ })).toBeVisible();
+  /*
+   * 이름에서 숫자는 **낱말로 떨어져 있다**(`장바구니, 1 개`). 붙여 두면 보이는 `장바구니1` 이 이름 안에
+   * 든 것으로 읽히지 않는다 — axe 의 label-content-name-mismatch 가 보는 자리다.
+   */
+  await expect(page.getByRole('link', { name: /장바구니, \d+ 개/ })).toBeVisible();
 });
 
 test('검색은 주소에 남아 새로고침해도 유지된다', async ({ page }) => {

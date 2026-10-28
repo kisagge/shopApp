@@ -12,7 +12,7 @@ export interface PageNavLabels {
 }
 
 const KO_LABELS: PageNavLabels = {
-  first: '첫 쪽', prev: '이전 쪽', next: '다음 쪽', last: '마지막 쪽', page: (n) => `${n}쪽`,
+  first: '첫 쪽', prev: '이전 쪽', next: '다음 쪽', last: '마지막 쪽', page: (n) => `${n} 쪽`,
 };
 
 /** 손님 화면이 넘기는 이름 — 사전에서 꺼낸다 */
@@ -95,6 +95,15 @@ export function PageNav({
                 {n}
               </span>
             ) : (
+              /*
+                **이름 안에서 번호가 낱말로 떨어져 있어야 한다.** 보이는 글자는 `2` 뿐인데 이름이
+                `2쪽` 처럼 붙어 있으면, 보이는 말이 이름 안에 든 것으로 읽히지 않는다 — 한글과 숫자는
+                둘 다 "글자" 라서 `2쪽` 이 토큰 하나가 되기 때문이다(axe 4.14 의
+                label-content-name-mismatch 가 낱말 단위로 본다. 4.13 은 글자 포함만 봐서 통과했다).
+
+                눈에 보이는 말로 음성 조작하는 사람에게도 같은 일이다. 그래서 사전에서 `{page} 쪽` 으로
+                띄어 둔다 — 말의 차례는 나라말이 정하므로(영어는 `Page 2`) 여기서 붙이거나 떼지 않는다.
+              */
               <Link href={hrefOf(n)} aria-label={labels.page(n)} className={idle}>
                 {n}
               </Link>

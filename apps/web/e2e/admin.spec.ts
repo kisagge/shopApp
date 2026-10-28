@@ -372,7 +372,7 @@ test('목록은 쪽 번호로 넘긴다 — 조건을 쥔 채로', async ({ page
   const firstRow = () => page.locator('table tbody tr').first().innerText();
   const onPage1 = await firstRow();
 
-  await nav.getByRole('link', { name: '2쪽' }).click();
+  await nav.getByRole('link', { name: '2 쪽' }).click();
   await page.waitForURL(/page=2/);
   await ready(page);
 

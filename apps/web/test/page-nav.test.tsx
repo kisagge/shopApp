@@ -41,8 +41,13 @@ describe('쪽 번호', () => {
   });
 
   it('다른 쪽은 링크이고 어디로 가는지 이름이 붙는다', () => {
+    /*
+     * **번호와 낱말을 띄운다.** 눈에 보이는 것은 `3` 뿐이라, 이름이 `3쪽` 처럼 붙어 있으면 보이는 말이
+     * 이름 안에 든 것으로 읽히지 않는다 — 한글과 숫자는 둘 다 "글자" 라서 한 덩어리가 된다. 눈에 보이는
+     * 말로 음성 조작하는 사람에게도 같은 일이다. axe 4.14 가 운영 화면 넷에서 이것을 잡았다.
+     */
     nav(5);
-    const third = screen.getByRole('link', { name: '3쪽' });
+    const third = screen.getByRole('link', { name: '3 쪽' });
     expect(third.getAttribute('href')).toContain('page=3');
   });
 
@@ -110,6 +115,6 @@ describe('번역한 이름', () => {
 
   it('넘기지 않으면 운영 화면처럼 한국어로 읽힌다', () => {
     nav(3);
-    expect(screen.getByRole('link', { name: '4쪽' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: '4 쪽' })).toBeInTheDocument();
   });
 });

@@ -34,12 +34,22 @@ export function CartBadge() {
     >
       {t('nav.cart')}
       {mounted && count > 0 && (
-        <span
-          aria-hidden="true"
-          className="tnum ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-semibold text-[var(--bg)]"
-        >
-          {count}
-        </span>
+        <>
+          {/*
+            **이 공백은 꾸밈이 아니다.** 보이는 글자를 이을 때 사이에 아무것도 넣지 않으면
+            `장바구니1` 한 덩어리가 되고, 그러면 **보이는 말이 이름(`장바구니, 1 개`) 안에 든 것으로
+            읽히지 않는다** — 한글과 숫자는 둘 다 "글자" 라서 한 낱말로 세어진다. 눈에 보이는 말로
+            음성 조작하는 사람에게도 같은 일이다(axe 의 label-content-name-mismatch 가 보는 자리).
+            여백은 margin 이 주지만 **낱말을 가르는 것은 이 공백이다.**
+          */}
+          {' '}
+          <span
+            aria-hidden="true"
+            className="tnum ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--brand)] px-1 text-[10px] font-semibold text-[var(--bg)]"
+          >
+            {count}
+          </span>
+        </>
       )}
     </Link>
   );

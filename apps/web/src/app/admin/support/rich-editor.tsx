@@ -35,6 +35,34 @@ import { isSafeHref, RICH_TEXT_HEADING_LEVEL, type RichTextDoc } from '@shop/cor
  * - `link` — StarterKit 의 것 대신 아래에서 직접 켠다. 받아 줄 프로토콜을
  *   core 가 정하기 때문이다.
  */
+/**
+ * 목록으로 바꾼다.
+ *
+ * **제목 줄에서도 목록이 되어야 한다.** 제목을 쓰다 "이건 목록이 낫다" 고 바꾸는 것은 흔한 동작이고,
+ * 그때 단추가 안 먹으면 제목을 먼저 끄는 두 수를 사람이 알아내야 한다.
+ *
+ * 목록 항목의 내용 규격은 `paragraph block*` 이라 **첫 줄이 문단이어야 한다** — 제목인 채로는
+ * 감싸지지 않는다. 그래서 제목이면 먼저 문단으로 되돌린다.
+ *
+ * 한 사슬로 이어 두어 **되돌리기 한 번에 함께 풀리게** 한다.
+ *
+ * **상태는 편집기에 직접 묻는다.** 도구 모음이 들고 있는 `active` 묶음으로 판단하면 그 값이 그려진
+ * 시점의 것이라, 눌리는 순간의 사실과 어긋날 여지가 남는다 — 여기서 묻는 것은 한 번뿐이니 그 여지를
+ * 둘 이유가 없다.
+ *
+ * 예전에는 이 두 수를 tiptap 이 알아서 해 주었다(3.31). 3.32 에서 그러지 않게 되어 단추가 조용히
+ * 안 먹었다 — 눌러도 아무 일도 없고 눌림 표시도 안 켜진다. 라이브러리의 속사정에 기대지 않고
+ * 여기서 뜻을 적는다.
+ */
+export function applyList(
+  editor: Editor,
+  command: 'toggleBulletList' | 'toggleOrderedList',
+): void {
+  const onHeading = RICH_TEXT_HEADING_LEVEL.some((level) => editor.isActive('heading', { level }));
+  const chain = editor.chain().focus();
+  (onHeading ? chain.setParagraph() : chain)[command]().run();
+}
+
 export const editorExtensions = [
   StarterKit.configure({
     heading: { levels: [...RICH_TEXT_HEADING_LEVEL] },
@@ -236,9 +264,9 @@ export function RichEditor({
         ))}
 
         <ToolbarButton editor={editor} label="글머리" active={active.bulletList}
-          onClick={() => editor.chain().focus().toggleBulletList().run()} />
+          onClick={() => applyList(editor, 'toggleBulletList')} />
         <ToolbarButton editor={editor} label="번호" active={active.orderedList}
-          onClick={() => editor.chain().focus().toggleOrderedList().run()} />
+          onClick={() => applyList(editor, 'toggleOrderedList')} />
         <ToolbarButton editor={editor} label="인용" active={active.blockquote}
           onClick={() => editor.chain().focus().toggleBlockquote().run()} />
         <ToolbarButton editor={editor} label="구분선" active={false}
