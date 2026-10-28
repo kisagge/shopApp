@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@shop/config": "workspace:*",
-    "eslint": "10.9.1",
+    "eslint": "10.13.0",
     "typescript": "6.0.3",
     "vitest": "4.1.12"
   }
