@@ -1761,8 +1761,17 @@ model Session {
 }
 
 model Account {
-  id         String @id @default(cuid())
-  issuer     String
+  id String @id @default(cuid())
+
+  /// Better Auth 가 1.7.7 미만에서 `accountId` 와 함께 계정 조회 열쇠로 쓰던 칸.
+  ///
+  /// **1.7.7 이 이 칸을 모델에서 없앴다**(OAuth 계정 탈취 권고 셋을 고친 판이다). 그 뒤로는 아무도
+  /// 쓰지 않으면서 필수로 남아, 새 계정을 만들 때 Prisma 가 `Argument issuer is missing` 으로 거절했다 —
+  /// 가입과 소셜 로그인이 통째로 막히는 자리였고 시드에서 먼저 드러났다.
+  ///
+  /// **지우지 않고 비울 수 있게 둔다.** 이미 있는 행에는 값이 들어 있고, 칸을 떨구는 것은 되돌릴 수
+  /// 없는 변경이라 따로 정할 일이다. 지금 조회 열쇠는 `providerId` + `accountId` 다(아래 unique).
+  issuer     String?
   accountId  String
   providerId String
 
