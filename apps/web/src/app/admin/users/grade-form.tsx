@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { MEMBER_GRADE, type MemberGrade } from '@shop/core';
 import { Button } from '@shop/ui';
 import { failureMessage } from '~/lib/client/failure-message';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 
 /** 운영 화면은 한국어다 — 손님 화면의 등급 이름은 사전이 세 말로 갖고 있다 */
 const GRADE_LABEL: Readonly<Record<MemberGrade, string>> = {
@@ -47,12 +48,19 @@ export function GradeForm({
   const gradeId = useId();
   const reasonId = useId();
   const hintId = useId();
-  const gradeRef = useRef<HTMLSelectElement>(null);
+  const panelId = useId();
 
-  // 단추를 눌러 연 폼으로 초점을 옮긴다 — 누른 단추가 사라져 초점이 문서 처음으로 튀지 않게
-  useEffect(() => {
-    if (open) gradeRef.current?.focus();
-  }, [open]);
+  /*
+   * **칸이 아니라 폼으로 옮기고, 닫으면 단추로 돌려준다.**
+   *
+   * 여기서는 손으로 적은 이펙트가 열 때만 챙기고 있었다 — 고른 칸(select)으로 바로 옮기니
+   * 낭독기는 "고르세요" 만 읽고 **무엇이 열렸는지는 말하지 않았다.** 그리고 닫을 때는 아무것도
+   * 하지 않아, 취소를 누르면 초점이 사라진 폼과 함께 문서 처음으로 떨어졌다.
+   *
+   * 규칙은 훅에 모여 있다(useDisclosureFocus). 같은 모양이 저장소에 아홉 개라, 각자 적으면
+   * 각자 다르게 빠뜨린다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
 
   /** 지금보다 높은 것만. 낮은 값은 적어 봐야 화면이 그대로다(effectiveGrade 가 높은 쪽을 쓴다) */
   const higher = MEMBER_GRADE.slice(MEMBER_GRADE.indexOf(current) + 1);
@@ -67,7 +75,15 @@ export function GradeForm({
 
   if (!open) {
     return (
-      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        ref={triggerRef}
+        aria-expanded={false}
+        aria-controls={panelId}
+        onClick={() => setOpen(true)}
+      >
         등급 올리기
       </Button>
     );
@@ -100,11 +116,15 @@ export function GradeForm({
 
   return (
     <form
+      id={panelId}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 — 열릴 때 우리가 옮겨 줄 뿐이다 */
+      tabIndex={-1}
       onSubmit={(e) => {
         e.preventDefault();
         void send();
       }}
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
       aria-label={`${userName} 등급 올리기`}
     >
       <label htmlFor={gradeId} className="text-[11px] text-[var(--fg-secondary)]">
@@ -112,7 +132,6 @@ export function GradeForm({
       </label>
       <select
         id={gradeId}
-        ref={gradeRef}
         value={grade}
         onChange={(e) => setGrade(e.target.value as MemberGrade)}
         required

@@ -4,6 +4,7 @@ import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { failureMessage } from '~/lib/client/failure-message';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 
 /**
  * 카테고리 나무.
@@ -280,14 +281,30 @@ function NewCategory({
 }) {
   const nameId = useId();
   const slugId = useId();
+  const panelId = useId();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
 
+  /*
+   * **초점을 챙긴다.** 누른 단추가 사라지고 폼이 그 자리를 차지하므로, 아무것도 안 하면 초점이
+   * `<body>` 로 떨어진다 — 갈래가 여럿인 화면에서 특히 고약하다. 어느 갈래 밑에 추가하려던
+   * 것인지 잃고 문서 맨 앞부터 다시 훑어야 한다. 닫을 때도 같다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
+
   if (!open) {
     return (
       <div>
-        <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          size="sm"
+          variant="secondary"
+          ref={triggerRef}
+          aria-expanded={false}
+          aria-controls={panelId}
+          onClick={() => setOpen(true)}
+        >
           {label}
         </Button>
       </div>
@@ -296,6 +313,10 @@ function NewCategory({
 
   return (
     <form
+      id={panelId}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 */
+      tabIndex={-1}
       aria-label={label}
       onSubmit={(event) => {
         event.preventDefault();
@@ -310,7 +331,7 @@ function NewCategory({
           setOpen(false);
         });
       }}
-      className="flex flex-wrap items-end gap-2 rounded-sm border border-[var(--border)] p-3"
+      className="flex flex-wrap items-end gap-2 rounded-sm border border-[var(--border)] p-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
     >
       <div className="flex min-w-[120px] flex-1 flex-col gap-1">
         <label htmlFor={nameId} className="text-[11px] text-[var(--fg-secondary)]">이름</label>

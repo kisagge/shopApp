@@ -19,7 +19,6 @@ import { join } from 'node:path';
  */
 
 const SRC = join(__dirname, '..', 'src');
-const COMPONENTS = join(SRC, 'components');
 
 /**
  * 초점을 챙기지 않아도 되는 자리와 그 이유.
@@ -39,39 +38,68 @@ function walk(dir: string): string[] {
 /**
  * 여는 버튼이 열린 뒤 사라지는가.
  *
- * `if (!open) { return <button …> }` 모양을 찾는다. 이 이른 반환이 곧
- * "열리면 이 버튼은 없다" 는 뜻이다.
+ * `if (!open) { … setOpen(true) … }` 모양을 찾는다. 이 이른 반환이 곧 "열리면 이 버튼은 없다" 는 뜻이다.
+ *
+ * **예전에는 `aria-expanded` 를 표식으로 썼다.** 그랬더니 그 속성이 없는 조각은 탐지를 빠져나갔다 —
+ * 정작 고쳐야 할 쪽이 빠진다. `components/order-address-edit` 가 훑는 범위 안에 있으면서도 그렇게
+ * 새 나갔다. 표식은 **그 모양 자체**(열면 사라지는 단추)여야 한다.
  */
 function vanishingTrigger(source: string): boolean {
-  return /if\s*\(\s*!\s*open\s*\)\s*\{[\s\S]{0,600}?aria-expanded/.test(source);
+  return /if\s*\(\s*!\s*open\s*\)\s*\{[\s\S]{0,800}?setOpen\(\s*true\s*\)/.test(source);
 }
 
 describe('펼침 폼의 초점', () => {
-  const files = walk(COMPONENTS).filter((f) => vanishingTrigger(readFileSync(f, 'utf8')));
+  /*
+   * **`components` 만 훑고 있었다.** 같은 모양이 운영 화면(`app/admin/**`)에 다섯 더 있었고 —
+   * 등급 올리기·이용 정지·정산 보류·브랜드 등록·갈래 추가 — 그물 밖이라 아무도 안 봤다.
+   * 셋은 초점이 `<body>` 로 떨어졌고, 셋은 열 때만 칸으로 옮기고 닫을 때는 아무것도 하지 않았다.
+   *
+   * 화면 조각이 `components` 에만 사는 저장소가 아니다. `src` 전체를 훑는다.
+   */
+  const files = walk(SRC).filter((f) => vanishingTrigger(readFileSync(f, 'utf8')));
 
   it('그런 모양의 컴포넌트를 실제로 찾아냈다', () => {
-    // 정규식이 어긋나면 아래 검사가 조용히 통과한다. 지금 둘이다.
-    expect(files.length).toBeGreaterThanOrEqual(2);
+    // 정규식이 어긋나면 아래 검사가 조용히 통과한다. 지금 아홉이다.
+    expect(files.length).toBeGreaterThanOrEqual(9);
   });
 
-  it.each(files.map((f) => f.slice(COMPONENTS.length + 1)))(
+  it.each(files.map((f) => f.slice(SRC.length + 1)))(
     '%s 가 초점을 챙긴다',
     (rel) => {
       if (rel in EXEMPT) return;
-      const source = readFileSync(join(COMPONENTS, rel), 'utf8');
+      const source = readFileSync(join(SRC, rel), 'utf8');
+      /*
+       * **이름이 아니라 부른 자리를 본다.** 글자만 찾으면 `import { useDisclosureFocus }` 한 줄로
+       * 통과한다 — 훅을 부르지 않고 ref 를 손으로 만들어도 몰랐다(그렇게 돌연변이가 새 나갔다).
+       * 타입을 주고 부르는 모양(`useDisclosureFocus<HTMLElement>(open)`)도 함께 받는다.
+       */
       expect(
-        source,
-        `${rel} 는 열리면 버튼이 사라진다. useDisclosureFocus 로 초점을 옮기거나, ` +
+        /useDisclosureFocus(<[^>]*>)?\s*\(/.test(source),
+        `${rel} 는 열리면 버튼이 사라진다. useDisclosureFocus 를 불러 초점을 옮기거나, ` +
           '안 옮기는 이유를 EXEMPT 에 적는다.',
-      ).toContain('useDisclosureFocus');
+      ).toBe(true);
     },
   );
 
-  it.each(files.map((f) => f.slice(COMPONENTS.length + 1)))(
+  it.each(files.map((f) => f.slice(SRC.length + 1)))(
+    '%s 의 단추가 펼침 상태를 말한다',
+    (rel) => {
+      /*
+       * **초점만 챙기면 반쪽이다.** 낭독기는 그 단추가 무언가를 펼치는 단추인지 모른 채 읽는다 —
+       * 눌러 보고 나서야 안다. 여섯 곳 모두 이 속성이 없었다.
+       */
+      if (rel in EXEMPT) return;
+      const source = readFileSync(join(SRC, rel), 'utf8');
+      expect(source, `${rel} 의 여는 단추에 aria-expanded 가 없다`).toContain('aria-expanded');
+      expect(source, `${rel} 의 단추가 어느 판을 펼치는지 가리키지 않는다`).toContain('aria-controls');
+    },
+  );
+
+  it.each(files.map((f) => f.slice(SRC.length + 1)))(
     '%s 의 폼이 초점을 받을 수 있다',
     (rel) => {
       if (rel in EXEMPT) return;
-      const source = readFileSync(join(COMPONENTS, rel), 'utf8');
+      const source = readFileSync(join(SRC, rel), 'utf8');
       // 훅을 부르기만 하고 ref 와 tabIndex 를 안 달면 아무 일도 일어나지 않는다
       expect(source, `${rel} 에 panelRef 가 안 붙었다`).toContain('ref={panelRef}');
       expect(source, `${rel} 에 tabIndex={-1} 이 없다`).toContain('tabIndex={-1}');

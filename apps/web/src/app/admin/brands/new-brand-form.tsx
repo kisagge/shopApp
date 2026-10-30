@@ -3,6 +3,7 @@
 import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 import {
   BRAND_NAME_MAX, BRAND_SLUG_MAX, BRAND_SLUG_MIN, BRAND_SLUG_PATTERN,
 } from '@shop/core';
@@ -30,12 +31,20 @@ export function NewBrandForm() {
   const router = useRouter();
   const nameId = useId();
   const slugId = useId();
+  const panelId = useId();
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /*
+   * **초점을 챙긴다.** 누른 단추가 사라지고 그 자리를 폼이 차지하므로, 아무것도 안 하면 초점이
+   * `<body>` 로 떨어진다 — 키보드 사용자는 탭을 문서 맨 앞부터 다시 눌러야 하고 낭독기는 무엇이
+   * 열렸는지 말하지 않는다. 닫을 때도 같다. 규칙은 훅에 모여 있다(useDisclosureFocus).
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,16 +74,29 @@ export function NewBrandForm() {
   if (!open) {
     return (
       <div>
-        <Button type="button" size="sm" onClick={() => setOpen(true)}>자사 브랜드 등록</Button>
+        <Button
+          type="button"
+          size="sm"
+          ref={triggerRef}
+          aria-expanded={false}
+          aria-controls={panelId}
+          onClick={() => setOpen(true)}
+        >
+          자사 브랜드 등록
+        </Button>
       </div>
     );
   }
 
   return (
     <form
+      id={panelId}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 */
+      tabIndex={-1}
       onSubmit={(e) => void onSubmit(e)}
       aria-labelledby="new-brand-title"
-      className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6"
+      className="flex flex-col gap-3 rounded-md border border-[var(--border)] bg-[var(--bg)] p-4 sm:p-6 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
     >
       <h2 id="new-brand-title" className="text-[14px] font-semibold">자사 브랜드 등록</h2>
 

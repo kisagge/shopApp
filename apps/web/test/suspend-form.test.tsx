@@ -16,6 +16,30 @@ beforeEach(() => {
   vi.stubGlobal('fetch', fetchMock);
 });
 
+describe('펼침 판의 초점', () => {
+  it('여는 단추가 펼침 상태와 가리키는 판을 말한다', () => {
+    render(<SuspendForm userId="u-1" userName="홍길동" suspendedAt={null} suspendedReason={null} />);
+
+    const trigger = screen.getByRole('button', { name: '이용 정지' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger.getAttribute('aria-controls')).toBeTruthy();
+  });
+
+  it('닫으면 눌렀던 단추로 초점이 돌아온다', async () => {
+    /*
+     * 열 때만 챙기고 닫을 때는 아무것도 하지 않았다 — 취소를 누르면 초점이 `<body>` 로 떨어져
+     * 키보드 사용자는 탭을 문서 맨 앞부터 다시 눌러야 했다.
+     */
+    const user = userEvent.setup();
+    render(<SuspendForm userId="u-1" userName="홍길동" suspendedAt={null} suspendedReason={null} />);
+
+    await user.click(screen.getByRole('button', { name: '이용 정지' }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: '이용 정지' })).toHaveFocus();
+  });
+});
+
 describe('이용 정지 폼', () => {
   it('정지는 사유를 적어야 누를 수 있고, 로그인이 끊긴다는 설명이 입력에 이어진다', async () => {
     const user = userEvent.setup();
@@ -24,9 +48,12 @@ describe('이용 정지 폼', () => {
     await user.click(screen.getByRole('button', { name: '이용 정지' }));
     const form = screen.getByRole('form', { name: '홍길동 이용 정지' });
     const reason = screen.getByLabelText(/정지 사유/);
-    expect(form).toBeTruthy();
-    // 누른 단추가 사라지므로 초점이 사유 입력으로 와야 한다
-    expect(document.activeElement).toBe(reason);
+    /*
+     * **초점은 칸이 아니라 판으로 간다.** 누른 단추가 사라지므로 갈 곳을 정해 줘야 하는데,
+     * 사유 칸을 짚으면 낭독기가 그 칸 이름만 읽고 무엇이 열렸는지는 말하지 않는다. 판에 이름이
+     * 달려 있어 "홍길동 이용 정지, 양식" 부터 읽는다 — 저장소의 다른 펼침 판들과 같은 규칙이다.
+     */
+    expect(form).toHaveFocus();
     expect(reason.getAttribute('aria-describedby')).toBeTruthy();
     expect(document.getElementById(reason.getAttribute('aria-describedby')!)?.textContent).toContain('로그인이 바로 끊기고');
     expect(screen.getByRole('button', { name: '정지' }).hasAttribute('disabled')).toBe(true);

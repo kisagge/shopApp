@@ -6,6 +6,7 @@ import { Button } from '@shop/ui';
 import { formatMoney } from '@shop/i18n';
 import { AddressForm } from './address-form';
 import { useLocale, useT } from '~/lib/i18n/client';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 
 /**
  * 주문의 배송지를 고친다.
@@ -48,6 +49,14 @@ export function OrderAddressEdit({
   const router = useRouter();
   const memoId = useId();
   const [open, setOpen] = useState(false);
+  const panelId = useId();
+
+  /*
+   * **초점을 챙긴다.** 누른 단추가 사라지고 그 자리를 수정 판이 차지하므로, 아무것도 안 하면
+   * 초점이 `<body>` 로 떨어진다 — 주문 상세는 긴 화면이라 탭을 문서 맨 앞부터 다시 눌러
+   * 내려와야 한다. 닫을 때도 같다. 판이 폼이 아니라 `<section>` 이어서 요소 종류를 함께 준다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus<HTMLElement>(open);
   const [memo, setMemo] = useState(current.memo ?? '');
   const [done, setDone] = useState<string | null>(null);
 
@@ -55,7 +64,15 @@ export function OrderAddressEdit({
     return (
       <div className="mt-3 flex flex-col gap-2">
         <div>
-          <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            ref={triggerRef}
+            aria-expanded={false}
+            aria-controls={panelId}
+            onClick={() => setOpen(true)}
+          >
             {t('orderAddr.edit')}
           </Button>
         </div>
@@ -67,8 +84,12 @@ export function OrderAddressEdit({
 
   return (
     <section
+      id={panelId}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 */
+      tabIndex={-1}
       aria-label={t('orderAddr.editing', { orderNo })}
-      className="mt-3 rounded-sm border border-[var(--border-strong)] p-4"
+      className="mt-3 rounded-sm border border-[var(--border-strong)] p-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
     >
       <h3 className="mb-1 text-[13px] font-semibold">{t('orderAddr.editing', { orderNo })}</h3>
       <p className="mb-3 text-[12px] leading-relaxed text-[var(--fg-muted)]">{t('orderAddr.note')}</p>

@@ -29,16 +29,43 @@ beforeEach(() => {
 });
 
 describe('보류', () => {
-  it('누르면 까닭 칸이 열리고 초점이 그리로 간다', async () => {
+  it('누르면 판이 열리고 초점이 판으로 간다 — 칸이 아니라 판이다', async () => {
+    /*
+     * **칸으로 바로 옮기지 않는다.** 예전에는 까닭 칸을 짚었는데, 그러면 낭독기가 그 칸 이름만
+     * 읽고 **무엇이 열렸는지는 말하지 않는다.** 판에 이름을 달아 두면 "무어 정산 지급 보류, 양식"
+     * 부터 읽는다. 저장소의 다른 펼침 판들과 같은 규칙이고, 그 규칙은 훅에 모여 있다.
+     */
     const user = userEvent.setup();
     render(<HoldButton settlementId="s-1" merchantName="무어" held={false} />);
 
     await user.click(screen.getByRole('button', { name: HOLD }));
 
     const form = screen.getByRole('form', { name: '무어 정산 지급 보류' });
-    expect(form).toBeInTheDocument();
-    expect(screen.getByLabelText('보류 까닭')).toHaveFocus();
+    expect(form).toHaveFocus();
     expect(screen.getByLabelText('보류 까닭')).toHaveAccessibleDescription('가맹점 정산 화면에도 보입니다.');
+  });
+
+  it('여는 단추가 펼침 상태와 가리키는 판을 말한다', async () => {
+    render(<HoldButton settlementId="s-1" merchantName="무어" held={false} />);
+
+    const trigger = screen.getByRole('button', { name: HOLD });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger.getAttribute('aria-controls')).toBeTruthy();
+  });
+
+  it('닫으면 눌렀던 단추로 초점이 돌아온다', async () => {
+    /*
+     * **단추가 사라졌다 다시 생기는 자리다.** 취소를 누르면 초점이 `<body>` 로 떨어져 키보드
+     * 사용자는 탭을 문서 맨 앞부터 다시 눌러야 했다 — 열 때만 챙기고 닫을 때는 아무것도 하지
+     * 않았기 때문이다.
+     */
+    const user = userEvent.setup();
+    render(<HoldButton settlementId="s-1" merchantName="무어" held={false} />);
+
+    await user.click(screen.getByRole('button', { name: HOLD }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: HOLD })).toHaveFocus();
   });
 
   it('까닭 없이는 보내지 않고 왜 안 되는지 말한다', async () => {

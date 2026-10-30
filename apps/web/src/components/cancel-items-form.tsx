@@ -41,7 +41,7 @@ export function CancelItemsForm({
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
-  const ids = { legend: useId(), reason: useId(), pick: useId(), preview: useId() };
+  const ids = { legend: useId(), reason: useId(), pick: useId(), preview: useId(), panel: useId() };
 
   const [open, setOpen] = useState(false);
   // 여는 단추가 사라지는 모양이다 — 열면 폼으로, 닫으면 단추로 초점을 옮긴다
@@ -138,8 +138,16 @@ export function CancelItemsForm({
      */
     return (
       <div className="flex flex-col gap-2">
+        {/* aria-controls 로 어느 판을 펼치는지 가리킨다 — 이름만으로는 낭독기가 그 둘을 잇지 못한다 */}
         {items.length >= 2 && (
-          <Button ref={triggerRef} variant="secondary" block onClick={() => setOpen(true)} aria-expanded={false}>
+          <Button
+            ref={triggerRef}
+            variant="secondary"
+            block
+            onClick={() => setOpen(true)}
+            aria-expanded={false}
+            aria-controls={ids.panel}
+          >
             {t('cancel.itemsOpen')}
           </Button>
         )}
@@ -153,6 +161,7 @@ export function CancelItemsForm({
 
   return (
     <form
+      id={ids.panel}
       ref={panelRef}
       // 초점을 받되 탭 순서에는 넣지 않는다. 열릴 때 옮겨 줄 뿐이다
       tabIndex={-1}

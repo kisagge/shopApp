@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
 import { adminDate } from '~/lib/admin/date-format';
 import { failureMessage } from '~/lib/client/failure-message';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 
 /**
  * 회원 이용 정지·해제.
@@ -38,12 +39,14 @@ export function SuspendForm({
 
   const reasonId = useId();
   const hintId = useId();
-  const reasonRef = useRef<HTMLInputElement>(null);
+  const panelId = useId();
 
-  // 단추를 눌러 연 입력으로 초점을 옮긴다 — 누른 단추가 사라져 초점이 문서 처음으로 튀지 않게
-  useEffect(() => {
-    if (open) reasonRef.current?.focus();
-  }, [open]);
+  /*
+   * **칸이 아니라 폼으로 옮기고, 닫으면 단추로 돌려준다.** 손으로 적은 이펙트는 열 때만 챙기고
+   * 사유 칸으로 바로 갔다 — 낭독기는 "정지 사유" 만 읽고 무엇이 열렸는지는 말하지 않는다.
+   * 닫을 때는 아무것도 하지 않아 취소를 누르면 초점이 문서 처음으로 떨어졌다. 규칙은 훅에 모았다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
 
   if (disabledReason) {
     return <p className="text-[11px] text-[var(--fg-muted)]">{disabledReason}</p>;
@@ -99,7 +102,15 @@ export function SuspendForm({
 
   if (!open) {
     return (
-      <Button type="button" size="sm" variant="secondary" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="secondary"
+        ref={triggerRef}
+        aria-expanded={false}
+        aria-controls={panelId}
+        onClick={() => setOpen(true)}
+      >
         이용 정지
       </Button>
     );
@@ -107,11 +118,15 @@ export function SuspendForm({
 
   return (
     <form
+      id={panelId}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 */
+      tabIndex={-1}
       onSubmit={(e) => {
         e.preventDefault();
         void send({ action: 'SUSPEND', reason });
       }}
-      className="flex flex-col gap-1.5"
+      className="flex flex-col gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
       aria-label={`${userName} 이용 정지`}
     >
       <label htmlFor={reasonId} className="text-[11px] text-[var(--fg-secondary)]">
@@ -124,7 +139,6 @@ export function SuspendForm({
         maxLength={300}
         required
         aria-describedby={hintId}
-        ref={reasonRef}
         className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
       />
       <p id={hintId} className="text-[11px] text-[var(--fg-muted)]">

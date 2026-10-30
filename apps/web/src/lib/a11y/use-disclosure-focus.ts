@@ -28,12 +28,17 @@ import { useEffect, useRef } from 'react';
  * 처음 그릴 때는 아무것도 하지 않는다. 화면에 폼이 닫힌 채로 여럿 있는데
  * 그때마다 초점을 옮기면 페이지를 열자마자 초점이 튄다.
  */
-export function useDisclosureFocus(open: boolean): {
+/**
+ * **판이 폼이 아닐 수도 있다.** 운영 화면의 보류·등급 같은 판은 `<div>` 나 `<section>` 이다 —
+ * 폼으로만 받으면 그쪽은 이 훅을 쓸 수 없어 초점을 챙기지 못한다. 기본값은 폼으로 두어
+ * 먼저 쓰던 자리들이 그대로 돌아가게 한다.
+ */
+export function useDisclosureFocus<Panel extends HTMLElement = HTMLFormElement>(open: boolean): {
   triggerRef: React.RefObject<HTMLButtonElement | null>;
-  panelRef: React.RefObject<HTMLFormElement | null>;
+  panelRef: React.RefObject<Panel | null>;
 } {
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const panelRef = useRef<HTMLFormElement>(null);
+  const panelRef = useRef<Panel>(null);
   /** 한 번이라도 열렸는가. 처음 그릴 때 버튼으로 초점을 끌어오지 않기 위해서다. */
   const opened = useRef(false);
 

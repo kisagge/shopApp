@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useId, useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@shop/ui';
+import { useDisclosureFocus } from '~/lib/a11y/use-disclosure-focus';
 
 /** 기간 확정. 여러 번 눌러도 결과가 같지만, 되돌리기 어려운 일이라 한 번 묻는다. */
 export function CloseButton({ yearMonth }: { yearMonth: string }) {
@@ -141,14 +142,15 @@ export function HoldButton({
   held: boolean;
 }) {
   const router = useRouter();
-  const ids = { reason: useId(), note: useId() };
+  const ids = { reason: useId(), note: useId(), panel: useId() };
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
-  const reasonRef = useRef<HTMLInputElement>(null);
-  // 누른 단추가 사라지므로 초점을 까닭 칸으로 옮긴다 — 키보드 사용자가 제자리를 잃지 않게
-  useEffect(() => {
-    if (open) reasonRef.current?.focus();
-  }, [open]);
+  /*
+   * **칸이 아니라 폼으로 옮기고, 닫으면 단추로 돌려준다.** 손으로 적은 이펙트는 열 때만 챙기고
+   * 까닭 칸으로 바로 갔다 — 낭독기는 그 칸만 읽고 무엇이 열렸는지는 말하지 않는다. 닫을 때는
+   * 아무것도 하지 않아 취소를 누르면 초점이 문서 처음으로 떨어졌다. 규칙은 훅에 모았다.
+   */
+  const { triggerRef, panelRef } = useDisclosureFocus(open);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -190,7 +192,16 @@ export function HoldButton({
 
   if (!open) {
     return (
-      <Button type="button" size="sm" variant="ghost" className="mt-1.5" onClick={() => setOpen(true)}>
+      <Button
+        type="button"
+        size="sm"
+        variant="ghost"
+        className="mt-1.5"
+        ref={triggerRef}
+        aria-expanded={false}
+        aria-controls={ids.panel}
+        onClick={() => setOpen(true)}
+      >
         <span className="sr-only">{`${merchantName} `}</span>
         보류
       </Button>
@@ -199,8 +210,12 @@ export function HoldButton({
 
   return (
     <form
+      id={ids.panel}
+      ref={panelRef}
+      /* 초점을 받을 수 있게 하되 탭 순서에는 넣지 않는다 */
+      tabIndex={-1}
       aria-label={`${merchantName} 정산 지급 보류`}
-      className="mt-1.5 flex w-56 flex-col gap-1.5 text-left"
+      className="mt-1.5 flex w-56 flex-col gap-1.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fg)]"
       onSubmit={(event) => {
         event.preventDefault();
         if (reason.trim().length === 0) {
@@ -220,7 +235,6 @@ export function HoldButton({
         onChange={(e) => setReason(e.target.value)}
         aria-describedby={ids.note}
         aria-invalid={error !== null && reason.trim().length === 0 ? true : undefined}
-        ref={reasonRef}
         className="h-9 rounded-sm border border-[var(--border-strong)] bg-[var(--bg)] px-2 text-[12px]"
       />
       <p id={ids.note} className="text-[11px] text-[var(--fg-muted)]">가맹점 정산 화면에도 보입니다.</p>
