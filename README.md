@@ -190,7 +190,7 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 | **백 로직** | `packages/*/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 매출 인식, 권한 정책, 이벤트 퍼널, 입력 검증, enum 정합성 |
 
 ```
-core 1,590 · web 6,230 · contract 302 · ui 130 · auth 65 · i18n 39 · db 54 · native 31 · mail 7
+core 1,590 · web 6,232 · contract 302 · ui 130 · auth 65 · i18n 39 · db 54 · native 31 · mail 7
 e2e 976 (Playwright, 94 파일)
 ```
 
@@ -1210,3 +1210,11 @@ E2E 를 한 잡에서 돌린다.
   로그인할 수 없는 회원 행을 두거나 FK 를 끊어야 하는데, 뒤엣것은 포인트·메일·리뷰 등
   돈이 걸린 코드 51곳을 함께 손봐야 한다.
 - **푸시 알림** — APNs/FCM 인증서가 필요해서 뺐다.
+- **타입스크립트 7** — `pnpm outdated` 가 권하지만 **올릴 수 없다.** 설치도 되고 `tsc 7.0.2` 도
+  통과하는데 `typescript-eslint` 가 불러오는 순간 던진다(`does not support TS 7.0`). 짝 범위
+  경고가 아니라 가드이고, 그쪽이 준비 중인 것은 **7.1 이상**이라 7.0 은 대상이 아니다
+  (typescript-eslint#10940). 최신이 8.72.1 이고 9.x 가 없으니 기다리는 수밖에 없다.
+  이 저장소는 `recommendedTypeChecked` + `projectService` 로 타입 기반 규칙에 기대고 있어 —
+  next 16.4 가 넣은 타입 때문에 군더더기가 된 단정을 그 규칙이 잡았다 — lint 를 끄고 컴파일러만
+  올리는 것은 맞바꿀 거래가 아니다. **글로만 적어 두지 않는다**: `test/typescript-range.test.ts`
+  가 선언한 판이 lint 가 받는 범위 안인지 보고, 그쪽이 범위를 넓히는 날 저절로 풀린다.
