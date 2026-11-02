@@ -354,7 +354,44 @@ const options = {
   },
 } satisfies BetterAuthOptions;
 
-export const auth = betterAuth(options);
+/**
+ * 인스턴스는 **처음 쓰는 시점**에 만든다.
+ *
+ * 예전에는 `betterAuth(options)` 를 여기서 바로 불렀다. 그러면 **이 모듈을 import 하는
+ * 것만으로** better-auth 가 초기화되고, prisma 어댑터가 데이터 모델을 읽으려 `prisma` 의
+ * 속성을 만진다 — `packages/db` 의 Proxy 가 그때 클라이언트를 만들고, `DATABASE_URL` 이
+ * 없으면 **import 가 던진다.**
+ *
+ * 그래서 DB 를 쓰지도 않는 검사가 거짓으로 졌다. `apps/web` 에서 `vitest run` 을 그냥
+ * 돌리면 언어 고르기 창구 검사 아홉이 그렇게 졌고(게이트는 폐기용 DB 주소를 넣어 주니
+ * 통과했다), **단독 실행이 거짓 실패를 내면 돌연변이로 무엇을 재든 신호와 잡음을 가를 수
+ * 없다** — 실제로 한 번 잘못 읽었다. 이 패키지의 검사들도 그 탓에 모듈을 새로 import 할
+ * 때마다 쓰지 않는 better-auth·프리즈마를 함께 끌고 왔다(vitest.config 의 주석이 그 값을
+ * 적어 두었다).
+ *
+ * `packages/db` 가 같은 문제를 같은 방법으로 이미 풀어 두었고, 그 주석이 까닭을 적고 있다 —
+ * "import 만으로 던지면 DB를 전혀 건드리지 않는 페이지의 빌드까지 같이 죽는다."
+ *
+ * **가드를 없앤 것이 아니다.** 실제로 쓰는 순간에는 그대로 던진다 — 검사가 그 둘을 함께 본다.
+ */
+const create = () => betterAuth(options);
+type AuthInstance = ReturnType<typeof create>;
+
+/*
+ * **globalThis 에 담지 않는다.** db 클라이언트는 그렇게 하지만(커넥션이 쌓이므로) 이쪽은
+ * 반대다 — `options` 가 환경변수를 읽어 만들어지므로, 모듈을 새로 불러 환경을 바꿔 보는
+ * 검사에서 전역 사본이 살아남으면 **낡은 설정을 돌려준다**. 실제로 base-url 검사 다섯이
+ * 그렇게 깨졌다. 모듈과 수명을 같이 하면 그 문제가 없고, 연결은 어차피 db 쪽에서 모인다.
+ */
+let instance: AuthInstance | undefined;
+
+export const auth: AuthInstance = new Proxy({} as AuthInstance, {
+  get(_target, prop, receiver) {
+    instance ??= create();
+    const value = Reflect.get(instance, prop, receiver);
+    return typeof value === 'function' ? value.bind(instance) : value;
+  },
+});
 
 /**
  * 세션 쿠키의 이름과 속성.

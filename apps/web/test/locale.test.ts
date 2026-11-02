@@ -1,8 +1,29 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { LOCALE_COOKIE, LOCALES } from '@shop/i18n';
-import { POST } from '~/app/api/locale/route';
+
+/**
+ * **세션을 흉내 낸다 — 이 창구가 진짜로 세션을 읽기 때문이다.**
+ *
+ * 로그인한 사람이면 자기 행의 locale 한 칸을 함께 갱신한다. 그래서 흉내 없이 부르면
+ * `auth.api.getSession` 이 실제로 돌아 `DATABASE_URL` 을 찾고, **쿠키와 리다이렉트만 보는
+ * 검사 아홉이 DB 주소가 없다는 까닭으로 졌다.** 게이트는 폐기용 주소를 넣어 주니 거기서는
+ * 조용했고, 그래서 단독 실행에서만 빨개졌다 — 돌연변이로 무엇을 재든 신호와 잡음을 가를 수
+ * 없게 만드는 종류다.
+ *
+ * 비로그인으로 둔다. 아래 검사들이 보는 것은 쿠키와 Location 이고, 로그인한 길의 DB 쓰기는
+ * 여기서 보는 대상이 아니다.
+ */
+const session = await vi.hoisted(async () => (await import('./support/session-mock')).sessionMock());
+vi.mock('@shop/auth/session', () => session);
+
+const { POST } = await import('~/app/api/locale/route');
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  session.getSessionUser.mockResolvedValue(null);
+});
 
 /** 폼 전송 하나를 흉내 낸다 */
 function submit(fields: Record<string, string>) {
