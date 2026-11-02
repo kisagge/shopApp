@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ForbiddenError, permissionsOf, type Actor, type Permission } from '@shop/core';
 import { actorQueries, queriesSource } from './admin-queries';
+import { unseenPointers, type SeenBy } from './support/exempt-proof';
 
 const db = vi.hoisted(() => {
   const empty = () => vi.fn<(...a: any[]) => any>().mockResolvedValue([]);
@@ -29,11 +30,38 @@ const merchantNoScope: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: null }
  * 권한 문이 아닌 조회 — 막을 것이 아니라 **보는 사람에 따라 달라질** 것들이다.
  * 여기에 넣으면 "누가 볼 수 있나" 는 다른 검사가 본다(까닭에 적는다).
  */
-const VIEWER_SCOPED: Readonly<Record<string, string>> = {
-  getMyPageSummary: '마이페이지 요약 — actor 는 "내가 누구인가" 일 뿐, 남의 것을 읽을 길이 없다(customer-query-scope)',
-  getReviewableItems: '내 주문 줄에서 아직 안 쓴 후기를 고른다 — 같은 결',
-  getProductInquiries: '상품 화면의 공개 문의 목록이다. viewer 는 막는 열쇠가 아니라 비밀글을 가릴지 정하는 값이고, 그 가림은 core(canAnswerInquiry)와 문의 검사가 본다',
+const VIEWER_SCOPED: Readonly<Record<string, { why: string; seenBy: SeenBy }>> = {
+  /*
+   * **"저쪽이 본다" 고 적을 때는 저쪽에 증거를 남긴다.**
+   *
+   * 이 줄은 "남의 것을 읽을 길이 없다(customer-query-scope)" 였고, 저쪽은 "각각은 여기서
+   * 본다" 로 되돌려 가리켰다 — **서로를 가리키는 사이 집계 셋이 아무도 안 보는 자리로
+   * 남았다.** 돌연변이로 확인했다: 셋에서 `userId` 를 떼도 전부 초록이었다. 지금은 저쪽이
+   * 집계마다 본다. 그 검사가 사라지면 아래 표식이 깨진다.
+   */
+  getMyPageSummary: {
+    why: '마이페이지 요약 — actor 는 "내가 누구인가" 일 뿐이다. 집계마다 주인을 묻는지는 저쪽이 본다',
+    seenBy: { file: 'customer-query-scope.test.ts', marker: '마이페이지 요약의 집계마다 주인을 묻는다' },
+  },
+  getReviewableItems: {
+    why: '내 주문 줄에서 아직 안 쓴 후기를 고른다 — 같은 결',
+    seenBy: { file: 'reviewable-items.test.ts', marker: '자기 주문만 본다' },
+  },
+  getProductInquiries: {
+    why: '상품 화면의 공개 문의 목록이다. viewer 는 막는 열쇠가 아니라 비밀글을 가릴지 정하는 값이다',
+    seenBy: { file: 'inquiry.test.ts', marker: '비공개 문의는 서버에서 지운 채 내려간다' },
+  },
 };
+
+/** 가리킨 자리가 실제로 보는지 — 가리키기만 하면 그게 구멍이다 */
+describe('넘긴 조회를 가리킨 자리', () => {
+  it('가리킨 검사에 그 표식이 실제로 있다', () => {
+    const pointers = Object.entries(VIEWER_SCOPED).map(([of, v]) => ({ of, ...v.seenBy }));
+
+    expect(pointers.length).toBe(Object.keys(VIEWER_SCOPED).length);
+    expect(unseenPointers(pointers), '가리키기만 하고 저쪽은 안 본다').toEqual([]);
+  });
+});
 
 beforeEach(() => vi.clearAllMocks());
 

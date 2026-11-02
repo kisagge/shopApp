@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { unseenPointers, type SeenBy } from './support/exempt-proof';
 
 /**
  * **손님의 것은 주인만 연다.**
@@ -14,13 +15,22 @@ import { join } from 'node:path';
  */
 
 const db = vi.hoisted(() => ({
-  order: { findFirst: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
+  order: {
+    findFirst: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>(),
+    count: vi.fn<(...a: any[]) => any>(), groupBy: vi.fn<(...a: any[]) => any>(),
+    aggregate: vi.fn<(...a: any[]) => any>(),
+  },
   review: { findFirst: vi.fn<(...a: any[]) => any>(), findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   inquiry: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   notification: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   pointTransaction: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   address: { findFirst: vi.fn<(...a: any[]) => any>() },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>() },
+  // 마이페이지 요약이 직접 거는 집계들 — 아래 '요약의 집계마다' 가 본다
+  user: { findUnique: vi.fn<(...a: any[]) => any>() },
+  userCoupon: { count: vi.fn<(...a: any[]) => any>() },
+  wishlistItem: { count: vi.fn<(...a: any[]) => any>() },
+  orderItem: { count: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 
@@ -29,6 +39,7 @@ const { getMyReview, getMyReviews } = await import('~/lib/queries/reviews');
 const { getMyOrders, getPointHistory } = await import('~/lib/queries/mypage');
 const { getMyInquiries } = await import('~/lib/queries/inquiries');
 const { getMyNotifications, countUnread } = await import('~/lib/queries/notifications');
+const { getMyPageSummary, getPointExpiry } = await import('~/lib/queries/mypage');
 
 const OTHER = 'u-owner';
 const ME = 'u-me';
@@ -47,6 +58,15 @@ beforeEach(() => {
   db.inquiry.findMany.mockResolvedValue([]);
   db.notification.findMany.mockResolvedValue([]);
   db.pointTransaction.findMany.mockResolvedValue([]);
+  db.order.groupBy.mockResolvedValue([]);
+  db.order.aggregate.mockResolvedValue({ _sum: { payable: 0 } });
+  db.user.findUnique.mockResolvedValue({
+    grade: 'BASIC', name: '나', email: 'me@plain.test',
+    pointBalance: 0, marketingAgreedAt: null, analyticsAgreedAt: null,
+  });
+  db.userCoupon.count.mockResolvedValue(0);
+  db.wishlistItem.count.mockResolvedValue(0);
+  db.orderItem.count.mockResolvedValue(0);
 });
 
 /** 조회가 DB 에 건넨 where 절 */
@@ -120,6 +140,75 @@ describe('마이페이지의 목록도 주인 것만 센다', () => {
  * 위 검사들은 이름을 적어 둔 목록이라, 새 조회가 생기면 조용히 빠진다 — 이 검사가 막으려는 실수와 같은 모양이다.
  * 그래서 폴더를 훑어, 소유자를 인자로 받는 조회가 전부 위에 등장하는지 본다.
  */
+/**
+ * **마이페이지 요약은 "불러 모으는 자리" 가 아니다.**
+ *
+ * 면제에 "actor 를 받아 위 조회들을 불러 모으는 자리다 — 각각은 여기서 본다" 고 적혀
+ * 있었다. 그런데 이 함수는 다른 조회를 부르지 않고 **집계를 직접 세 개 돈다.**
+ * `query-authz` 쪽 면제는 "남의 것을 읽을 길이 없다(customer-query-scope)" 로 **여기를
+ * 가리키고**, 여기는 "각각은 여기서 본다" 로 되돌려 가리켰다 — **두 그물이 서로를 가리키고
+ * 아무도 안 봤다.**
+ *
+ * 돌연변이로 쟀다: 세 집계에서 `userId` 를 하나씩 떼도 웹 검사 6,315개가 전부 초록이었다.
+ * 떼면 내 마이페이지에 **플랫폼 전체**의 상태별 주문 수·쿠폰 수·찜 수가 뜬다. 새는 것이
+ * 레코드가 아니라 집계라 크게 번지지는 않지만, 그물이 막으려고 있는 자리가 여기다.
+ *
+ * (누적 구매액 집계는 `effective-grade` 가 이미 본다 — 돌연변이로 확인했다.)
+ */
+describe('마이페이지 요약의 집계마다 주인을 묻는다', () => {
+  const me = { id: ME, role: 'CUSTOMER' as const, merchantId: null };
+
+  it('상태별 주문 수를 셀 때', async () => {
+    await getMyPageSummary(me);
+
+    expect(whereOf(db.order.groupBy), '내 마이페이지에 플랫폼 전체의 주문 현황이 뜬다')
+      .toMatchObject({ userId: ME });
+  });
+
+  it('쓸 수 있는 쿠폰을 셀 때', async () => {
+    await getMyPageSummary(me);
+
+    expect(whereOf(db.userCoupon.count), '남의 쿠폰까지 센다').toMatchObject({ userId: ME });
+  });
+
+  it('찜한 것을 셀 때', async () => {
+    await getMyPageSummary(me);
+
+    expect(whereOf(db.wishlistItem.count), '남의 찜까지 센다').toMatchObject({ userId: ME });
+  });
+
+  /** 후기 쓸 줄은 공용 조건(reviewableWhere)을 쓴다 — 그 조건 안에 주인이 들어 있어야 한다 */
+  it('쓸 수 있는 후기를 셀 때', async () => {
+    await getMyPageSummary(me);
+
+    expect(whereOf(db.orderItem.count)).toMatchObject({ order: { userId: ME } });
+  });
+
+  it('등급을 읽을 때도 내 행만 읽는다', async () => {
+    await getMyPageSummary(me);
+
+    expect(whereOf(db.user.findUnique)).toEqual({ id: ME });
+  });
+});
+
+/**
+ * **"같은 where 를 쓴다" 는 덮였다는 뜻이 아니다.**
+ *
+ * 면제에 "같은 파일의 `getPointHistory` 가 같은 where 를 쓴다" 고 적혀 있었다. 글자는
+ * 정말 같다 — 그런데 **별개의 prisma 호출**이라, 저쪽이 검사된다고 이쪽 필터가 지켜지는 것이
+ * 아니다. 돌연변이로 확인했다: 여기서 `userId` 를 떼도 전부 초록이었다.
+ *
+ * 떼면 **전체 회원의 소멸 예정 적립금**이 내 마이페이지에 뜬다 — 넷 중 유일하게 금액이다.
+ */
+describe('소멸 예정 적립금도 내 것만 센다', () => {
+  it('묶음을 셀 때 주인을 함께 묻는다', async () => {
+    await getPointExpiry(ME, new Date('2026-11-02T00:00:00Z'));
+
+    expect(whereOf(db.pointTransaction.findMany), '남의 소멸 예정 적립금이 내 화면에 뜬다')
+      .toMatchObject({ userId: ME });
+  });
+});
+
 describe('빠진 조회가 없다', () => {
   const DIR = join(process.cwd(), 'src', 'lib', 'queries');
   const here = readFileSync(join(process.cwd(), 'test', 'customer-query-scope.test.ts'), 'utf8');
@@ -130,20 +219,25 @@ describe('빠진 조회가 없다', () => {
   /**
    * 소유자 id 를 받는 조회인데 여기서 안 보는 것들. 빼는 까닭을 함께 적는다 — 이유 없이 빠지면 그게 구멍이다.
    */
-  const EXEMPT: Readonly<Record<string, string>> = {
-    // 운영 조회 — 여기서 보는 것은 "내 것만 읽는가" 이고, 저쪽은 "볼 권한이 있는가" 다(query-authz)
-    getAdminReviews: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    getAdminInquiries: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    getAdminSupportPosts: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    getAdminSupportPost: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    getAuditLogs: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    exportAuditLogs: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    countPendingInquiries: '운영 조회 — 권한 검사는 query-authz 가 본다',
-    getPointExpiry: '소멸 예정 묶음을 세는 집계다. 같은 파일의 getPointHistory 가 같은 where 를 쓴다',
-    getMyPageSummary: 'actor 를 받아 위 조회들을 불러 모으는 자리다 — 각각은 여기서 본다',
-    getReviewableItems: '주문 줄에서 아직 안 쓴 후기를 고른다. actor 범위는 getMyOrders 와 같은 where 를 쓴다',
-    quoteCart: '장바구니는 화면이 준 줄로 견적만 낸다 — 저장된 것을 읽지 않는다',
-    quoteCartDetailed: '같다',
+  const EXEMPT: Readonly<Record<string, { why: string; seenBy?: SeenBy }>> = {
+    // 운영 조회 — 여기서 보는 것은 "내 것만 읽는가" 이고, 저쪽은 "볼 권한이 있는가" 다
+    ...Object.fromEntries(
+      [
+        'getAdminReviews', 'getAdminInquiries', 'getAdminSupportPosts', 'getAdminSupportPost',
+        'getAuditLogs', 'exportAuditLogs', 'countPendingInquiries',
+      ].map((name) => [name, {
+        why: '운영 조회 — 권한 검사는 query-authz 가 본다',
+        // 가리키기만 하면 안 된다: 저쪽 표에 이 이름이 실제로 있어야 한다
+        seenBy: { file: 'query-authz.test.ts', marker: `${name}:` },
+      }]),
+    ),
+    getReviewableItems: {
+      why: '주문 줄에서 아직 안 쓴 후기를 고른다. 주인은 공용 조건(reviewableWhere)이 들고 있다',
+      // 돌연변이로 확인했다 — reviewableWhere 에서 userId 를 떼면 저 검사가 진다
+      seenBy: { file: 'reviewable-items.test.ts', marker: '자기 주문만 본다' },
+    },
+    quoteCart: { why: '장바구니는 화면이 준 줄로 견적만 낸다 — 저장된 것을 읽지 않는다' },
+    quoteCartDetailed: { why: '같다' },
   };
 
   it('소유자를 받는 조회가 전부 검사에 등장한다', () => {
@@ -163,6 +257,21 @@ describe('빠진 조회가 없다', () => {
     // 훑기가 헛돌면 아래가 빈 채로 통과한다
     expect(found, '소유자를 받는 조회를 하나도 못 찾았다').toBeGreaterThan(5);
     expect(missing, '이 조회들은 남의 것을 여는지 아무도 안 본다').toEqual([]);
+  });
+
+  /**
+   * **가리킨 자리가 실제로 보는지 본다.**
+   *
+   * "저쪽이 본다" 고 적고 저쪽은 이쪽을 가리키는 일이 실제로 있었다 — 마이페이지 요약이
+   * 그랬고, 그 사이 집계 셋이 아무도 안 보는 자리로 남았다. 가리키는 말에는 증거를 붙인다.
+   */
+  it('가리킨 검사에 그 이름이 실제로 있다', () => {
+    const pointers = Object.entries(EXEMPT)
+      .filter(([, v]) => v.seenBy)
+      .map(([of, v]) => ({ of, ...v.seenBy! }));
+
+    expect(pointers.length, '가리키는 근거를 하나도 못 찾았다 — 훑기가 헛돈다').toBeGreaterThan(5);
+    expect(unseenPointers(pointers), '가리키기만 하고 저쪽은 안 본다').toEqual([]);
   });
 
   it('빼 둔 조회는 실제로 있는 조회다 — 목록만 남고 함수가 사라지면 안 된다', () => {

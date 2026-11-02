@@ -80,3 +80,40 @@ export function unprovenClaims(relRoute: string, reason: string): string[] {
   const source = routeGraph(relRoute).map((f) => readFileSync(f, 'utf8')).join('\n');
   return claimed.filter((c) => !c.proof.test(source)).map((c) => c.what);
 }
+
+/**
+ * **"저쪽이 본다" 는 근거도 증명한다.**
+ *
+ * 면제 근거가 다른 검사를 가리키는 일이 많다 — "권한 검사는 query-authz 가 본다",
+ * "getMyOrders 와 같은 where 를 쓴다". 그 말이 맞는지는 **가리킨 자리에 그 표식이
+ * 있는지**로 확인할 수 있고, 안 하면 가리키기만 하고 아무도 안 보는 일이 생긴다.
+ *
+ * 실제로 그랬다: `query-authz` 는 마이페이지 요약을 "남의 것을 읽을 길이 없다
+ * (customer-query-scope)" 로 넘기고, `customer-query-scope` 는 "각각은 여기서 본다" 로
+ * 되돌려 넘겼다 — **두 그물이 서로를 가리키고 그 사이 집계 셋이 아무도 안 보는 자리로
+ * 남았다.** 돌연변이로 확인했고(전부 초록), 그래서 가리키는 말에 증거를 붙인다.
+ *
+ * 표식은 **그쪽에서 사라지면 깨지는 글자**여야 한다 — 검사 이름이나 표의 열쇠처럼.
+ */
+export interface SeenBy {
+  /** `test/` 아래의 상대 경로 */
+  readonly file: string;
+  /** 그 파일에 있어야 하는 글자 */
+  readonly marker: string;
+}
+
+/** 가리킨 자리에 표식이 없는 것들 */
+export function unseenPointers(pointers: readonly (SeenBy & { readonly of: string })[]): string[] {
+  const missing: string[] = [];
+  for (const p of pointers) {
+    const path = join(process.cwd(), 'test', p.file);
+    if (!existsSync(path)) {
+      missing.push(`${p.of} → ${p.file} (파일이 없다)`);
+      continue;
+    }
+    if (!readFileSync(path, 'utf8').includes(p.marker)) {
+      missing.push(`${p.of} → ${p.file} 에 "${p.marker}" 가 없다`);
+    }
+  }
+  return missing;
+}
