@@ -131,6 +131,35 @@ describe('결제 걸기', () => {
  * 결제창 이름은 부르는 곳이 둘이라(장바구니 줄 / 주문에 박힌 줄) 여기 모았다.
  * 두 곳에 따로 적으면 같은 주문이 결제창에서 다른 이름으로 보인다.
  */
+/**
+ * **승인 창구가 끊겨도 주문은 남는다.**
+ *
+ * 이 `fetch` 가 맨몸이었다. 승인 도중 끊기면 여기서 던져 부르는 쪽을 지나 화면까지
+ * 올라가고, 받는 곳이 없어 **결제 단추가 "보내는 중…" 인 채로 멈췄다** — 주문은 이미
+ * 만들어져 있는데 화면은 아무 말도 하지 않았다. 창을 여는 길은 감쌌는데 이 길만 빠져
+ * 있었고, **파일에 catch 가 있다는 사실 때문에 그물도 통과시켰다.**
+ */
+describe('승인 창구가 끊길 때', () => {
+  it('승인 거절과 같은 자리로 보낸다 — 주문은 그대로다', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    const r = await payOrder({ ...base, mode: 'mock', method: 'CARD' });
+
+    // 주문 화면에서 다시 걸 수 있는 상태다. 서버가 한 말은 없다.
+    expect(r).toEqual({ kind: 'confirmFailed', message: null });
+  });
+
+  it('창을 여는 길은 그대로 — 끊김은 승인에만 해당한다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', KEY);
+    openPaymentWindow.mockRejectedValueOnce(new Error('SDK 를 못 불러왔다'));
+
+    const r = await payOrder({ ...base, mode: 'window', method: 'CARD' });
+
+    expect(r).toEqual({ kind: 'windowFailed' });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  });
+});
+
 describe('결제창에 뜨는 주문 이름', () => {
   const t = ((key: string, vars?: Record<string, unknown>) =>
     key === 'order.moreItems' ? `외 ${String(vars?.['count'])}건` : '주문') as never;

@@ -78,11 +78,26 @@ export async function payOrder(input: PayOrderInput): Promise<PayResult> {
    * 바로 승인으로 답한다.
    */
   const mockKey = `${input.method === 'VIRTUAL_ACCOUNT' ? 'mock_va' : 'mock'}_${input.orderNo}`;
-  const res = await fetch(`/api/orders/${input.orderNo}/confirm`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ paymentKey: mockKey, amount: input.payable }),
-  });
+  /*
+   * **끊겨도 주문은 남는다.**
+   *
+   * 이 창구가 맨몸이었다. 승인 도중 끊기면 여기서 던져 부르는 쪽(`place-order`)을 지나
+   * 화면까지 올라가고, 받는 곳이 없어 **결제 단추가 "보내는 중…" 인 채로 멈췄다** —
+   * 주문은 이미 만들어져 있는데 화면은 아무 말도 하지 않았다. 창을 여는 길은 위에서
+   * 감쌌는데 이 길만 빠져 있었고, 파일에 catch 가 있다는 사실 때문에 그물도 못 봤다.
+   *
+   * 승인 거절과 같은 자리로 보낸다 — 주문은 그대로이고 주문 화면에서 다시 걸 수 있다.
+   */
+  let res: Response;
+  try {
+    res = await fetch(`/api/orders/${input.orderNo}/confirm`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paymentKey: mockKey, amount: input.payable }),
+    });
+  } catch {
+    return { kind: 'confirmFailed', message: null };
+  }
 
   if (res.ok) return { kind: 'confirmed' };
 

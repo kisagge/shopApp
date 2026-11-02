@@ -18,10 +18,20 @@ import { useT } from '~/lib/i18n/client';
 export function OrderTotal({
   quote,
   pending,
+  failed,
   money,
 }: {
   quote: CartQuoteResponse | undefined;
   pending: boolean;
+  /**
+   * 견적을 못 받아 왔는가.
+   *
+   * **없으면 실패가 "계산 중" 으로 보인다.** 금액이 없는 까닭은 둘인데(아직 묻는 중,
+   * 물었지만 못 받았다) 그리는 모습이 같으면 사람은 영원히 기다린다 — 그 사이 결제
+   * 단추는 `aria-disabled` 로 잠겨 있고 왜 잠겼는지는 아무 데도 없다. 장바구니는
+   * 이것을 이미 그리고 있었다(`cart-view` 의 `quote.isError`).
+   */
+  failed: boolean;
   money: (won: number) => string;
 }) {
   const t = useT();
@@ -29,7 +39,11 @@ export function OrderTotal({
   return (
     <section aria-labelledby="total-title">
       <h2 id="total-title" className="mb-3.5 text-sm font-semibold">{t('checkout.total')}</h2>
-      {pending || !quote ? (
+      {failed ? (
+        <p role="alert" className="rounded-sm bg-accent-soft px-3 py-2.5 text-[13px] text-accent-hover">
+          {t('cart.quoteFailed')}
+        </p>
+      ) : pending || !quote ? (
         <p className="text-[13px] text-[var(--fg-muted)]">{t('cart.calculating')}</p>
       ) : (
         <dl className="flex flex-col gap-2.5">

@@ -83,38 +83,69 @@ export function usePlaceOrder(mode: PaymentMode) {
     setError(null);
     setPending(true);
 
-    const res = await fetch('/api/orders', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        lines: input.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
-        addressId: input.addressId,
-        ...(input.memo.trim() ? { deliveryMemo: input.memo.trim() } : {}),
-        /*
-         * **견적에 붙인 쿠폰은 주문에도 붙어야 한다.** 화면에서는 깎인 금액이
-         * 보이는데 주문이 제값으로 만들어지면, 사람은 결제창에서야 다른 숫자를
-         * 본다. 서버가 다시 검증하므로 여기서 보내는 것은 "무엇을 골랐는가" 다.
-         */
-        ...(input.couponCode ? { couponCode: input.couponCode } : {}),
-        ...(input.pointsToUse > 0 ? { pointsToUse: input.pointsToUse } : {}),
-        paymentMethod: input.method,
-        // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다
-        browserSessionId: getSessionId(),
-        // 같은 시도를 두 번 보내도 주문은 하나다
-        idempotencyKey: orderKey,
-        agreedToTerms: true,
-      }),
-    });
+    /*
+     * **끊기는 길도 끝을 맺어야 한다.**
+     *
+     * 여기에 try 가 없었다. `fetch` 가 던지면(오프라인·DNS·중단) 아래 `setPending(false)` 에
+     * 닿지 못하고, 부르는 쪽(`checkout-form`)도 감싸지 않아 **결제 단추가 "보내는 중…" 인
+     * 채로 영영 남았다 — 아무 말도 없이.** 이벤트 핸들러에서 난 거절은 오류 경계도 받지
+     * 않으므로 어디에도 안 뜬다.
+     *
+     * 다시 눌러도 주문은 하나다 — 열쇠가 훅이 사는 동안 같은 값이라 서버가 같은 시도로
+     * 묶는다. 그래서 여기서 할 일은 잠금을 풀고 무슨 일인지 말하는 것뿐이다.
+     */
+    let res: Response;
+    try {
+      res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          lines: input.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity })),
+          addressId: input.addressId,
+          ...(input.memo.trim() ? { deliveryMemo: input.memo.trim() } : {}),
+          /*
+           * **견적에 붙인 쿠폰은 주문에도 붙어야 한다.** 화면에서는 깎인 금액이
+           * 보이는데 주문이 제값으로 만들어지면, 사람은 결제창에서야 다른 숫자를
+           * 본다. 서버가 다시 검증하므로 여기서 보내는 것은 "무엇을 골랐는가" 다.
+           */
+          ...(input.couponCode ? { couponCode: input.couponCode } : {}),
+          ...(input.pointsToUse > 0 ? { pointsToUse: input.pointsToUse } : {}),
+          paymentMethod: input.method,
+          // 퍼널을 이어 붙이려면 조회·담기와 같은 세션이어야 한다
+          browserSessionId: getSessionId(),
+          // 같은 시도를 두 번 보내도 주문은 하나다
+          idempotencyKey: orderKey,
+          agreedToTerms: true,
+        }),
+      });
+    } catch {
+      setPending(false);
+      setError(t('checkout.orderFailed'));
+      return { refetchQuote: false };
+    }
 
     setPending(false);
 
     if (!res.ok) {
-      const body = (await res.json()) as Partial<OrderError> & { message?: string };
+      /*
+       * **본문을 맨몸으로 읽지 않는다.** 앞단이 502 HTML 을 주거나 본문이 비면 이 줄이
+       * 던진다 — try 밖이라 그대로 거절이 되어, **서버가 한 말이 있는 자리에서 화면은
+       * 아무 말도 못 하고 멈췄다.** `failure-message.ts` 가 적어 둔 그 고장이다.
+       */
+      const body = (await res.json().catch(() => ({}))) as Partial<OrderError> & { message?: string };
       setError(body.message ?? t('checkout.orderFailed'));
       return { refetchQuote: body.code === 'OUT_OF_STOCK' };
     }
 
-    const order = (await res.json()) as CreateOrderResponse;
+    /*
+     * 200 인데 본문을 못 읽은 경우. 주문은 만들어졌을 수 있으니 "실패했다" 로 끝내지
+     * 않고 다시 시도하라고 한다 — 열쇠가 같으므로 다시 보내도 주문은 하나다.
+     */
+    const order = (await res.json().catch(() => null)) as CreateOrderResponse | null;
+    if (order === null) {
+      setError(t('checkout.orderFailed'));
+      return { refetchQuote: false };
+    }
     track('add_payment_info', { method: input.method });
 
     /**

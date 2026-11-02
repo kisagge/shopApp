@@ -78,6 +78,71 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn());
 });
 
+/**
+ * **끊기는 길도 끝을 맺는다.**
+ *
+ * 여기 try 가 없었다. `fetch` 가 던지면 잠금을 푸는 줄까지 못 가고, 부르는 쪽
+ * (`checkout-form`)도 감싸지 않아 **결제 단추가 "보내는 중…" 인 채로 영영 남았다 —
+ * 아무 말도 없이.** 이벤트 핸들러의 거절은 오류 경계도 받지 않아 어디에도 안 뜬다.
+ *
+ * 돈이 걸린 자리의 고장인데 서버 로그에는 아무것도 안 남는다. 눌러 봐야만 보인다.
+ */
+describe('끊겨도 끝을 맺는다', () => {
+  it('창구가 던지면 잠금을 풀고 까닭을 말한다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBe(ko['checkout.orderFailed']);
+  });
+
+  /**
+   * **본문을 맨몸으로 읽지 않는다.** 앞단이 502 HTML 을 주면 `res.json()` 이 던진다 —
+   * 서버가 한 말이 있는 자리에서 화면이 아무 말도 못 하고 멈췄다.
+   */
+  it('실패 응답이 JSON 이 아니어도 말하고 멈추지 않는다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('<html>502</html>', { status: 502 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBe(ko['checkout.orderFailed']);
+  });
+
+  /** 서버가 한 말이 있으면 그 말을 쓴다 — 기본 문구로 덮지 않는다 */
+  it('서버가 한 말은 그대로 옮긴다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    vi.mocked(fetch).mockResolvedValueOnce(fail({ code: 'OUT_OF_STOCK', message: '재고가 모자랍니다' }, 409));
+
+    let out: { refetchQuote: boolean } | undefined;
+    await act(async () => { out = await result.current.place(input([item('v1')])); });
+
+    expect(result.current.error).toBe('재고가 모자랍니다');
+    // 재고로 막힌 것만 금액을 다시 받는다
+    expect(out).toEqual({ refetchQuote: true });
+  });
+
+  /**
+   * 200 인데 본문을 못 읽은 경우. 주문은 만들어졌을 수 있어 열쇠가 같은 다시 보내기가
+   * 안전하다 — 그래서 멈추지 않고 다시 시도하라고 한다. **결제는 걸지 않는다.**
+   */
+  it('200 인데 본문을 못 읽으면 결제를 걸지 않고 다시 시도하라고 한다', async () => {
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    vi.mocked(fetch).mockResolvedValueOnce(new Response('<html>', { status: 200 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(false);
+    expect(result.current.error).toBe(ko['checkout.orderFailed']);
+    expect(openPaymentWindow).not.toHaveBeenCalled();
+    // 주문을 만들지 못했으면 장바구니는 그대로 둔다
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('같은 시도는 한 번만', () => {
   /**
    * 열쇠가 매번 새로 만들어지면 **있어도 없는 것과 같다.** 두 번 눌렀을 때

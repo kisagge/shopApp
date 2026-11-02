@@ -334,7 +334,7 @@ export function CheckoutForm({
         realGateway={realGateway}
       />
 
-      <OrderTotal quote={q} pending={quote.isPending} money={money} />
+      <OrderTotal quote={q} pending={quote.isPending} failed={quote.isError} money={money} />
 
       <section aria-labelledby="agree-title">
         <h2 id="agree-title" className="sr-only">{t('checkout.terms')}</h2>

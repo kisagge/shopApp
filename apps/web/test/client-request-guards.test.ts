@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 /**
  * 창구를 거는 화면 조각이 **끝을 맺는지** 지킨다.
@@ -23,10 +23,9 @@ import { join } from 'node:path';
 
 const SRC = join(process.cwd(), 'src');
 
-/** `'use client'` 로 시작하고 창구를 거는 조각들. 손으로 적지 않고 폴더에서 찾는다. */
-function clientFetchers(): { path: string; code: string }[] {
-  const found: { path: string; code: string }[] = [];
-
+/** src 아래 모든 `.ts`·`.tsx` — 폴더도 확장자도 손으로 적지 않는다 */
+function sourceFiles(): { full: string; code: string }[] {
+  const out: { full: string; code: string }[] = [];
   const walk = (dir: string) => {
     for (const name of readdirSync(dir)) {
       const full = join(dir, name);
@@ -34,17 +33,94 @@ function clientFetchers(): { path: string; code: string }[] {
         walk(full);
         continue;
       }
-      if (!name.endsWith('.tsx')) continue;
-      const code = readFileSync(full, 'utf8');
-      if (!code.startsWith("'use client'")) continue;
-      // `quote.refetch()` 같은 것은 창구가 아니다
-      if (!/(^|[^\w.])fetch\(/.test(code)) continue;
-      found.push({ path: full.replace(SRC, '').replaceAll('\\', '/'), code });
+      if (!/\.tsx?$/.test(name)) continue;
+      out.push({ full, code: readFileSync(full, 'utf8') });
     }
   };
-  walk(join(SRC, 'app'));
-  walk(join(SRC, 'components'));
-  return found.sort((a, b) => a.path.localeCompare(b.path));
+  walk(SRC);
+  return out;
+}
+
+const FILES = sourceFiles();
+const byFull = new Map(FILES.map((f) => [f.full, f.code]));
+
+/** `'use client'` 를 적은 파일인가 — 경계를 여는 쪽이다 */
+function declaresClient(code: string): boolean {
+  return code.startsWith("'use client'");
+}
+
+/**
+ * 한 파일이 저장소 안에서 **값으로** 들여오는 자리.
+ *
+ * **타입만 들여오는 것은 세지 않는다.** 타입은 컴파일에서 사라지므로 그 모듈이 브라우저로
+ * 따라가지 않는다. 안 가리면 `payments/toss.ts`(`import 'server-only'` 로 시작하는 서버
+ * 전용 모듈)까지 브라우저 식구로 끌려 들어왔다 — 그러면 그물이 서버 코드에 브라우저
+ * 규칙을 들이댄다.
+ */
+function localSpecs(code: string): string[] {
+  const out: string[] = [];
+  for (const m of code.matchAll(/(?:^|\n)\s*(?:import|export)\s+(type\s+)?([^;'"]*?)\sfrom\s*'([^']+)'/g)) {
+    const spec = m[3]!;
+    if (!spec.startsWith('.') && !spec.startsWith('~/')) continue;
+    const clause = (m[2] ?? '').trim();
+    // `import type { A } from …` 와 `import { type A, type B } from …` 둘 다 타입뿐이다
+    const onlyTypes =
+      Boolean(m[1]) ||
+      (/^\{[\s\S]*\}$/.test(clause) &&
+        clause
+          .replace(/[{}]/g, '')
+          .split(',')
+          .filter((one) => one.trim() !== '')
+          .every((one) => /^\s*type\s/.test(one)));
+    if (onlyTypes) continue;
+    out.push(spec);
+  }
+  return out;
+}
+
+/** `~/x` 와 `./x` 를 실제 파일로. 확장자 없이 적고, 폴더면 index 를 쓴다 */
+function resolveLocal(fromFull: string, spec: string): string | null {
+  const base = spec.startsWith('~/')
+    ? join(SRC, spec.slice(2))
+    : join(dirname(fromFull), spec);
+  for (const candidate of [`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'), join(base, 'index.tsx')]) {
+    if (byFull.has(candidate)) return candidate;
+  }
+  return byFull.has(base) ? base : null;
+}
+
+/**
+ * 브라우저로 가는 파일들.
+ *
+ * **지시문을 적은 파일만 세면 결제가 빠진다.** `'use client'` 는 **경계**를 표시하는 것이고,
+ * 그 경계 안쪽으로 끌려 들어온 모듈은 지시문을 적지 않는다 — Next 가 알아서 함께 보낸다.
+ * `pay-order.ts` 가 그랬다: 지시문도 `.tsx` 도 아니지만 브라우저에서 결제 승인 창구를 걸고,
+ * 그 `fetch` 는 아무도 받아 내지 않고 있었다. 그물이 못 본 까닭은 결함이 숨어서가 아니라
+ * **표식이 지시문이었기 때문이다.**
+ *
+ * 그래서 지시문을 적은 파일에서 **들여오기를 따라 걸어** 경계 안쪽을 모은다.
+ */
+function clientGraph(): Set<string> {
+  const seen = new Set<string>();
+  const queue = FILES.filter((f) => declaresClient(f.code)).map((f) => f.full);
+  while (queue.length > 0) {
+    const full = queue.pop()!;
+    if (seen.has(full)) continue;
+    seen.add(full);
+    for (const spec of localSpecs(byFull.get(full)!)) {
+      const next = resolveLocal(full, spec);
+      if (next !== null) queue.push(next);
+    }
+  }
+  return seen;
+}
+
+/** 브라우저로 가면서 창구를 거는 조각들. 손으로 적지 않는다. */
+function clientFetchers(): { path: string; code: string }[] {
+  return [...clientGraph()]
+    .filter((full) => /(^|[^\w.])fetch\(/.test(byFull.get(full)!))
+    .map((full) => ({ path: full.replace(SRC, '').replaceAll('\\', '/'), code: byFull.get(full)! }))
+    .sort((a, b) => a.path.localeCompare(b.path));
 }
 
 const FETCHERS = clientFetchers();
@@ -66,6 +142,32 @@ describe('훑을 것이 실제로 있다', () => {
       expect(paths, one).toContain(one);
     }
   });
+
+  /**
+   * **넓힌 눈이 다시 좁아지면 여기서 진다.**
+   *
+   * 아래 넷은 그물 밖에 있던 자리다. 눈을 좁히면 그물은 **조용히 통과한다** — 검사할
+   * 식구가 사라지니 질 사람이 없다. 그래서 식구임을 따로 못 박는다.
+   *
+   * 좁히는 길이 셋이고, 셋 다 이들 중 일부를 떨어뜨린다(돌연변이로 하나씩 확인했다):
+   *
+   *   - 폴더를 손으로 적기(`app`·`components`) → `lib` 넷 전부
+   *   - 확장자를 `.tsx` 로 보기 → JSX 에서 떼어 낸 훅 전부
+   *   - 지시문을 적은 파일만 세기 → 경계 안쪽으로 끌려 들어온 `pay-order`·`analytics/client`
+   */
+  it.each([
+    '/lib/use-cart-quote.ts',
+    '/lib/checkout/place-order.ts',
+    '/lib/checkout/pay-order.ts',
+    '/lib/analytics/client.ts',
+  ])('%s 도 식구다', (path) => {
+    expect(FETCHERS.map((f) => f.path)).toContain(path);
+  });
+
+  /** 서버 전용 모듈은 식구가 아니다 — 브라우저 규칙을 들이대면 안 된다 */
+  it('타입만 들여온 서버 모듈은 끌려 들어오지 않는다', () => {
+    expect(FETCHERS.map((f) => f.path)).not.toContain('/lib/payments/toss.ts');
+  });
 });
 
 /**
@@ -77,9 +179,132 @@ describe('훑을 것이 실제로 있다', () => {
  *
  * `try { } catch` 든 `.catch(...)` 든 상관없다. 받아 내기만 하면 된다.
  */
-const NO_CATCH_EXEMPT: Readonly<Record<string, string>> = {
-  '/components/recently-viewed.tsx':
-    '여기 fetch 는 조회 함수다 — 던지면 그것을 부른 쪽(데이터 훅)이 받아 실패 상태로 그린다. 여기서 받아 내면 훅이 실패를 못 본다.',
+/**
+ * **파일에 catch 가 있는지로는 모자라다.**
+ *
+ * 처음에는 `/catch/.test(code)` 였다. 한 파일에 창구가 둘이고 **한쪽만** 감싸져 있으면
+ * 그대로 통과한다 — `pay-order.ts` 가 그랬다. 결제창을 여는 길은 `try` 로 감쌌는데
+ * 창 없이 승인까지 가는 길(`/confirm`)은 맨몸이었고, 파일에 catch 가 있다는 사실 하나로
+ * 그물을 지나갔다. 그 길이 끊기면 결제 단추가 "보내는 중…" 인 채로 영영 남는다.
+ *
+ * 아래 json·ok 검사가 이미 같은 교훈을 적어 두었다 — "호출 하나씩 본다". 여기에도 적용한다.
+ *
+ * 괄호 깊이를 세어 `try { … }` 안쪽인지 보고, 아니면 `.catch` 가 바로 붙었는지 본다.
+ * 글자열과 주석은 괄호 셈에서 뺀다 — 안 빼면 `'{'` 한 글자에 셈이 어긋난다.
+ */
+/** `(` 가 있는 자리에서 짝이 되는 `)` 다음 칸. 글자열·주석은 셈에서 뺀다 */
+function closingParen(code: string, openAt: number): number {
+  let depth = 0;
+  let i = openAt;
+  while (i < code.length) {
+    const two = code.slice(i, i + 2);
+    if (two === '//') { const at = code.indexOf('\n', i); i = at === -1 ? code.length : at + 1; continue; }
+    if (two === '/*') { const at = code.indexOf('*/', i); i = at === -1 ? code.length : at + 2; continue; }
+    const ch = code[i]!;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i += 1;
+      while (i < code.length && code[i] !== ch) i += code[i] === '\\' ? 2 : 1;
+      i += 1;
+      continue;
+    }
+    if (ch === '(') depth += 1;
+    if (ch === ')') {
+      depth -= 1;
+      if (depth === 0) return i + 1;
+    }
+    i += 1;
+  }
+  return code.length;
+}
+
+/**
+ * 창구 뒤에 이어 붙은 사슬에 `.catch` 가 있는가.
+ *
+ * **바로 붙은 것만 보면 안 된다.** `fetch(…).then(…).catch(…)` 가 이 저장소에서 가장 흔한
+ * 모양이다(장바구니 맞추기, 검색 자동완성, 일부 취소). 사슬을 한 칸씩 걸어가며 본다 —
+ * `.then` 이든 `.finally` 든 지나가고, `.catch` 를 만나면 받아 낸 것이다.
+ */
+function chainCatches(code: string, from: number): boolean {
+  let at = from;
+  for (;;) {
+    const link = /^\s*\.(\w+)\s*\(/.exec(code.slice(at));
+    if (!link) return false;
+    if (link[1] === 'catch') return true;
+    at = closingParen(code, at + link[0].length - 1);
+  }
+}
+
+function unguardedCalls(code: string, callee: string): number[] {
+  const open = `${callee}(`;
+  const tryDepths: number[] = [];
+  const out: number[] = [];
+  let depth = 0;
+  let i = 0;
+
+  const skipTo = (end: string): void => {
+    const at = code.indexOf(end, i + end.length);
+    i = at === -1 ? code.length : at + end.length;
+  };
+
+  while (i < code.length) {
+    const two = code.slice(i, i + 2);
+    if (two === '//') { skipTo('\n'); continue; }
+    if (two === '/*') { skipTo('*/'); continue; }
+    const ch = code[i]!;
+    if (ch === '"' || ch === "'" || ch === '`') {
+      i += 1;
+      while (i < code.length && code[i] !== ch) i += code[i] === '\\' ? 2 : 1;
+      i += 1;
+      continue;
+    }
+    if (ch === '{') { depth += 1; i += 1; continue; }
+    if (ch === '}') {
+      depth -= 1;
+      while (tryDepths.length > 0 && tryDepths[tryDepths.length - 1]! > depth) tryDepths.pop();
+      i += 1;
+      continue;
+    }
+    if (code.startsWith('try', i) && /^try\s*\{/.test(code.slice(i))) {
+      // 여는 괄호는 다음 바퀴가 센다 — 그때의 깊이가 이 try 의 안쪽이다
+      tryDepths.push(depth + 1);
+      i += 3;
+      continue;
+    }
+    if (code.startsWith(open, i) && !/[\w.]/.test(code[i - 1] ?? ' ')) {
+      /*
+       * **`.catch` 는 이 창구의 것이어야 한다.** 처음에는 뒤쪽 900자에서 `) .catch` 를
+       * 찾았는데, 바로 아래의 `res.json().catch(…)` 가 그 모양에 걸려 **맨몸인 fetch 를
+       * 감싼 것으로 읽혔다**(`pay-order.ts` 의 승인 창구가 그렇게 빠져나갔다).
+       * 그래서 fetch 가 연 괄호가 닫히는 자리를 찾아 **거기 바로 붙은 것만** 센다.
+       */
+      const guarded = tryDepths.length > 0 || chainCatches(code, closingParen(code, i + callee.length));
+      if (!guarded) out.push(i);
+      i += open.length;
+      continue;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+const unguardedFetches = (code: string): number[] => unguardedCalls(code, 'fetch');
+
+const NO_CATCH_EXEMPT: Readonly<
+  Record<string, { why: string; caughtBy?: string; shownBy?: readonly string[] }>
+> = {
+  '/components/recently-viewed.tsx': {
+    why: '여기 fetch 는 조회 함수다 — 던지면 그것을 부른 쪽(데이터 훅)이 받아 실패 상태로 그린다. 여기서 받아 내면 훅이 실패를 못 본다.',
+  },
+  '/lib/use-cart-quote.ts': {
+    why:
+      'react-query 의 queryFn 이다 — **던지는 것이 계약이다.** 여기서 받아 내면 질의는 성공한 것처럼 보이면서 data 가 없고, ' +
+      '화면은 실패를 영원히 "계산 중" 으로 그린다. 대신 쓰는 화면이 isError 를 그려야 하고, 그것을 아래에서 증명한다.',
+    shownBy: ['/components/cart-view.tsx', '/components/checkout-form.tsx'],
+  },
+  '/components/order-address-edit.tsx': {
+    why: '보내는 것은 여기가 하지만 **받아 내는 것은 주소 폼이다** — submit 콜백으로 넘기고 그쪽이 try 로 감싼다.',
+    caughtBy: '/components/address-form.tsx',
+  },
 };
 
 describe('길이 끊겨도 끝을 맺는다', () => {
@@ -88,10 +313,41 @@ describe('길이 끊겨도 끝을 맺는다', () => {
     for (const path of Object.keys(NO_CATCH_EXEMPT)) expect(paths, path).toContain(path);
   });
 
+  /**
+   * **면제는 근거까지 증명한다.** "저쪽이 받아 낸다" 고 적었으면 저쪽이 실제로 감싸야 하고,
+   * "화면이 그린다" 고 적었으면 그 화면이 실제로 실패를 읽어야 한다. 거기까지 안 하면
+   * 면제는 그냥 구멍이다 — 아래 두 검사는 `guardedBy`·`askedBy` 와 같은 결이다.
+   */
+  it.each(
+    Object.entries(NO_CATCH_EXEMPT)
+      .filter(([, v]) => v.caughtBy)
+      .map(([path, v]) => [path, v.caughtBy!]),
+  )('%s 를 받아 내기로 한 %s 가 실제로 감싼다', (_path, caughtBy) => {
+    const owner = readFileSync(join(SRC, caughtBy.slice(1)), 'utf8');
+    expect(
+      unguardedCalls(owner, 'submit'),
+      `${caughtBy} 가 콜백을 try 로 감싸지 않으면 면제는 그냥 구멍이다`,
+    ).toEqual([]);
+  });
+
+  it.each(
+    Object.entries(NO_CATCH_EXEMPT)
+      .flatMap(([path, v]) => (v.shownBy ?? []).map((screen) => [path, screen] as const)),
+  )('%s 의 실패를 %s 가 그린다', (_path, screen) => {
+    const code = readFileSync(join(SRC, screen.slice(1)), 'utf8');
+    expect(
+      /\.isError\b/.test(code),
+      `${screen} 이 isError 를 안 본다 — 질의가 실패하면 화면은 그것을 "계산 중" 으로 그린다`,
+    ).toBe(true);
+  });
+
   it.each(FETCHERS.filter((f) => !(f.path in NO_CATCH_EXEMPT)).map((f) => [f.path, f.code]))(
-    '%s 는 실패를 받아 낸다',
+    '%s 는 창구마다 실패를 받아 낸다',
     (_path, code) => {
-      expect(/catch/.test(code), '끊기면 보내는 중인 채로 멈춘다 — try/catch 나 .catch 를 두세요').toBe(true);
+      expect(
+        unguardedFetches(code),
+        '맨몸으로 거는 창구가 있다 — 끊기면 보내는 중인 채로 멈춘다. try/catch 나 .catch 를 두세요',
+      ).toEqual([]);
     },
   );
 });

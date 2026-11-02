@@ -33,7 +33,7 @@ const quote = (over: Partial<CartQuoteResponse> = {}): CartQuoteResponse =>
 
 const money = (value: number) => `${value.toLocaleString('ko-KR')}원`;
 const open = (props: Partial<Parameters<typeof OrderTotal>[0]> = {}) =>
-  render(<OrderTotal quote={quote()} pending={false} money={money} {...props} />);
+  render(<OrderTotal quote={quote()} pending={false} failed={false} money={money} {...props} />);
 
 const line = (label: string) => screen.getByText(label).parentElement!;
 
@@ -45,10 +45,46 @@ describe('아직 셈이 끝나지 않았을 때', () => {
   });
 
   it('견적이 아직 없으면 금액을 적지 않는다', () => {
-    render(<OrderTotal quote={undefined} pending={false} money={money} />);
+    render(<OrderTotal quote={undefined} pending={false} failed={false} money={money} />);
 
     expect(screen.getByText('계산 중…')).toBeDefined();
     expect(screen.queryByText('상품 금액')).toBeNull();
+  });
+});
+
+/**
+ * **실패를 "계산 중" 으로 그리지 않는다.**
+ *
+ * 금액이 없는 까닭은 둘이다 — 아직 묻는 중이거나, 물었지만 못 받았다. 그리는 모습이 같으면
+ * 사람은 영원히 기다린다. 그 사이 결제 단추는 `aria-disabled` 로 잠겨 있고 왜 잠겼는지는
+ * 아무 데도 없다. 장바구니는 이것을 이미 그리고 있었는데(`cart-view` 의 `quote.isError`)
+ * 결제 화면만 빠져 있었다 — 돈을 내는 자리가 빠진 셈이다.
+ */
+describe('견적을 못 받아 왔을 때', () => {
+  it('계산 중이라고 하지 않는다', () => {
+    open({ quote: undefined, failed: true });
+
+    expect(screen.queryByText('계산 중…')).toBeNull();
+  });
+
+  it('못 받았다고 소리로도 말한다', () => {
+    open({ quote: undefined, failed: true });
+
+    expect(screen.getByRole('alert').textContent).toContain('금액을 불러오지 못했습니다');
+  });
+
+  it('금액 줄은 적지 않는다 — 없는 숫자를 그릴 수 없다', () => {
+    open({ quote: undefined, failed: true });
+
+    expect(screen.queryByText('상품 금액')).toBeNull();
+    expect(document.querySelector('dl')).toBeNull();
+  });
+
+  /** 구역 제목은 남는다 — 통째로 사라지면 금액 자리가 어디였는지 알 수 없다 */
+  it('제목은 그대로 남는다', () => {
+    open({ quote: undefined, failed: true });
+
+    expect(screen.getByRole('region', { name: '결제 금액' })).toBeDefined();
   });
 });
 

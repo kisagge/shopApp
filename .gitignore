@@ -69,4 +69,10 @@ packages/db/src/generated/
 skills-lock.json
 packages/*/.claude/
 
+# 뿌리의 스킬도 같다 — 손으로 받아 둔 남의 스킬이 들어온다
+# (cloudflare/security-audit-skill, 문서 16개 + 검증기 둘).
+# 제품이 아니라 내가 쓰는 도구이고, 이 저장소는 공개라 한 번 밀면 역사에
+# 남는다. `skills/` 만 막는다 — 옆의 launch.json 은 미리보기 설정이라 추적한다.
+.claude/skills/
+
 
