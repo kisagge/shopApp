@@ -64,6 +64,18 @@ const item = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
+/**
+ * **기한을 재는 검사의 날짜는 지금에서 거슬러 센다.**
+ *
+ * 배송완료일을 `2026-10-02` 로 적어 두었더니 **31일째 되는 날 게이트가 빨개졌다.** 반품
+ * 기한이 가장 긴 하자·오배송도 30일이라, 그날부터 폼이 서지 않는다 — 아무도 아무것도
+ * 고치지 않았는데 검사가 진다. 그러면 원인을 그날의 변경에서 찾게 되고, 거기엔 없다.
+ *
+ * 날짜를 고정하는 것 자체가 나쁜 것은 아니다(주문번호처럼 그냥 글자인 자리도 있다).
+ * **기한의 안쪽에 있다는 뜻으로 쓴 날짜**만 지금을 기준으로 둔다.
+ */
+const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
 const order = (over: Record<string, unknown> = {}) => ({
   orderNo: '20260930-0000001',
   status: 'DELIVERED',
@@ -74,8 +86,8 @@ const order = (over: Record<string, unknown> = {}) => ({
   shippingFee: 3_000,
   listTotal: 289_000,
   productDiscount: 0,
-  placedAt: new Date('2026-09-30T01:00:00Z'),
-  deliveredAt: new Date('2026-10-02T01:00:00Z'),
+  placedAt: daysAgo(4),
+  deliveredAt: daysAgo(2),
   recipient: '장○○', phone: '010-1234-5678',
   postalCode: '04524', address1: '서울 중구 세종대로 110', address2: '3층',
   deliveryMemo: null,
@@ -235,7 +247,7 @@ describe('필요할 때만 묻는다', () => {
   it('신청이 있으면 읽는다', async () => {
     getOrderForUser.mockResolvedValue(order({
       status: 'RETURN_REQUESTED',
-      returnRequests: [{ id: 'r-1', type: 'RETURN', reason: 'DEFECT', status: 'APPROVED', detail: null, rejectReason: null, shippingBorneBy: 'SELLER', reshipCarrier: null, reshipTrackingNumber: null, exchangeLines: [], approvedAt: new Date('2026-10-03T00:00:00Z'), receivedAt: null }],
+      returnRequests: [{ id: 'r-1', type: 'RETURN', reason: 'DEFECT', status: 'APPROVED', detail: null, rejectReason: null, shippingBorneBy: 'SELLER', reshipCarrier: null, reshipTrackingNumber: null, exchangeLines: [], approvedAt: daysAgo(1), receivedAt: null }],
     }));
 
     await open();
