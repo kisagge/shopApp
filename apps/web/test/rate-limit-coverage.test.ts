@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { unprovenClaims } from './support/exempt-proof';
 
 /**
  * 제한이 필요한 창구를 **폴더에서 찾는다.**
@@ -29,7 +30,11 @@ const EXEMPT: Readonly<Record<string, string>> = {
   'api/theme/route.ts':
     '쿠키 하나를 굽고 끝난다 — DB 도 저장소도 안 건드린다. 언어와 같은 폼 전송이라 429 의 JSON 이 사람에게 그대로 보인다.',
   'api/webhooks/toss/route.ts':
-    '결제사가 부른다. 사람이 아니라 재시도 정책이 호출 빈도를 정하고, 조이면 입금 통지를 놓친다. 서명 검증이 아무나 못 부르게 막는다.',
+    '결제사가 부른다. 사람이 아니라 재시도 정책이 호출 빈도를 정하고, 조이면 입금 통지를 놓친다. ' +
+    '**아무나 부를 수 있는 자리다** — 서명 검증이 없다. 본문을 안 믿고 상태·금액을 PG 에 다시 묻는 ' +
+    '설계라 필요가 없고(라우트 주석·docs/DEPLOY.md), 그래서 제한이 없어도 무결제 결제완료는 불가능하다. ' +
+    '조회는 pgPaymentKey 유니크 인덱스 한 건이다. 남는 위험 하나: 유효한 키를 아는 사람(자기 가상계좌 ' +
+    '주문을 한 손님 포함)이 PG 조회를 무제한 유발할 수 있다 — 쿼터가 문제가 되면 그때 제한을 건다.',
   'api/cart/route.ts':
     '한 사용자에 장바구니 하나다. (사용자, 변형) 유니크가 있어 몇 번을 불러도 줄이 늘지 않고, 담을 수 있는 줄 수도 MAX_CART_LINES 로 묶여 있다.',
   'api/cart/sync/route.ts': '같은 장바구니를 덮어쓴다 — 반복해도 줄이 늘지 않는다.',
@@ -101,6 +106,23 @@ const EXEMPT_ZONE: readonly { prefix: string; reason: string; proof: RegExp }[] 
 ];
 
 const inZone = (rel: string) => EXEMPT_ZONE.find((z) => rel.startsWith(z.prefix));
+
+/**
+ * **평평한 면제 맵의 근거도 증명한다.**
+ *
+ * `EXEMPT_ZONE` 은 근거마다 `proof` 를 달아 두는데 위의 `EXEMPT` 는 글로만 받고 있었다.
+ * 그래서 토스 웹훅 줄이 "서명 검증이 아무나 못 부르게 막는다" 로 통과했다 — **서명 검증은
+ * 저장소에 없다.** 거짓 근거는 걸리지 않은 채 두 번째 훑기(customer-session-coverage)와
+ * README 로 복사됐다. 통제를 내세운 근거만 증명을 요구한다 — support/exempt-proof 를 보라.
+ */
+describe('면제의 근거', () => {
+  it.each(Object.entries(EXEMPT))('%s 의 근거가 내세운 통제가 실제로 있다', (rel, reason) => {
+    expect(
+      unprovenClaims(rel, reason),
+      `${rel} 의 면제 근거가 없는 통제를 내세운다. 소스에 있는 것으로 근거를 고치거나, 그 통제를 만든다`,
+    ).toEqual([]);
+  });
+});
 
 const ROUTES = allRoutes();
 const GUARDED = ROUTES.filter((r) => !(r in EXEMPT) && !inZone(r));

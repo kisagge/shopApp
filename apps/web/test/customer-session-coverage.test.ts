@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { unprovenClaims } from './support/exempt-proof';
 
 /**
  * 손님 창구가 **세션을 확인하는지** 폴더에서 찾는다.
@@ -64,7 +65,9 @@ const NO_SESSION: Readonly<Record<string, string>> = {
   'api/theme/route.ts':
     '쿠키 한 장을 굽고 끝난다. 밝기는 로그인과 무관하고, 비로그인에게도 저장돼야 한다.',
   'api/webhooks/toss/route.ts':
-    '결제사가 부른다. 사람의 세션이 아니라 서명이 아무나 못 부르게 막는다.',
+    '결제사가 부른다. 사람이 부르는 자리가 아니라 세션이 없고, 서명 검증도 없다. ' +
+    '본문을 안 믿고 상태·금액을 PG 에 다시 묻는 설계라 누가 불러도 결과가 같다 — ' +
+    '요청 제한 훑기의 같은 줄에 자세히 적었다.',
 };
 
 /**
@@ -88,6 +91,25 @@ const SERVES_GUESTS: Readonly<Record<string, string>> = {
 
 const ROUTES = customerRoutes();
 const WRITING = ROUTES.filter((rel) => WRITES.test(read(rel)));
+
+/**
+ * **면제의 근거가 통제를 내세우면 증명한다.**
+ *
+ * 이 파일의 토스 웹훅 줄은 "서명이 아무나 못 부르게 막는다" 였는데 **서명 검증은 저장소에
+ * 없다.** 요청 제한 훑기에 같은 거짓 근거가 있었고 이쪽으로 복사된 것이다 — 글로만 받는
+ * 근거는 베껴지면서 함께 퍼진다.
+ */
+describe('면제의 근거', () => {
+  it.each([...Object.entries(NO_SESSION), ...Object.entries(SERVES_GUESTS)])(
+    '%s 의 근거가 내세운 통제가 실제로 있다',
+    (rel, reason) => {
+      expect(
+        unprovenClaims(rel, reason),
+        `${rel} 의 면제 근거가 없는 통제를 내세운다`,
+      ).toEqual([]);
+    },
+  );
+});
 
 describe('손님 쓰기 창구는 세션을 확인한다', () => {
   it('훑을 창구가 실제로 있다', () => {

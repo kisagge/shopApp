@@ -3,6 +3,16 @@ import { applyDeposit } from '~/lib/payments/deposit';
 import { recordAudit, WEBHOOK_ACTOR } from '~/lib/audit';
 
 /**
+ * 받아 줄 `paymentKey` 의 길이 상한.
+ *
+ * **이 주소는 아무나 부를 수 있다**(서명 검증이 없다 — 본문을 안 믿고 PG 에 다시 묻는
+ * 설계라 필요가 없다). 그래서 본문의 글자 하나가 그대로 DB 조회로 들어가는데, 길이를
+ * 안 보면 임의 길이 문자열이 유니크 인덱스 조회에 실린다. 실제 키는 가장 긴 것이 서른여섯
+ * 자라, 이 상한은 **정상 키를 거절할 수 없다.**
+ */
+const MAX_PAYMENT_KEY = 200;
+
+/**
  * 토스 웹훅.
  *
  * **본문을 믿지 않는다.** 이 주소는 공개돼 있어서 누구나 아무 내용이나
@@ -33,6 +43,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (typeof paymentKey !== 'string' || paymentKey.length === 0) {
     return NextResponse.json({ received: true, reason: 'paymentKey 가 없습니다' });
+  }
+  if (paymentKey.length > MAX_PAYMENT_KEY) {
+    // DB 조회 앞에서 끊는다. 200 을 주는 까닭은 위와 같다 — 다시 받아도 결과가 같다.
+    return NextResponse.json({ received: true, reason: 'paymentKey 가 너무 깁니다' });
   }
 
   try {

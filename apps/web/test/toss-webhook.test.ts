@@ -30,6 +30,42 @@ beforeEach(() => {
   applyDeposit.mockResolvedValue({ applied: true, orderNo: '20260921-0000001', status: 'PAID' });
 });
 
+/**
+ * **길이를 보는 까닭.**
+ *
+ * 이 주소는 서명 검증이 없다 — 본문을 안 믿고 PG 에 다시 묻는 설계라 필요가 없고, 그래서
+ * **누구나 부를 수 있다.** 그 사실이 요청 제한 면제의 근거에는 "서명 검증이 막는다" 로
+ * 거꾸로 적혀 있었다. 아무나 부를 수 있으면 본문의 글자 하나가 그대로 DB 조회로 들어가므로,
+ * 조회 앞에서 길이를 끊는다. 실제 키는 가장 긴 것이 서른여섯 자다.
+ */
+describe('받아 줄 paymentKey', () => {
+  it('너무 길면 DB 를 치지 않는다', async () => {
+    const response = await send({ data: { paymentKey: 'x'.repeat(201) } });
+
+    expect(applyDeposit).not.toHaveBeenCalled();
+    expect(await response.json()).toMatchObject({ reason: 'paymentKey 가 너무 깁니다' });
+  });
+
+  it('상한까지는 받는다 — 정상 키를 거절하면 입금을 놓친다', async () => {
+    await send({ data: { paymentKey: 'x'.repeat(200) } });
+
+    expect(applyDeposit).toHaveBeenCalledWith('x'.repeat(200));
+  });
+
+  it('실제 키 길이는 상한에 한참 못 미친다', async () => {
+    // 가장 긴 실물이 서른여섯 자다. 상한이 그 근처로 내려오면 정상 키가 막힌다
+    await send({ data: { paymentKey: 'mock_va_20260910-7063897' } });
+
+    expect(applyDeposit).toHaveBeenCalledWith('mock_va_20260910-7063897');
+  });
+
+  it('길이로 끊어도 200 이다 — 재시도해도 결과가 같다', async () => {
+    const response = await send({ data: { paymentKey: 'x'.repeat(5_000) } });
+
+    expect(response.status).toBe(200);
+  });
+});
+
 describe('입금이 반영되면', () => {
   it('누가·무엇을 했는지 감사 로그에 남는다 — 사람이 아니라 웹훅이다', async () => {
     await send({ eventType: 'PAYMENT_STATUS_CHANGED', data: { paymentKey: 'pk_1' } });
