@@ -21,6 +21,7 @@ import { SectionSkeleton, StripSkeleton } from '~/components/section-skeleton';
 import { WishlistButton } from '~/components/wishlist-button';
 import { ShareButton } from '~/components/share-button';
 import { RecordRecentView } from '~/components/record-recent-view';
+import { ProductReport } from '~/components/product-report';
 import { RecentlyViewed } from '~/components/recently-viewed';
 import { Recommendations } from '~/components/recommendations';
 import { getWishlistedIds } from '~/lib/wishlist/wishlist';
@@ -292,6 +293,17 @@ export default async function ProductPage({ params, searchParams }: Params) {
         <p className="max-w-[620px] pt-6 text-[15px] leading-loose text-[var(--fg-secondary)]">
           {product.description}
         </p>
+
+        {/*
+          **신고는 로그인한 사람에게만 보인다.** 창구가 로그인을 요구하므로 비로그인에게
+          보여 주면 눌렀을 때 401 만 돌아온다 — 할 수 없는 일을 권하는 셈이다. 자리는
+          설명 끝이다: 찾는 사람은 찾고, 찾지 않는 사람의 눈에는 걸리지 않는다.
+        */}
+        {viewer !== null && (
+          <div className="pt-8">
+            <ProductReport productId={product.id} productName={product.name} />
+          </div>
+        )}
       </section>
 
       {/*

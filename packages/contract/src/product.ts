@@ -3,6 +3,7 @@ import {
   ARCHIVE_ACTION, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, PRODUCT_STATUS as CORE_PRODUCT_STATUS, PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL, PUBLISH_ERROR, STOCK_MAX, VARIANT_SKU_MAX, type ProductStatus as CoreProductStatus,
 } from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
+import { PRODUCT_REPORT_REASON } from '@shop/core';
 
 /**
  * 상품 등록·수정 계약.
@@ -160,3 +161,21 @@ export const reviewProductSchema = z.object({
 export const bulkStockSchema = z.object({
   csv: z.string().min(1, 'valid.fileRequired').max(1_000_000, 'valid.tooLongChars'),
 });
+
+/**
+ * 상품 신고.
+ *
+ * 사유는 고르게 한다 — 자유 입력만 받으면 분류가 안 되고, 무엇이 문제인지 매번 읽어야
+ * 처리 순서를 정할 수 있다. 설명은 선택이다. 리뷰 신고와 같은 모양이고, 다른 것은 사유
+ * 집합뿐이다(`PRODUCT_REPORT_REASON` — 글이 아니라 파는 물건을 가리킨다).
+ */
+export const reportProductSchema = z.object({
+  reason: z.enum(PRODUCT_REPORT_REASON, { error: 'valid.reportReasonRequired' }),
+  detail: z
+    .string()
+    .trim()
+    .max(500, 'valid.tooLongChars')
+    .nullable()
+    .default(null),
+});
+export type ReportProductInput = z.infer<typeof reportProductSchema>;

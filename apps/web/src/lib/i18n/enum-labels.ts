@@ -1,8 +1,9 @@
 import {
   ORDER_STATUS, MEMBER_GRADE, RETURN_TYPE, RETURN_REASON, RETURN_STATUS,
-  SIZE_FIT, REPORT_REASON, POINT_REASON, THEMES, type Theme,
+  SIZE_FIT, REPORT_REASON, PRODUCT_REPORT_REASON, POINT_REASON, THEMES, type Theme,
   type OrderStatus, type MemberGrade, type ReturnType, type ReturnReason,
-  type ReturnStatus, type SizeFit, type ReportReason, type PointReason,
+  type ReturnStatus, type SizeFit, type ReportReason, type ProductReportReason,
+  type PointReason,
 } from '@shop/core';
 import type { MessageKey } from '@shop/i18n';
 
@@ -38,6 +39,11 @@ export const SIZE_FIT_KEY: Record<SizeFit, MessageKey> = keysOf(SIZE_FIT, 'sizeF
 export const REPORT_REASON_KEY: Record<ReportReason, MessageKey> = keysOf(
   REPORT_REASON,
   'reportReason',
+);
+/** 상품 신고 사유 — 리뷰 신고와 다른 집합이라 열쇠 묶음도 따로다 */
+export const PRODUCT_REPORT_REASON_KEY: Record<ProductReportReason, MessageKey> = keysOf(
+  PRODUCT_REPORT_REASON,
+  'productReportReason',
 );
 export const POINT_REASON_KEY: Record<PointReason, MessageKey> = keysOf(
   POINT_REASON,

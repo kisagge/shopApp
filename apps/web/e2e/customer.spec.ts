@@ -113,15 +113,56 @@ test('남의 리뷰는 신고할 수 있고, 신고해도 글은 남는다고 �
     `${await heading.textContent()} 라고 적어 놓고 목록이 비어 있다`,
   ).toBeVisible();
 
-  const report = page.getByRole('button', { name: '신고' }).first();
+  /*
+   * **리뷰 구역 안에서 고른다.** 예전에는 화면 전체에서 이름에 '신고' 가 든 단추를
+   * `.first()` 로 집었는데, 상품 신고가 생기면서 그 단추가 설명 구역에 먼저 놓였다 —
+   * 테스트는 상품 신고 폼을 열고 리뷰 쪽 문구를 찾다 졌다. 한 화면에 '신고' 가 둘이면
+   * 어느 것인지 말해야 한다(사람에게도 그렇다: 상품 쪽은 '이 상품 신고' 라고 적는다).
+   */
+  const reviews = page.getByRole('region', { name: /^리뷰/ });
+  const report = reviews.getByRole('button', { name: '신고' }).first();
   await expect(report).toBeVisible();
   await expect(report).toHaveAttribute('aria-expanded', 'false');
 
   await report.click();
 
-  await expect(page.getByRole('group', { name: '신고 사유' })).toBeVisible();
+  await expect(reviews.getByRole('group', { name: '신고 사유' })).toBeVisible();
   // 누른 뒤 아무 변화가 없으면 눌리지 않은 줄 알고 다시 누른다
   await expect(page.getByText(/글은 그대로 남습니다/)).toBeVisible();
+});
+
+test('상품도 신고할 수 있고, 사유는 상품을 가리키는 말이다', async ({ page }) => {
+  await page.goto('/product/wool-double-jacket');
+
+  /*
+   * 신고 단추는 로그인한 사람에게만 그려진다 — 창구가 로그인을 요구하므로, 비로그인에게
+   * 보여 주면 눌렀을 때 401 만 돌아온다. 세션이 없으면 아래는 "단추가 없다" 로 지는데
+   * 그 문구는 기능이 빠진 것과 구분되지 않는다.
+   */
+  await expect(
+    page.getByRole('link', { name: '마이페이지' }),
+    '로그인 상태로 열려야 신고 단추가 그려진다',
+  ).toBeVisible();
+
+  const trigger = page.getByRole('button', { name: '이 상품 신고' });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await trigger.click();
+
+  const form = page.getByRole('form', { name: /신고$/ });
+  await expect(form).toBeVisible();
+
+  /*
+   * **리뷰 신고의 말이 섞여 있으면 안 된다.** 글을 신고하는 말(도배·욕설)로는 파는 물건을
+   * 가리킬 수 없고, 그 둘을 한 집합으로 묶으면 화면이 고를 수 없는 사유를 보여 준다.
+   */
+  await expect(form.getByRole('radio', { name: '정품이 아닌 것 같아요' })).toBeVisible();
+  await expect(form.getByRole('radio', { name: '광고 · 도배' })).toHaveCount(0);
+
+  await form.getByRole('radio', { name: '안전에 문제가 있어요' }).check();
+  await form.getByRole('button', { name: '신고' }).click();
+
+  // 누른 뒤 아무 변화가 없으면 눌리지 않은 줄 알고 다시 누른다
+  await expect(page.getByRole('status').filter({ hasText: '신고를 받았습니다' })).toBeVisible();
 });
 
 test('탈퇴 화면은 무엇이 지워지고 무엇이 남는지 먼저 말한다', async ({ page }) => {
