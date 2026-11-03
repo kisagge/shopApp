@@ -34,5 +34,19 @@ export default defineConfig({
     environment: 'node',
     include: ['test/**/*.test.{ts,tsx}'],
     setupFiles: ['./test/setup.ts'],
+    /**
+     * 커버리지는 **퍼센트로 문지기를 세우려는 것이 아니다.**
+     *
+     * 숫자를 문턱으로 걸면 수를 채우는 검사가 생기고, 그건 검사가 아니라 장식이다. 여기서
+     * 쓰려는 것은 하나뿐이다 — **"어느 소스 파일이 한 줄도 실행되지 않았나"**. 그 질문을
+     * 이름으로 묻다가 거짓 양성을 네 번 냈다(이 저장소는 상수나 함수 이름을 적지 않고 덮는
+     * 방식을 많이 쓴다). 데이터로 물으면 그런 착각이 없다.
+     *
+     * 생성물과 타입 선언은 뺀다 — 실행될 줄이 없는 파일이 0% 로 잡히면 읽을 것이 묻힌다.
+     */
+    coverage: {
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.d.ts', 'src/lib/i18n/client-groups.generated.ts'],
+    },
   },
 });

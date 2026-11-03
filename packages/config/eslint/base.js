@@ -23,6 +23,15 @@ export const baseConfig = tseslint.config(
       // 문지기가 쓰는 빌드 폴더 — 개발 서버의 .next 와 다투지 않게 따로 둔다(tooling/ci-local.sh)
       '**/.next-ci/**',
       '**/src/generated/**', // Prisma 가 만든 코드는 우리가 고치지 않는다
+      /*
+       * 커버리지 보고서.
+       *
+       * `--coverage` 가 HTML 보고서를 쓰면서 `block-navigation.js`·`prettify.js`·`sorter.js`
+       * 를 함께 떨어뜨린다. 그 파일들은 tsconfig 밖이라 타입 기반 규칙이 **파싱조차 못 하고**
+       * lint 가 통째로 진다 — "project service 가 못 찾았다" 로. 한 번 커버리지를 돌린 사람의
+       * 다음 lint 가 코드와 무관하게 빨개지는 셈이다(playwright-report 가 같은 일을 했다).
+       */
+      '**/coverage/**',
       '**/node_modules/**',
       '**/*.mjs',
     ],
