@@ -5,6 +5,7 @@ import { setBrandLogo, removeBrandLogo } from '~/lib/admin/manage-brand';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { bodyTooLarge } from '~/lib/api/body-size';
 
 
 /**
@@ -20,6 +21,9 @@ export async function POST(
   const actor = await getActor(request.headers);
   if (!actor) return await unauthorized();
 
+  // 본문부터 끊는다 — formData() 가 끝나면 이미 다 올라와 있다(한계는 body-size 에 적었다)
+  if (bodyTooLarge(request, 1)) return await imageTooLarge();
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -29,7 +33,7 @@ export async function POST(
 
   const file = form.get('file');
   if (!(file instanceof File)) return await fileRequired();
-  // 바이트를 메모리에 올리기 전에 크기부터 본다
+  // 파일별 상한. 본문 자릿수는 위에서 이미 끊었다
   if (file.size > MAX_IMAGE_BYTES) return await imageTooLarge();
 
   const { id } = await params;

@@ -25,6 +25,24 @@ export const IMAGE_CONTENT_TYPE = [
 export type ImageContentType = (typeof IMAGE_CONTENT_TYPE)[number];
 
 export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/**
+ * 본문 전체의 상한.
+ *
+ * **파일 하나의 상한만으로는 본문을 못 막는다.** 창구들은 `request.formData()` 로 읽는데,
+ * 그 한 줄이 끝나는 순간 **본문 전체가 이미 메모리에 올라와 있다** — 그 뒤에 `file.size` 를
+ * 보는 것은 "다 받아 놓고 거절" 이다. 그래서 읽기 **전에** 볼 수 있는 값(Content-Length)과
+ * 견줄 상한이 따로 필요하다.
+ *
+ * 파일 수만큼의 상한에 여유를 더한다 — multipart 경계·헤더와 `data` 칸의 JSON 이 그만큼
+ * 차지한다. 넉넉히 두는 쪽이 맞다: 이 값은 정상 업로드를 막지 않는 선에서 **자릿수**를
+ * 끊는 것이 목적이고, 정확한 한 바이트를 가리는 것은 파일별 검사가 한다.
+ */
+const UPLOAD_OVERHEAD_BYTES = 1024 * 1024;
+
+export function uploadBodyLimit(maxFiles: number): number {
+  return MAX_IMAGE_BYTES * Math.max(1, maxFiles) + UPLOAD_OVERHEAD_BYTES;
+}
 export const MAX_IMAGES_PER_PRODUCT = 8;
 
 /**

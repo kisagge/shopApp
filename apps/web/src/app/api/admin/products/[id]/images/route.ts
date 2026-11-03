@@ -8,6 +8,7 @@ import {
 import { recordAudit } from '~/lib/audit';
 import { revalidateCatalog } from '~/lib/cache';
 import { apiError, fileRequired, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { bodyTooLarge } from '~/lib/api/body-size';
 import { readBody } from '~/lib/api/read-body';
 
 const reorderSchema = z.object({ orderedIds: z.array(z.string()).min(1).max(20) });
@@ -23,6 +24,9 @@ export async function POST(
     return await unauthorized();
   }
 
+  // 본문부터 끊는다 — formData() 가 끝나면 이미 다 올라와 있다(한계는 body-size 에 적었다)
+  if (bodyTooLarge(request, 1)) return await imageTooLarge();
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -34,8 +38,7 @@ export async function POST(
   if (!(file instanceof File)) {
     return await fileRequired();
   }
-  // 바이트를 메모리에 올리기 전에 크기를 먼저 본다. 5MB 제한을 통과할 수 없는
-  // 파일을 굳이 다 읽을 이유가 없다.
+  // 파일별 상한. 본문 자릿수는 위에서 이미 끊었다 — 여기는 한 바이트를 가린다.
   if (file.size > MAX_IMAGE_BYTES) {
     return await imageTooLarge();
   }

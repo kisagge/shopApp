@@ -5,6 +5,7 @@ import { setCollectionImage } from '~/lib/admin/manage-collection';
 import { recordAudit } from '~/lib/audit';
 import { revalidateCollections } from '~/lib/cache';
 import { apiError, fileRequired, forbidden, imageTooLarge, invalidForm, unauthorized } from '~/lib/api/respond';
+import { bodyTooLarge } from '~/lib/api/body-size';
 
 /** 기획전 배경 이미지 교체 */
 export async function POST(
@@ -20,6 +21,9 @@ export async function POST(
   if (!hasPermission(actor, 'collection:write')) {
     return await forbidden();
   }
+
+  // 본문부터 끊는다 — formData() 가 끝나면 이미 다 올라와 있다(한계는 body-size 에 적었다)
+  if (bodyTooLarge(request, 1)) return await imageTooLarge();
 
   let form: FormData;
   try {
