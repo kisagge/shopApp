@@ -1,7 +1,21 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { unprovenClaims } from './support/exempt-proof';
+import {
+  unlimitedRoutes, unprovenClaims, unprovenUniques, unseenPointers, type SeenBy,
+} from './support/exempt-proof';
+
+/**
+ * 면제 한 줄.
+ *
+ * `why` 는 사람이 읽는 까닭이고, 나머지는 **그 까닭의 증거**다 — 가리키는 검사(`seenBy`),
+ * 막아 주는 다른 창구(`limitedBy`). 까닭에 유니크 짝이 적혀 있으면 스키마에서 바로 확인한다.
+ */
+interface Exempt {
+  readonly why: string;
+  readonly seenBy?: SeenBy;
+  readonly limitedBy?: string;
+}
 
 /**
  * 제한이 필요한 창구를 **폴더에서 찾는다.**
@@ -22,43 +36,70 @@ import { unprovenClaims } from './support/exempt-proof';
  * 이유 없이 이름만 적는 것은 목록으로 되돌아가는 것과 같다. 왜 안 거는지가
  * 남아 있어야 나중에 그 판단이 아직 맞는지 볼 수 있다.
  */
-const EXEMPT: Readonly<Record<string, string>> = {
-  'api/health/route.ts':
-    'DB 를 치지 않는 상태 확인 창구다. 여기를 조이면 감시 도구가 먼저 막힌다.',
-  'api/locale/route.ts':
-    '평범한 폼 전송이라 429 를 주면 사람이 JSON 을 보게 된다. 로그인했으면 자기 행의 locale 한 칸을 갱신하는데, 세션이 있어야 하고 자기 행뿐이라 남에게 번지지 않는다.',
-  'api/theme/route.ts':
-    '쿠키 하나를 굽고 끝난다 — DB 도 저장소도 안 건드린다. 언어와 같은 폼 전송이라 429 의 JSON 이 사람에게 그대로 보인다.',
-  'api/webhooks/toss/route.ts':
-    '결제사가 부른다. 사람이 아니라 재시도 정책이 호출 빈도를 정하고, 조이면 입금 통지를 놓친다. ' +
-    '**아무나 부를 수 있는 자리다** — 서명 검증이 없다. 본문을 안 믿고 상태·금액을 PG 에 다시 묻는 ' +
-    '설계라 필요가 없고(라우트 주석·docs/DEPLOY.md), 그래서 제한이 없어도 무결제 결제완료는 불가능하다. ' +
-    '조회는 pgPaymentKey 유니크 인덱스 한 건이다. 남는 위험 하나: 유효한 키를 아는 사람(자기 가상계좌 ' +
-    '주문을 한 손님 포함)이 PG 조회를 무제한 유발할 수 있다 — 쿼터가 문제가 되면 그때 제한을 건다.',
-  'api/cart/route.ts':
-    '한 사용자에 장바구니 하나다. (사용자, 변형) 유니크가 있어 몇 번을 불러도 줄이 늘지 않고, 담을 수 있는 줄 수도 MAX_CART_LINES 로 묶여 있다.',
-  'api/cart/sync/route.ts': '같은 장바구니를 덮어쓴다 — 반복해도 줄이 늘지 않는다.',
-  'api/wishlist/[productId]/route.ts':
-    '(사용자, 상품) 유니크. 반복 호출이 줄을 늘리지 못한다.',
-  'api/restock/[variantId]/route.ts':
-    '(사용자, 변형) 유니크. 반복 호출이 줄을 늘리지 못한다.',
-  'api/notifications/read/route.ts':
-    '이미 있는 줄의 읽음 표시를 바꾼다. 새로 만드는 것이 없다.',
-  'api/addresses/[id]/route.ts':
-    '자기 주소 하나를 고치거나(PUT) 기본으로 삼거나(PATCH) 지운다. 줄이 늘지 않고, 만드는 창구(POST /addresses)에 제한이 있다.',
-  'api/account/close/route.ts':
-    '확인 문구를 정확히 받아야 하고, 한 번 닫히면 두 번째 호출은 상태 검사에서 걸린다.',
-  'api/inquiries/[id]/route.ts': '자기 문의 하나를 읽거나 지운다.',
-  'api/inquiries/[id]/answer/route.ts':
-    '가맹점·운영진만 부른다. 권한 검사가 앞에 있고, 답변은 문의 하나에 하나다.',
-  'api/merchant/apply/route.ts':
-    '심사 중인 신청이 있으면 ALREADY_APPLIED 로 막힌다 — 한 사람이 여러 건을 쌓을 수 없다.',
-  'api/orders/[orderNo]/cancel/route.ts':
-    '주문 하나의 상태를 옮긴다. 이미 취소된 주문은 상태 검사에서 걸린다.',
-  'api/orders/[orderNo]/cancel-items/route.ts':
-    '줄 하나는 한 번만 취소된다(이미 취소된 줄은 거절). 미리보기는 자기 주문 하나를 읽을 뿐이다.',
-  'api/orders/[orderNo]/confirm/route.ts': '같은 이유 — 상태 기계가 반복을 막는다.',
-  'api/orders/[orderNo]/return/route.ts': '같은 이유 — 상태 기계가 반복을 막는다.',
+const EXEMPT: Readonly<Record<string, Exempt>> = {
+  'api/health/route.ts': {
+    why: 'DB 를 치지 않는 상태 확인 창구다. 여기를 조이면 감시 도구가 먼저 막힌다.',
+  },
+  'api/locale/route.ts': {
+    why: '평범한 폼 전송이라 429 를 주면 사람이 JSON 을 보게 된다. 로그인했으면 자기 행의 locale 한 칸을 갱신하는데, 세션이 있어야 하고 자기 행뿐이라 남에게 번지지 않는다.',
+  },
+  'api/theme/route.ts': {
+    why: '쿠키 하나를 굽고 끝난다 — DB 도 저장소도 안 건드린다. 언어와 같은 폼 전송이라 429 의 JSON 이 사람에게 그대로 보인다.',
+  },
+  'api/webhooks/toss/route.ts': {
+    why:
+      '결제사가 부른다. 사람이 아니라 재시도 정책이 호출 빈도를 정하고, 조이면 입금 통지를 놓친다. ' +
+      '**아무나 부를 수 있는 자리다** — 서명 검증이 없다. 본문을 안 믿고 상태·금액을 PG 에 다시 묻는 ' +
+      '설계라 필요가 없고(라우트 주석·docs/DEPLOY.md), 그래서 제한이 없어도 무결제 결제완료는 불가능하다. ' +
+      '조회는 pgPaymentKey 유니크 인덱스 한 건이다. 남는 위험 하나: 유효한 키를 아는 사람(자기 가상계좌 ' +
+      '주문을 한 손님 포함)이 PG 조회를 무제한 유발할 수 있다 — 쿼터가 문제가 되면 그때 제한을 건다.',
+  },
+  'api/cart/route.ts': {
+    why: '한 사용자에 장바구니 하나다. (사용자, 변형) 유니크가 있어 몇 번을 불러도 줄이 늘지 않고, 담을 수 있는 줄 수도 MAX_CART_LINES 로 묶여 있다.',
+    seenBy: { file: 'packages/contract/test/cart.test.ts', marker: '장바구니가 담을 수 있는 줄 수까지 받는다' },
+  },
+  'api/cart/sync/route.ts': { why: '같은 장바구니를 덮어쓴다 — 반복해도 줄이 늘지 않는다.' },
+  'api/wishlist/[productId]/route.ts': {
+    why: '(사용자, 상품) 유니크. 반복 호출이 줄을 늘리지 못한다.',
+  },
+  'api/restock/[variantId]/route.ts': {
+    why: '(사용자, 변형) 유니크. 반복 호출이 줄을 늘리지 못한다.',
+  },
+  'api/notifications/read/route.ts': {
+    why: '이미 있는 줄의 읽음 표시를 바꾼다. 새로 만드는 것이 없다.',
+  },
+  'api/addresses/[id]/route.ts': {
+    why: '자기 주소 하나를 고치거나(PUT) 기본으로 삼거나(PATCH) 지운다. 줄이 늘지 않고, 만드는 창구(POST /addresses)에 제한이 있다.',
+    limitedBy: 'api/addresses/route.ts',
+  },
+  'api/account/close/route.ts': {
+    why: '확인 문구를 정확히 받아야 하고, 한 번 닫히면 두 번째 호출은 상태 검사에서 걸린다.',
+    seenBy: { file: 'close-account.test.ts', marker: '두 번' },
+  },
+  'api/inquiries/[id]/route.ts': { why: '자기 문의 하나를 읽거나 지운다.' },
+  'api/inquiries/[id]/answer/route.ts': {
+    why: '가맹점·운영진만 부른다. 권한 검사가 앞에 있고, 답변은 문의 하나에 하나다.',
+  },
+  'api/merchant/apply/route.ts': {
+    why: '심사 중인 신청이 있으면 ALREADY_APPLIED 로 막힌다 — 한 사람이 여러 건을 쌓을 수 없다.',
+    seenBy: { file: 'merchant-apply.test.ts', marker: 'ALREADY_APPLIED' },
+  },
+  'api/orders/[orderNo]/cancel/route.ts': {
+    why: '주문 하나의 상태를 옮긴다. 이미 취소된 주문은 상태 검사에서 걸린다.',
+    seenBy: { file: 'cancel-order.test.ts', marker: '이미 취소' },
+  },
+  'api/orders/[orderNo]/cancel-items/route.ts': {
+    why: '줄 하나는 한 번만 취소된다(이미 취소된 줄은 거절). 미리보기는 자기 주문 하나를 읽을 뿐이다.',
+    seenBy: { file: 'cancel-items.test.ts', marker: 'ALREADY' },
+  },
+  'api/orders/[orderNo]/confirm/route.ts': {
+    why: '같은 이유 — 상태 기계가 반복을 막는다.',
+    seenBy: { file: 'toss-gateway.test.ts', marker: '두 번' },
+  },
+  'api/orders/[orderNo]/return/route.ts': {
+    why: '같은 이유 — 상태 기계가 반복을 막는다.',
+    seenBy: { file: 'return-request.test.ts', marker: '이미 처리된 신청은 다시 처리하지 않는다' },
+  },
 };
 
 const APP = join(process.cwd(), 'src', 'app');
@@ -116,11 +157,52 @@ const inZone = (rel: string) => EXEMPT_ZONE.find((z) => rel.startsWith(z.prefix)
  * README 로 복사됐다. 통제를 내세운 근거만 증명을 요구한다 — support/exempt-proof 를 보라.
  */
 describe('면제의 근거', () => {
-  it.each(Object.entries(EXEMPT))('%s 의 근거가 내세운 통제가 실제로 있다', (rel, reason) => {
+  it.each(Object.entries(EXEMPT))('%s 의 근거가 내세운 통제가 실제로 있다', (rel, { why }) => {
     expect(
-      unprovenClaims(rel, reason),
+      unprovenClaims(rel, why),
       `${rel} 의 면제 근거가 없는 통제를 내세운다. 소스에 있는 것으로 근거를 고치거나, 그 통제를 만든다`,
     ).toEqual([]);
+  });
+
+  /**
+   * **유니크로 민 근거는 스키마에서 확인한다.**
+   *
+   * 쓰기 창구를 빼는 가장 흔한 근거다 — 몇 번을 불러도 같은 줄을 덮으니 늘어날 것이 없다는
+   * 말이고, 그것이 사실이면 맞는 판단이다. 그런데 그 사실이 **DB 제약 한 줄에 달려 있다.**
+   * 마이그레이션이 `@@unique` 를 떼는 날 세 창구의 면제가 조용히 구멍이 된다(줄 무한 생성).
+   * 그때 깨질 검사가 하나도 없었다.
+   */
+  it.each(Object.entries(EXEMPT))('%s 의 유니크 근거가 스키마에 있다', (rel, { why }) => {
+    expect(
+      unprovenUniques(rel, why),
+      `${rel} 의 면제가 기대는 유니크 제약이 없다 — 떼였으면 제한을 걸어야 한다`,
+    ).toEqual([]);
+  });
+
+  it('유니크를 미는 근거를 실제로 찾았다 — 훑기가 헛돌지 않게', () => {
+    const claiming = Object.values(EXEMPT).filter((e) => /\([^)]+\)\s*유니크/.test(e.why));
+
+    expect(claiming.length, '유니크를 근거로 든 면제가 없다 — 읽는 법이 바뀌었는지 본다')
+      .toBeGreaterThanOrEqual(3);
+  });
+
+  /** "저쪽 검사가 본다"·"저쪽 창구가 막는다" 도 가리키기만 하면 구멍이다 */
+  it('가리킨 검사에 그 표식이 실제로 있다', () => {
+    const pointers = Object.entries(EXEMPT)
+      .filter(([, v]) => v.seenBy)
+      .map(([of, v]) => ({ of, ...v.seenBy! }));
+
+    expect(pointers.length).toBeGreaterThanOrEqual(6);
+    expect(unseenPointers(pointers), '가리키기만 하고 저쪽은 안 본다').toEqual([]);
+  });
+
+  it('막아 준다고 적은 창구가 실제로 제한을 건다', () => {
+    const pointers = Object.entries(EXEMPT)
+      .filter(([, v]) => v.limitedBy)
+      .map(([of, v]) => ({ of, route: v.limitedBy! }));
+
+    expect(pointers.length).toBeGreaterThanOrEqual(1);
+    expect(unlimitedRoutes(pointers), '그 창구에서 제한이 빠지면 둘이 함께 열린다').toEqual([]);
   });
 });
 
