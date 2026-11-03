@@ -96,11 +96,11 @@ export function productReportState(input: {
 /**
  * 처리 결과로 적는 값. DB 에는 글자로 남는다 — 무엇을 적을지는 여기서 정한다.
  *
- * 파생 타입(`ProductReportResolution`)은 **쓰는 자리가 생길 때** 만든다. 운영 처리 창구가
- * 아직 없는데 미리 내보내면 아무도 부르지 않는 export 가 되고, `dead-exports` 가 그것을
- * 잡는다 — 실제로 잡혔다.
+ * 파생 타입은 쓰는 자리가 생겨서 만들었다 — 운영 처리 창구가 이 값을 받는다. 그 창구가
+ * 없던 동안에는 내보내지 않았고, `dead-exports` 가 미리 내보낸 것을 잡아 주었다.
  */
 export const PRODUCT_REPORT_RESOLUTION = ['kept', 'archived'] as const;
+export type ProductReportResolution = (typeof PRODUCT_REPORT_RESOLUTION)[number];
 
 export const PRODUCT_REPORT_ERROR = {
   ALREADY_REPORTED: 'err.productReport.already',

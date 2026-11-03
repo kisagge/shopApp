@@ -3,7 +3,7 @@ import {
   ARCHIVE_ACTION, PRODUCT_NAME_MAX, PRODUCT_SLUG_MAX, PRODUCT_STATUS as CORE_PRODUCT_STATUS, PRODUCT_STATUS_LABEL as CORE_PRODUCT_STATUS_LABEL, PUBLISH_ERROR, STOCK_MAX, VARIANT_SKU_MAX, type ProductStatus as CoreProductStatus,
 } from '@shop/core';
 import { cuidSchema, wonSchema } from './common';
-import { PRODUCT_REPORT_REASON } from '@shop/core';
+import { PRODUCT_REPORT_REASON, PRODUCT_REPORT_RESOLUTION } from '@shop/core';
 
 /**
  * 상품 등록·수정 계약.
@@ -179,3 +179,19 @@ export const reportProductSchema = z.object({
     .default(null),
 });
 export type ReportProductInput = z.infer<typeof reportProductSchema>;
+
+/**
+ * 상품 신고 처리.
+ *
+ * 둘 중 하나를 고른다 — 문제없음(`kept`)이거나 상품을 내린다(`archived`). 자유 입력을
+ * 받지 않는 까닭은 이 값이 나중에 "전에 한 번 보고 넘긴 상품" 을 가리는 근거가 되기
+ * 때문이다. 글자가 제각각이면 그 판정을 할 수 없다.
+ */
+export const resolveProductReportSchema = z.object({
+  resolution: z.enum(PRODUCT_REPORT_RESOLUTION, { error: 'valid.required' }),
+});
+/*
+ * 추론 타입은 내보내지 않는다 — 부르는 자리가 없다. 처리 창구는 스키마가 좁혀 준 값을
+ * 그대로 넘기고, 받는 쪽은 core 의 `ProductReportResolution` 을 쓴다. 미리 내보내면
+ * `dead-exports` 가 잡는다(실제로 잡혔다).
+ */

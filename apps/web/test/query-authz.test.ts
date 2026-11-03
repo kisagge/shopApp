@@ -234,6 +234,8 @@ describe('조회가 묻는 권한', () => {
     getAdminProductDetail: 'product:read',
     getSettlements: 'settlement:read',
     getAdminReviews: 'review:read',
+    // 신고의 대상이 파는 쪽이다 — 가맹점에게는 없다
+    getProductReportQueue: 'product:moderate',
     getAdminInquiries: 'inquiry:answer',
     countPendingInquiries: 'inquiry:answer',
   };

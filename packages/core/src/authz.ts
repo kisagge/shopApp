@@ -32,6 +32,13 @@ export const PERMISSION = [
   'product:read',
   'product:write',
   'product:publish',
+  /*
+   * **신고된 상품을 판단한다.** `product:write` 와 가른다 — 쓰기는 파는 쪽의 일이고
+   * 이것은 **파는 쪽을 심판하는 일**이다. 한 권한으로 묶으면 가맹점이 자기 상품에 들어온
+   * 신고를 스스로 닫을 수 있고, 그러면 신고가 운영진에게 닿지 않는다. 리뷰에서 읽기
+   * (`review:read`)와 내리기(`review:moderate`)를 가른 것과 같은 까닭이다.
+   */
+  'product:moderate',
   'order:read',
   'order:fulfill',      // 배송 준비 → 배송중
   'order:cancel',
@@ -146,7 +153,7 @@ const MERCHANT: readonly Permission[] = [
  */
 const ADMIN: readonly Permission[] = [
   'admin:access',
-  'product:read', 'product:write', 'product:publish',
+  'product:read', 'product:write', 'product:publish', 'product:moderate',
   'order:read', 'order:fulfill', 'order:cancel', 'order:refund', 'return:resolve',
   'merchant:read', 'merchant:write',
   'user:read', 'user:write', 'point:adjust',

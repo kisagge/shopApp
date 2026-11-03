@@ -19,6 +19,7 @@ import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   order: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
+  productReport: { findMany: vi.fn<(...a: any[]) => any>() },
   returnRequest: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   inquiry: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
   product: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
@@ -33,6 +34,7 @@ const { getReturnQueue } = await import('~/lib/queries/admin/returns');
 const { getAdminInquiries } = await import('~/lib/queries/inquiries');
 const { getAdminProducts } = await import('~/lib/queries/admin/products');
 const { getAdminReviews } = await import('~/lib/queries/admin-reviews');
+const { getProductReportQueue } = await import('~/lib/queries/admin/product-reports');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
 
@@ -42,6 +44,7 @@ beforeEach(() => {
     model.findMany.mockResolvedValue([]);
     model.count.mockResolvedValue(0);
   }
+  db.productReport.findMany.mockResolvedValue([]);
   db.category.findMany.mockResolvedValue([]);
   db.user.findMany.mockResolvedValue([]);
 });
@@ -80,6 +83,11 @@ describe('처리할 일은 오래 기다린 것부터', () => {
       async () => { await getAdminReviews(admin, { tab: 'reported' }); },
       () => direction(db.review),
     ],
+    [
+      '상품 신고 — 대기줄(점수는 메모리에서 세우므로 자르는 방향이 무엇이 보이느냐를 정한다)',
+      async () => { await getProductReportQueue(admin, { tab: 'open' }); },
+      () => direction(db.productReport),
+    ],
   ])('%s', async (_label, call, got) => {
     await call();
     expect(got()).toBe('asc');
@@ -111,6 +119,11 @@ describe('처리할 일은 오래 기다린 것부터', () => {
       '상품 — 검수 대기가 아닌 탭',
       async () => { await getAdminProducts(admin, {}); },
       () => direction(db.product),
+    ],
+    [
+      '상품 신고 — 처리한 것',
+      async () => { await getProductReportQueue(admin, { tab: 'done' }); },
+      () => direction(db.productReport),
     ],
   ])('%s 는 최신순', async (_label, call, got) => {
     await call();

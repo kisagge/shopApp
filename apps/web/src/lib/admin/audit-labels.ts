@@ -22,6 +22,8 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'product.archive': '상품 보관',
   'product.restore': '보관 상품 되돌리기',
   'product.stock': '재고 조정',
+  'productReport.keep': '상품 신고 문제없음',
+  'productReport.archive': '상품 신고로 보관',
   'product.publish.approve': '게시 승인',
   'product.publish.reject': '게시 반려',
   'review.delete': '리뷰 삭제',

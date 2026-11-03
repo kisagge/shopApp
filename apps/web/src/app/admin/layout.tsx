@@ -18,7 +18,7 @@ interface NavItem {
     | '/admin/merchants' | '/admin/users' | '/admin/points' | '/admin/banners' | '/admin/reviews'
     | '/admin/errors'
     | '/admin/collections' | '/admin/brands' | '/admin/categories'
-    | '/admin/inquiries' | '/admin/support'
+    | '/admin/inquiries' | '/admin/support' | '/admin/product-reports'
     | '/admin/traffic' | '/admin/coupons' | '/admin/shipping' | '/admin/notification-templates' | '/admin/mail-templates';
   readonly label: string;
   readonly permission: Permission;
@@ -48,6 +48,11 @@ const NAV: readonly NavItem[] = [
   // 리뷰가 상품 설명의 일부가 된다.
   // 가맹점도 들어온다 — 자기 상품만, 읽기만. 자세한 이유는 authz 의 review:read 에
   { href: '/admin/reviews', label: '리뷰', permission: 'review:read' },
+  /*
+   * 상품 신고는 가맹점에게 보이지 않는다 — 신고의 대상이 파는 쪽이고, 그 쪽이 자기 건을
+   * 닫을 수 있으면 신고가 운영진에게 닿지 않는다(authz 의 product:moderate).
+   */
+  { href: '/admin/product-reports', label: '상품 신고', permission: 'product:moderate' },
   // 가맹점도 본다 — 자기 상품 문의는 파는 사람이 답하는 것이 맞다
   { href: '/admin/inquiries', label: '문의', permission: 'inquiry:answer' },
   { href: '/admin/support', label: '공지·FAQ', permission: 'support:write' },

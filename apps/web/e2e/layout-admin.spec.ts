@@ -69,6 +69,7 @@ layoutTests(test, expect, [
   ['배너', '/admin/banners'],
   ['기획전', '/admin/collections'],
   ['리뷰 신고', '/admin/reviews'],
+  ['상품 신고', '/admin/product-reports'],
   ['문의', '/admin/inquiries'],
   ['고객센터 글', '/admin/support'],
   ['약관·방침', '/admin/policies'],

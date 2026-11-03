@@ -79,6 +79,12 @@ const CATALOG_WRITERS = [
    * 정지한 가맹점의 상품이 캐시 수명만큼 계속 팔리고, 승인한 가맹점의 상품은 그만큼 안 보인다.
    */
   'app/api/admin/merchants/[id]/status/route.ts',
+  /*
+   * **신고 처리도 매대를 바꾼다.** 내리면 그 상품이 매대·검색에서 빠져야 하고, 안 털면
+   * 캐시 수명만큼 계속 팔린다 — 신고로 내린 상품이 그대로 팔리는 것은 처리가 처리가
+   * 아니라는 뜻이다.
+   */
+  'app/api/admin/product-reports/[productId]/route.ts',
 ] as const;
 
 const BANNER_WRITERS = [
