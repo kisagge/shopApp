@@ -30,6 +30,24 @@ export default defineConfig({
      */
     testTimeout: 20_000,
     hookTimeout: 60_000,
+    /**
+     * **`isolate: false` 를 쓰지 않는다 — 돌려 보고 정한 것이다.**
+     *
+     * vitest 가 끝날 때마다 권한다: "워커 421개를 띄우고 파일마다 ~279ms 를 치른다,
+     * `isolate: false` 면 13초쯤 빠르다." 숫자는 맞다 — 37.2초가 11.8초가 된다.
+     * 그런데 **검사 347개가 39파일에서 진다.**
+     *
+     * 까닭은 이 저장소가 흉내 내는 방식이다. 파일마다 `vi.mock('@shop/db', …)` 로
+     * **자기가 쓰는 모델만** 흉내 낸다(주문 검사는 `order`, 리뷰 검사는 `review`).
+     * 워커를 공유하면 옆 파일의 부분 흉내를 그대로 받아 `prisma.order.count is not a
+     * function`·`Cannot read properties of undefined (reading 'findMany')` 가 쏟아진다.
+     * 실패 347개 중 대부분이 그 모양이다.
+     *
+     * 고치려면 파일마다 흉내를 "전체 모델" 로 키워야 하는데, 그러면 **검사가 쓰지 않는
+     * 모델까지 적게 되고** 어느 검사가 무엇에 기대는지 읽을 수 없게 된다. 25초를 아끼려고
+     * 치를 값이 아니다. 받아도 곧바로 빨개지므로 위험하지는 않다 — 적어 두는 까닭은
+     * **같은 실험을 다시 하지 않게** 하려는 것이다(타입스크립트 7·prisma 미리보기와 같다).
+     */
     // 파일별로 `// @vitest-environment jsdom` 주석을 붙여 필요한 곳만 DOM을 쓴다
     environment: 'node',
     include: ['test/**/*.test.{ts,tsx}'],
