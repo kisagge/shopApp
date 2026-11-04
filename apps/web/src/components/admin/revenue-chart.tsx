@@ -35,7 +35,33 @@ export function RevenueChart({
   const RIGHT = 678;
 
   const max = Math.max(...data.map((d) => d.revenue), 1);
-  const ceiling = Math.ceil(max / 4) * 4;
+
+  /**
+   * 축의 눈금 하나 크기.
+   *
+   * **라벨이 말할 수 있는 값으로 천장을 올린다.** 예전에는 `Math.ceil(max / 4) * 4` 로
+   * 올리고 라벨을 만원 단위로 **반올림**해 적었는데, 천장이 만원의 배수가 아니면 그 둘이
+   * 어긋난다 — 최댓값 3만이면 눈금은 7,500·15,000·22,500 인데 라벨은 `1만·2만·2만` 이
+   * 됐다(**2만이 두 번**, 7,500 을 1만이라 적었다). 최댓값 12만 5천이면 맨 위 눈금이
+   * `13만` 으로 적혔다 — 거기 선 막대는 12만 5천이다. **매출이 없는 날은 축 전체가 `0만`**
+   * 이었다. 일 매출이 10만원 아래면 늘 그랬고, 새 가게와 한가한 날이 전부 그 자리다.
+   *
+   * 그래서 눈금을 반듯한 값으로 끊어 **라벨이 그 값을 그대로 말하게** 한다. 작은 금액은
+   * 천원 단위로(라벨이 짧아 원으로 적어도 된다), 큰 금액은 만원 단위로 끊는다 — 큰 쪽을
+   * 원으로 적으면 축 글자가 그래프를 밀어낸다.
+   */
+  const roughStep = max / 4;
+  const unit = roughStep >= 100_000 ? 10_000 : 1_000;
+  // `Math.ceil` 이 이미 한 칸을 보장한다 — 하한을 따로 두었더니 닿을 수 없는 줄이었다
+  const step = Math.ceil(roughStep / unit) * unit;
+  const ceiling = step * 4;
+  /**
+   * 한 그래프 안에서 단위를 섞지 않는다.
+   *
+   * 눈금마다 "만원의 배수인가" 를 따로 물으면 `5,000 · 1만 · 15,000 · 2만` 처럼 섞인다.
+   * 눈금 크기 하나로 정하면 다섯 줄이 같은 단위로 선다.
+   */
+  const inMan = step % 10_000 === 0;
   const today = data.at(-1)?.date;
 
   const slot = (RIGHT - LEFT) / data.length;
@@ -58,7 +84,7 @@ export function RevenueChart({
               x={LEFT - 8} y={y(v) + 4} textAnchor="end"
               fontSize={10} fill="var(--fg-muted)" style={{ fontVariantNumeric: 'tabular-nums' }}
             >
-              {v === 0 ? '0' : `${Math.round(v / 10_000)}만`}
+              {v === 0 ? '0' : inMan ? `${v / 10_000}만` : format(won(v))}
             </text>
           </g>
         ))}
