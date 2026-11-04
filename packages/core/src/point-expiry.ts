@@ -143,8 +143,14 @@ export function pointExpirySchedule(
     const date = kstDate(new Date(at));
     const day = byDate.get(date);
     if (day) {
+      /*
+       * **시각은 먼저 온 것을 그대로 쓴다.** `remainingEarnings` 가 기한 순으로 줄을
+       * 세우므로 같은 날 안에서는 **가장 이른 것이 늘 먼저 온다.** 예전에는 여기서
+       * `at < day.expiresAt` 이면 당기는 줄이 있었는데, 그 줄은 닿을 수 없었다 —
+       * 돌연변이로 지워도 지는 검사가 없어서 드러났다. 묶음의 시각이 그 날의 가장
+       * 이른 것이라는 뜻은 그대로고, 그것을 지키는 것은 저쪽의 줄 세우기다.
+       */
       day.amount += e.remaining;
-      if (at < day.expiresAt.getTime()) day.expiresAt = e.expiresAt;
     } else {
       byDate.set(date, { amount: e.remaining, expiresAt: e.expiresAt });
     }

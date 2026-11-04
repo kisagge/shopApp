@@ -43,8 +43,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const upload = readDeliveryUpload(parseCsv(parsed.data.csv));
 
-  const header = upload.problems[0];
-  if (header) {
+  const header = upload.problems.find((p) => p.kind === 'NO_HEADER');
+  if (header && header.kind === 'NO_HEADER') {
     return NextResponse.json(
       {
         code: 'NO_HEADER',
@@ -64,7 +64,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const failures: BulkDeliveryResult['failures'][number][] = [];
+  /*
+   * **주문번호가 빈 줄도 실패로 적는다.** 옮길 주문이 없으니 아래 루프가 할 일은 없는데,
+   * 아무 말도 안 하면 그 줄은 조용히 사라진다 — 운영자는 올렸다고 여기고 그 주문의
+   * 반품 기한 시계는 멈춘 채로 있다. 이 창구의 약속이 "무엇이 왜 안 됐는지 줄 번호와
+   * 함께 준다" 이므로 그 약속을 파일 쪽 실패에도 적용한다.
+   */
+  const failures: BulkDeliveryResult['failures'][number][] = upload.problems.flatMap((p) =>
+    p.kind === 'NO_ORDER_NO'
+      ? [{
+          orderNo: null,
+          lines: [p.line],
+          code: p.kind,
+          message: '주문번호가 비어 있습니다. 어느 주문인지 알 수 없어 옮기지 않았습니다.',
+        }]
+      : [],
+  );
   const moved: string[] = [];
 
   /*

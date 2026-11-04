@@ -255,3 +255,51 @@ describe('곧 사라질 포인트의 경계', () => {
     expect(expiringSoonAmount(entries, NOW)).toBe(500);
   });
 });
+
+/**
+ * **같은 날에 두 번 사라지면 이른 쪽이 그 날의 시각이다.**
+ *
+ * 날짜별로 묶을 때 금액은 더하고, 시각은 **그 날의 가장 이른 것**이다. 그 값으로 화면이
+ * "오늘 23시에 사라집니다" 를 적는데, 늦은 시각을 적으면 10시에 이미 없어진 포인트를
+ * 아직 있다고 말하게 된다.
+ *
+ * **지키는 자리가 여기가 아니었다.** 묶는 쪽에 시각을 당기는 줄이 있었는데 **닿을 수
+ * 없는 줄**이었다 — `remainingEarnings` 가 기한 순으로 줄을 세우므로 같은 날 안에서는
+ * 이른 것이 늘 먼저 온다. 돌연변이로 그 줄을 지워도 아무도 지지 않아 드러났고, 지웠다.
+ * 그래서 이 검사는 **줄 세우기**를 붙든다 — 원장에 적힌 순서와 무관하게 같은 답이 나오는지.
+ */
+describe('같은 날에 두 번 사라질 때', () => {
+  const old = day(-100);
+  // 둘 다 KST 로 2026-09-14 다 (10시와 14시)
+  const early = new Date('2026-09-14T01:00:00Z');
+  const late = new Date('2026-09-14T05:00:00Z');
+
+  it.each([
+    ['늦은 것이 먼저 적힌 원장', [late, early]],
+    ['이른 것이 먼저 적힌 원장', [early, late]],
+  ])('%s — 한 날로 묶고 이른 시각을 쓴다', (_label, [first, second]) => {
+    const schedule = pointExpirySchedule(
+      [
+        { amount: 1000, createdAt: old, expiresAt: first! },
+        { amount: 500, createdAt: old, expiresAt: second! },
+      ],
+      NOW,
+    );
+
+    expect(schedule).toHaveLength(1);
+    expect(schedule[0]!.amount).toBe(1500);
+    expect(schedule[0]!.expiresAt.getTime()).toBe(early.getTime());
+  });
+
+  it('날짜가 다르면 묶지 않는다 — 위의 묶음이 한 칸 넓지 않은지', () => {
+    const schedule = pointExpirySchedule(
+      [
+        { amount: 1000, createdAt: old, expiresAt: new Date('2026-09-14T01:00:00Z') },
+        { amount: 500, createdAt: old, expiresAt: new Date('2026-09-15T01:00:00Z') },
+      ],
+      NOW,
+    );
+
+    expect(schedule.map((d) => d.amount)).toEqual([1000, 500]);
+  });
+});

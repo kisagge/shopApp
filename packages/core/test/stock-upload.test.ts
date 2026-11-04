@@ -166,3 +166,53 @@ describe('올린 줄을 어떻게 할까', () => {
     });
   });
 });
+
+/**
+ * **SKU 칸만 빈 줄은 조용히 사라졌다.**
+ *
+ * 엑셀에서 SKU 칸을 잘못 지우거나, 줄을 끼워 넣고 재고만 적으면 그 줄은 `entries` 에도
+ * `problems` 에도 없고 **`skipped` 에도 안 들어갔다.** 운영자는 "N건 반영" 을 보고 다
+ * 됐다고 여기는데 그 옵션의 재고는 그대로다 — 이 모듈의 머리글이 "틀리면 없는 물건을
+ * 팔거나 있는 물건을 품절로 보인다" 고 적은 자리다.
+ *
+ * **`skipped` 와 섞지 않는다.** 그쪽은 "재고 칸을 비워 둔 줄" 이고 **일부러 그러는 것이
+ * 보통이다**(고칠 줄만 채워 올린다). 이쪽은 사람의 실수라 줄 번호를 말해야 한다.
+ */
+describe('SKU 칸만 비어 있는 줄', () => {
+  const HEAD = ['SKU', '상품', '옵션', '판매', '재고'];
+
+  it('어느 줄인지 말한다 — 조용히 버리지 않는다', () => {
+    const result = readStockUpload(parseCsv(csvDocument(HEAD, [
+      ['A-1', '코트', 'M', '판매중', '5'],
+      ['', '코트', 'L', '판매중', '7'],
+    ])));
+
+    expect(result.problems).toEqual([{ kind: 'NO_SKU', line: 3 }]);
+    // 나머지 줄은 그대로 반영한다 — 한 줄 때문에 파일을 되돌리지 않는다
+    expect(result.entries.map((e) => e.sku)).toEqual(['A-1']);
+  });
+
+  it('건너뜀으로 세지 않는다 — 그쪽은 일부러 비워 둔 줄이다', () => {
+    const result = readStockUpload(parseCsv(csvDocument(HEAD, [
+      ['A-1', '코트', 'M', '판매중', ''],
+      ['', '코트', 'L', '판매중', '7'],
+    ])));
+
+    expect(result.skipped).toBe(1); // 재고를 비운 A-1
+    expect(result.problems).toEqual([{ kind: 'NO_SKU', line: 3 }]);
+  });
+
+  /**
+   * **도구가 남긴 빈 줄은 신고하지 않는다.**
+   *
+   * 엑셀로 내보내면 끝에 빈 행이 붙는다. 그걸 사람의 실수라고 신고하면 **멀쩡한 파일마다
+   * 빨간 줄이 뜨고**, 그러면 운영자는 실패 목록을 안 읽게 된다. `parseCsv` 가 버리는 줄과
+   * 같은 기준(`hasContent`)을 쓴다.
+   */
+  it('완전히 빈 줄은 아무 말 없이 버린다', () => {
+    const result = readStockUpload([HEAD, ['A-1', '코트', 'M', '판매중', '5'], ['', '', '', '', ''], ['  ']]);
+
+    expect(result.problems).toEqual([]);
+    expect(result.entries).toHaveLength(1);
+  });
+});

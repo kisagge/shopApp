@@ -186,3 +186,25 @@ describe('브라우저가 보낸 스택', () => {
     expect(isErrorSource('app')).toBe(false);
   });
 });
+
+/**
+ * **없는 헤더는 적지 않는다.**
+ *
+ * `Record<string, string | string[] | undefined>` 를 받는다 — Node 의 헤더 객체가 그
+ * 모양이고, 묻지 않은 헤더는 `undefined` 로 온다. 그 자리를 건너뛰는 줄이 안 돈 줄이었다.
+ *
+ * 건너뛰지 않으면 오류 보고에 `{"x-forwarded-for": undefined}` 같은 칸이 쌓인다. JSON 으로
+ * 나가면서 사라지거나 `null` 이 되는데, 어느 쪽이든 **"헤더가 없었다" 와 "값이 없었다" 가
+ * 구별되지 않는다** — 보고를 읽고 고장을 좁히는 사람이 거기서 헷갈린다.
+ */
+describe('없는 헤더', () => {
+  it('값이 undefined 면 열쇠 자체가 없다', () => {
+    const out = redactHeaders({ 'user-agent': 'curl', 'x-forwarded-for': undefined });
+    expect(Object.keys(out)).toEqual(['user-agent']);
+    expect('x-forwarded-for' in out).toBe(false);
+  });
+
+  it('빈 글자는 값이 있는 것이다 — undefined 와 다르다', () => {
+    expect(redactHeaders({ 'x-request-id': '' })['x-request-id']).toBe('');
+  });
+});

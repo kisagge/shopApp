@@ -151,3 +151,37 @@ describe('옮기기', () => {
     expect(recordAudit).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **주문번호 칸만 빈 줄을 창구가 말로 내놓는지.**
+ *
+ * 여기가 가장 아프다. 그 주문은 `DELIVERED` 로 가지 않고, **거기서부터 도는 시계가 멈춘
+ * 채로 있다** — 반품·교환 기한, 자동 구매확정, 후기를 쓸 수 있는 때, 정산. 예전에는 그
+ * 줄이 어디에도 안 남았고, 이 창구의 약속은 "무엇이 왜 안 됐는지 줄 번호와 함께 준다" 였다.
+ */
+describe('주문번호 칸만 비어 있는 줄', () => {
+  it('실패 목록에 줄 번호와 함께 넣고, 옮기기에는 보내지 않는다', async () => {
+    const response = await post({
+      csv: csvDocument(['주문번호', '상품'], [['20260915-0000001', '울 코트'], ['', '니트']]),
+    });
+    const body = await response.json();
+
+    expect(body).toMatchObject({ delivered: 1, merged: 0 });
+    expect(body.failures).toEqual([
+      {
+        orderNo: null,
+        lines: [3],
+        code: 'NO_ORDER_NO',
+        message: '주문번호가 비어 있습니다. 어느 주문인지 알 수 없어 옮기지 않았습니다.',
+      },
+    ]);
+    expect(transitionOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('머리칸이 없는 것과 섞이지 않는다 — 그쪽은 파일 전체를 되돌린다', async () => {
+    const response = await post({ csv: csvDocument(['상품'], [['울 코트']]) });
+
+    expect(response.status).toBe(400);
+    expect((await response.json()).code).toBe('NO_HEADER');
+  });
+});

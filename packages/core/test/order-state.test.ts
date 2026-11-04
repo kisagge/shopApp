@@ -604,3 +604,25 @@ describe('일부만 취소할 수 있는 구간', () => {
     expect([...PARTIAL_CANCELLABLE_STATUS].sort()).toEqual([...UNSHIPPED_LINE_STATUS].sort());
   });
 });
+
+/**
+ * **옮길 수 있는 길에서는 옮긴 상태를 돌려준다.**
+ *
+ * `transition` 의 검사들이 전부 **막히는 쪽**만 보고 있었다 — 돌려주는 줄이 한 번도 안
+ * 돈 줄이었다. 그래서 `return to` 를 `return from` 으로 바꿔도 아무도 지지 않았다.
+ * 그러면 상태가 영원히 그 자리에 머문다(결제했는데 계속 입금 대기).
+ *
+ * 허용된 길을 **손으로 적지 않는다** — `nextStatuses` 에서 꺼내 전수로 돈다.
+ */
+describe('옮긴 상태를 돌려준다', () => {
+  const ALLOWED = ORDER_STATUS.flatMap((from) => nextStatuses(from).map((to) => [from, to] as const));
+
+  // 그물이 헛돌지 않는지 — 길이 하나도 없으면 아래 루프가 조용히 통과한다
+  it('허용된 길이 여럿 있다', () => {
+    expect(ALLOWED.length).toBeGreaterThan(5);
+  });
+
+  it.each(ALLOWED)('%s → %s 는 그 상태를 돌려준다', (from, to) => {
+    expect(transition(from, to)).toBe(to);
+  });
+});

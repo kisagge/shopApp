@@ -29,6 +29,7 @@ const PROBLEM_MESSAGE: Record<ShipmentUploadProblem['kind'], string> = {
   CONFLICT: '같은 주문에 송장번호가 둘 이상 적혀 있습니다. 한 줄만 남겨 주세요.',
   MISSING_CARRIER: '택배사가 비어 있습니다.',
   UNKNOWN_CARRIER: '모르는 택배사입니다.',
+  NO_ORDER_NO: '주문번호가 비어 있습니다. 어느 주문인지 알 수 없어 등록하지 않았습니다.',
 };
 
 export async function POST(request: Request): Promise<NextResponse> {

@@ -51,10 +51,14 @@ export function allocateByWeight(total: number, weights: readonly number[]): num
   if (weights.some((w) => !Number.isInteger(w) || w < 0)) {
     throw new RangeError('가중치는 0 이상의 정수여야 합니다');
   }
-  if (weights.length === 0) return [];
-
   const sum = weights.reduce((a, b) => a + b, 0);
-  // 가중치가 모두 0 이면 비율이 없다. 금액이 있으면 첫 줄이 받는다 — 흘리지 않는다.
+  /*
+   * 가중치가 모두 0 이면 비율이 없다. 금액이 있으면 첫 줄이 받는다 — 흘리지 않는다.
+   *
+   * **줄이 아예 없는 경우도 여기서 끝난다**(`[].map` 은 `[]`). 앞에 `weights.length === 0`
+   * 을 따로 두었더니 돌연변이에 걸렸다 — 지워도 지는 검사가 없었고, 실제로 같은 답을
+   * 두 번 적고 있었다.
+   */
   if (sum === 0) return weights.map((_, i) => (i === 0 ? total : 0));
 
   const T = BigInt(total);

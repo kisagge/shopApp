@@ -3,6 +3,7 @@ import {
   USER_ROLE, USER_ROLE_LABEL, PERMISSION, permissionsOf,
   hasPermission, assertPermission, ForbiddenError, canManageProduct,
   canRefundOrder, canAssignRole, canEditUser, merchantScope, canResolveReturnOf, canSuspendUser,
+  ownsMerchant,
   actorForMerchantStatus,
   type Actor,
 } from '../src/authz';
@@ -216,5 +217,80 @@ describe('가맹점 상태로 다시 정한 권한', () => {
     const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
     expect(actorForMerchantStatus(admin, null)).toBe(admin);
     expect(actorForMerchantStatus(customer, 'SUSPENDED')).toBe(customer);
+  });
+});
+
+/**
+ * **가맹점이 없는 가맹점 계정 — 문이 두 개다.**
+ *
+ * `MERCHANT` 역할인데 `merchantId` 가 `null` 인 계정이 있다: 역할만 먼저 주고 가맹점을
+ * 아직 잇지 않았거나, 이었던 것을 끊은 뒤다. 그 계정을 **두 자리가 따로 닫는다.**
+ *
+ *   1. `hasPermission` — 소속이 없으면 **아무 권한도 없다**고 답한다
+ *   2. `ownsMerchant` — 소속이 없으면 **무엇도 자기 것이 아니다**라고 답한다
+ *
+ * 둘째 줄은 지금 **앱에서 닿지 않는다.** `ownsMerchant` 를 부르는 다섯 곳
+ * (`canManageProduct`·`canManageMerchant`·`canEditMerchantSettings`·`canReplyToReview`·
+ * `canAnswerInquiry`)이 전부 `hasPermission` 을 먼저 보기 때문이다. 그래서 커버리지가
+ * 이 줄을 **한 번도 안 돈 줄**로 가리켰다 — 검사가 없었던 것이 아니라 **첫째 문에서
+ * 다 걸러졌다.**
+ *
+ * 그렇다고 지우지 않는다. 걸러 내는 줄이 사라지면 `actor.merchantId === merchantId` 만
+ * 남고, **우리가 직매입한 상품은 `merchantId` 가 `null`** 이라 `null === null` 이 참이
+ * 된다 — 소속을 잃은 계정이 자사 상품의 주인이 된다. 첫째 문을 잊은 여섯 번째 호출자가
+ * 생기는 날 그 줄이 받는다. 둘을 **따로** 못 박아 둔다: 하나를 지워도 다른 쪽 검사가
+ * 지므로, 둘 중 어느 것을 지웠는지가 보인다.
+ */
+describe('가맹점이 없는 가맹점 계정', () => {
+  const unlinked: Actor = { id: 'u-9', role: 'MERCHANT', merchantId: null };
+
+  it('첫째 문 — 아무 권한도 없다', () => {
+    // 소속이 있으면 있는 권한이다. 그 차이가 소속에서 온다는 뜻
+    expect(hasPermission(merchant, 'product:write')).toBe(true);
+    expect(hasPermission(unlinked, 'product:write')).toBe(false);
+  });
+
+  it.each([
+    ['자사 직매입(merchantId 없음)', null],
+    ['남의 가맹점', 'm-1'],
+  ])('둘째 문 — %s 을 자기 것이라 하지 않는다', (_label, merchantId) => {
+    expect(ownsMerchant(unlinked, merchantId)).toBe(false);
+  });
+
+  /** 멀쩡한 가맹점은 그대로 — 위의 걸러 냄이 한 칸 넓지 않은지 */
+  it('가맹점이 이어져 있으면 자기 것은 자기 것이다', () => {
+    expect(ownsMerchant(merchant, 'm-1')).toBe(true);
+    expect(ownsMerchant(merchant, 'm-2')).toBe(false);
+  });
+
+  /** 두 문이 겹쳐서 실제 판정은 어느 쪽으로도 새지 않는다 */
+  it('그래서 자사 직매입 상품도 다룰 수 없다', () => {
+    expect(canManageProduct(unlinked, { merchantId: null })).toBe(false);
+  });
+});
+
+/**
+ * **권한을 보는지 자체를 못 박는다.**
+ *
+ * `canAssignRole`·`canEditUser` 는 첫 줄에서 권한을 보고 나머지 규칙으로 넘어간다.
+ * 그런데 그 첫 줄이 **지는 쪽으로 돈 적이 없었다** — 검사들이 전부 운영진으로 물어
+ * 통과한 뒤의 규칙(자기 역할은 못 바꾼다·슈퍼관리자는 못 건드린다)만 보고 있었다.
+ * 첫 줄을 지우면 **손님이 남의 역할을 바꿀 수 있다고 답한다.**
+ */
+describe('권한이 없으면 거기서 끝난다', () => {
+  it.each([
+    ['손님', customer],
+    ['가맹점', merchant],
+  ])('%s 은 역할을 줄 수 없다', (_label, actor) => {
+    expect(hasPermission(actor, 'user:assignRole')).toBe(false);
+    expect(canAssignRole(actor, { id: 'u-other' }, 'ADMIN')).toBe(false);
+  });
+
+  it.each([
+    ['손님', customer],
+    ['가맹점', merchant],
+  ])('%s 은 남의 계정을 고칠 수 없다', (_label, actor) => {
+    expect(hasPermission(actor, 'user:write')).toBe(false);
+    expect(canEditUser(actor, { id: 'u-other', role: 'CUSTOMER' })).toBe(false);
   });
 });

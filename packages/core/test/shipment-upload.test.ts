@@ -184,3 +184,54 @@ describe('배송완료 올리기', () => {
     expect(upload.entries).toHaveLength(1);
   });
 });
+
+/**
+ * **주문번호 칸만 빈 줄도 조용히 사라졌다.**
+ *
+ * 재고 올리기와 같은 자리다. 송장번호를 적어 올렸는데 주문번호 칸이 비어 있으면 그 줄은
+ * 어디에도 안 남았다 — 운영자는 올렸다고 여기고 손님에게는 송장이 안 뜬다.
+ *
+ * 배송완료 올리기가 더 아프다: 그 주문은 `DELIVERED` 로 안 가고, **거기서부터 도는 시계가
+ * 멈춘 채로 있다** — 반품·교환 기한, 자동 구매확정, 후기를 쓸 수 있는 때, 정산.
+ */
+describe('주문번호 칸만 비어 있는 줄', () => {
+  it('송장 올리기 — 어느 줄인지 말하고 나머지는 받는다', () => {
+    const result = upload(['주문번호', '택배사', '송장번호'], [
+      ['20260915-0000001', 'CJ대한통운', '111'],
+      ['', 'CJ대한통운', '999'],
+    ]);
+
+    expect(result.problems).toEqual([{ kind: 'NO_ORDER_NO', line: 3 }]);
+    expect(result.entries.map((e) => e.orderNo)).toEqual(['20260915-0000001']);
+  });
+
+  it('배송완료 올리기 — 같은 말을 한다', () => {
+    const result = readDeliveryUpload(parseCsv(csvDocument(['주문번호', '상태'], [
+      ['20260915-0000001', '배송중'],
+      ['', '배송중'],
+    ])));
+
+    expect(result.problems).toEqual([{ kind: 'NO_ORDER_NO', line: 3 }]);
+    expect(result.entries.map((e) => e.orderNo)).toEqual(['20260915-0000001']);
+  });
+
+  /** 도구가 남긴 빈 줄은 신고하지 않는다 — 멀쩡한 파일마다 빨간 줄이 뜨면 아무도 안 읽는다 */
+  it.each([
+    ['송장', (rows: string[][]) => readShipmentUpload([['주문번호', '택배사', '송장번호'], ...rows]).problems],
+    ['배송완료', (rows: string[][]) => readDeliveryUpload([['주문번호'], ...rows]).problems],
+  ])('%s — 완전히 빈 줄은 아무 말 없이 버린다', (_label, read) => {
+    expect(read([['', '', ''], ['  ']])).toEqual([]);
+  });
+
+  /** 묶인 줄과 섞이지 않는다 — 그쪽은 실패가 아니다(내보낸 파일은 항목마다 한 줄이다) */
+  it('배송완료 — 묶인 수와 신고를 따로 센다', () => {
+    const result = readDeliveryUpload(parseCsv(csvDocument(['주문번호'], [
+      ['20260915-0000001'],
+      ['20260915-0000001'],
+      ['', '적다 만 줄'],
+    ])));
+
+    expect(result.merged).toBe(1);
+    expect(result.problems).toEqual([{ kind: 'NO_ORDER_NO', line: 4 }]);
+  });
+});

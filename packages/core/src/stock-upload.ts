@@ -9,6 +9,8 @@
  * 수정과 같은 함수가 한다.
  */
 
+import { hasContent } from './csv';
+
 export interface StockEntry {
   /** 대문자로 맞춘 SKU */
   readonly sku: string;
@@ -32,7 +34,18 @@ export type StockUploadProblem =
   | { readonly kind: 'NO_HEADER'; readonly missing: readonly string[] }
   | { readonly kind: 'INVALID_STOCK'; readonly line: number; readonly sku: string; readonly value: string }
   | { readonly kind: 'INVALID_ACTIVE'; readonly line: number; readonly sku: string; readonly value: string }
-  | { readonly kind: 'CONFLICT'; readonly sku: string; readonly lines: readonly number[] };
+  | { readonly kind: 'CONFLICT'; readonly sku: string; readonly lines: readonly number[] }
+  /**
+   * SKU 칸만 비었고 다른 칸에는 적은 것이 있는 줄.
+   *
+   * **예전에는 아무 말 없이 사라졌다.** 엑셀에서 SKU 칸을 잘못 지우거나 줄을 끼워 넣고
+   * 재고만 적으면, 그 줄은 `entries` 에도 `problems` 에도 없고 `skipped` 에도 안 들어갔다.
+   * 운영자는 "N건 반영" 을 보고 다 됐다고 여기는데 **그 옵션의 재고는 그대로였다** —
+   * 없는 물건을 팔거나 있는 물건을 품절로 보이게 하는 자리다.
+   *
+   * 완전히 빈 줄은 여기 오지 않는다(`hasContent`). 그래서 이 신고는 늘 사람의 실수다.
+   */
+  | { readonly kind: 'NO_SKU'; readonly line: number };
 
 export interface StockUpload {
   readonly entries: readonly StockEntry[];
@@ -112,7 +125,11 @@ export function readStockUpload(rows: readonly (readonly string[])[]): StockUplo
   body.forEach((cells, i) => {
     const line = i + 2;
     const sku = (cells[col.sku] ?? '').trim().toUpperCase();
-    if (sku === '') return;
+    if (sku === '') {
+      // 도구가 남긴 빈 줄은 조용히 버리고, 사람이 적은 줄은 어느 줄인지 말한다
+      if (hasContent(cells)) problems.push({ kind: 'NO_SKU', line });
+      return;
+    }
 
     const rawStock = cells[col.stock] ?? '';
     if (rawStock.trim() === '') {

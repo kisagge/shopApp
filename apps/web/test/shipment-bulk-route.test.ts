@@ -209,3 +209,29 @@ describe('배송지가 바뀐 주문', () => {
     expect(registerShipmentAudited).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **주문번호 칸만 빈 줄을 창구가 말로 내놓는지.**
+ *
+ * 송장번호를 적어 올렸는데 주문번호가 비어 있으면 어느 주문인지 알 수 없다. 예전에는
+ * 그 줄이 어디에도 안 남아, 운영자는 올렸다고 여기고 손님에게는 송장이 안 떴다.
+ */
+describe('주문번호 칸만 비어 있는 줄', () => {
+  it('실패 목록에 줄 번호와 함께 넣고, 등록에는 보내지 않는다', async () => {
+    const response = await upload([
+      ['20260915-0000001', '울 코트', 'CJ대한통운', '111'],
+      ['', '니트', 'CJ대한통운', '999'],
+    ]);
+    const body = await response.json();
+
+    expect(body.failures).toEqual([
+      {
+        orderNo: null,
+        lines: [3],
+        code: 'NO_ORDER_NO',
+        message: '주문번호가 비어 있습니다. 어느 주문인지 알 수 없어 등록하지 않았습니다.',
+      },
+    ]);
+    expect(registerShipmentAudited).toHaveBeenCalledTimes(1);
+  });
+});

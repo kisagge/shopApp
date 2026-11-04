@@ -108,3 +108,34 @@ describe('할인 내용 수정', () => {
     expect(canEditDiscount(1)).toBe(false);
   });
 });
+
+/**
+ * **칸마다 사유를 돌려준다 — 그 사유들이 한 번도 안 나온 적이 있다.**
+ *
+ * 세 줄이 안 돈 줄이었다: 정액인데 금액이 0 이하, 정률인데 상한이 0 이하, 최소 주문
+ * 금액이 음수. 셋 다 "말이 안 되는 쿠폰" 인데 지금까지 아무 검사도 그 사유를 보지
+ * 않았다. 사유가 사라지면 운영자는 **왜 저장이 안 되는지 모른 채** 같은 값을 다시
+ * 넣는다(이 함수를 둔 까닭이 바로 그것이라고 주석이 적는다).
+ */
+describe('말이 안 되는 발행 내용', () => {
+  it.each([0, -1000])('정액 할인 금액이 %s 이면 그 칸을 가리킨다', (value) => {
+    expect(validateCouponDefinition({ ...base, kind: 'AMOUNT', value, minimumOrder: 0 })['value'])
+      .toBe('할인 금액을 입력해 주세요');
+  });
+
+  it.each([0, -1])('정률 할인의 상한이 %s 이면 그 칸을 가리킨다', (maxDiscount) => {
+    expect(validateCouponDefinition({ ...base, kind: 'PERCENT', percent: 10, maxDiscount })['maxDiscount'])
+      .toBe('상한은 0보다 커야 합니다');
+  });
+
+  it('최소 주문 금액은 음수가 될 수 없다', () => {
+    expect(validateCouponDefinition({ ...base, minimumOrder: -1 })['minimumOrder'])
+      .toBe('최소 주문 금액은 0 이상입니다');
+  });
+
+  /** 멀쩡한 값에는 사유가 붙지 않는다 — 위의 셋이 한 칸 넓지 않은지 */
+  it('상한이 없는 정률은 멀쩡하다', () => {
+    expect(validateCouponDefinition({ ...base, kind: 'PERCENT', percent: 10, maxDiscount: null }))
+      .toEqual({});
+  });
+});

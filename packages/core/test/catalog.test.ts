@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   normalizeSearchTerm, normalizePriceRange, emptyResultReason, searchWords, MAX_SEARCH_WORDS,
   isProductSort, PRODUCT_SORT, MIN_SEARCH_LENGTH, sellingPriceOf,
-  PRICE_BUCKET, resolvePriceRange,
+  PRICE_BUCKET, resolvePriceRange, PRICE_BUCKET_IDS, isPriceBucketId, searchTextFor,
 } from '../src/catalog';
 
 describe('검색어 정규화', () => {
@@ -250,5 +250,44 @@ describe('searchWords — 낱말이 붙어 있지 않아도 찾는다', () => {
   it('남는 낱말이 없으면 검색어를 통째로 쓴다', () => {
     // 빈손으로 답하지 않는다 — 무엇이든 찾아 보려던 사람이다
     expect(searchWords('a b')).toEqual(['a b']);
+  });
+});
+
+/**
+ * **검색용 글자는 쓰는 곳이 둘이라 규칙도 하나여야 한다.**
+ *
+ * 브랜드명을 상품 행에 복사해 둔다(검색 OR 가 두 테이블에 걸치면 인덱스를 못 쓴다).
+ * 예전에는 이 규칙이 어드민 쓰기 경로에만 있어서 **시드가 그 칸을 비워 두었고, 갓
+ * 시드한 DB 에서는 검색이 아무것도 못 찾았다** — 함수 주석이 그 사고를 적는다.
+ *
+ * 그래서 규칙을 한 곳으로 모았는데, **그 함수를 부르는 검사가 없었다.** 소문자로
+ * 떨어뜨리는 것을 빼면 대문자로 적힌 브랜드가 검색에서 사라진다.
+ */
+describe('검색용 글자', () => {
+  it('이름과 브랜드를 한 칸 띄워 잇고 소문자로 떨어뜨린다', () => {
+    expect(searchTextFor({ name: '울 코트', brandName: 'MOOR' })).toBe('울 코트 moor');
+  });
+
+  it('대소문자를 섞어 적어도 같은 값이 된다 — 비교 때 신경 쓰지 않으려고 저장할 때 떨어뜨린다', () => {
+    expect(searchTextFor({ name: 'Wool Coat', brandName: 'Moor' }))
+      .toBe(searchTextFor({ name: 'WOOL COAT', brandName: 'MOOR' }));
+  });
+});
+
+/**
+ * 가격 구간 이름이 우리 것인지 — 주소로 들어온 글자를 그대로 믿지 않는다.
+ */
+describe('가격 구간 이름', () => {
+  it.each(PRICE_BUCKET_IDS)('%s 은 우리 구간이다', (id) => {
+    expect(isPriceBucketId(id)).toBe(true);
+  });
+
+  it.each(['', 'over-300k ', 'OVER-300K', '0-50k;drop', 'free'])('%s 은 아니다', (value) => {
+    expect(isPriceBucketId(value)).toBe(false);
+  });
+
+  // 목록을 손으로 적지 않았는지 — 구간이 늘면 위 루프도 함께 늘어야 한다
+  it('구간 목록과 이름 목록의 길이가 같다', () => {
+    expect(PRICE_BUCKET_IDS).toHaveLength(PRICE_BUCKET.length);
   });
 });

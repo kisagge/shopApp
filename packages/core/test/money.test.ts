@@ -2,6 +2,30 @@ import { describe, it, expect } from 'vitest';
 import { won, add, subtractToZero, multiply, percentOf, discountRateOf, format, formatWithUnit, MoneyError } from '../src/money';
 
 describe('won', () => {
+  /**
+   * **정수 검사만으로는 2^53 을 못 막는다.**
+   *
+   * `Number.isInteger(2 ** 53)` 은 참이다 — 거기부터는 **정수 사이의 간격이 1 보다
+   * 커서** 더한 1원이 사라진다(`2**53 + 1 === 2**53`). 그래서 `won` 은 안전 정수까지
+   * 본다. 그 줄이 지는 쪽으로 돈 적이 없었다.
+   *
+   * 현실의 주문 금액은 여기 닿지 않는다. 닿는 길은 **셈이 어긋났을 때**다 —
+   * 수량이나 가중치가 터무니없이 커진 곱. 그때 조용히 틀린 금액을 받는 것보다
+   * 그 자리에서 터지는 쪽이 맞다.
+   */
+  it.each([
+    ['2^53', 2 ** 53],
+    ['2^53 + 2', 2 ** 53 + 2],
+    ['음수 쪽 2^53', -(2 ** 53)],
+  ])('안전 정수 범위를 벗어난 %s 은 거절한다', (_label, value) => {
+    expect(Number.isInteger(value)).toBe(true);
+    expect(() => won(value)).toThrow(MoneyError);
+  });
+
+  it('안전 정수의 끝은 받는다 — 위의 거절이 한 칸 넓지 않은지', () => {
+    expect(won(Number.MAX_SAFE_INTEGER)).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
   it('정수만 허용한다', () => {
     expect(() => won(1000.5)).toThrow(MoneyError);
     expect(() => won(Number.NaN)).toThrow(MoneyError);

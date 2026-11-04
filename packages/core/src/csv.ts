@@ -51,6 +51,18 @@ export function csvDocument(
  * 걷어 낸다 — 엑셀로 저장하면 붙어 오고, 안 걷으면 첫 머리칸 이름이 틀려진다.
  * 빈 줄은 버린다.
  */
+/**
+ * 이 줄에 적힌 것이 있는가.
+ *
+ * **`parseCsv` 가 버리는 줄의 기준이자, 읽는 쪽이 조용히 건너뛰어도 되는 줄의 기준이다.**
+ * 엑셀에서 내보내면 끝에 빈 행이 붙고 중간에도 빈 줄이 섞인다 — 그건 사람의 뜻이 아니라
+ * 도구의 흔적이라 아무 말 없이 버린다.
+ *
+ * 둘이 같은 서술어를 써야 한다. 읽는 쪽이 더 넓게 버리면 **사람이 적은 줄이 말없이
+ * 사라지고**, 더 좁게 버리면 도구의 흔적을 사람의 실수로 신고한다.
+ */
+export const hasContent = (row: readonly string[]): boolean => row.some((c) => c.trim() !== '');
+
 export function parseCsv(input: string): string[][] {
   const text = input.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
@@ -96,5 +108,5 @@ export function parseCsv(input: string): string[][] {
     rows.push(row);
   }
 
-  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+  return rows.filter(hasContent);
 }

@@ -1,4 +1,5 @@
 import { CARRIERS, CARRIER_CODE, type CarrierCode } from './carrier';
+import { hasContent } from './csv';
 
 /**
  * 송장 일괄 올리기 파일을 읽는다.
@@ -28,7 +29,17 @@ export type ShipmentUploadProblem =
       readonly kind: 'CONFLICT';
       readonly orderNo: string;
       readonly lines: readonly number[];
-    };
+    }
+  /**
+   * 주문번호 칸만 비었고 다른 칸에는 적은 것이 있는 줄.
+   *
+   * **예전에는 아무 말 없이 사라졌다.** 송장번호를 적어 올렸는데 주문번호 칸이 비어 있으면
+   * 그 줄은 어디에도 안 남았다 — 운영자는 올렸다고 여기고, 손님에게는 송장이 안 뜬다.
+   * 배송완료 올리기도 같은 자리였다(거기서는 그 주문의 반품 기한 시계가 안 돌기 시작한다).
+   *
+   * 완전히 빈 줄은 여기 오지 않는다(`hasContent`). 그래서 이 신고는 늘 사람의 실수다.
+   */
+  | { readonly kind: 'NO_ORDER_NO'; readonly line: number };
 
 export interface ShipmentUpload {
   readonly entries: readonly ShipmentEntry[];
@@ -83,11 +94,17 @@ export function readShipmentUpload(rows: readonly (readonly string[])[]): Shipme
    */
   const byOrder = new Map<string, { carrier: string; tracking: string; lines: number[] }[]>();
   const firstLine = new Map<string, number>();
+  // 줄을 읽는 동안에도 신고할 것이 있어 여기서 만든다 — 주문번호가 빈 줄
+  const problems: ShipmentUploadProblem[] = [];
 
   body.forEach((cells, i) => {
     const line = i + 2;
     const orderNo = (cells[col.orderNo] ?? '').trim();
-    if (orderNo === '') return;
+    if (orderNo === '') {
+      // 도구가 남긴 빈 줄은 조용히 버리고, 사람이 적은 줄은 어느 줄인지 말한다
+      if (hasContent(cells)) problems.push({ kind: 'NO_ORDER_NO', line });
+      return;
+    }
 
     const carrier = (cells[col.carrier] ?? '').trim();
     const tracking = (cells[col.trackingNumber] ?? '').trim();
@@ -101,7 +118,6 @@ export function readShipmentUpload(rows: readonly (readonly string[])[]): Shipme
   });
 
   const entries: ShipmentEntry[] = [];
-  const problems: ShipmentUploadProblem[] = [];
   let skipped = 0;
 
   for (const [orderNo, variants] of byOrder) {
@@ -166,7 +182,11 @@ export interface DeliveryEntry {
 
 export interface DeliveryUpload {
   readonly entries: readonly DeliveryEntry[];
-  readonly problems: readonly { readonly kind: 'NO_HEADER'; readonly missing: readonly string[] }[];
+  readonly problems: readonly (
+    | { readonly kind: 'NO_HEADER'; readonly missing: readonly string[] }
+    /** 주문번호만 빈 줄 — 송장 올리기와 같은 까닭이다 */
+    | { readonly kind: 'NO_ORDER_NO'; readonly line: number }
+  )[];
   /** 같은 주문이 여러 줄에 나와 묶인 수. 실패가 아니다 — 내보낸 파일은 항목마다 한 줄이다 */
   readonly merged: number;
 }
@@ -183,21 +203,27 @@ export function readDeliveryUpload(rows: readonly (readonly string[])[]): Delive
    * 두 번째부터는 "이미 배송완료" 로 실패하고, 운영자는 멀쩡한 처리를 실패 목록으로 보게 된다.
    */
   const firstLine = new Map<string, number>();
+  const problems: DeliveryUpload['problems'][number][] = [];
   let merged = 0;
 
   body.forEach((cells, i) => {
+    const line = i + 2;
     const orderNo = (cells[at] ?? '').trim();
-    if (orderNo === '') return;
+    if (orderNo === '') {
+      // 도구가 남긴 빈 줄은 조용히 버리고, 사람이 적은 줄은 어느 줄인지 말한다
+      if (hasContent(cells)) problems.push({ kind: 'NO_ORDER_NO', line });
+      return;
+    }
     if (firstLine.has(orderNo)) {
       merged += 1;
       return;
     }
-    firstLine.set(orderNo, i + 2);
+    firstLine.set(orderNo, line);
   });
 
   return {
     entries: [...firstLine].map(([orderNo, line]) => ({ orderNo, line })),
-    problems: [],
+    problems,
     merged,
   };
 }

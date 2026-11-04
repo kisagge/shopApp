@@ -147,3 +147,39 @@ describe('그 줄에서 나은 것', () => {
       .toEqual([]);
   });
 });
+
+/**
+ * **낫고 못함을 우리가 정하는 줄만 표시한다.**
+ *
+ * `bestInRow` 는 줄마다 다른 잣대를 쓴다 — 가격은 낮은 쪽, 할인율·평점·리뷰 수는 높은
+ * 쪽. 가격과 평점은 검사가 있었는데 **할인율과 리뷰 수는 둘 다 안 돈 줄**이었다.
+ *
+ * 할인율의 `?? 0` 이 요점이다. 할인이 없는 상품은 값이 없는데(`undefined`), 그대로 흘리면
+ * "우리가 정하지 않는 줄" 과 같은 값이 되어 **할인하는 상품에 표시가 붙지 않는다.**
+ * 0% 는 "모른다" 가 아니라 "할인이 없다" 다.
+ */
+describe('줄마다 다른 잣대', () => {
+  it('할인율은 높은 쪽이다', () => {
+    const best = bestInRow('discount', [
+      p({ slug: 'a', discountPercent: 30 }),
+      p({ slug: 'b', discountPercent: 10 }),
+    ]);
+    expect(best).toEqual(['a']);
+  });
+
+  it('할인이 없는 것은 0% 다 — 모른다가 아니라서 할인하는 쪽이 이긴다', () => {
+    const best = bestInRow('discount', [
+      p({ slug: 'a', discountPercent: undefined }),
+      p({ slug: 'b', discountPercent: 5 }),
+    ]);
+    expect(best).toEqual(['b']);
+  });
+
+  it('리뷰 수는 많은 쪽이다', () => {
+    const best = bestInRow('reviewCount', [
+      p({ slug: 'a', reviewCount: 2 }),
+      p({ slug: 'b', reviewCount: 41 }),
+    ]);
+    expect(best).toEqual(['b']);
+  });
+});

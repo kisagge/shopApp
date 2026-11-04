@@ -106,3 +106,28 @@ describe('내려받기', () => {
     expect((await GET(new Request('http://localhost/api/admin/products/stock/export'))).status).toBe(401);
   });
 });
+
+/**
+ * **SKU 칸만 빈 줄을 창구가 말로 내놓는지.**
+ *
+ * core 가 신고를 만들고 창구가 그것을 사람 말로 바꾼다(`PROBLEM_MESSAGE`). 적을 SKU 가
+ * 없는 신고라 `sku` 는 빈 글자이고, 화면은 **줄 번호로** 찾아간다. 그 자리를 비워 두면
+ * 운영자는 다 반영된 줄 알고 넘어간다 — 재고가 틀린 채로.
+ */
+describe('SKU 칸만 비어 있는 줄', () => {
+  it('실패 목록에 줄 번호와 함께 넣고, 적용에는 보내지 않는다', async () => {
+    const csv = csvDocument(HEADER, [
+      ['COAT-M', 'MOOR', '코트', 'M', '판매중', '10'],
+      ['', 'MOOR', '코트', 'L', '판매중', '7'],
+    ]);
+    const response = await post({ csv });
+    const body = await response.json();
+
+    expect(lib.bulkUpdateStock.mock.calls[0]![1].map((e: { sku: string }) => e.sku)).toEqual(['COAT-M']);
+    expect(body.failures).toEqual([
+      { sku: '', lines: [3], code: 'NO_SKU', message: 'SKU 칸이 비어 있습니다. 어느 옵션인지 알 수 없어 반영하지 않았습니다.' },
+    ]);
+    // 건너뜀과 섞지 않는다 — 그쪽은 일부러 비워 둔 줄이다
+    expect(body.skipped).toBe(0);
+  });
+});

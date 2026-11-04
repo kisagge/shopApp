@@ -20,6 +20,7 @@ const PROBLEM_MESSAGE: Record<Exclude<StockUploadProblem['kind'], 'NO_HEADER'>, 
   INVALID_STOCK: '재고는 0 이상의 정수여야 합니다.',
   INVALID_ACTIVE: '판매 칸은 판매중·판매중지 중 하나로 적어 주세요.',
   CONFLICT: '같은 SKU 에 다른 값이 적혀 있습니다. 한 줄만 남겨 주세요.',
+  NO_SKU: 'SKU 칸이 비어 있습니다. 어느 옵션인지 알 수 없어 반영하지 않았습니다.',
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -57,7 +58,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     p.kind === 'NO_HEADER'
       ? []
       : [{
-          sku: p.sku,
+          // SKU 칸이 빈 줄은 적을 SKU 가 없다 — 화면은 줄 번호로 찾아간다
+          sku: 'sku' in p ? p.sku : '',
           lines: 'lines' in p ? p.lines : [p.line],
           code: p.kind,
           message: 'value' in p ? `${PROBLEM_MESSAGE[p.kind]} (${p.value})` : PROBLEM_MESSAGE[p.kind],
