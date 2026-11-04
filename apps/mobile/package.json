@@ -20,13 +20,13 @@
     "@capacitor/preferences": "8.0.1",
     "@capacitor/share": "8.0.3",
     "@capacitor/splash-screen": "8.0.2",
-    "@capgo/capacitor-social-login": "8.7.5"
+    "@capgo/capacitor-social-login": "8.7.6"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",
     "@shop/config": "workspace:*",
     "@types/node": "26.6.6",
-    "eslint": "10.13.0",
+    "eslint": "10.14.0",
     "sharp": "0.35.5",
     "typescript": "6.0.3"
   }
