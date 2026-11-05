@@ -281,3 +281,48 @@ describe('옛 주소가 가리키는 곳', () => {
     expect(await getBrandSlugMovedTo('never-used')).toBeNull();
   });
 });
+
+/**
+ * **두 사람이 같은 이름을 동시에 넣으면.**
+ *
+ * 주소는 넣기 전에 한 번 보지만(`slugTaken`), 그 사이에 남이 넣을 수 있다. 최종 방어선은
+ * DB 의 유니크 제약이고, 여기서는 **그 오류를 우리 말로 바꾼다** — 안 바꾸면 운영자에게
+ * 500 이 나가서 "서버가 터졌다" 로 보인다. 다시 눌러도 되는 일인지, 이름을 바꿔야 하는
+ * 일인지 알 수 없다.
+ *
+ * **우리가 모르는 오류는 감싸지 않는다.** 감싸면 진짜 고장이 409 로 포장돼 나가고,
+ * 운영자는 자기가 뭘 잘못 적은 줄 안다.
+ */
+describe('이름이 겹쳤을 때', () => {
+  /** 프리즈마가 유니크 제약을 어겼을 때 주는 모양 */
+  const unique = { code: 'P2002', meta: { target: ['name'] } };
+
+  it('만들 때 — 409 로 어느 칸이 문제인지 짚어 준다', async () => {
+    db.brand.create.mockRejectedValue(unique);
+
+    await expect(createBrand(admin, createBrandSchema.parse({ name: 'MOOR', slug: 'moor-2' })))
+      .rejects.toMatchObject({ name: 'BrandError', code: 'NAME_TAKEN', status: 409 });
+  });
+
+  it('고칠 때 — 같은 말을 한다', async () => {
+    db.brand.findUnique.mockResolvedValue(brandRow());
+    tx.brand.update.mockRejectedValue(unique);
+
+    await expect(updateBrand(admin, 'b-1', update({ name: '겹치는 이름' })))
+      .rejects.toMatchObject({ name: 'BrandError', code: 'NAME_TAKEN', status: 409 });
+  });
+
+  it.each([
+    ['만들 때', async () => {
+      db.brand.create.mockRejectedValue(new Error('연결이 끊겼다'));
+      await createBrand(admin, createBrandSchema.parse({ name: '새 간판', slug: 'new-one' }));
+    }],
+    ['고칠 때', async () => {
+      db.brand.findUnique.mockResolvedValue(brandRow());
+      tx.brand.update.mockRejectedValue(new Error('연결이 끊겼다'));
+      await updateBrand(admin, 'b-1', update({ name: '새 이름' }));
+    }],
+  ])('%s 우리가 모르는 고장은 감싸지 않는다', async (_label, run) => {
+    await expect(run()).rejects.toThrow('연결이 끊겼다');
+  });
+});

@@ -525,3 +525,79 @@ describe('쿠폰 목록의 대상', () => {
     });
   });
 });
+
+/**
+ * **같은 코드가 이미 있으면.**
+ *
+ * 코드에 유니크가 걸려 있다. 두 사람이 같은 코드를 동시에 넣으면 뒤에 온 쪽이 DB 에서
+ * 막히는데, 여기서 **그 오류를 우리 말로 바꾼다** — 안 바꾸면 500 이 나가고 운영자는
+ * "다시 눌러 볼 일" 인지 "코드를 바꿀 일" 인지 모른다. 칸 이름까지 함께 준다(`vars`).
+ */
+describe('코드가 겹쳤을 때', () => {
+  it('409 로 어느 칸이 문제인지 짚어 준다', async () => {
+    db.coupon.create.mockRejectedValue({ code: 'P2002', meta: { target: ['code'] } });
+
+    await expect(createCoupon(admin, input())).rejects.toMatchObject({
+      name: 'CouponError', code: 'DUPLICATE_CODE', status: 409,
+    });
+  });
+
+  it('어느 칸이 문제인지 화면이 짚을 수 있게 칸 이름과 함께 준다', async () => {
+    db.coupon.create.mockRejectedValue({ code: 'P2002' });
+
+    // 화면은 `fields` 를 읽어 그 입력 칸 아래에 글을 붙인다
+    await expect(createCoupon(admin, input())).rejects.toMatchObject({
+      fields: { code: '이미 쓰고 있는 코드입니다' },
+    });
+  });
+
+  it('우리가 모르는 고장은 감싸지 않는다', async () => {
+    db.coupon.create.mockRejectedValue(new Error('연결이 끊겼다'));
+
+    await expect(createCoupon(admin, input())).rejects.toThrow('연결이 끊겼다');
+  });
+});
+
+/**
+ * **없는 쿠폰을 가리키면 404 로 말한다.**
+ *
+ * 고치는 창구와 주는 창구가 각자 먼저 본다. 안 보면 프리즈마가 "레코드 없음" 으로
+ * 터지고(P2025) 운영자에게는 500 이 나간다 — 지운 뒤에 또 누른 것인지 서버가 고장난
+ * 것인지 가를 수 없다.
+ */
+describe('없는 쿠폰을 가리키면', () => {
+  it('고칠 수 없다', async () => {
+    db.coupon.findUnique.mockResolvedValue(null);
+
+    await expect(updateCoupon(admin, 'c-gone', { isActive: false }))
+      .rejects.toMatchObject({ name: 'CouponError', code: 'NOT_FOUND', status: 404 });
+  });
+
+  it('줄 수 없다', async () => {
+    db.coupon.findUnique.mockResolvedValue(null);
+
+    await expect(issueCouponToUser('c-gone', 'u-1', now))
+      .rejects.toMatchObject({ code: 'NOT_FOUND', status: 404 });
+    expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **본 뒤 쓰기까지 사이에 받았을 수도 있다.**
+ *
+ * "이미 받았는가" 를 트랜잭션 **밖에서** 먼저 보는데, 거기서 통과한 뒤 트랜잭션 안에
+ * 들어오기까지 틈이 있다. 그래서 안에서 한 번 더 본다 — 유니크 제약이 최종 방어선이고,
+ * 이 확인은 **그 오류를 우리 말로 바꿔 주는 것**이다(소스 주석이 그렇게 적는다).
+ *
+ * 없으면 같은 사람에게 쿠폰이 두 장 가거나, 유니크가 막아 500 이 나간다.
+ */
+describe('받는 사이에 또 받으면', () => {
+  it('안에서 다시 보고 이미 받았다고 말한다', async () => {
+    // 밖에서 볼 때는 없었고, 안에서 보니 있다
+    db.userCoupon.findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'uc-x' });
+
+    await expect(issueCouponToUser('c-1', 'u-1', now))
+      .rejects.toMatchObject({ code: 'ALREADY_ISSUED', status: 409 });
+    expect(db.userCoupon.create).not.toHaveBeenCalled();
+  });
+});

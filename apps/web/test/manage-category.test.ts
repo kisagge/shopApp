@@ -20,7 +20,7 @@ const db = vi.hoisted(() => ({
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { PrismaClientKnownRequestError: class {} } }));
 
-const { getCategoryTree, createCategory, updateCategory, reorderCategories, deleteCategory } =
+const { getCategoryTree, createCategory, updateCategory, reorderCategories, deleteCategory, getCategorySlugMovedTo } =
   await import('~/lib/admin/manage-category');
 
 /**
@@ -237,5 +237,83 @@ describe('지우기', () => {
     await expect(deleteCategory(admin, 'c-1')).rejects.toMatchObject({
       code: 'CATEGORY_NOT_EMPTY',
     });
+  });
+});
+
+/**
+ * **없는 것을 가리키면 404 로 말한다.**
+ *
+ * 세 창구가 각자 "그 갈래가 있는가" 를 먼저 본다 — 만들 때의 부모, 고칠 때의 자신,
+ * 지울 때의 자신. 셋 다 안 돈 줄이었다.
+ *
+ * 안 보면 프리즈마가 **외래키나 레코드 없음으로 터지고**(P2003·P2025) 운영자에게는 500 이
+ * 나간다. 그러면 "내가 지운 뒤에 또 누른 것" 인지 "서버가 고장난 것" 인지 알 수 없다.
+ */
+describe('없는 갈래를 가리키면', () => {
+  it('없는 부모 아래에는 만들지 않는다', async () => {
+    await expect(createCategory(admin, create({ name: '코트', slug: 'coat', parentId: 'c-gone' })))
+      .rejects.toMatchObject({ name: 'CategoryError', code: 'CATEGORY_NOT_FOUND', status: 404 });
+    expect(db.category.create).not.toHaveBeenCalled();
+  });
+
+  it('없는 갈래는 고칠 수 없다', async () => {
+    await expect(updateCategory(admin, 'c-gone', update({ name: '새 이름' })))
+      .rejects.toMatchObject({ code: 'CATEGORY_NOT_FOUND', status: 404 });
+  });
+
+  it('없는 갈래는 지울 수 없다', async () => {
+    await expect(deleteCategory(admin, 'c-gone'))
+      .rejects.toMatchObject({ code: 'CATEGORY_NOT_FOUND', status: 404 });
+    expect(db.category.delete).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **권한 없음도 404 로 말한다.** 403 으로 답하면 "그 id 는 있다" 를 알려 주는 셈이다 —
+   * 가맹점에게 운영진의 갈래 구조를 떠보게 할 이유가 없다. 상태만 다르고 코드는 같다.
+   */
+  it('가맹점에게는 상태만 다르고 같은 코드다', async () => {
+    await expect(deleteCategory(merchant, 'c-1'))
+      .rejects.toMatchObject({ code: 'CATEGORY_NOT_FOUND', status: 403 });
+  });
+});
+
+/**
+ * **두 사람이 같은 주소를 동시에 넣으면.**
+ *
+ * 넣기 전에 한 번 보지만 그 사이에 남이 넣을 수 있다. 최종 방어선은 DB 의 유니크 제약이고,
+ * 여기서 **그 오류를 우리 말로 바꾼다.** 우리가 모르는 오류는 감싸지 않는다 — 감싸면
+ * 진짜 고장이 409 로 포장돼 나가고 운영자는 자기가 잘못 적은 줄 안다.
+ */
+describe('주소가 겹쳤을 때', () => {
+  it('409 로 어느 칸이 문제인지 짚어 준다', async () => {
+    db.category.create.mockRejectedValue({ code: 'P2002', meta: { target: ['slug'] } });
+
+    await expect(createCategory(admin, create({ name: '코트', slug: 'coat' })))
+      .rejects.toMatchObject({ name: 'CategoryError', code: 'SLUG_TAKEN', status: 409 });
+  });
+
+  it('우리가 모르는 고장은 감싸지 않는다', async () => {
+    db.category.create.mockRejectedValue(new Error('연결이 끊겼다'));
+
+    await expect(createCategory(admin, create({ name: '코트', slug: 'coat' })))
+      .rejects.toThrow('연결이 끊겼다');
+  });
+});
+
+/**
+ * 옛 주소가 가리키는 지금 주소.
+ *
+ * 매대가 옛 링크를 받았을 때 넘길 곳을 묻는 자리다. **없으면 `null`** 이고, 그때 매대는
+ * 404 를 보여 준다 — 여기서 던지면 404 대신 500 이 나간다.
+ */
+describe('옛 주소가 가리키는 곳', () => {
+  it('기록이 있으면 지금 주소를 준다', async () => {
+    db.categorySlug.findUnique.mockResolvedValue({ category: { slug: 'outer-coat' } });
+
+    expect(await getCategorySlugMovedTo('outer')).toBe('outer-coat');
+  });
+
+  it('기록이 없으면 null 이다 — 던지지 않는다', async () => {
+    expect(await getCategorySlugMovedTo('never-existed')).toBeNull();
   });
 });

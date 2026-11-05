@@ -33,6 +33,10 @@ vi.mock('~/lib/notifications/product-review', () => ({ notifyProductReviewed }))
 const clearLowStockDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
 vi.mock('~/lib/notifications/low-stock', () => ({ clearLowStockDone }));
 
+/* 재입고 알림도 갈아 끼운다 — 여기서 볼 것은 **그것이 터져도 재고가 남는가** 다 */
+const notifyRestocked = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/restock/notify', () => ({ notifyRestocked }));
+
 const {
   createProduct, updateProduct, updateStock, createVariant, getProductFormOptions,
   reviewProduct,
@@ -683,5 +687,126 @@ describe('반품지 없이는 매대로 못 간다', () => {
       { id: 'b-b', name: 'STUDIO NOON', merchantId: 'm-b', canSell: false },
       { id: 'b-own', name: 'PLAIN', merchantId: null, canSell: true },
     ]);
+  });
+});
+
+/**
+ * **범위가 없는 사람은 상품을 못 본다.**
+ *
+ * `merchantScope` 는 운영진에게 `null`(전체), 소속 있는 가맹점에게 그 id, **그 밖에는
+ * `undefined`** 를 준다 — 손님이거나 소속을 잃은 가맹점 계정이다. 그때 404 로 끊는다.
+ *
+ * 끊지 않으면 `where` 절에 범위가 안 붙어 **남의 상품이 그대로 조회된다.** 세 창구가 각자
+ * 그 줄을 갖고 있고 셋 다 안 돈 줄이었다.
+ */
+describe('범위가 없는 사람', () => {
+  const unlinked: Actor = { id: 'u-x', role: 'MERCHANT', merchantId: null };
+
+  it.each([
+    ['손님', customer],
+    ['소속을 잃은 가맹점', unlinked],
+  ])('%s 은 상품을 고칠 수 없다', async (_label, actor) => {
+    await expect(updateProduct(actor, 'p-1', updateProductSchema.parse({ name: '새 이름' })))
+      .rejects.toMatchObject({ name: 'ProductError', code: 'PRODUCT_NOT_FOUND', status: 404 });
+    expect(db.product.update).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['손님', customer],
+    ['소속을 잃은 가맹점', unlinked],
+  ])('%s 에게는 등록 폼의 선택지도 주지 않는다', async (_label, actor) => {
+    await expect(getProductFormOptions(actor))
+      .rejects.toMatchObject({ code: 'PRODUCT_NOT_FOUND', status: 404 });
+    expect(db.brand.findMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **브랜드 주인 확인은 두 번째 잠금이다.**
+ *
+ * 첫째 잠금은 조회의 `where` 절이다 — `loadProductForAudit` 이 가맹점의 범위를 붙여 읽으므로
+ * 남의 상품은 **애초에 찾히지 않는다.** 그래서 이 세 줄(`canManageProduct`)은 지금 앱에서
+ * 닿지 않고, 그것이 안 돈 까닭이다.
+ *
+ * 지우지 않는다. 조회에 범위를 빠뜨린 네 번째 창구가 생기는 날 이 줄이 받는다 — 그때
+ * 막는 것은 **남의 상품 값과 재고를 고치는 일**이다. 두 잠금을 따로 못 박아 둔다: 둘이
+ * 어긋나는 상황을 만들어 둘째가 실제로 무는지 본다.
+ */
+describe('브랜드 주인이 아니면', () => {
+  /** 조회가 범위를 빠뜨렸다고 치고 — 남의 브랜드 상품이 돌아온 상태 */
+  const foreign = () => db.product.findFirst.mockResolvedValue({
+    id: 'p-1', slug: 'coat', name: '코트', description: '설명',
+    listPrice: 100_000, salePrice: 90_000, status: 'ACTIVE',
+    brandId: 'b-b', categoryId: 'c-1', publishedAt: null,
+    brand: { merchantId: 'm-b' },
+  });
+
+  it('상품을 고칠 수 없다', async () => {
+    foreign();
+    await expect(updateProduct(merchantA, 'p-1', updateProductSchema.parse({ name: '새 이름' })))
+      .rejects.toMatchObject({ code: 'BRAND_NOT_ALLOWED', status: 403 });
+  });
+
+  it('재고를 고칠 수 없다', async () => {
+    foreign();
+    await expect(updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 1 }] }))
+      .rejects.toMatchObject({ code: 'BRAND_NOT_ALLOWED', status: 403 });
+    expect(db.productVariant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('옵션을 더할 수 없다', async () => {
+    foreign();
+    await expect(createVariant(merchantA, 'p-1', { sku: 'B-1', optionLabel: 'L', stock: 1 }))
+      .rejects.toMatchObject({ code: 'BRAND_NOT_ALLOWED', status: 403 });
+    expect(db.productVariant.create).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **재입고 알림이 터져도 재고는 남는다.**
+ *
+ * 채운 재고를 쓴 뒤에 "다시 들어왔습니다" 를 보내러 간다. 그 발송이 실패했다고 **재고
+ * 수정을 되돌리면** 운영자는 같은 일을 다시 해야 하고, 그동안 매대는 품절로 남는다 —
+ * 알림을 못 받는 것보다 그쪽이 훨씬 나쁘다. 삼키되 흔적은 남긴다.
+ */
+describe('재입고 알림이 실패해도', () => {
+  const restock = () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 0 }]);
+    return updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 7 }] });
+  };
+
+  it('재고 수정은 그대로 남는다', async () => {
+    notifyRestocked.mockRejectedValue(new Error('메일이 안 나갔다'));
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(restock()).resolves.toMatchObject({ after: [{ sku: 'A-1', stock: 7 }] });
+
+    expect(db.productVariant.updateMany).toHaveBeenCalledWith({ where: { id: 'v-1' }, data: { stock: 7 } });
+    // 아무 데도 안 적으면 알림이 안 가는 것을 알 길이 없다
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
+  it('품절이던 것이 채워졌을 때만 부른다', async () => {
+    db.productVariant.findMany.mockResolvedValue([{ id: 'v-1', sku: 'A-1', stock: 3 }]);
+    await updateStock(merchantA, 'p-1', { variants: [{ variantId: 'v-1', stock: 7 }] });
+
+    expect(notifyRestocked).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **없는 상품은 검수할 수 없다.**
+ *
+ * 대기줄에서 누르는 사이에 상품이 지워질 수 있다(보관·삭제). 안 보면 프리즈마가 "레코드
+ * 없음" 으로 터져 500 이 나가고, 운영자는 자기 권한 문제인지 알 수 없다.
+ */
+describe('검수할 상품이 없으면', () => {
+  it('404 로 말한다', async () => {
+    db.product.findFirst.mockResolvedValue(null);
+
+    await expect(reviewProduct(admin, 'p-gone', { approve: true }))
+      .rejects.toMatchObject({ name: 'ProductError', code: 'PRODUCT_NOT_FOUND', status: 404 });
+    expect(notifyProductReviewed).not.toHaveBeenCalled();
   });
 });

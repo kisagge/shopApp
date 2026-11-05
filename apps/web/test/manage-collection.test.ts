@@ -26,7 +26,9 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const {
   getAdminCollections, getCollectionItems, getCollectionItemsFor, createCollection,
   updateCollection, setCollectionItems, deleteCollection, CollectionError,
+  reorderCollections, setCollectionImage,
 } = await import('~/lib/admin/manage-collection');
+const { MAX_COLLECTION_ITEMS } = await import('@shop/core');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -266,5 +268,75 @@ describe('지우기', () => {
     await deleteCollection(admin, 'c-1');
 
     expect(db.collectionItem.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **없는 기획전을 가리키면 404 로 말한다.**
+ *
+ * 고치기·상품 넣기·순서 바꾸기·배경 바꾸기가 각자 먼저 본다. 넷 다 안 돈 줄이었다.
+ * 안 보면 프리즈마가 "레코드 없음" 으로 터지고(P2025) 운영자에게는 500 이 나간다 —
+ * 지운 뒤에 또 누른 것인지 서버가 고장난 것인지 가를 수 없다.
+ */
+describe('없는 기획전을 가리키면', () => {
+  it('고칠 수 없다', async () => {
+    await expect(updateCollection(admin, 'c-gone', { title: '새 제목' }))
+      .rejects.toMatchObject({ name: 'CollectionError', code: 'COLLECTION_NOT_FOUND', status: 404 });
+  });
+
+  it('상품을 넣을 수 없다', async () => {
+    await expect(setCollectionItems(admin, 'c-gone', ['p-1']))
+      .rejects.toMatchObject({ code: 'COLLECTION_NOT_FOUND', status: 404 });
+    expect(db.collectionItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it('배경을 바꿀 수 없다', async () => {
+    await expect(setCollectionImage(admin, 'c-gone', { bytes: new Uint8Array([1]), declaredType: 'image/png' }, '배경'))
+      .rejects.toMatchObject({ code: 'COLLECTION_NOT_FOUND', status: 404 });
+  });
+
+  /**
+   * **순서 바꾸기는 목록이 통째로 맞아야 받는다.**
+   *
+   * 보낸 id 가 하나라도 우리 것이 아니거나 수가 다르면 거절한다. 일부만 받아 쓰면
+   * **보내지 않은 기획전의 순서가 어긋나** 매대에 엉뚱한 차례로 뜬다 — 운영자는 자기가
+   * 옮긴 것만 보고 있어서 그 사실을 모른다.
+   */
+  it.each([
+    ['모르는 id 가 섞이면', ['c-1', 'c-gone']],
+    ['수가 모자라면', ['c-1']],
+    ['수가 넘치면', ['c-1', 'c-2', 'c-3']],
+  ])('%s 순서를 바꾸지 않는다', async (_label, ordered) => {
+    db.collection.findMany.mockResolvedValue([{ id: 'c-1' }, { id: 'c-2' }]);
+
+    await expect(reorderCollections(admin, ordered))
+      .rejects.toMatchObject({ code: 'COLLECTION_NOT_FOUND', status: 404 });
+    expect(db.collection.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **한 기획전에 넣을 수 있는 상품 수에 상한이 있다.**
+ *
+ * 매대가 한 번에 읽어 그리는 목록이라 수가 늘면 그 화면이 느려진다. 상한을 넘기면
+ * 거절하는데, 그 줄이 안 돈 줄이었다 — 넘겨도 그대로 저장돼 **그 기획전을 연 손님이
+ * 기다리게 된다.**
+ */
+describe('상품 수 상한', () => {
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `p-${i}`);
+
+  beforeEach(() => {
+    db.collection.findUnique.mockResolvedValue({ id: 'c-1' });
+    db.product.count.mockImplementation(({ where }: any) => Promise.resolve(where.id.in.length));
+  });
+
+  it('상한을 넘기면 거절한다', async () => {
+    await expect(setCollectionItems(admin, 'c-1', ids(MAX_COLLECTION_ITEMS + 1)))
+      .rejects.toMatchObject({ name: 'CollectionError', status: 400 });
+    expect(db.collectionItem.createMany).not.toHaveBeenCalled();
+  });
+
+  it('상한까지는 받는다 — 거절이 한 칸 넓지 않은지', async () => {
+    await expect(setCollectionItems(admin, 'c-1', ids(MAX_COLLECTION_ITEMS))).resolves.not.toThrow();
   });
 });
