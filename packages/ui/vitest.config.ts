@@ -22,5 +22,14 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./test/setup.ts'],
     include: ['test/**/*.test.{ts,tsx}'],
+    /**
+     * 비율은 문지기가 아니다 — 묻는 것 하나뿐이다: **어느 조각이 한 번도 안 그려졌는가.**
+     * core 와 auth 에 같은 렌즈를 비췄더니 둘 다 실제 결함이 나왔다.
+     */
+    coverage: {
+      include: ['src/**/*.{ts,tsx}'],
+      // 모아 내보내기만 하는 파일이다
+      exclude: ['src/index.ts'],
+    },
   },
 });

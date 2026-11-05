@@ -95,3 +95,51 @@ describe('자격증명은 로그에 남기지 않는다', () => {
     expect(said.join('\n')).not.toContain('hunter2');
   });
 });
+
+/**
+ * **형식을 알 수 없는 주소.**
+ *
+ * `isLocalDatabase` 가 모르는 형식을 원격으로 보는 것은 이미 못 박혀 있다(위). 빠져
+ * 있던 것은 **그때 로그에 무엇을 적는가**다 — 호스트를 뽑는 자리도 같은 주소를 파싱하고,
+ * 거기서 던지면 관문이 "원격이라 막는다" 가 아니라 **파싱 오류로** 터진다. 운영자는
+ * 승인 깃발을 켜도 같은 오류를 다시 보게 되고 무엇이 문제인지 알 수 없다.
+ *
+ * 그래서 못 뽑으면 자리를 글로 채운다. 주소를 그대로 적지는 않는다 — 형식을 모르는
+ * 글자에 자격증명이 섞여 있을 수 있고, 로그는 남는다.
+ */
+describe('형식을 알 수 없는 주소', () => {
+  it('원격으로 막으면서 모르는 형식이라고 적는다', () => {
+    let message = '';
+    try {
+      target('postgres-주소를-잘못-붙였다');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).toContain('(형식을 알 수 없는 주소)');
+    // 막는 까닭은 그대로 알려 준다 — 켜는 방법까지
+    expect(message).toContain(SEED_REMOTE_FLAG);
+  });
+
+  it('주소 글자를 로그에 옮기지 않는다', () => {
+    let message = '';
+    try {
+      target('oops://admin:hunter2@@@');
+    } catch (error) {
+      message = (error as Error).message;
+    }
+    expect(message).not.toContain('hunter2');
+  });
+
+  /** 승인하고 돌리면 지나간다 — 모르는 형식이라고 길을 막아 두지는 않는다 */
+  it('승인하면 지나가고, 그때도 모르는 형식이라고 적는다', () => {
+    const said: string[] = [];
+    const keep = console.log;
+    console.log = (...a: unknown[]) => void said.push(a.join(' '));
+    try {
+      expect(() => target('postgres-주소를-잘못-붙였다', true)).not.toThrow();
+    } finally {
+      console.log = keep;
+    }
+    expect(said.join('\n')).toContain('(형식을 알 수 없는 주소)');
+  });
+});
