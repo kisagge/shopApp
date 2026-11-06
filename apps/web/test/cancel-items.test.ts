@@ -300,3 +300,82 @@ describe('돌아온 재고로 재고 부족 알림을 닫으러 간다', () => {
     expect(clearLowStockForVariants).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **없는 주문을 가리키면 404 로 말한다 — 미리보기도, 잠근 뒤에도.**
+ *
+ * 미리보기는 단추 옆 금액을 띄우는 길이고, 취소는 잠그고 **다시 읽는다.** 그 두 자리가
+ * 안 돈 줄이었다.
+ *
+ * 잠근 뒤의 읽기가 요점이다. 처음 읽을 때는 있었는데 잠그고 보니 없는 경우 — 같은 순간에
+ * 전체 취소가 지나갔거나 운영진이 주문을 옮겼다. 그때 없는 것을 그대로 셈하면 `null` 에서
+ * 값을 읽는다.
+ */
+describe('없는 주문을 가리키면', () => {
+  it('미리보기가 404 로 답한다', async () => {
+    db.order.findFirst.mockResolvedValue(null);
+
+    await expect(previewCancelItems('20260914-0000001', ['i-knit'], customer))
+      .rejects.toMatchObject({ name: 'CancelItemsError', code: 'ORDER_NOT_FOUND', status: 404 });
+  });
+
+  it('잠근 뒤 보니 없으면 되돌린다', async () => {
+    tx.order.findFirst.mockResolvedValue(null);
+
+    await expect(cancelOrderItems('20260914-0000001', ['i-knit'], customer, '사이즈', gateway()))
+      .rejects.toMatchObject({ code: 'ORDER_NOT_FOUND', status: 404 });
+    expect(tx.orderItem.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **금액 셈이 거절하면 상태 코드로 옮긴다.**
+ *
+ * 셈은 core 가 한다(`planPartialCancel`). 거기서 나온 거절은 코드마다 뜻이 달라 **상태도
+ * 달라야 한다** — 모르는 줄은 404(그 줄이 없다), 고른 것이 없으면 400(요청이 잘못됐다),
+ * 나머지는 409(지금은 안 된다). 전부 409 로 보내면 창구를 쓰는 쪽이 "다시 보내면 되는
+ * 것" 과 "요청을 고쳐야 하는 것" 을 가를 수 없다.
+ *
+ * **전부 취소가 되는 경우만 따로 받는다**(`ALL_ITEMS`) — 그건 거절이 아니라 "줄 취소가
+ * 아니라 전체 취소" 라는 뜻이고 미리보기는 그 금액을 보여 준다.
+ */
+describe('금액 셈이 거절하면', () => {
+  /** 2,000원짜리 줄을 취소하는데 뗄 배송비가 3,000원이다 — 돌려줄 돈보다 뗄 돈이 많다 */
+  const tooSmall = () => order({
+    couponDiscount: 0, pointsUsed: 0, payable: 50_000, rewardPoints: 0,
+    shippingPolicy: { baseFee: 3000, freeThreshold: 50_000, remoteSurcharge: 3000 },
+    items: [
+      { id: 'i-coat', variantId: 'v-coat', merchantId: 'm-a', quantity: 1, subtotal: 48_000, status: 'PAID',
+        couponShare: 0, pointsShare: 0, rewardShare: 0, canceledAt: null },
+      { id: 'i-sock', variantId: 'v-sock', merchantId: 'm-b', quantity: 1, subtotal: 2_000, status: 'PAID',
+        couponShare: 0, pointsShare: 0, rewardShare: 0, canceledAt: null },
+    ],
+  });
+
+  it('우리 오류로 옮기고 409 로 답한다', async () => {
+    db.order.findFirst.mockResolvedValue(tooSmall());
+
+    await expect(previewCancelItems('20260914-0000001', ['i-sock'], customer))
+      .rejects.toMatchObject({
+        name: 'CancelItemsError', code: 'SHIPPING_EXCEEDS_REFUND', status: 409,
+      });
+  });
+
+  /**
+   * **우리가 모르는 고장은 감싸지 않는다.** 감싸면 버그가 4xx 로 포장돼 나가고, 쓰는 쪽은
+   * 자기 요청이 잘못된 줄 안다. 금액 칸이 깨진 줄로 `MoneyError` 를 흘려 그 길을 본다.
+   */
+  it('우리가 모르는 고장은 그대로 올린다', async () => {
+    db.order.findFirst.mockResolvedValue(order({
+      items: [
+        { id: 'i-coat', variantId: 'v-coat', merchantId: 'm-a', quantity: 1, subtotal: 60_000.5, status: 'PAID',
+          couponShare: 6_000, pointsShare: 3_000, rewardShare: 510, canceledAt: null },
+        { id: 'i-knit', variantId: 'v-knit', merchantId: 'm-a', quantity: 2, subtotal: 30_000, status: 'PAID',
+          couponShare: 3_000, pointsShare: 1_500, rewardShare: 255, canceledAt: null },
+      ],
+    }));
+
+    await expect(previewCancelItems('20260914-0000001', ['i-knit'], customer))
+      .rejects.toMatchObject({ name: 'MoneyError' });
+  });
+});

@@ -712,3 +712,69 @@ describe('재고 부족 알림', () => {
     });
   });
 });
+
+/**
+ * **함께 보낸 네 조회가 깨졌을 때.**
+ *
+ * 넷을 `Promise.allSettled` 로 한꺼번에 보내고 **보는 순서는 그대로** 둔다(소스 주석이
+ * 그 까닭을 적는다 — `all` 로 묶으면 먼저 깨진 것이 던져져, 이미 만든 주문이 있는데
+ * 배송지가 지워진 경우 그 주문을 돌려주던 것이 `ADDRESS_NOT_FOUND` 로 바뀐다).
+ *
+ * 순서가 뜻이라면 **깨진 것을 보는 자리도 순서대로** 있어야 한다. 네 자리 중 셋이 안 돈
+ * 줄이었다 — 거절을 그냥 흘리면 어떻게 되는지가 자리마다 다르다.
+ */
+describe('함께 보낸 조회가 깨지면', () => {
+  const withKey = () => request({ idempotencyKey: 'abcdefgh-1234-5678-9012-abcdefabcdef' });
+  const broken = new Error('DB 가 흔들렸다');
+
+  /**
+   * **이미 만든 주문을 못 읽었으면 만들지 않는다.** 흘려 보내면 "없다" 로 읽혀 **같은
+   * 주문이 두 번 만들어진다** — 재고가 두 번 깎이고 결제되지 않은 주문이 하나 더 남아
+   * 그 재고를 물고 있는다. 버튼을 두 번 누르는 것은 흔한 일이다.
+   */
+  it('이미 만든 주문 조회가 깨지면 만들지 않고 올린다', async () => {
+    db.order.findFirst.mockRejectedValue(broken);
+
+    await expect(createOrder(withKey(), user)).rejects.toThrow('DB 가 흔들렸다');
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **스냅샷을 못 읽었으면 만들지 않는다.** 주문 줄에 박아 둘 가맹점과 대표 이미지가
+   * 거기서 온다. 흘려 보내면 `?? null` 이 받아 **가맹점 없는 줄**이 만들어지고, 그 줄은
+   * 정산에 잡히지 않는다 — 조용히 그렇게 되고 주문은 성공으로 끝난다.
+   */
+  it('스냅샷 조회가 깨지면 만들지 않고 올린다', async () => {
+    db.productVariant.findMany.mockRejectedValue(broken);
+
+    await expect(createOrder(request(), user)).rejects.toThrow('DB 가 흔들렸다');
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **쿠폰을 못 읽었으면 만들지 않는다.** 흘려 보내면 쿠폰 없이 주문이 만들어지는데,
+   * 견적에는 할인이 들어가 있다 — 손님은 깎인 금액을 보고 눌렀고 쿠폰은 그대로 남는다.
+   */
+  it('쿠폰 조회가 깨지면 만들지 않고 올린다', async () => {
+    quoteCart.mockResolvedValue(quote({ couponDiscount: 9_000, couponCode: 'WELCOME10000', payable: 280_000 }));
+    db.userCoupon.findFirst.mockRejectedValue(broken);
+
+    await expect(createOrder(request({ couponCode: 'WELCOME10000' }), user)).rejects.toThrow('DB 가 흔들렸다');
+    expect(tx.order.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **보는 순서가 뜻이다.** 이미 만든 주문이 있으면 그것을 돌려주고 끝낸다 — 그 뒤의
+   * 조회가 깨졌든 아니든. `all` 로 묶었을 때 깨졌던 자리가 바로 이것이다.
+   */
+  it('이미 만든 주문이 있으면 뒤의 조회가 깨져도 그 주문을 준다', async () => {
+    db.order.findFirst.mockResolvedValue({
+      orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING',
+    });
+    db.address.findFirst.mockRejectedValue(broken);
+    db.productVariant.findMany.mockRejectedValue(broken);
+
+    expect(await createOrder(withKey(), user))
+      .toEqual({ orderNo: '20260831-1234567', payable: 289_000, status: 'PENDING' });
+  });
+});

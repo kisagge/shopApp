@@ -458,5 +458,13 @@ async function withOrderNumberRetry<T>(run: (orderNo: string) => Promise<T>): Pr
       throw error;
     }
   }
+  /*
+   * **닿을 수 없는 줄이다.** `ORDER_NO_RETRIES` 가 1 이상이면 본문이 적어도 한 번 돌고,
+   * 그 안에서 반드시 돌려주거나 던진다 — 마지막 판에서는 위의 `throw error` 가 받는다.
+   * 타입이 요구하는 바닥이라 둔다(모든 길에서 값을 돌려줘야 한다).
+   *
+   * 커버리지가 이 줄을 "안 돈 줄" 로 가리키는데, 검사로 밟을 길이 없다. 다음에 그 보고를
+   * 읽는 사람이 같은 자리를 다시 파지 않게 적어 둔다.
+   */
   throw new Error('주문번호를 생성하지 못했습니다');
 }
