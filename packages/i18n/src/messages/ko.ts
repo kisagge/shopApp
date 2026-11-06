@@ -194,6 +194,13 @@ export const ko = {
   'support.photoOpen': '첨부한 사진 {index} 새 탭으로 크게 보기',
   'support.submit': '문의 보내기',
   'support.sent': '문의를 접수했습니다. 답변은 메일로 알려 드립니다.',
+  /**
+   * **보내기 단추 이름을 오류로 쓰고 있었다.** 실패하면 경고 자리에 '문의 보내기'(en 에서는
+   * 'Send', ja 에서는 '送信')가 떴다 — 글을 다 쓴 사람이 단추 이름을 다시 읽는 셈이고,
+   * 실패한 것을 알 길이 없었다. 같은 결의 다른 자리들(`ret.failed`·`cancel.failed`)처럼
+   * 무엇이 안 됐는지 말한다.
+   */
+  'support.askFailed': '문의를 보내지 못했습니다. 잠시 후 다시 시도해 주세요.',
   'support.myInquiries': '내 문의 내역',
   'support.noInquiries': '아직 남긴 문의가 없습니다.',
   'support.answered': '답변 완료',

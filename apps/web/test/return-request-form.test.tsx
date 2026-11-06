@@ -153,3 +153,98 @@ describe('교환은 줄마다 바꿀 옵션을 고른다', () => {
     expect(body).toMatchObject({ type: 'EXCHANGE', itemIds: ['i-knit'], exchanges: [{ itemId: 'i-knit', variantId: 'v-s' }] });
   });
 });
+
+/**
+ * **신청하지 못했을 때.**
+ *
+ * 반품 신청은 사람이 **사유를 고르고 상품을 고른 뒤** 누르는 일이다. 실패했는데 아무 말도
+ * 안 하면 신청이 들어간 줄 알고 기다리게 되고, 반품 기한은 그동안 흐른다.
+ *
+ * 서버가 한 말이 있으면 그것을 쓰고(기한이 지났다·이미 신청했다 같은 구체적인 말), 없으면
+ * 무엇이 안 됐는지 말한다. **요청이 아예 못 간 경우는 또 다르다** — 그때는 네트워크다.
+ */
+describe('신청하지 못했을 때', () => {
+  const openWithResponse = async (answer: () => Promise<Response>) => {
+    const fetchMock = vi.fn(answer);
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: /반품|교환/ }));
+    return { fetchMock, userEvent };
+  };
+
+  it('서버가 한 말을 그대로 보여 준다', async () => {
+    const { userEvent } = await openWithResponse(async () =>
+      new Response(JSON.stringify({ message: '반품 기한이 지났습니다.' }), { status: 409 }));
+
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('반품 기한이 지났습니다.');
+  });
+
+  it.each([
+    ['아무 말도 안 하면', async () => new Response('{}', { status: 500 })],
+    ['본문이 JSON 이 아니면', async () => new Response('<html>502</html>', { status: 502 })],
+  ])('%s 신청하지 못했다고 말한다', async (_label, answer) => {
+    const { userEvent } = await openWithResponse(answer);
+
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('신청하지 못했습니다');
+  });
+
+  /** 요청이 못 간 것과 서버가 거절한 것은 다른 일이다 — 사람이 할 행동도 다르다 */
+  it('요청이 터지면 네트워크 오류라고 말한다', async () => {
+    const { userEvent } = await openWithResponse(() => Promise.reject(new Error('네트워크가 끊겼다')));
+
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류');
+  });
+
+  it('실패해도 폼은 열려 있다 — 고른 것을 다시 고르게 하지 않는다', async () => {
+    const { userEvent } = await openWithResponse(async () => new Response('{}', { status: 500 }));
+
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+    await screen.findByRole('alert');
+
+    expect(screen.getByRole('button', { name: '신청하기' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * **고른 사유가 그대로 간다.**
+ *
+ * 사유마다 반송비를 누가 내는지가 갈린다(단순 변심은 손님, 불량·오배송은 판매자). 고른
+ * 것과 보내는 것이 어긋나면 **엉뚱한 쪽이 반송비를 낸다.**
+ */
+describe('고른 사유', () => {
+  it('고른 것을 그대로 보낸다', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ orderNo: 'x' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: /반품|교환/ }));
+
+    await userEvent.click(screen.getByRole('radio', { name: /상품 불량/ }));
+    await userEvent.click(screen.getByRole('button', { name: '신청하기' }));
+
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(body.reason).toBe('DEFECT');
+  });
+});
+
+/** 열었다 그만두는 길 — 닫으면 폼이 사라지고 여는 단추로 돌아온다 */
+describe('그만두기', () => {
+  it('취소를 누르면 폼이 닫힌다', async () => {
+    render(<ReturnRequestForm orderNo="20260909-0000001" status="DELIVERED" />);
+    const { default: userEvent } = await import('@testing-library/user-event');
+    await userEvent.click(screen.getByRole('button', { name: /반품|교환/ }));
+    expect(screen.getByRole('button', { name: '신청하기' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('button', { name: '신청하기' })).toBeNull();
+    expect(screen.getByRole('button', { name: /반품|교환/ })).toBeInTheDocument();
+  });
+});

@@ -147,3 +147,170 @@ describe('취소 뒤 남은 상품이 하나일 때', () => {
     expect(screen.getByText('상품 1개를 취소했습니다.')).toBeInTheDocument();
   });
 });
+
+/**
+ * **금액을 못 받았을 때.**
+ *
+ * 금액은 서버에게 묻는다. 그 물음이 거절되거나 터지면 **금액 자리가 비는데**, 아무 말도
+ * 안 하면 사람은 계산이 늦는 줄 알고 기다린다. 그러고는 금액을 모르는 채로 누른다.
+ */
+describe('금액을 못 받으면', () => {
+  it('서버가 한 말을 보여 준다', async () => {
+    fetchMock.mockResolvedValueOnce(json(409, { message: '이 주문은 줄 단위로 취소할 수 없습니다.' }));
+    await open();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('이 주문은 줄 단위로');
+  });
+
+  /**
+   * **본문이 JSON 이 아닐 수도 있다.** 앞단이 502 HTML 을 주거나 본문이 비면 `res.json()`
+   * 이 던진다 — 그걸 잡지 않으면 서버가 한 말 대신 그 던짐이 올라가 `.catch` 로 떨어지고,
+   * 같은 문구가 뜨기는 하지만 **왜 그런지 모르는 채로** 그렇게 된다. 여기서는 잡아서
+   * 빈 객체로 두고 기본 문구를 쓴다.
+   */
+  it('본문이 JSON 이 아니어도 무엇이 안 됐는지 말한다', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+    await open();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('주문을 취소하지 못했습니다');
+  });
+
+  /**
+   * **200 인데 본문이 깨진 경우가 가장 나쁘다.** 거절이면 적어도 거절이라고 아는데, 이쪽은
+   * 성공으로 보인다 — 예전에는 빈 금액이 **오류도 없이** 서고 사람은 계산이 끝난 줄 알았다.
+   */
+  it('200 인데 본문이 깨져 있으면 금액을 믿지 않는다', async () => {
+    fetchMock.mockResolvedValueOnce(new Response('<html>프록시가 끼어들었다</html>', { status: 200 }));
+    await open();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('주문을 취소하지 못했습니다');
+  });
+
+  it('물음 자체가 터지면 무엇이 안 됐는지 말한다', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+    await open();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('주문을 취소하지 못했습니다');
+  });
+
+  /** 다시 고르면 옛 오류는 거둔다 — 안 거두면 방금 고른 것이 먹혔는지 알 수 없다 */
+  it('다시 골라 금액이 오면 오류를 거둔다', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await screen.findByRole('alert');
+
+    // 코트를 끄고 니트를 켠다 — 고른 것이 바뀌면 다시 묻는다
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+
+    expect(await screen.findByText('25,500원')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});
+
+/**
+ * **보내기가 터졌을 때.**
+ *
+ * 거절은 이미 본다(위의 '거절되면'). 여기서 보는 것은 **요청이 아예 못 간 경우**다 —
+ * 지하철이나 기내다. 말하지 않으면 사람은 취소가 된 줄 알고 나가고, 주문은 그대로 있다.
+ */
+describe('보내기가 터지면', () => {
+  it('말하고, 폼을 열어 둔 채 다시 누를 수 있다', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+    await screen.findByText('25,500원');
+    fetchMock.mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+
+    await userEvent.click(screen.getByRole('button', { name: '고른 상품 취소' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('주문을 취소하지 못했습니다');
+    expect(refresh).not.toHaveBeenCalled();
+    // 보내는 중에서 멈추지 않았다 — 같은 단추가 그대로 있다
+    expect(screen.getByRole('button', { name: '고른 상품 취소' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * **못 누르는 단추는 `disabled` 가 아니라 `aria-disabled` 다.**
+ *
+ * 그렇게 두는 까닭은 낭독기가 단추를 건너뛰지 않게 하려는 것인데(왜 못 누르는지 읽을 수
+ * 있어야 한다), 그 대가로 **클릭은 그대로 들어온다.** 그래서 보내는 쪽이 한 번 더 막는다.
+ *
+ * 막지 않으면 아무것도 안 고른 취소가 창구로 나간다.
+ */
+describe('고른 것이 없으면', () => {
+  it('눌러도 보내지 않는다', async () => {
+    await open();
+
+    await userEvent.click(screen.getByRole('button', { name: '고른 상품 취소' }));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **사유 칸은 기본값을 담고 시작한다**(`단순 변심`). 비워 두고 보내는 사람이 대부분이라
+ * 그 값을 미리 넣어 두는데, 그래서 **지우고 적어야** 사람이 적은 말이 간다. 빈 칸으로
+ * 보내면 다시 기본값으로 떨어진다 — 그 둘을 함께 본다.
+ */
+describe('사유', () => {
+  it('적으면 그대로 보낸다', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+    await screen.findByText('25,500원');
+    const field = screen.getByLabelText('취소 사유');
+    expect(field).toHaveValue('단순 변심');
+    await userEvent.clear(field);
+    await userEvent.type(field, '색이 달라요');
+
+    await userEvent.click(screen.getByRole('button', { name: '고른 상품 취소' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const sent = JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string) as Record<string, unknown>;
+    expect(sent).toMatchObject({ reason: '색이 달라요' });
+  });
+
+  it('비워 두면 기본값으로 보낸다 — 창구가 빈 사유를 거절한다', async () => {
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: /라운드 니트/ }));
+    await screen.findByText('25,500원');
+    await userEvent.clear(screen.getByLabelText('취소 사유'));
+
+    await userEvent.click(screen.getByRole('button', { name: '고른 상품 취소' }));
+
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    const sent = JSON.parse(fetchMock.mock.calls.at(-1)![1].body as string) as Record<string, unknown>;
+    expect(sent).toMatchObject({ reason: '단순 변심' });
+  });
+});
+
+/**
+ * **돌아가면 고른 것과 오류를 거둔다.**
+ *
+ * 안 거두면 다시 열었을 때 **지난번에 고른 줄이 체크된 채로** 보인다 — 그 상태로 누르면
+ * 생각하지 않은 줄이 취소된다. 오류도 그렇다: 지난번 실패가 남아 있으면 지금 무엇이
+ * 잘못된 줄 안다.
+ */
+describe('돌아가기', () => {
+  it('고른 것과 오류를 거두고 닫는다', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+    await open();
+    await userEvent.click(screen.getByRole('checkbox', { name: /울 코트/ }));
+    await screen.findByRole('alert');
+
+    await userEvent.click(screen.getByRole('button', { name: '돌아가기' }));
+    await userEvent.click(screen.getByRole('button', { name: '일부 상품만 취소' }));
+
+    expect(screen.getByRole('checkbox', { name: /울 코트/ })).not.toBeChecked();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

@@ -182,6 +182,7 @@ export const ja: Dictionary = {
   'support.photoOpen': '添付した写真 {index} を新しいタブで大きく見る',
   'support.submit': '送信',
   'support.sent': 'お問い合わせを受け付けました。回答はメールでお知らせします。',
+  'support.askFailed': 'お問い合わせを送信できませんでした。しばらくしてからもう一度お試しください。',
   'support.myInquiries': 'お問い合わせ履歴',
   'support.noInquiries': 'まだお問い合わせがありません。',
   'support.answered': '回答済み',

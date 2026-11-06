@@ -80,12 +80,24 @@ export function CancelItemsForm({
         body: JSON.stringify({ itemIds: next, reason: t('cancel.defaultReason'), preview: true }),
       })
         .then(async (res) => {
-          const body = (await res.json().catch(() => ({}))) as CancelItemsPreviewResponse & { message?: string };
           if (ticket !== asked.current) return;
+          /*
+           * **ok 를 보고 나서 본문을 읽는다.**
+           *
+           * 예전에는 본문을 먼저 읽고 `.catch(() => ({}))` 로 받쳐 두었다. 그 받침은 502 가
+           * HTML 을 줄 때를 위한 것이었는데(`client-request-guards` 가 그 순서를 지킨다),
+           * 대가가 있었다 — **200 인데 본문이 JSON 이 아니면 오류도 없이 빈 금액이 서고**
+           * 사람은 계산이 끝난 줄 알고 누른다. 돌연변이가 그 받침이 아무에게도 안 붙들린
+           * 것을 알려 줘서 드러났다.
+           *
+           * 그래서 집에서 쓰는 모양으로 바꾼다: 거절이면 `failureMessage` 가 본문을 안전하게
+           * 읽고(없으면 기본 문구), 성공인데 본문이 깨졌으면 바깥 `catch` 가 말을 한다.
+           */
           if (!res.ok) {
-            setError(body.message ?? t('cancel.failed'));
+            setError(await failureMessage(res, t('cancel.failed')));
             return;
           }
+          const body = (await res.json()) as CancelItemsPreviewResponse;
           setError(null);
           setPreview(body);
         })

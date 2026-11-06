@@ -186,6 +186,7 @@ export const en: Dictionary = {
   'support.photoOpen': 'Open attached photo {index} in a new tab',
   'support.submit': 'Send',
   'support.sent': 'We have received your question. We will reply by email.',
+  'support.askFailed': 'We could not send your question. Please try again in a moment.',
   'support.myInquiries': 'My questions',
   'support.noInquiries': 'You have not asked anything yet.',
   'support.answered': 'Answered',

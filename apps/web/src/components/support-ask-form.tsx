@@ -65,7 +65,7 @@ export function SupportAskForm({ photosEnabled = false }: { photosEnabled?: bool
           });
 
       if (!response.ok) {
-        setError(await failureMessage(response, t('support.submit')));
+        setError(await failureMessage(response, t('support.askFailed')));
         return;
       }
 
@@ -74,7 +74,7 @@ export function SupportAskForm({ photosEnabled = false }: { photosEnabled?: bool
       setSent(true);
       router.refresh();
     } catch {
-      setError(t('support.submit'));
+      setError(t('support.askFailed'));
     } finally {
       setPending(false);
     }
