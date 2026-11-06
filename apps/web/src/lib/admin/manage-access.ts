@@ -177,6 +177,17 @@ export async function assignRole(
   if (!canAssignRole(actor, target, input.role)) {
     throw new AccessError('CANNOT_CHANGE_OWN_ROLE', 403);
   }
+  /*
+   * **둘째 잠금이다 — 지금은 닿지 않는다.**
+   *
+   * 첫째 잠금은 이 함수 머리의 `assertPermission(actor, 'user:assignRole')` 이고, 그
+   * 권한은 **슈퍼관리자만** 갖는다(관리자에게 없는 셋 중 하나다 — authz 의 주석). 그래서
+   * 여기 닿는 사람은 늘 슈퍼관리자이고, `canEditUser` 는 슈퍼관리자를 막지 않는다.
+   *
+   * 그래도 둔다. 관리자에게 `user:assignRole` 을 주는 날이 오면 **그날 이 줄이 받는다** —
+   * 없으면 관리자가 슈퍼관리자의 역할을 내려 자기 위를 비울 수 있다. 커버리지가 "안 돈
+   * 줄" 로 가리키는데 검사로 밟을 길이 없어, 다음 사람이 다시 파지 않게 적어 둔다.
+   */
   if (!canEditUser(actor, { id: target.id, role: target.role })) {
     throw new AccessError('CANNOT_EDIT_SUPER_ADMIN', 403);
   }
@@ -253,6 +264,11 @@ export async function suspendUser(
   const verdict = canSuspendUser(actor, target);
   if (verdict === 'SELF') throw new AccessError('CANNOT_SUSPEND_SELF', 403);
   if (verdict === 'STAFF') throw new AccessError('CANNOT_SUSPEND_STAFF', 403);
+  /*
+   * `FORBIDDEN` 은 `user:write` 가 없다는 뜻인데, 그것은 이 함수 머리의 `assertPermission`
+   * 이 이미 막았다 — 위의 `SELF`·`STAFF` 와 달리 **닿지 않는 갈래**다. 판정의 네 값을 다
+   * 받아 두는 것이 읽는 사람에게 맞고, 저 호출이 다른 자리로 복사될 때도 그렇다.
+   */
   if (verdict === 'FORBIDDEN') throw new AccessError('CANNOT_EDIT_SUPER_ADMIN', 403);
 
   const before = { suspendedAt: target.suspendedAt, suspendedReason: target.suspendedReason };

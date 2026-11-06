@@ -652,3 +652,77 @@ describe('등급 올려 주기', () => {
     });
   });
 });
+
+/**
+ * **없는 가맹점에는 계정을 붙이지 않는다.**
+ *
+ * 소속을 확인하는 조회가 둘로 갈린다 — 가맹점 행이 **없는** 경우와 있지만 **승인 전인**
+ * 경우. 뒤쪽은 검사가 있었고 앞쪽이 안 돈 줄이었다.
+ *
+ * 안 보면 `merchant.status` 를 `undefined` 에서 읽어 터지고, 운영자에게는 500 이 나간다 —
+ * "id 를 잘못 적었다" 가 "서버가 고장났다" 로 보인다. 입점 신청이 반려돼 행이 지워진 뒤
+ * 옛 화면에서 누르는 것이 그 길이다.
+ */
+describe('소속을 붙일 가맹점이 없으면', () => {
+  it('404 로 말하고 역할을 바꾸지 않는다', async () => {
+    db.merchant.findUnique.mockResolvedValue(null);
+
+    await expect(assignRole(superAdmin, 'u-target', role({
+      role: 'MERCHANT', merchantId: MERCHANT_ID, reason: '입점 승인',
+    }))).rejects.toMatchObject({ name: 'AccessError', code: 'MERCHANT_NOT_FOUND', status: 404 });
+
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **정지·해제의 두 빈 자리.**
+ *
+ * 하나는 **없는 회원**이다 — 대기줄이나 목록에서 누르는 사이에 탈퇴가 처리될 수 있다.
+ * 안 보면 `target.deletedAt` 을 `null` 에서 읽어 터진다.
+ *
+ * 다른 하나는 **해제 쪽의 동시 변경**이다. 정지 쪽에는 검사가 있었는데(조건부 갱신이 0건),
+ * 해제 쪽은 같은 조건을 달고도 아무도 보지 않았다. 읽은 역할을 조건에 싣는 것이 요점이다 —
+ * 읽고 쓰는 사이에 그 회원이 관리자로 올라갔으면 "관리자는 슈퍼관리자만 건드린다" 는
+ * 위의 판단이 **무의미해진다.** 0건이면 되돌리고 409 로 말한다.
+ */
+describe('정지·해제의 빈 자리', () => {
+  const NOW2 = new Date('2026-09-14T10:00:00Z');
+  const suspendInput = suspendUserSchema.parse({ action: 'SUSPEND', reason: '결제 도용 신고' });
+  const restoreInput = suspendUserSchema.parse({ action: 'RESTORE' });
+
+  it('없는 회원은 404 — 정지도 해제도', async () => {
+    db.user.findUnique.mockResolvedValue(null);
+
+    await expect(suspendUser(admin, 'u-gone', suspendInput))
+      .rejects.toMatchObject({ name: 'AccessError', code: 'USER_NOT_FOUND', status: 404 });
+    await expect(suspendUser(admin, 'u-gone', restoreInput))
+      .rejects.toMatchObject({ code: 'USER_NOT_FOUND', status: 404 });
+    expect(db.user.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('해제하는 사이에 그 회원이 바뀌었으면 되돌린다', async () => {
+    db.user.findUnique.mockResolvedValue({
+      id: 'u-target', role: 'CUSTOMER', deletedAt: null,
+      suspendedAt: NOW2, suspendedReason: '결제 도용 신고',
+    });
+    db.user.updateMany.mockResolvedValue({ count: 0 });
+
+    await expect(suspendUser(admin, 'u-target', restoreInput))
+      .rejects.toMatchObject({ code: 'CHANGED_MEANWHILE', status: 409 });
+  });
+
+  /** 읽은 역할을 조건에 실어야 그 되돌림이 가능하다 — 조건이 빠지면 늘 1건이다 */
+  it('해제도 읽은 역할을 조건에 싣는다', async () => {
+    db.user.findUnique.mockResolvedValue({
+      id: 'u-target', role: 'CUSTOMER', deletedAt: null,
+      suspendedAt: NOW2, suspendedReason: '결제 도용 신고',
+    });
+
+    await suspendUser(admin, 'u-target', restoreInput);
+
+    expect(db.user.updateMany.mock.calls[0]![0].where).toMatchObject({
+      id: 'u-target', role: 'CUSTOMER', deletedAt: null,
+    });
+  });
+});
