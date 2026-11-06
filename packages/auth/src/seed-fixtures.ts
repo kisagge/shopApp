@@ -46,6 +46,14 @@ export const SEED_ACCOUNT = {
   cartCallback: 'cart-callback@plain.test',
   /** 줄을 고르고 수량을 바꾸고 지운다 — cart-lines */
   cartLines: 'cart-lines@plain.test',
+  /**
+   * **창구가 실패했을 때 빠져나갈 수 있는가** — failure-escape.
+   *
+   * 화면 검사가 창구를 실패시켜 본 적이 거의 없었다(명세 94개 중 하나). 그런데 이
+   * 저장소에서 되풀이된 결함이 바로 거기다 — 실패가 "불러오는 중" 으로 보이고,
+   * 보내는 중 표시가 안 풀리고, 금액이 없는 까닭이 둘인데 하나로 보였다.
+   */
+  failureEscaper: 'failure-escape@plain.test',
 
   /*
    * **마지막 한 개를 두 사람이 동시에 산다.** 이 둘만은 서로를 상대로 쓰는
@@ -141,7 +149,7 @@ export const SEED_ACCOUNT = {
 /** 장바구니를 쥐는 계정들. 시드와 E2E 가드가 같은 것을 본다. */
 export const CART_ACCOUNTS = [
   'cartOrdering', 'cartPayment', 'cartA11y', 'cartBudget', 'cartLayout', 'cartLifecycle',
-  'cartDeposit', 'cartTotal', 'cartCallback', 'cartLines', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
+  'cartDeposit', 'cartTotal', 'cartCallback', 'cartLines', 'failureEscaper', 'raceBuyerA', 'raceBuyerB', 'doubleSpender', 'orderSearch', 'lowStockBuyer',
   'partialCanceler', 'orderCanceler', 'partialReturner', 'merchantReturner', 'wishlistRestock', 'exchanger',
   'purchaseConfirmer', 'reviewEditor', 'reorderer', 'orderPrivacy', 'orderAddressEditor',
 ] as const satisfies readonly (keyof typeof SEED_ACCOUNT)[];

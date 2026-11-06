@@ -32,6 +32,8 @@ export const STATE_FILE = {
   cartTotal: 'test-results/.auth/cart-total.json',
   cartCallback: 'test-results/.auth/cart-callback.json',
   cartLines: 'test-results/.auth/cart-lines.json',
+  /** 창구를 실패시켜 보고 빠져나가는 길이 있는지 본다 — failure-escape */
+  failureEscaper: 'test-results/.auth/failure-escape.json',
 
   /** 한 줄짜리 주문을 통째로 무른다 — order-cancel. 열쇠는 시드 계정 이름과 같아야 한다(auth.setup) */
   orderCanceler: 'test-results/.auth/order-cancel.json',
