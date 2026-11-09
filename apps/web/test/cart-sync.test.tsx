@@ -171,3 +171,99 @@ describe('장바구니 서버 맞추기', () => {
     expect(calls('POST')).toHaveLength(2);
   });
 });
+
+/**
+ * **기다리는 사이 수량을 바꾼 것.**
+ *
+ * 담은 것과 뺀 것은 이미 본다(위 둘). 빠진 것은 **이미 있던 줄의 수량·선택을 바꾼** 경우다 —
+ * 병합 응답이 그 줄을 서버 값으로 되돌리면, 방금 2개로 올린 것이 **아무 말 없이 1개로**
+ * 돌아간다. 사라지는 것보다 알아채기 더 어렵다: 줄은 그대로 있고 숫자만 다르다.
+ */
+describe('병합을 기다리는 사이 바꾼 것', () => {
+  it('수량을 바꿨으면 그 수량으로 남는다', async () => {
+    useCartStore.setState({ items: [line('v1', 1)] });
+    let finish!: (r: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(asUser('u1'));
+
+    act(() => {
+      useCartStore.setState({ items: [line('v1', 3)] });
+    });
+    await act(async () => {
+      // 서버에는 1개로 있었다
+      finish(new Response(JSON.stringify({ items: [line('v1', 1)] }), { status: 200 }));
+    });
+
+    expect(useCartStore.getState().items.map((i) => [i.variantId, i.quantity])).toEqual([['v1', 3]]);
+  });
+
+  it('선택을 껐으면 꺼진 채로 남는다 — 고르기가 곧 무엇을 사는지다', async () => {
+    useCartStore.setState({ items: [line('v1')] });
+    let finish!: (r: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    render(asUser('u1'));
+
+    act(() => {
+      useCartStore.setState({ items: [{ ...line('v1'), selected: false }] });
+    });
+    await act(async () => {
+      finish(new Response(JSON.stringify({ items: [line('v1')] }), { status: 200 }));
+    });
+
+    expect(useCartStore.getState().items[0]?.selected).toBe(false);
+  });
+
+  /** 아무것도 안 건드렸으면 서버 값을 쓴다 — 위의 되살림이 한 칸 넓지 않은지 */
+  it('안 건드린 줄은 서버 값을 쓴다', async () => {
+    useCartStore.setState({ items: [line('v1', 1)] });
+    // 흉내는 렌더보다 먼저 — 렌더가 그 자리에서 묻는다
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ items: [line('v1', 5)] }), { status: 200 }));
+    render(asUser('u1'));
+
+    await act(async () => {});
+
+    expect(useCartStore.getState().items.map((i) => i.quantity)).toEqual([5]);
+  });
+});
+
+/**
+ * **병합이 안 됐을 때는 로컬 장바구니를 그대로 둔다.**
+ *
+ * 서버가 거절하거나 요청이 못 가면 **담아 둔 것을 지우지 않는다** — 로그인했다는 이유로
+ * 장바구니가 비면 손님은 담은 것을 처음부터 다시 찾는다.
+ *
+ * 요청이 못 간 경우에는 **다음에 다시 시도할 수 있게 표시를 되돌린다.** 안 되돌리면 그
+ * 세션 동안 영영 병합되지 않고, 다른 기기에서 담아 둔 것이 안 보인다.
+ */
+describe('병합이 안 되면', () => {
+  it('서버가 거절하면 로컬을 건드리지 않는다', async () => {
+    useCartStore.setState({ items: [line('v-local')] });
+    /*
+     * **본문은 멀쩡하게 둔다.** 깨진 본문을 주면 읽는 줄이 던져 `catch` 로 떨어지고,
+     * `ok` 검사가 없어도 결과가 같아진다 — 돌연변이가 그 눈가림을 알려 줬다.
+     */
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ items: [] }), { status: 500 }));
+    render(asUser('u1'));
+
+    await act(async () => {});
+
+    expect(useCartStore.getState().items.map((i) => i.variantId)).toEqual(['v-local']);
+  });
+
+  it('요청이 못 가면 로컬을 두고, 다음 기회에 다시 시도한다', async () => {
+    useCartStore.setState({ items: [line('v-local')] });
+    vi.mocked(fetch).mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+    const view = render(asUser('u1'));
+
+    await act(async () => {});
+    expect(useCartStore.getState().items.map((i) => i.variantId)).toEqual(['v-local']);
+
+    // 같은 사람으로 다시 그리면 또 묻는다 — 한 번 실패로 포기하지 않는다
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ items: [line('v-other')] }), { status: 200 }));
+    view.unmount();
+    render(asUser('u1'));
+    await act(async () => {});
+
+    expect(calls('POST').length).toBeGreaterThanOrEqual(2);
+  });
+});

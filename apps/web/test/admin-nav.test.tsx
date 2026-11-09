@@ -97,3 +97,82 @@ describe('눌러 놓고 기다리는 동안', () => {
     expect(link('상품').querySelector('.link-busy')).toBeNull();
   });
 });
+
+/**
+ * **좁은 화면의 메뉴 — 열고 닫는 길이 셋이다.**
+ *
+ * 운영 화면 서른두 장을 오가는 유일한 통로인데, 좁은 화면에서는 그 통로가 서랍 뒤에 있다.
+ * 열고 **닫는 길**이 비어 있었다 — 파일의 절반이 안 돈 줄이었다(16/30).
+ *
+ * 닫는 길이 셋인 까닭이 있다: 닫기 단추(손), `Escape`(키보드), 바깥 누르기(손). 하나라도
+ * 없으면 그 방식으로 쓰는 사람이 **갇힌다** — 특히 키보드만 쓰는 사람에게 `Escape` 가 없으면
+ * 서랍 안을 끝까지 훑어야 빠져나온다.
+ *
+ * **닫은 뒤 초점을 여는 단추로 돌려준다.** 안 돌려주면 초점이 문서 처음으로 튀어, 키보드
+ * 사용자는 방금 있던 자리를 처음부터 다시 찾는다.
+ */
+describe('좁은 화면의 메뉴', () => {
+  const openMenu = async () => {
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+    render(<AdminNav items={ITEMS} roleLabel="운영진" merchant={false} theme="system" />);
+    const trigger = screen.getByRole('button', { name: '관리자 메뉴 열기' });
+    await user.click(trigger);
+    return { user, trigger };
+  };
+
+  it('여는 단추가 상태를 말한다', async () => {
+    const { trigger } = await openMenu();
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: '관리자 메뉴 닫기' })).toBeInTheDocument();
+  });
+
+  it('닫기 단추로 닫으면 초점이 여는 단추로 돌아온다', async () => {
+    const { user, trigger } = await openMenu();
+
+    await user.click(screen.getByRole('button', { name: '관리자 메뉴 닫기' }));
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  it('Escape 로도 닫히고 초점이 돌아온다 — 키보드만 쓰는 사람이 갇히지 않는다', async () => {
+    const { user, trigger } = await openMenu();
+    /*
+     * **초점을 서랍 안으로 먼저 옮긴다.** 여는 단추에 그대로 두면 "돌려줬는지" 를 가릴 수
+     * 없다 — 아무것도 안 해도 그 단추에 있다. 돌연변이로 그것을 확인하고 고쳤다.
+     */
+    screen.getByRole('button', { name: '관리자 메뉴 닫기' }).focus();
+
+    await user.keyboard('{Escape}');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveFocus();
+  });
+
+  it('다른 키는 닫지 않는다 — 메뉴 안에서 글자를 누를 수도 있다', async () => {
+    const { user, trigger } = await openMenu();
+
+    await user.keyboard('a');
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('바깥을 누르면 닫힌다', async () => {
+    const { user, trigger } = await openMenu();
+
+    await user.click(document.body);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  /** 안을 누르면 열려 있어야 한다 — 바깥 판정이 너무 넓으면 메뉴를 쓸 수 없다 */
+  it('메뉴 안을 누르면 열려 있다', async () => {
+    const { user, trigger } = await openMenu();
+
+    await user.click(screen.getByRole('link', { name: '주문' }));
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  });
+});

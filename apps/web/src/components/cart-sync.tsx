@@ -111,7 +111,18 @@ export function CartSync({ userId }: { userId: string | null }) {
         savedRef.current = toLines(data.items);
         useCartStore.setState({ items: replayPending(data.items, sent, useCartStore.getState().items) });
       } catch {
-        // 병합에 실패해도 로컬 장바구니는 그대로다. 다음 방문에 다시 시도한다.
+        /*
+         * 병합에 실패해도 로컬 장바구니는 그대로다. 다음 방문에 다시 시도한다.
+         *
+         * **이 한 줄은 지금 아무것도 바꾸지 않는다** — 돌연변이가 알려 줬다. 표시는
+         * 인스턴스마다 있는 `useRef` 라 다시 그려지면(새 방문) 비어 있고, 로그아웃은
+         * 아래 효과가 따로 비운다. 같은 `userId` 로 이 효과가 다시 도는 길이 없으니
+         * (의존이 `[userId]` 다) 비워 둘 기회 자체가 오지 않는다.
+         *
+         * 그래도 둔다: 나중에 "실패하면 다시 시도" 를 붙이는 사람이 **이 표시를 먼저
+         * 비워야 한다는 것**을 여기서 알게 된다. 커버리지가 "안 돈 줄" 로 가리키는데
+         * 검사로 밟을 길이 없어 적어 둔다.
+         */
         mergedForRef.current = null;
       }
     })();

@@ -73,4 +73,48 @@ describe('쿠폰 받기 목록', () => {
     expect(screen.getByRole('link', { name: '로그인하고 받기' })).toHaveAttribute('href', '/login?next=%2Fproduct%2Fwool-coat');
     expect(screen.queryByRole('button')).toBeNull();
   });
+
+  /**
+   * **이미 받아 둔 쿠폰은 처음부터 "받음" 이다.**
+   *
+   * 서버가 목록에 `claimed` 를 실어 준다. 그것을 시작값으로 쓰지 않으면 **이미 받은 쿠폰에
+   * 받기 단추가 떠서**, 눌러 보고 나서야 "이미 받았습니다" 를 듣는다.
+   */
+  it('이미 받은 쿠폰은 열 때부터 받음으로 보인다', async () => {
+    setup({ coupons: [{ ...COUPON, claimed: true }] });
+
+    expect(screen.getByRole('button', { name: '가을 20% 쿠폰 받음' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('button', { name: '가을 20% 쿠폰 받기' })).toBeNull();
+  });
+
+  /**
+   * **본문이 JSON 이 아닌 거절.** 앞단이 502 HTML 을 주면 `response.json()` 이 던진다 —
+   * 받침이 없으면 바깥 `catch` 로 떨어져 "네트워크 오류" 가 뜨고, 요청은 갔는데 사람은
+   * 연결 문제로 읽는다.
+   */
+  it('본문이 JSON 이 아닌 거절도 네트워크 오류로 말하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502</html>', { status: 502 }));
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '가을 20% 쿠폰 받기' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('받지 못했습니다');
+    expect(alert.textContent).not.toContain('네트워크 오류');
+    // 받지 못했으니 단추는 그대로 "받기" 다
+    expect(screen.getByRole('button', { name: '가을 20% 쿠폰 받기' })).toBeInTheDocument();
+  });
+
+  it('요청이 못 가면 네트워크 오류라고 말하고, 다시 누를 수 있다', async () => {
+    fetchMock.mockRejectedValueOnce(new Error('네트워크가 끊겼다'));
+    const user = setup();
+
+    await user.click(screen.getByRole('button', { name: '가을 20% 쿠폰 받기' }));
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류');
+
+    // 받는 중에서 멈추지 않았다 — 다시 누르면 이번에는 받힌다
+    fetchMock.mockResolvedValue(Response.json({ code: 'AUTUMN20' }, { status: 201 }));
+    await user.click(screen.getByRole('button', { name: '가을 20% 쿠폰 받기' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '가을 20% 쿠폰 받음' })).toBeInTheDocument());
+  });
 });
