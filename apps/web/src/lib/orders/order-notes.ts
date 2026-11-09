@@ -29,6 +29,15 @@ async function findOrder(actor: Actor, orderNo: string): Promise<{ id: string }>
   assertPermission(actor, 'admin:access');
   assertPermission(actor, 'order:read');
   const scope = orderNoteScope(actor);
+  /*
+   * **둘째 잠금이다 — 지금은 닿지 않는다.** 범위가 `undefined` 인 사람은 손님이거나 소속을
+   * 잃은 가맹점인데, 위의 `assertPermission` 둘이 이미 막는다(손님에게는 `admin:access` 가
+   * 없고, 소속 없는 가맹점에게는 `hasPermission` 이 아무 권한도 주지 않는다).
+   *
+   * 그래도 둔다. 범위를 `where` 절에 싣는 아래 조회가 **범위 없이 돌면 남의 주문 메모가
+   * 그대로 읽힌다** — 그 조회와 이 줄이 한 짝이다. 커버리지가 "안 돈 줄" 로 가리키는데
+   * 검사로 밟을 길이 없어, 다음 사람이 다시 파지 않게 적어 둔다.
+   */
   if (scope === undefined) throw new OrderNoteError('ORDER_NOT_FOUND', '주문을 찾을 수 없습니다.', 404);
   const order = await prisma.order.findFirst({
     where: { orderNo, ...(scope ? { items: { some: { merchantId: scope } } } : {}) },

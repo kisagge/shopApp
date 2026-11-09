@@ -123,3 +123,52 @@ describe('이 주소로 보내라고 안내받은 신청이 있으면', () => {
     expect(screen.queryByText(/안내받은 반품 신청/)).toBeNull();
   });
 });
+
+/**
+ * **반품지를 저장하지 못했을 때.**
+ *
+ * 반품지가 없으면 그 브랜드 상품은 매대에 올라가지 못한다(돌려받을 곳이 없다). 저장한 줄
+ * 알고 넘어가면 **상품이 왜 안 뜨는지 모른 채로** 남는다.
+ */
+describe('반품지를 저장하지 못하면', () => {
+  const save = async () => {
+    const user = userEvent.setup();
+    render(<ReturnAddressForm owner="m-a" initial={null} awaiting={0} />);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: '반품지 등록' }));
+  };
+
+  it('서버가 한 말을 보여 준다', async () => {
+    fetchMock.mockResolvedValue(Response.json({ message: '우편번호를 확인해 주세요.' }, { status: 400 }));
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('우편번호를 확인해 주세요.');
+  });
+
+  it('요청이 못 가면 네트워크 오류라고 말한다', async () => {
+    fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다'));
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류로 저장하지 못했습니다');
+  });
+
+  /**
+   * **본문이 JSON 이 아닌 거절.**
+   *
+   * 앞단이 502 HTML 을 주거나 본문이 비면 `response.json()` 이 던진다. 그 던짐을 잡지
+   * 않으면 바깥 `catch` 로 떨어져 **"네트워크 오류" 가 뜬다** — 요청은 갔고 서버가 거절한
+   * 것인데 사람은 연결 문제로 읽는다. 받침이 그 자리를 막는다(`failure-message` 가 적어 둔
+   * 그 고장이다).
+   */
+  it('본문이 JSON 이 아닌 거절도 네트워크 오류로 말하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+
+    await save();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('저장하지 못했습니다');
+    expect(alert.textContent).not.toContain('네트워크 오류');
+  });
+});

@@ -81,3 +81,82 @@ describe('주문 메모', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **메모를 남기지 못했을 때.**
+ *
+ * 주문 메모는 다음 사람이 읽을 글이다 — "부재 시 경비실", "출고 하루 지연". 실패했는데
+ * 아무 말도 안 하면 적은 사람은 남은 줄 알고 넘어가고, **다음 사람은 그 사실을 모른 채**
+ * 주문을 처리한다.
+ */
+describe('메모를 남기지 못하면', () => {
+  const write = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByLabelText('메모 남기기'), '경비실에 맡겨 달라고 함');
+    await user.click(screen.getByRole('button', { name: '메모 남기기' }));
+  };
+
+  it('서버가 한 말을 보여 준다', async () => {
+    fetchMock.mockResolvedValue(Response.json({ message: '이미 처리된 주문입니다.' }, { status: 409 }));
+    const user = userEvent.setup();
+    render(<OrderNotes orderNo="20260915-0000001" notes={NOTES} audience="staff" />);
+
+    await write(user);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('이미 처리된 주문입니다.');
+  });
+
+  it.each([
+    ['아무 말도 안 하면', async () => fetchMock.mockResolvedValue(Response.json({}, { status: 500 })), '메모를 남기지 못했습니다'],
+    ['요청이 못 가면', async () => fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다')), '네트워크 오류로 메모를 남기지 못했습니다'],
+  ])('%s 무엇이 안 됐는지 말한다', async (_label, arrange, says) => {
+    await arrange();
+    const user = userEvent.setup();
+    render(<OrderNotes orderNo="20260915-0000001" notes={NOTES} audience="staff" />);
+
+    await write(user);
+
+    expect((await screen.findByRole('alert')).textContent).toContain(says);
+  });
+
+  /** 적은 글을 지우면 다시 쓴다 — 성공했을 때만 비운다 */
+  it('적은 글은 남는다', async () => {
+    fetchMock.mockResolvedValue(Response.json({}, { status: 500 }));
+    const user = userEvent.setup();
+    render(<OrderNotes orderNo="20260915-0000001" notes={NOTES} audience="staff" />);
+
+    await write(user);
+    await screen.findByRole('alert');
+
+    expect(screen.getByLabelText<HTMLTextAreaElement>('메모 남기기').value).toBe('경비실에 맡겨 달라고 함');
+  });
+});
+
+describe('메모를 지우지 못하면', () => {
+  const confirmDelete = async (user: ReturnType<typeof userEvent.setup>) => {
+    render(<OrderNotes orderNo="20260915-0000001" notes={NOTES} audience="staff" />);
+    await user.click(screen.getByRole('button', { name: /메모 삭제$/ }));
+    await user.click(screen.getByRole('button', { name: '지우기' }));
+  };
+
+  it('요청이 못 가면 그렇게 말하고 줄은 남는다', async () => {
+    fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다'));
+    const user = userEvent.setup();
+
+    await confirmDelete(user);
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류로 메모를 지우지 못했습니다');
+    expect(screen.getByText(/경비실/)).toBeInTheDocument();
+  });
+
+  /** 물었다가 그만두면 아무 일도 없다 — 되돌릴 수 없는 일 앞의 두 번째 누름이다 */
+  it('물었다가 그만두면 보내지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<OrderNotes orderNo="20260915-0000001" notes={NOTES} audience="staff" />);
+
+    await user.click(screen.getByRole('button', { name: /메모 삭제$/ }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByText('되돌릴 수 없습니다. 지울까요?')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

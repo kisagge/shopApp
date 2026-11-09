@@ -61,3 +61,89 @@ describe('판매자 답글 폼', () => {
     expect(screen.getByRole('button', { name: '답글 저장' })).toBeTruthy();
   });
 });
+
+/**
+ * **답글을 저장하지 못했을 때.**
+ *
+ * 답글은 **손님에게 알림이 가는 글**이다. 실패했는데 말하지 않으면 가맹점은 답했다고
+ * 여기고, 손님은 답을 못 받은 채로 기다린다.
+ *
+ * 서버가 **어느 칸인지** 알려 주면 그것을 먼저 쓴다 — 답글은 칸이 하나뿐이라 폼 전체
+ * 문구와 칸 문구가 같은 자리에 뜨고, 둘을 섞으면 긴 쪽이 이겨 구체적인 말이 묻힌다.
+ */
+describe('답글을 저장하지 못하면', () => {
+  const write = async () => {
+    const user = userEvent.setup();
+    render(<ReviewReplyForm reviewId="r-1" productName="레더 카드 지갑" reply={null} />);
+    await user.type(screen.getByLabelText('레더 카드 지갑 리뷰에 남길 답글'), '감사합니다');
+    await user.click(screen.getByRole('button', { name: '답글 달기' }));
+  };
+
+  it('서버가 짚은 칸의 말을 먼저 쓴다', async () => {
+    fetchMock.mockResolvedValue(Response.json(
+      { message: '입력을 확인해 주세요', fields: { reply: '답글은 500자까지입니다.' } }, { status: 400 }));
+
+    await write();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('답글은 500자까지입니다.');
+  });
+
+  it.each([
+    ['칸을 안 짚으면 서버의 말을', async () => fetchMock.mockResolvedValue(Response.json({ message: '이미 지워진 리뷰입니다.' }, { status: 409 })), '이미 지워진 리뷰입니다.'],
+    ['아무 말도 없으면 기본 문구를', async () => fetchMock.mockResolvedValue(Response.json({}, { status: 500 })), '답글을 저장하지 못했습니다'],
+    ['요청이 못 가면 네트워크라고', async () => fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다')), '네트워크 오류로 저장하지 못했습니다'],
+  ])('%s 쓴다', async (_label, arrange, says) => {
+    await arrange();
+
+    await write();
+
+    expect((await screen.findByRole('alert')).textContent).toContain(says);
+  });
+
+  /**
+   * **본문이 JSON 이 아닌 거절.**
+   *
+   * 앞단이 502 HTML 을 주거나 본문이 비면 `response.json()` 이 던진다. 그 던짐을 잡지
+   * 않으면 바깥 `catch` 로 떨어져 **"네트워크 오류" 가 뜬다** — 요청은 갔고 서버가 거절한
+   * 것인데 사람은 연결 문제로 읽는다. 받침이 그 자리를 막는다(`failure-message` 가 적어 둔
+   * 그 고장이다).
+   */
+  it('본문이 JSON 이 아닌 거절도 네트워크 오류로 말하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+
+    await write();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('답글을 저장하지 못했습니다');
+    expect(alert.textContent).not.toContain('네트워크 오류');
+  });
+});
+
+/** 되돌릴 수 없는 일과 고치기를 그만두는 길 — 둘 다 아무것도 보내지 않는다 */
+describe('그만두기', () => {
+  it('지우기를 물었다가 그만두면 보내지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<ReviewReplyForm reviewId="r-1" productName="레더 카드 지갑" reply='감사합니다' />);
+
+    await user.click(screen.getByRole('button', { name: '답글 지우기' }));
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('button', { name: '답글 지우기 확인' })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('고치기를 그만두면 옛 오류도 거둔다', async () => {
+    fetchMock.mockResolvedValue(Response.json({}, { status: 500 }));
+    const user = userEvent.setup();
+    render(<ReviewReplyForm reviewId="r-1" productName="레더 카드 지갑" reply='감사합니다' />);
+
+    await user.click(screen.getByRole('button', { name: '답글 고치기' }));
+    await user.click(screen.getByRole('button', { name: '답글 저장' }));
+    await screen.findByRole('alert');
+
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    // 다시 열었을 때 지난번 실패가 남아 있으면 지금 무엇이 잘못된 줄 안다
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+});

@@ -83,3 +83,55 @@ describe('수수료율 폼', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('권한이 없습니다');
   });
 });
+
+/**
+ * **수수료율을 저장하지 못했을 때.**
+ *
+ * 이 값은 아직 확정하지 않은 정산 기간부터 쓰인다 — 바뀐 줄 알고 넘어가면 **다음 정산이
+ * 옛 수수료율로 끊긴다.** 서버가 어느 칸인지 알려 주면 그 칸에 잇고, 요청이 못 갔으면
+ * 그렇다고 말한다.
+ */
+describe('수수료율을 저장하지 못하면', () => {
+  /** 사유 없이는 보내지 않는다 — 기록에 "왜 이 요율이 됐는가" 가 남아야 한다 */
+  const save = async () => {
+    const user = userEvent.setup();
+    render(form());
+    await user.type(screen.getByLabelText(/바꾸는 사유/), '계약 갱신');
+    await user.click(screen.getByRole('button', { name: '수수료율 저장' }));
+  };
+
+  it('서버가 짚은 칸에 잇는다', async () => {
+    fetchMock.mockResolvedValue(Response.json(
+      { fields: { commissionPercent: '수수료율은 0~30% 사이입니다.' } }, { status: 400 }));
+
+    await save();
+
+    await waitFor(() => expect(screen.getByText('수수료율은 0~30% 사이입니다.')).toBeInTheDocument());
+  });
+
+  it('요청이 못 가면 네트워크 오류라고 말한다', async () => {
+    fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다'));
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류로 저장하지 못했습니다');
+  });
+
+  /**
+   * **본문이 JSON 이 아닌 거절.**
+   *
+   * 앞단이 502 HTML 을 주거나 본문이 비면 `response.json()` 이 던진다. 그 던짐을 잡지
+   * 않으면 바깥 `catch` 로 떨어져 **"네트워크 오류" 가 뜬다** — 요청은 갔고 서버가 거절한
+   * 것인데 사람은 연결 문제로 읽는다. 받침이 그 자리를 막는다(`failure-message` 가 적어 둔
+   * 그 고장이다).
+   */
+  it('본문이 JSON 이 아닌 거절도 네트워크 오류로 말하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+
+    await save();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('저장하지 못했습니다');
+    expect(alert.textContent).not.toContain('네트워크 오류');
+  });
+});

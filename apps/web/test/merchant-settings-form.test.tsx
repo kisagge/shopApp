@@ -101,3 +101,91 @@ describe('정산 계좌', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('권한이 없습니다');
   });
 });
+
+/**
+ * **연락처가 비어 있으면 보내지 않는다.**
+ *
+ * 이 둘은 **우리가 가맹점에게 닿는 유일한 길**이다 — 입점 심사 결과, 반품 요청, 정산 안내가
+ * 그 주소로 간다. 비어 있거나 모양이 아니면 보내는 쪽에서 먼저 막고 그 칸으로 초점을 옮긴다.
+ */
+describe('연락처 칸', () => {
+  const open = () => {
+    const user = userEvent.setup();
+    render(<MerchantSettingsForm merchantId="m-a" businessName="스튜디오눈 주식회사" initial={initial} />);
+    return user;
+  };
+
+  it('이메일에 @ 가 없으면 보내지 않고 그 칸에 적는다', async () => {
+    const user = open();
+    // 붙박이 값이 이미 채워져 있다 — 비우고 적어야 내가 넣은 값이 된다
+    await user.clear(screen.getByLabelText(/^연락 이메일/));
+    await user.type(screen.getByLabelText(/^연락 이메일/), 'studio.noon.test');
+    await fill(user);
+
+    await user.click(screen.getByRole('button', { name: '정보 저장' }));
+
+    expect(screen.getByText('연락 받을 이메일을 입력해 주세요.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('연락처가 비어 있으면 보내지 않고 그 칸에 적는다', async () => {
+    const user = open();
+    await user.clear(screen.getByLabelText(/^연락처/));
+    await fill(user);
+
+    await user.click(screen.getByRole('button', { name: '정보 저장' }));
+
+    expect(screen.getByText('연락처를 입력해 주세요.')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **저장하지 못했을 때.** 정산 계좌가 걸린 폼이라, 바뀐 줄 알고 넘어가면 **돈이 옛 계좌로
+ * 간다.** 서버가 어느 칸인지 알려 주면 그 칸에 잇고 **초점까지 옮긴다** — 긴 폼이라 어디가
+ * 문제인지 눈으로 찾게 두면 그 사이에 다른 칸을 고친다.
+ */
+describe('정보를 저장하지 못하면', () => {
+  const save = async () => {
+    const user = userEvent.setup();
+    render(<MerchantSettingsForm merchantId="m-a" businessName="스튜디오눈 주식회사" initial={initial} />);
+    await fill(user);
+    await user.click(screen.getByRole('button', { name: '정보 저장' }));
+  };
+
+  it('서버가 짚은 칸에 잇고 그 칸으로 초점을 옮긴다', async () => {
+    fetchMock.mockResolvedValue(Response.json(
+      { fields: { settlementAccount: '계좌번호를 확인해 주세요.' } }, { status: 400 }));
+
+    await save();
+
+    await waitFor(() => expect(screen.getByText('계좌번호를 확인해 주세요.')).toBeInTheDocument());
+    expect(screen.getByLabelText(/^계좌번호/)).toHaveFocus();
+  });
+
+  it('요청이 못 가면 네트워크 오류라고 말한다', async () => {
+    fetchMock.mockRejectedValue(new Error('네트워크가 끊겼다'));
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류로 저장하지 못했습니다');
+  });
+
+  /**
+   * **본문이 JSON 이 아닌 거절.**
+   *
+   * 앞단이 502 HTML 을 주거나 본문이 비면 `response.json()` 이 던진다. 그 던짐을 잡지
+   * 않으면 바깥 `catch` 로 떨어져 **"네트워크 오류" 가 뜬다** — 요청은 갔고 서버가 거절한
+   * 것인데 사람은 연결 문제로 읽는다. 받침이 그 자리를 막는다(`failure-message` 가 적어 둔
+   * 그 고장이다).
+   */
+  it('본문이 JSON 이 아닌 거절도 네트워크 오류로 말하지 않는다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>502 Bad Gateway</html>', { status: 502 }));
+
+    await save();
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('저장하지 못했습니다');
+    expect(alert.textContent).not.toContain('네트워크 오류');
+  });
+});
