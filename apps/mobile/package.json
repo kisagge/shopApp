@@ -20,7 +20,7 @@
     "@capacitor/preferences": "8.0.1",
     "@capacitor/share": "8.0.3",
     "@capacitor/splash-screen": "8.0.2",
-    "@capgo/capacitor-social-login": "8.7.6"
+    "@capgo/capacitor-social-login": "8.7.7"
   },
   "devDependencies": {
     "@capacitor/cli": "8.6.0",

@@ -56,7 +56,7 @@ docs/          배포 절차
 design/        디자인 캔버스 아트보드 소스
 ```
 
-Next 16.3.8 · React 19.2.8 · TypeScript 6.0.3 · Prisma 7 · Zod 4 ·
+Next 16.4.5 · React 19.3.1 · TypeScript 6.0.3 · Prisma 7 · Zod 4 ·
 Tailwind 4 · Zustand 5 · Capacitor 8 · Node 24 · pnpm 11
 
 ## 이렇게 정한 것들
@@ -193,7 +193,7 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 | **백 로직** | `packages/*/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 매출 인식, 권한 정책, 이벤트 퍼널, 입력 검증, enum 정합성 |
 
 ```
-core 1,737 · web 6,669 · contract 389 · ui 136 · auth 103 · i18n 39 · db 77 · native 31 · mail 7
+core 1,737 · web 6,681 · contract 389 · ui 136 · auth 103 · i18n 39 · db 77 · native 31 · mail 7
 e2e 989 (Playwright, 95 파일)
 ```
 

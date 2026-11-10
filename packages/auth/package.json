@@ -21,12 +21,12 @@
     "@shop/i18n": "workspace:*",
     "@shop/mail": "workspace:*",
     "@shop/native": "workspace:*",
-    "better-auth": "1.7.15"
+    "better-auth": "1.7.18"
   },
   "devDependencies": {
     "@shop/config": "workspace:*",
     "@vitest/coverage-v8": "5.1.0",
-    "dotenv": "18.0.9",
+    "dotenv": "18.0.10",
     "eslint": "10.14.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
