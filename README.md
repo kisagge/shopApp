@@ -194,7 +194,7 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 
 ```
 core 1,737 · web 6,669 · contract 389 · ui 136 · auth 103 · i18n 39 · db 77 · native 31 · mail 7
-e2e 987 (Playwright, 95 파일)
+e2e 989 (Playwright, 95 파일)
 ```
 
 **그 "기계로 셌다" 는 이름으로 센 것이었다.** 이 저장소는 상수나 함수 이름을 적지 않고 덮는

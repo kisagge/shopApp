@@ -156,3 +156,52 @@ test('배송지를 지우지 못하면 말하고, 그 줄은 남는다', async (
   await expect(page.getByRole('alert').filter({ hasText: '배송지를 지우지 못했습니다' })).toBeVisible();
   await expect(rows).toHaveCount(before);
 });
+
+/**
+ * **적은 값은 남아야 한다.**
+ *
+ * 회원정보는 이름과 연락처뿐이지만, 실패했는데 칸을 비우면 다시 적게 된다. 그리고
+ * **"저장했다" 고 말하지 않는 것**이 함께 중요하다 — 둘 다 말하면 사람은 저장된 줄 안다.
+ */
+test('회원정보를 저장하지 못하면 말하고, 적은 값은 남는다', async ({ page }) => {
+  await page.goto('/mypage/account');
+  await ready(page);
+
+  const phone = page.getByLabel(/^연락처/);
+  await phone.fill('01099998888');
+
+  await breakOnce(page, '**/api/account/profile');
+  await page.getByRole('button', { name: '저장' }).click();
+
+  await expect(page.getByRole('alert').filter({ hasText: '회원정보를 저장하지 못했습니다' })).toBeVisible();
+  await expect(phone).toHaveValue('01099998888');
+  // 저장되지 않았으니 저장했다고 하지 않는다
+  await expect(page.getByText('회원정보를 저장했습니다', { exact: false })).toHaveCount(0);
+});
+
+/**
+ * **낙관적으로 칠한 하트는 실패하면 되돌아와야 하고, 왜인지 보여야 한다.**
+ *
+ * 누르는 순간 하트를 칠해 두고 서버에 보낸다(기다리게 하면 느린 화면이 된다). 실패하면
+ * 되돌리는데, **예전에는 이유가 `sr-only` 에만 있었다** — 눈으로 보는 사람에게는 하트가
+ * 깜빡이고 원래대로 돌아간 것이 전부였다. 로그인이 풀렸는지, 망이 끊겼는지, 다시 누르면
+ * 되는지 알 방법이 없었다.
+ *
+ * 그 고침이 **진짜 화면에서 보이는지**가 여기서 볼 것이다 — 단위 검사는 조각을 따로
+ * 그리므로 상품 화면의 그 자리에 닿는지는 보지 않는다.
+ */
+test('찜하기가 실패하면 하트가 되돌아오고, 그 자리에 이유가 보인다', async ({ page }) => {
+  await page.goto('/product/nylon-coach-blouson');
+  await ready(page);
+
+  const add = page.getByRole('button', { name: /찜하기$/ }).first();
+  await expect(add).toBeVisible();
+
+  await breakOnce(page, '**/api/wishlist/*');
+  await add.click();
+
+  await expect(page.getByRole('alert').filter({ hasText: '처리하지 못했습니다' })).toBeVisible();
+  // 하트가 되돌아왔다 — 찜한 것으로 남아 있으면 안 한 것을 했다고 보이는 셈이다
+  await expect(page.getByRole('button', { name: /찜하기$/ }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /찜 해제$/ })).toHaveCount(0);
+});
