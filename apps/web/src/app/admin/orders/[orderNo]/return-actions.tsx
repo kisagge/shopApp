@@ -257,7 +257,17 @@ export function CompleteReturnButton({
           : '돌려보낸 물건이 도착했는지 확인한 뒤 누릅니다. 재고가 돌아오고 결제가 취소됩니다.'}
       </p>
       {preview?.kind === 'partial' && (
-        <dl className="flex flex-col gap-1 rounded-sm bg-[var(--surface)] px-3.5 py-3 text-[13px]" aria-label="돌려줄 금액">
+        /*
+         * **`role` 을 얹어야 이름표가 닿는다.** `dl` 은 대응하는 role 이 없어서(HTML-AAM)
+         * 거기 붙인 `aria-label` 은 보조기기에 전해지지 않을 수 있다 — 브라우저마다
+         * 다르고, 보수적인 쪽은 통째로 버린다. 이름 없는 숫자 셋만 읽히면 무슨 돈인지
+         * 모른다. 보이는 모습은 그대로다.
+         */
+        <dl
+          role="group"
+          aria-label="돌려줄 금액"
+          className="flex flex-col gap-1 rounded-sm bg-[var(--surface)] px-3.5 py-3 text-[13px]"
+        >
           <div className="flex justify-between">
             <dt className="text-[var(--fg-secondary)]">결제 수단으로</dt>
             <dd className="tnum font-semibold">{format(preview.cash)}원</dd>

@@ -125,7 +125,12 @@ export function OrderReceipt({
         </table>
       </div>
 
-      <dl aria-label={t('order.payInfo')} className="ml-auto flex w-full max-w-[320px] flex-col gap-1.5 text-[13px]">
+      {/* dl 은 대응하는 role 이 없어 aria-label 이 버려질 수 있다 — 반품 환불 표와 같은 까닭으로 role 을 얹는다 */}
+      <dl
+        role="group"
+        aria-label={t('order.payInfo')}
+        className="ml-auto flex w-full max-w-[320px] flex-col gap-1.5 text-[13px]"
+      >
         <Row label={t('cart.subtotal')} value={money(order.listTotal)} />
         {order.productDiscount > 0 && <Row label={t('cart.productDiscount')} value={`-${money(order.productDiscount)}`} />}
         {order.couponDiscount > 0 && <Row label={t('cart.couponDiscount')} value={`-${money(order.couponDiscount)}`} />}

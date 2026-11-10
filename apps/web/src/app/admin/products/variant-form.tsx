@@ -22,6 +22,11 @@ export function VariantForm({ productId }: { productId: string }) {
       const response = await fetch(`/api/admin/products/${productId}/variants`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        /*
+         * `|| 0` 은 지금 닿지 않는다 — 칸이 `type="number"` 라 값은 수를 적은
+         * 글자이거나 빈 글자뿐이고, `Number('')` 는 이미 0 이다(돌연변이로 재 봤다).
+         * 칸을 글자 칸으로 바꾸는 날 NaN 이 창구까지 가는 것을 막으려고 둔다.
+         */
         body: JSON.stringify({ sku, optionLabel, stock: Number(stock) || 0 }),
       });
       const data = (await response.json().catch(() => ({}))) as { message?: string };

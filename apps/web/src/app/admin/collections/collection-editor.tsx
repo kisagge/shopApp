@@ -18,6 +18,11 @@ export function CollectionEditor({ initial }: { initial: readonly CollectionItem
     setError(null);
     try {
       const response = await fetch(url, init);
+      /*
+       * 204 는 몸통이 없다(삭제만 그렇다). **뜻을 적어 두는 줄이고, 없어도 결과는
+       * 같다** — 아래 `json()` 이 빈 몸통에서 넘어지고 `catch` 가 같은 `{}` 를
+       * 돌려준다. 돌연변이로 재 보고 알았다. 예외를 한 번 덜 던지려고 둔다.
+       */
       if (response.status === 204) return {} as T;
       const data: unknown = await response.json().catch(() => ({}));
       if (!response.ok) {
