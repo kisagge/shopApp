@@ -105,3 +105,54 @@ test('주문하기가 실패하면 말하고, 다시 누를 수 있다', async (
   await expect(pay).toBeVisible();
   await expect(page.getByText('주문 처리 중…')).toHaveCount(0);
 });
+
+/**
+ * **쓴 글은 남아야 한다.**
+ *
+ * 문의는 사람이 **글을 쓰고** 누르는 일이다. 실패했는데 글까지 지우면 다시 쓰게 된다 —
+ * 그러느라 그만두는 사람도 있다.
+ *
+ * 이 폼에는 결함이 있었다: 실패하면 경고 자리에 `support.submit`, 곧 **'문의 보내기'**
+ * (단추 이름)가 떴다. 단위 검사가 그 고침을 붙들지만, **진짜 화면에서 그 경고에 닿는지**
+ * 는 보지 않는다 — 배송지 결함이 정확히 그 틈이었다.
+ */
+test('문의를 보내지 못하면 말하고, 쓴 글은 남는다', async ({ page }) => {
+  await page.goto('/support/ask');
+  await ready(page);
+
+  const content = page.getByLabel('문의 내용');
+  await content.fill('배송이 3일째 멈춰 있습니다.');
+
+  await breakOnce(page, '**/api/inquiries');
+  await page.getByRole('button', { name: '문의 보내기' }).click();
+
+  await expect(page.getByRole('alert').filter({ hasText: '문의를 보내지 못했습니다' })).toBeVisible();
+  // 단추 이름이 오류 자리에 오지 않는다 — 그것이 그 결함의 모양이었다
+  await expect(page.getByRole('alert').filter({ hasText: /^문의 보내기$/ })).toHaveCount(0);
+  // 접수했다고도 하지 않는다
+  await expect(page.getByText('문의를 접수했습니다', { exact: false })).toHaveCount(0);
+  await expect(content).toHaveValue('배송이 3일째 멈춰 있습니다.');
+});
+
+/**
+ * **지우지 못했으면 줄이 남아 있어야 하고, 그렇다고 말해야 한다.**
+ *
+ * 배송지 지우기는 한 번 더 묻고 보낸다. 거기서 실패했는데 아무 말이 없으면 **줄은 그대로
+ * 남아 있는데** 사람은 지워진 줄 알고 나간다 — 다음에 와서 그 주소를 보고 지웠는지
+ * 안 지웠는지 헷갈린다.
+ */
+test('배송지를 지우지 못하면 말하고, 그 줄은 남는다', async ({ page }) => {
+  await page.goto('/mypage/addresses');
+  await ready(page);
+
+  const rows = page.getByRole('listitem');
+  const before = await rows.count();
+  expect(before).toBeGreaterThan(0);
+
+  await page.getByRole('button', { name: /님의 배송지 삭제$/ }).first().click();
+  await breakOnce(page, '**/api/addresses/*');
+  await page.getByRole('button', { name: /님의 배송지 삭제 확인$/ }).first().click();
+
+  await expect(page.getByRole('alert').filter({ hasText: '배송지를 지우지 못했습니다' })).toBeVisible();
+  await expect(rows).toHaveCount(before);
+});
