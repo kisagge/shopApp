@@ -287,6 +287,86 @@ describe('꾸러미 선언', () => {
     expect(peers.some((p) => !EXACT.test(p.split('=')[1]!)), '짝 선언이 전부 정확한 판이다').toBe(true);
   });
 
+  /**
+   * **선언한 node 하한이 의존성이 요구하는 것보다 낮지 않다.**
+   *
+   * jsdom 31 을 올리는 날 드러난 자리다. 그쪽이 `^22.22.2 || ^24.15.0 || >=26.0.0`
+   * 을 요구하는데 이 저장소는 `>=24.0.0` 이라고 적고 있었다 — **24.0~24.14 를 쓰는
+   * 사람에게는 틀린 안내다.** `engine-strict` 를 안 켜 두었으니 설치가 막아 주지도
+   * 않는다. 문지기는 `.nvmrc`(24.20.0)로 돌아서 영영 모른다.
+   *
+   * 수를 손으로 적지 않는다 — **깔린 꾸러미의 `engines` 에서 끌어낸다.** 올리는
+   * 사람이 하한을 올려야 하는 날 여기서 걸린다.
+   *
+   * **node 24 계열만 읽는다.** 이 저장소는 24 로 고정이고(`.nvmrc`), 범위에 적힌
+   * 다른 계열(`^22`·`>=26`)은 여기서 쓸 일이 없다. 그 전제가 깨지면(nvmrc 가 24 가
+   * 아니게 되면) **읽는 법을 고치라고** 아래에서 진다.
+   */
+  type Floor = [number, number, number];
+
+  /** `^24.15.0`·`>=24.0` 같은 조각에서 24 계열 하한을 모아 가장 높은 것 */
+  function node24Floor(range: string): Floor | null {
+    let best: Floor | null = null;
+    for (const m of range.matchAll(/(?:\^|>=\s*)24(?:\.(\d+))?(?:\.(\d+))?/g)) {
+      const found: Floor = [24, Number(m[1] ?? 0), Number(m[2] ?? 0)];
+      if (best === null || found[1] > best[1] || (found[1] === best[1] && found[2] > best[2])) {
+        best = found;
+      }
+    }
+    return best;
+  }
+
+  /** 직접 적어 둔 꾸러미들이 깔린 자리에서 말하는 node 범위 */
+  function declaredEngines(): { name: string; range: string }[] {
+    const out = new Map<string, string>();
+    for (const pkg of PACKAGES) {
+      const deps = { ...(pkg.manifest.dependencies ?? {}), ...(pkg.manifest.devDependencies ?? {}) };
+      for (const [name, range] of Object.entries(deps)) {
+        if (range === 'workspace:*' || out.has(name)) continue;
+        for (const base of [join(ROOT, pkg.dir, 'node_modules'), join(ROOT, 'node_modules')]) {
+          const file = join(base, name, 'package.json');
+          if (!existsSync(file)) continue;
+          const engines = (JSON.parse(readFileSync(file, 'utf8')) as { engines?: { node?: string } }).engines;
+          if (engines?.node) out.set(name, engines.node);
+          break;
+        }
+      }
+    }
+    return [...out].map(([name, range]) => ({ name, range }));
+  }
+
+  it('node 하한을 의존성에서 끌어내 견준다', () => {
+    const nvmrc = readFileSync(join(ROOT, '.nvmrc'), 'utf8').trim();
+    expect(
+      nvmrc.startsWith('24.'),
+      `.nvmrc 가 ${nvmrc} 다 — 24 계열만 읽는 이 검사의 읽는 법을 함께 고친다`,
+    ).toBe(true);
+
+    const root = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')) as {
+      engines?: { node?: string };
+    };
+    const declared = /^>=\s*(\d+)\.(\d+)\.(\d+)$/.exec(root.engines?.node ?? '');
+    expect(
+      declared,
+      `뿌리의 engines.node 모양이 바뀌었다("${root.engines?.node}") — 읽는 법을 함께 고친다`,
+    ).not.toBeNull();
+    const ours: Floor = [Number(declared![1]), Number(declared![2]), Number(declared![3])];
+
+    const engines = declaredEngines();
+    expect(engines.length, 'engines 를 적은 꾸러미를 못 찾았다 — 이 검사가 헛돈다').toBeGreaterThan(10);
+
+    const tooHigh = engines
+      .map(({ name, range }) => ({ name, range, floor: node24Floor(range) }))
+      .filter(({ floor }) => floor !== null)
+      .filter(({ floor }) => floor![1] > ours[1] || (floor![1] === ours[1] && floor![2] > ours[2]))
+      .map(({ name, range }) => `${name} — ${range}`);
+
+    expect(
+      tooHigh.sort(),
+      `적어 둔 node ${ours.join('.')} 보다 높은 판을 요구하는 꾸러미가 있다 — 하한을 올린다`,
+    ).toEqual([]);
+  });
+
   it('씨앗 스크립트만 쓰는 것은 devDependencies 에 남는다', () => {
     /*
      * 면제의 증명이다. `dotenv` 가 `dependencies` 로 올라갈 까닭이 없다는 말을
