@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import sharp from 'sharp';
 import type { Actor } from '@shop/core';
 
 const db = vi.hoisted(() => ({
@@ -29,6 +30,23 @@ const {
   reorderCollections, setCollectionImage,
 } = await import('~/lib/admin/manage-collection');
 const { MAX_COLLECTION_ITEMS } = await import('@shop/core');
+const { setStorage } = await import('~/lib/storage');
+
+const storage = {
+  name: 'fake',
+  put: vi.fn(async ({ key }: { key: string }) => ({ url: `https://cdn.test/${key}` })),
+  remove: vi.fn(async () => {}),
+};
+
+/** 진짜 사진. 만들어 낸 헤더로는 다듬기가 되지 않는다. */
+const png = async () => ({
+  bytes: new Uint8Array(
+    await sharp({ create: { width: 40, height: 40, channels: 3, background: '#888' } })
+      .png()
+      .toBuffer(),
+  ),
+  declaredType: 'image/png',
+});
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-a' };
@@ -57,7 +75,9 @@ beforeEach(() => {
   db.$transaction.mockImplementation(async (arg: unknown) =>
     typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(db) : [],
   );
+  setStorage(storage);
 });
+afterEach(() => setStorage(undefined));
 
 describe('누가 만질 수 있는가', () => {
   it('가맹점은 기획전을 볼 수 없다 — 여러 브랜드를 가로지르는 플랫폼의 자리다', async () => {
@@ -338,5 +358,159 @@ describe('상품 수 상한', () => {
 
   it('상한까지는 받는다 — 거절이 한 칸 넓지 않은지', async () => {
     await expect(setCollectionItems(admin, 'c-1', ids(MAX_COLLECTION_ITEMS))).resolves.not.toThrow();
+  });
+});
+
+describe('만들면 맨 뒤에 붙는다', () => {
+  it('지금 개수가 곧 새 자리다 — 만드는 순간 맨 앞에 끼면 매대가 흔들린다', async () => {
+    db.collection.count.mockResolvedValue(3);
+    db.collection.create.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(row({ ...data })));
+
+    await createCollection(admin, { slug: 'new-one', title: '새 기획전' } as never);
+
+    expect(db.collection.create.mock.calls[0]![0].data).toMatchObject({
+      slug: 'new-one', title: '새 기획전', sortOrder: 3,
+    });
+  });
+});
+
+describe('주소를 바꾸면 옛 주소가 따라온다', () => {
+  /*
+   * **거절만 검사돼 있었다.** 남의 주소로 바꾸려 할 때 막는 것은 보고 있었는데,
+   * 실제로 바꿀 때 **옛 주소를 어디에 적어 두는지**는 한 줄도 안 돌았다.
+   *
+   * 옛 주소를 적어 두지 않으면 어제까지 공유된 링크가 그날부터 404 가 된다.
+   * 반대로 **새 주소에 남아 있던 옛 기록은 지워야 한다** — 안 지우면 새 주소가
+   * 자기 자신을 거쳐 돌아가는 꼴이 된다.
+   */
+  const renameTo = async (slug: string) => {
+    db.collection.findUnique
+      .mockResolvedValueOnce(row())          // 고칠 기획전
+      .mockResolvedValueOnce(null);          // 그 주소를 쓰는 다른 기획전은 없다
+    db.collection.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(row({ ...data })));
+    return updateCollection(admin, 'c-1', { slug });
+  };
+
+  it('옛 주소가 이 기획전을 가리키게 적어 둔다', async () => {
+    await renameTo('spring-outer');
+
+    expect(db.collectionSlug.upsert).toHaveBeenCalledTimes(1);
+    expect(db.collectionSlug.upsert.mock.calls[0]![0]).toMatchObject({
+      where: { slug: 'winter-outer' },
+      create: { slug: 'winter-outer', collectionId: 'c-1' },
+      update: { collectionId: 'c-1' },
+    });
+  });
+
+  it('새 주소에 남아 있던 옛 기록은 지운다 — 자기 자신으로 되돌아가지 않게', async () => {
+    await renameTo('spring-outer');
+
+    expect(db.collectionSlug.deleteMany).toHaveBeenCalledWith({ where: { slug: 'spring-outer' } });
+  });
+
+  it('고치기와 기록이 한 트랜잭션이다 — 하나만 남으면 주소가 어긋난 채 산다', async () => {
+    await renameTo('spring-outer');
+
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(typeof db.$transaction.mock.calls[0]![0]).toBe('function');
+  });
+
+  it('주소를 그대로 두면 기록을 건드리지 않는다', async () => {
+    db.collection.findUnique.mockResolvedValue(row());
+    db.collection.update.mockResolvedValue(row({ title: '새 제목' }));
+
+    await updateCollection(admin, 'c-1', { title: '새 제목' });
+
+    expect(db.collectionSlug.upsert).not.toHaveBeenCalled();
+    expect(db.collectionSlug.deleteMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('순서를 실제로 다시 적는 자리', () => {
+  it('받은 순서대로 0부터 다시 적고, 바꾼 목록을 돌려준다', async () => {
+    db.collection.findMany
+      .mockResolvedValueOnce([{ id: 'c-1' }, { id: 'c-2' }])
+      .mockResolvedValueOnce([row({ id: 'c-2', sortOrder: 0 }), row({ id: 'c-1', sortOrder: 1 })]);
+
+    const after = await reorderCollections(admin, ['c-2', 'c-1']);
+
+    expect(db.collection.update.mock.calls.map(([a]) => [a.where.id, a.data.sortOrder])).toEqual([
+      ['c-2', 0],
+      ['c-1', 1],
+    ]);
+    expect(after.map((r) => r.id)).toEqual(['c-2', 'c-1']);
+  });
+
+  it('가운데를 지우면 남은 것의 순서를 메운다', async () => {
+    db.collection.findUnique.mockResolvedValue({ id: 'c-2', storageKey: null });
+    db.collection.delete.mockResolvedValue({});
+    db.collection.findMany.mockResolvedValue([
+      { id: 'c-1', sortOrder: 0 },
+      { id: 'c-3', sortOrder: 2 },
+    ]);
+
+    await deleteCollection(admin, 'c-2');
+
+    expect(db.collection.update.mock.calls.map(([a]) => [a.where.id, a.data.sortOrder])).toEqual([
+      ['c-3', 1],
+    ]);
+  });
+
+  it('지울 때 걸려 있던 사진도 버린다 — 화면에서 사라지는 것이 우선이다', async () => {
+    db.collection.findUnique.mockResolvedValue({
+      id: 'c-1', storageKey: 'products/collection-c-1/old.png',
+    });
+    db.collection.delete.mockResolvedValue({});
+    db.collection.findMany.mockResolvedValue([]);
+
+    await deleteCollection(admin, 'c-1');
+
+    expect(storage.remove).toHaveBeenCalledWith('products/collection-c-1/old.png');
+  });
+});
+
+describe('배경 사진 교체 — 무엇을 넘기는가', () => {
+  /*
+   * 갈아 끼우는 순서는 `image-replace` 가 네 화면 몫으로 본다. 여기서는 배선만 본다.
+   * 404 는 위의 "없는 기획전을 가리키면" 이 이미 본다.
+   */
+  beforeEach(() => {
+    db.collection.findUnique.mockResolvedValue({ id: 'c-1', storageKey: null });
+    db.collection.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
+      Promise.resolve(row({ ...data })));
+  });
+
+  it('키가 products/ 아래로 간다 — 버킷이 그 접두사만 공개한다', async () => {
+    await setCollectionImage(admin, 'c-1', await png(), '배경');
+
+    const key: string = storage.put.mock.calls[0]![0].key;
+    expect(key.startsWith('products/collection-c-1/')).toBe(true);
+  });
+
+  it('올린 자리와 흐린 미리보기, 다듬은 대체 글을 함께 적는다', async () => {
+    await setCollectionImage(admin, 'c-1', await png(), '  겨울 아웃터  ');
+
+    const data = db.collection.update.mock.calls[0]![0].data as Record<string, unknown>;
+    expect(data.imageUrl).toBe(`https://cdn.test/${storage.put.mock.calls[0]![0].key}`);
+    expect(data.storageKey).toBe(storage.put.mock.calls[0]![0].key);
+    expect(String(data.blurDataUrl)).toMatch(/^data:image\//);
+    expect(data.imageAlt).toBe('겨울 아웃터');
+  });
+
+  it('대체 글이 공백뿐이면 비워 둔다', async () => {
+    await setCollectionImage(admin, 'c-1', await png(), '  ');
+
+    expect((db.collection.update.mock.calls[0]![0].data as Record<string, unknown>).imageAlt).toBeNull();
+  });
+
+  it('걸려 있던 파일은 지운다', async () => {
+    db.collection.findUnique.mockResolvedValue({
+      id: 'c-1', storageKey: 'products/collection-c-1/old.png',
+    });
+    await setCollectionImage(admin, 'c-1', await png(), '배경');
+
+    expect(storage.remove).toHaveBeenCalledWith('products/collection-c-1/old.png');
   });
 });
