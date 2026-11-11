@@ -20,6 +20,17 @@ export function AnalyticsProvider({ consent }: { consent?: boolean }) {
     if (!consent) getTracker().flush();
   }, [consent]);
 
+  /*
+   * 지난 경로를 ref 로 들고 있는다.
+   *
+   * **다시 그리는 것은 이것 없이도 막힌다** — 이펙트가 경로에 매여 있어 같은
+   * 경로로는 아예 다시 돌지 않는다(돌연변이로 재 보고 알았다). 이 한 줄이 사는
+   * 자리는 **같은 조각이 이펙트를 두 번 돌리는 때**다: 개발 모드의 두 번 호출,
+   * 그리고 리액트가 상태를 들고 되살리는 길(ref 는 그때 살아남는다). 그 수가
+   * 두 배가 되면 집계가 조용히 부푼다.
+   *
+   * 지금 검사 환경에서는 두 번 호출이 재현되지 않아 **검사로 못 박지 못했다.**
+   */
   useEffect(() => {
     if (lastPath.current === pathname) return;
     lastPath.current = pathname;
