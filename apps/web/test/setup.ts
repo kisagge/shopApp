@@ -35,6 +35,38 @@ configure({ asyncUtilTimeout: 15_000 });
 URL.createObjectURL = () => 'blob:x';
 URL.revokeObjectURL = () => {};
 
+/**
+ * **글자의 자리를 재는 두 함수가 `Range` 에 없다.** jsdom 은 `Element` 쪽에만 두었다.
+ *
+ * ProseMirror(편집기)는 글자 사이에 커서를 놓으려고 범위를 만들어 재는데, 그 함수가
+ * 없으면 `target.getClientRects is not a function` 으로 **핸들러가 통째로 끊긴다** —
+ * 단추를 눌렀는데 아무 일도 안 일어난 것처럼 보이고, 검사는 "요소가 안 닫혔다" 같은
+ * 엉뚱한 말로 진다. 그 자리를 찾는 데 한참 걸린다.
+ *
+ * 재는 값은 **영이다.** jsdom 은 배치를 하지 않으므로 어떤 수를 꾸며 내도 거짓이고,
+ * 자리를 쓰는 쪽(툴팁 위치 같은 것)은 애초에 여기서 검사할 수 없다. 빈 목록이 아니라
+ * 영 크기 사각형 하나를 주는 까닭은, 비어 있으면 "잴 자리가 없다" 는 다른 길로 가는
+ * 쪽이 있기 때문이다.
+ *
+ * **DOM 이 있을 때만 손댄다.** 이 파일은 `node` 환경으로 도는 검사에도 함께 실리고,
+ * 거기에는 `Range` 가 아예 없다 — 조건 없이 적었더니 `Range is not defined` 로
+ * **263개 묶음이 한꺼번에 졌다**(jsdom 파일만 돌려 보고는 몰랐고 문지기가 잡았다).
+ * 위의 `URL` 둘이 조건 없이 적혀 있는 것은 그쪽은 node 에도 있기 때문이다.
+ */
+if (typeof Range !== 'undefined') {
+  const zeroRect = (): DOMRect => new DOMRect(0, 0, 0, 0);
+  Range.prototype.getBoundingClientRect = zeroRect;
+  Range.prototype.getClientRects = function getClientRects(): DOMRectList {
+    const rects = [zeroRect()];
+    return {
+      length: rects.length,
+      item: (i: number) => rects[i] ?? null,
+      [Symbol.iterator]: () => rects[Symbol.iterator](),
+      0: rects[0],
+    } as unknown as DOMRectList;
+  };
+}
+
 // 이게 없으면 컴포넌트가 마운트된 채로 다음 테스트에 넘어가고,
 // 다음 테스트가 스토어나 목을 바꾸는 순간 남아 있던 컴포넌트가 다시 렌더돼
 // 엉뚱한 곳에서 터진다. 실제로 겪었다.

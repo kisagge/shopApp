@@ -94,6 +94,12 @@ function ToolbarButton({
       aria-pressed={active}
       onClick={() => {
         onClick();
+        /*
+         * 누르고 바로 이어 쓸 수 있게 초점을 돌려준다. **서식 단추에는 없어도
+         * 된다** — 명령 사슬이 `.focus()` 로 시작한다. 이 줄이 유일한 길인 것은
+         * 상태만 바꾸는 링크 단추다. jsdom 에는 배치가 없어 초점이 재현되지
+         * 않으므로 검사는 e2e 쪽에 있다.
+         */
         editor.commands.focus();
       }}
       className={[
@@ -218,6 +224,14 @@ export function RichEditor({
     if (href.length === 0) {
       editor.chain().focus().unsetLink().run();
     } else if (isSafeHref(href)) {
+      /*
+       * **둘째 잠금이다.** 첫째는 Link 확장의 `protocols` 로, `javascript:` 같은
+       * 것은 `setLink` 자체가 받지 않는다(돌연변이로 이 줄을 없애 봐도 아무것도
+       * 안 걸렸다 — 확장이 먼저 막았다). 그래도 둔다: 받아 줄 목록을 정하는 곳은
+       * core 이고(`isSafeHref`), 확장 설정과 계약이 어긋나는 날 **저장할 때
+       * 튕기는 쪽보다 적용이 안 되는 쪽이 낫다.** 어긋남 자체는
+       * rich-editor-vocabulary 가 본다.
+       */
       editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
     }
     setLinkHref('');
