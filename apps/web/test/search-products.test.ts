@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { PRODUCT_SORT } from '@shop/core';
 
 const db = vi.hoisted(() => ({
   product: { findMany: vi.fn<(...a: any[]) => any>(), count: vi.fn<(...a: any[]) => any>() },
@@ -80,14 +81,33 @@ describe('검색어', () => {
 });
 
 describe('정렬', () => {
-  it.each([
-    ['recommended', 'soldCount'],
-    ['newest', 'publishedAt'],
-    ['price_asc', 'sellingPrice'],
-    ['price_desc', 'sellingPrice'],
-  ] as const)('%s 는 %s 로 정렬한다', async (sort, field) => {
+  /**
+   * **고를 수 있는 정렬을 손으로 적지 않는다.**
+   *
+   * 넷을 적어 두었더니 `rating` 이 빠졌다 — core 에 다섯째가 들어온 날 아무도
+   * 안 졌고, 그 줄은 커버리지가 "안 돈다" 고 찍어 줄 때까지 비어 있었다.
+   * 목록에서 끌어내면 더하는 날 여기서 짝을 적게 만든다.
+   */
+  const FIELD: Record<(typeof PRODUCT_SORT)[number], string> = {
+    recommended: 'soldCount',
+    newest: 'publishedAt',
+    price_asc: 'sellingPrice',
+    price_desc: 'sellingPrice',
+    rating: 'ratingScore',
+  };
+
+  it('정렬 목록을 손으로 적지 않는다 — core 의 것과 짝이 맞는다', () => {
+    expect(Object.keys(FIELD).sort()).toEqual([...PRODUCT_SORT].sort());
+  });
+
+  it.each(PRODUCT_SORT)('%s 는 짝지은 칸으로 정렬한다', async (sort) => {
     await searchProducts({ sort });
-    expect(Object.keys(orderOf()[0])[0]).toBe(field);
+    expect(Object.keys(orderOf()[0])[0]).toBe(FIELD[sort]);
+  });
+
+  it('별점순은 높은 쪽부터다 — 리뷰 없는 상품은 0 이라 자연히 뒤로 밀린다', async () => {
+    await searchProducts({ sort: 'rating' });
+    expect(orderOf()[0]).toEqual({ ratingScore: 'desc' });
   });
 
   it('가격 정렬 방향이 반대다', async () => {
@@ -102,7 +122,7 @@ describe('정렬', () => {
 
   it('어느 정렬이든 id 를 마지막 축으로 붙인다', async () => {
     // 같은 값이 여럿이면 순서가 요청마다 달라져 커서가 행을 건너뛴다
-    for (const sort of ['recommended', 'newest', 'price_asc', 'price_desc'] as const) {
+    for (const sort of PRODUCT_SORT) {
       vi.clearAllMocks();
       db.product.findMany.mockResolvedValue([]);
       db.product.count.mockResolvedValue(0);
