@@ -243,6 +243,50 @@ describe('꾸러미 선언', () => {
     expect(wrong.sort()).toEqual([]);
   });
 
+  /**
+   * **설치하는 못은 정확한 판이다.**
+   *
+   * 이 저장소에 캐럿이 넷 남아 있었고, 그중 하나가 `@playwright/test` 였다 —
+   * **검사가 보는 동작을 정하는 꾸러미**다. 그 판의 깨지는 변경이 열 개였는데
+   * (동작이 inert 아님을 기다린다, 접근 이름에서 안 그려진 글자를 뺀다 …)
+   * 캐럿을 둔 채로는 그것이 **커밋 없이, 아무 설명 없이** 들어온다. 어느 날
+   * 다른 기계에서 e2e 가 지면 무엇이 달라졌는지 아무 기록이 없다.
+   *
+   * 정확한 판은 "올리는 일" 을 커밋 하나로 만든다 — 그 커밋에 무엇을 세어
+   * 보았는지 적을 수 있다.
+   *
+   * **짝 선언(peerDependencies)은 뺀다.** 그것은 설치 선택이 아니라 "이 판대로
+   * 넣어 주면 된다" 는 호환 선언이라, 범위가 맞다(`ui` 의 `react ^19.0.0`).
+   * 그래서 그 칸이 실제로 있다는 것도 함께 본다 — 없어지면 이 면제가 헛돈다.
+   *
+   * 범위를 둬야 할 꾸러미가 생기면 여기에 까닭을 적은 면제 표를 만든다. 지금은
+   * 하나도 없어서 표를 두지 않는다 — 빈 표는 지키는 것이 없다.
+   */
+  const EXACT = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/;
+
+  it.each(PACKAGES.map((p) => [p.dir, p] as const))('%s — 설치하는 못이 정확한 판이다', (dir, pkg) => {
+    const loose: string[] = [];
+    for (const field of ['dependencies', 'devDependencies'] as const) {
+      for (const [name, range] of Object.entries(pkg.manifest[field] ?? {})) {
+        // 워크스페이스끼리는 늘 지금 것을 쓴다 — 위의 검사가 그쪽을 본다
+        if (range === 'workspace:*') continue;
+        if (!EXACT.test(range)) loose.push(`${field}.${name}=${range}`);
+      }
+    }
+    expect(
+      loose.sort(),
+      `${dir} 의 못이 느슨하다 — 올리는 일이 커밋 없이 일어난다`,
+    ).toEqual([]);
+  });
+
+  it('짝 선언은 범위다 — 뺀 까닭이 실재한다', () => {
+    const peers = PACKAGES.flatMap((p) =>
+      Object.entries(p.manifest.peerDependencies ?? {}).map(([name, range]) => `${p.dir}: ${name}=${range}`),
+    );
+    expect(peers.length, '짝 선언이 하나도 없다 — 위 검사의 면제가 지키는 것이 없다').toBeGreaterThan(0);
+    expect(peers.some((p) => !EXACT.test(p.split('=')[1]!)), '짝 선언이 전부 정확한 판이다').toBe(true);
+  });
+
   it('씨앗 스크립트만 쓰는 것은 devDependencies 에 남는다', () => {
     /*
      * 면제의 증명이다. `dotenv` 가 `dependencies` 로 올라갈 까닭이 없다는 말을
