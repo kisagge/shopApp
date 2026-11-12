@@ -145,3 +145,142 @@ describe('기간과 지난 기간', () => {
     expect(db.order.aggregate.mock.calls[1]![0].where.paidAt).toEqual({ gte: kst('2026-08-27T00:00:00'), lt: kst('2026-09-01T00:00:00') });
   });
 });
+
+describe('목록으로 내놓는 것들', () => {
+  /*
+   * **세는 쪽은 보고 있었는데 내놓는 쪽이 안 돌았다.** 합계·기간은 위에서 다
+   * 보지만, 그 아래 네 목록(잘 나간 상품·최근 주문·날짜별 매출·퍼널)은 흉내가
+   * 빈 배열을 돌려주어 `map` 안쪽이 한 줄도 안 돌고 있었다. 화면에 **숫자로**
+   * 나가는 자리다.
+   */
+  it('잘 나간 상품은 합계가 없으면 0 으로 적는다 — 빈 칸을 내놓지 않는다', async () => {
+    db.orderItem.groupBy.mockResolvedValue([
+      { productName: '울 코트', brandName: '무어', _sum: { quantity: 3, subtotal: 180_000 } },
+      { productName: '니트', brandName: '무어', _sum: { quantity: null, subtotal: null } },
+    ]);
+
+    const { topProducts } = await getDashboard(admin, '7d', NOW);
+
+    expect(topProducts).toEqual([
+      { productName: '울 코트', brandName: '무어', quantity: 3, revenue: 180_000 },
+      { productName: '니트', brandName: '무어', quantity: 0, revenue: 0 },
+    ]);
+  });
+
+  it('최근 주문은 산 사람 이름을 가린다', async () => {
+    db.order.findMany.mockResolvedValue([
+      {
+        orderNo: '20260909-0000001', status: 'PAID', placedAt: NOW,
+        payable: 128_000, user: { name: '장보영' }, items: false,
+      },
+    ]);
+
+    const { recentOrders } = await getDashboard(admin, '7d', NOW);
+
+    expect(recentOrders[0]).toMatchObject({ orderNo: '20260909-0000001', amount: 128_000 });
+    expect(recentOrders[0]!.buyerName).not.toBe('장보영');
+  });
+
+  it('가맹점에게는 자기 줄의 합계만 보여 준다 — 남의 매출을 유추할 수 없게', async () => {
+    /*
+     * 주문 하나에 여러 가맹점이 섞인다. 주문의 결제 금액을 그대로 보여 주면
+     * 자기 몫을 빼서 남의 몫을 알 수 있다.
+     */
+    db.order.findMany.mockResolvedValue([
+      {
+        orderNo: '20260909-0000001', status: 'PAID', placedAt: NOW,
+        payable: 128_000, user: { name: '장보영' },
+        items: [{ subtotal: 30_000 }, { subtotal: 20_000 }],
+      },
+    ]);
+
+    const { recentOrders } = await getDashboard(merchant, '7d', NOW);
+
+    expect(recentOrders[0]!.amount).toBe(50_000);
+  });
+
+  it('날짜별 매출은 DB 가 준 큰 수를 수로 바꿔 준다', async () => {
+    /*
+     * 합계를 `::bigint` 로 받는다. 그대로 두면 화면에서 더하거나 견줄 수 없고,
+     * JSON 으로 내려보낼 때도 터진다.
+     */
+    db.$queryRaw.mockResolvedValue([
+      { date: '2026-09-08', revenue: 1_200_000n },
+      { date: '2026-09-09', revenue: -50_000n },
+    ]);
+
+    const { dailyRevenue } = await getDashboard(admin, '7d', NOW);
+
+    expect(dailyRevenue).toEqual([
+      { date: '2026-09-08', revenue: 1_200_000 },
+      { date: '2026-09-09', revenue: -50_000 },
+    ]);
+    expect(typeof dailyRevenue[0]!.revenue).toBe('number');
+  });
+});
+
+describe('퍼널', () => {
+  /*
+   * **주문 조회는 두 자리가 함께 쓴다** — 최근 주문과 가맹점 퍼널. 한 흉내로
+   * 덮으면 퍼널 줄이 최근 주문으로 흘러 들어가 `won(undefined)` 로 터진다.
+   * 고르는 필드로 가른다.
+   */
+  const orders = (sessions: { browserSessionId: string | null }[]) => {
+    db.order.findMany.mockImplementation(async (args: { select?: Record<string, unknown> }) =>
+      args.select?.['browserSessionId'] ? sessions : [],
+    );
+  };
+
+  it('기간 안에 이벤트가 없으면 네 단계를 0 으로 준다 — 빈 화면이 아니라 0 이다', async () => {
+    db.$queryRaw.mockResolvedValue([]);
+
+    const { funnel } = await getDashboard(admin, '7d', NOW);
+
+    expect(funnel, '운영진에게는 퍼널이 있다').not.toBeNull();
+    expect(funnel).toHaveLength(4);
+    expect(funnel!.every((s) => s.sessions === 0)).toBe(true);
+  });
+
+  it('센 수를 그대로 받아 단계로 세운다', async () => {
+    /*
+     * 세는 것은 DB 가 하고(`count(*) filter`), 비율은 core 가 한다. 이 자리는
+     * 그 수를 수로 바꿔 넘기는 일만 한다 — `::bigint` 로 오기 때문이다.
+     */
+    db.$queryRaw.mockImplementation(async (strings: unknown) => {
+      const text = Array.isArray((strings as { strings?: string[] }).strings)
+        ? ((strings as { strings: string[] }).strings.join(''))
+        : String(strings);
+      return text.includes('filter') ? [{ s1: 100n, s2: 40n, s3: 20n, s4: 10n }] : [];
+    });
+
+    const { funnel } = await getDashboard(admin, '7d', NOW);
+
+    expect(funnel!.map((s) => s.sessions)).toEqual([100, 40, 20, 10]);
+  });
+
+  it('가맹점 퍼널은 세 벌을 세션 id 로 맞댄다 — 주문은 브라우저 세션으로 이어진다', async () => {
+    /*
+     * 주문에는 가맹점이 하나로 찍히지 않아(한 주문에 여러 가맹점) 이벤트 쪽에서
+     * 센다. 주문이 안고 있는 `browserSessionId` 가 조회·담기와 이어지는 자리다.
+     */
+    db.eventLog.groupBy
+      .mockResolvedValueOnce([{ sessionId: 's-1' }, { sessionId: 's-2' }, { sessionId: 's-3' }])
+      .mockResolvedValueOnce([{ sessionId: 's-1' }, { sessionId: 's-2' }]);
+    orders([{ browserSessionId: 's-1' }]);
+
+    const { funnel } = await getDashboard(merchant, '7d', NOW);
+
+    expect(funnel!.map((s) => s.sessions)).toEqual([3, 2, 1]);
+  });
+
+  it('세션을 모르는 줄은 퍼널에서 빠진다 — 결제창에서 돌아오지 못한 주문 등', async () => {
+    db.eventLog.groupBy
+      .mockResolvedValueOnce([{ sessionId: 's-1' }, { sessionId: null }])
+      .mockResolvedValueOnce([{ sessionId: 's-1' }]);
+    orders([{ browserSessionId: null }, { browserSessionId: 's-1' }]);
+
+    const { funnel } = await getDashboard(merchant, '7d', NOW);
+
+    expect(funnel!.map((s) => s.sessions)).toEqual([1, 1, 1]);
+  });
+});
