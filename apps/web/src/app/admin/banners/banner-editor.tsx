@@ -70,6 +70,11 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
    *
    * 응답 모양이 호출마다 달라 (배너 하나 / 배너 목록 / 삭제 확인) 제네릭으로
    * 받는다. any 로 두면 setBanners 에 아무 값이나 넣어도 조용히 통과한다.
+   *
+   * **다만 제네릭은 컴파일 때까지만 지킨다.** 200 인데 모양이 다른 몸통이 오면
+   * 그대로 목록에 들어가고, 그 줄을 그리는 자리에서 `headline.trim()` 이 터져
+   * **화면이 통째로 날아간다**(검사를 쓰다 실수로 재현했다 — 오류 문구가 뜨는
+   * 것이 아니라 아무것도 안 뜬다). 그래서 목록에 넣기 전에 한 번 본다.
    */
   async function send<T>(key: string, url: string, init: RequestInit): Promise<T | null> {
     setBusy(key);
@@ -93,6 +98,10 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
     }
   }
 
+  /** 200 이어도 모양이 아니면 실패다 */
+  const isItem = (value: unknown): value is BannerItem =>
+    typeof value === 'object' && value !== null && typeof (value as { id?: unknown }).id === 'string';
+
   async function create() {
     const data = await send<BannerItem>('create', '/api/admin/banners', {
       method: 'POST',
@@ -100,6 +109,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
       body: JSON.stringify({ headline: '새 배너', isActive: false, tone: 'sand' }),
     });
     if (!data) return;
+    if (!isItem(data)) return setError('처리하지 못했습니다.');
     setBanners([...banners, data]);
     setStatus('배너를 추가했습니다. 내용을 채운 뒤 노출을 켜 주세요.');
     router.refresh();
@@ -112,6 +122,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
       body: JSON.stringify(body),
     });
     if (!data) return;
+    if (!isItem(data)) return setError('처리하지 못했습니다.');
     setBanners(banners.map((b) => (b.id === id ? data : b)));
     setStatus('저장했습니다.');
     router.refresh();
@@ -133,6 +144,7 @@ export function BannerEditor({ initial }: { initial: readonly BannerItem[] }) {
       body: JSON.stringify({ orderedIds: next.map((x) => x.id) }),
     });
     if (!data) return;
+    if (!data.banners.every(isItem)) return setError('처리하지 못했습니다.');
     setBanners(data.banners);
     setStatus(`${a.headline} 을(를) ${target + 1}번째로 옮겼습니다.`);
     router.refresh();

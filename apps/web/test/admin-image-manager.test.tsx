@@ -291,3 +291,150 @@ describe('순서 바꾸기', () => {
     expect(await screen.findByText(/정면 을\(를\) 2번째로 옮겼습니다/)).toBeDefined();
   });
 });
+
+describe('앞으로 옮기기', () => {
+  it('올린 뒤의 차례도 통째로 보낸다 — 내리기만 되는 것이 아니다', async () => {
+    vi.stubGlobal('fetch', reply({ images: [row('i-2', '뒷면', 0), row('i-1', '정면', 1)] }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '2번째 이미지를 앞으로' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string) as {
+      orderedIds: string[];
+    };
+    expect(body.orderedIds).toEqual(['i-2', 'i-1']);
+  });
+
+  it('못 옮겼으면 차례를 그대로 둔다 — 눈앞에서만 바뀌면 대표 이미지가 어긋난다', async () => {
+    vi.stubGlobal('fetch', reply({ message: '이미 바뀐 차례입니다.' }, 409));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '1번째 이미지를 뒤로' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('이미 바뀐 차례입니다.'));
+    // 차례는 칸의 값으로 본다 — 단추의 잠김은 어느 쪽이든 그대로다
+    expect(
+      screen.getByLabelText('1번째 이미지 대체 텍스트'),
+      '창구가 거절했는데 눈앞에서는 바뀌어 있다',
+    ).toHaveValue('정면');
+  });
+});
+
+describe('대체 텍스트', () => {
+  /*
+   * **칸을 떠나는 순간 저장한다.** 저장 단추를 따로 두지 않은 자리라, 떠날 때
+   * 보내지 않으면 적은 글이 조용히 사라진다 — 운영자는 적었다고 믿는다.
+   *
+   * 대체 텍스트는 사진을 못 보는 사람에게는 사진 그 자체다. 비어 있으면 낭독기가
+   * 파일 이름을 읽거나 아무것도 읽지 않는다.
+   */
+  const altBox = (n: number) => screen.getByLabelText(`${n}번째 이미지 대체 텍스트`);
+
+  it('고치고 칸을 떠나면 다듬어 보낸다', async () => {
+    vi.stubGlobal('fetch', reply(row('i-1', '정면 전체 모습', 0)));
+    open();
+
+    await userEvent.clear(altBox(1));
+    await userEvent.type(altBox(1), '  정면 전체 모습  ');
+    await userEvent.tab();
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('/api/admin/products/p-1/images/i-1');
+    const init = vi.mocked(fetch).mock.calls[0]![1] as RequestInit;
+    expect(init.method).toBe('PATCH');
+    expect(JSON.parse(init.body as string)).toEqual({ alt: '정면 전체 모습' });
+  });
+
+  it('바뀐 것이 없으면 보내지 않는다 — 훑어보기만 해도 저장이 나가면 안 된다', async () => {
+    open();
+
+    altBox(1).focus();
+    await userEvent.tab();
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('앞뒤 공백만 더한 것도 바뀐 것이 아니다 — 다듬고 나서 견준다', async () => {
+    open();
+
+    await userEvent.type(altBox(1), '   ');
+    await userEvent.tab();
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('저장하면 창구가 적은 값을 칸이 따르고, 그 줄만 바뀐다', async () => {
+    /*
+     * **화면이 적은 값이 아니라 창구가 적은 값이 참이다.** 서버가 다듬거나 잘라서
+     * 돌려주면 칸도 그 값을 보여야 한다 — 안 그러면 새로 고치는 순간 글이 달라져
+     * 운영자는 저장이 안 된 줄 안다.
+     */
+    vi.stubGlobal('fetch', reply(row('i-1', '정면 전체', 0)));
+    open();
+
+    await userEvent.clear(altBox(1));
+    await userEvent.type(altBox(1), '정면 전체 모습');
+    await userEvent.tab();
+
+    expect(await screen.findByText('대체 텍스트를 저장했습니다.')).toBeDefined();
+    expect(refresh).toHaveBeenCalled();
+    expect(altBox(1), '창구가 돌려준 값이 칸에 안 들어왔다').toHaveValue('정면 전체');
+    // 둘째 줄은 그대로다 — 목록을 다시 받지 않고 그 자리만 바꾼다
+    expect(altBox(2)).toHaveValue('뒷면');
+  });
+
+  it('저장이 실패하면 까닭을 말하고 적은 글을 지우지 않는다', async () => {
+    vi.stubGlobal('fetch', reply({ message: '너무 깁니다.' }, 400));
+    open();
+
+    await userEvent.clear(altBox(1));
+    await userEvent.type(altBox(1), '아주 긴 설명');
+    await userEvent.tab();
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('너무 깁니다.'));
+    expect(altBox(1)).toHaveValue('아주 긴 설명');
+  });
+});
+
+describe('모양이 틀린 200', () => {
+  /*
+   * 배너 편집기와 같은 자리다 — 타입 단정(`as ImageRow`)은 컴파일 때까지만
+   * 지켜 주고, 줄이 아닌 몸통이 상태에 들어가면 그리는 자리에서 터진다.
+   */
+  it('줄이 아닌 몸통은 목록에 넣지 않고 말로 알린다', async () => {
+    vi.stubGlobal('fetch', reply({ images: [{ nope: true }] }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '1번째 이미지를 뒤로' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+    expect(screen.getByLabelText('1번째 이미지 대체 텍스트')).toHaveValue('정면');
+  });
+
+  it('대체 텍스트가 빠진 줄도 받지 않는다 — 칸이 조용히 비면 적은 글이 사라진 줄 안다', async () => {
+    /*
+     * id 는 있는데 `alt` 가 없는 몸통이다. 그대로 받으면 터지지는 않지만 칸이
+     * 비어 보인다 — 서버에는 글이 있는데 화면에는 없으니, 운영자는 저장이 안 된
+     * 줄 알고 다시 적는다.
+     */
+    vi.stubGlobal('fetch', reply({ images: [{ id: 'i-1' }, { id: 'i-2' }] }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '1번째 이미지를 뒤로' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+    expect(screen.getByLabelText('1번째 이미지 대체 텍스트')).toHaveValue('정면');
+  });
+
+  it('대체 텍스트를 저장할 때도 본다', async () => {
+    vi.stubGlobal('fetch', reply({ ok: true }));
+    open();
+
+    await userEvent.clear(screen.getByLabelText('1번째 이미지 대체 텍스트'));
+    await userEvent.type(screen.getByLabelText('1번째 이미지 대체 텍스트'), '정면 전체');
+    await userEvent.tab();
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+  });
+});

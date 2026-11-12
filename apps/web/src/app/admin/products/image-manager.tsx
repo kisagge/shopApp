@@ -52,9 +52,28 @@ export function ImageManager({
 
   const full = images.length >= MAX_IMAGES_PER_PRODUCT;
 
-  function apply(next: readonly ImageRow[]) {
+  /**
+   * 목록을 갈아 끼운다.
+   *
+   * **넣기 전에 모양을 본다.** 200 인데 줄이 아닌 몸통이 오면 그대로 상태에
+   * 들어가고, 그 줄을 그리는 자리에서 `alt.trim()` 같은 줄이 터져 **화면이
+   * 통째로 날아간다** — 오류 문구가 뜨는 것이 아니라 아무것도 안 뜬다.
+   * 배너 편집기에서 같은 자리를 고쳤다(거기서는 검사를 쓰다 실수로 재현했다).
+   * 타입 단정(`as ImageRow`)은 컴파일 때까지만 지켜 준다.
+   */
+  const isRow = (value: unknown): value is ImageRow =>
+    typeof value === 'object' && value !== null
+    && typeof (value as { id?: unknown }).id === 'string'
+    && typeof (value as { alt?: unknown }).alt === 'string';
+
+  function apply(next: readonly unknown[]): boolean {
+    if (!next.every(isRow)) {
+      setError('처리하지 못했습니다.');
+      return false;
+    }
     setImages(next);
     setAlts(Object.fromEntries(next.map((i) => [i.id, i.alt])));
+    return true;
   }
 
   async function send(
@@ -115,7 +134,7 @@ export function ImageManager({
     });
     if (!data) return;
 
-    apply([...images, data as unknown as ImageRow]);
+    if (!apply([...images, data])) return;
     setStatus(`이미지를 추가했습니다. 현재 ${images.length + 1}장.`);
     if (fileRef.current) fileRef.current.value = '';
     router.refresh();
@@ -139,7 +158,7 @@ export function ImageManager({
     });
     if (!data) return;
 
-    apply(data['images'] as ImageRow[]);
+    if (!apply((data['images'] ?? []) as unknown[])) return;
     setStatus(`${moved.alt} 을(를) ${target + 1}번째로 옮겼습니다.`);
     router.refresh();
   }
@@ -155,7 +174,7 @@ export function ImageManager({
     });
     if (!data) return;
 
-    apply(images.map((i) => (i.id === image.id ? (data as unknown as ImageRow) : i)));
+    if (!apply(images.map((i) => (i.id === image.id ? data : i)))) return;
     setStatus('대체 텍스트를 저장했습니다.');
     router.refresh();
   }
@@ -166,7 +185,7 @@ export function ImageManager({
     });
     if (!data) return;
 
-    apply(data['images'] as ImageRow[]);
+    if (!apply((data['images'] ?? []) as unknown[])) return;
     setStatus('이미지를 삭제했습니다.');
     router.refresh();
   }

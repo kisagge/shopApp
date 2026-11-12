@@ -310,3 +310,177 @@ describe('저장하기 전에 거르는 것', () => {
     expect(saveButton()).toBeEnabled();
   });
 });
+
+describe('배너 추가', () => {
+  it('맨 뒤에 붙이고 내용을 채우라고 알린다 — 빈 배너가 그대로 뜨면 안 된다', async () => {
+    const created = banner({ id: 'b-3', headline: '', sortOrder: 2, isActive: false, status: 'PAUSED' });
+    vi.stubGlobal('fetch', reply(created));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '배너 추가' }));
+
+    await waitFor(() => expect(screen.getAllByLabelText(/^제목/)).toHaveLength(3));
+    // 새것은 맨 뒤다 — 홈 최상단에 빈 배너가 끼어들면 손님이 먼저 그것을 본다
+    const titles = screen.getAllByLabelText(/^제목/).map((el) => (el as HTMLTextAreaElement).value);
+    expect(titles).toEqual(['가을 신상', '겨울 준비', '']);
+    expect(vi.mocked(fetch).mock.calls[0]![0]).toBe('/api/admin/banners');
+    expect((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).method).toBe('POST');
+    expect(document.querySelector('[aria-live="polite"]')!.textContent)
+      .toBe('배너를 추가했습니다. 내용을 채운 뒤 노출을 켜 주세요.');
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('여섯 개면 더 못 만들고 그 사실을 단추가 말한다', () => {
+    open(Array.from({ length: 6 }, (_, i) => banner({ id: `b-${i}`, headline: `배너 ${i}`, sortOrder: i })));
+
+    const add = screen.getByRole('button', { name: '6개까지' });
+    expect(add).toBeDisabled();
+    expect(screen.queryByRole('button', { name: '배너 추가' })).toBeNull();
+  });
+
+  it('못 만들었으면 목록을 건드리지 않는다', async () => {
+    vi.stubGlobal('fetch', reply({ message: '배너가 너무 많습니다.' }, 409));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '배너 추가' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('배너가 너무 많습니다.'));
+    expect(screen.getAllByLabelText(/^제목/)).toHaveLength(2);
+  });
+});
+
+describe('앞으로 옮기기', () => {
+  it('올린 뒤의 차례도 통째로 보낸다 — 내리기만 되는 것이 아니다', async () => {
+    vi.stubGlobal('fetch', reply({ banners: [BANNERS[1], BANNERS[0]] }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '2번째 배너를 앞으로' }));
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string) as {
+      orderedIds: string[];
+    };
+    expect(body.orderedIds).toEqual(['b-2', 'b-1']);
+  });
+
+  it('못 옮겼으면 차례를 그대로 둔다 — 눈앞에서만 바뀌면 다음 끌어놓기가 어긋난다', async () => {
+    vi.stubGlobal('fetch', reply({ message: '이미 바뀐 차례입니다.' }, 409));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '1번째 배너를 뒤로' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('이미 바뀐 차례입니다.'));
+    const titles = screen.getAllByLabelText(/^제목/).map((el) => (el as HTMLTextAreaElement).value);
+    expect(titles, '창구가 거절했는데 눈앞에서는 바뀌어 있다').toEqual(['가을 신상', '겨울 준비']);
+  });
+});
+
+describe('적은 내용을 보내는 모양', () => {
+  const save = async () => {
+    await userEvent.click(screen.getAllByRole('button', { name: '내용 저장' })[0]!);
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    return JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string) as
+      Record<string, unknown>;
+  };
+
+  beforeEach(() => {
+    // 저장 창구는 **배너 하나**를 돌려준다(목록이 아니다)
+    vi.stubGlobal('fetch', reply(banner({ id: 'b-1', headline: '가을 신상' })));
+  });
+
+  it('선택인 칸은 다듬어 보내고, 비면 비운 것으로 보낸다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    await userEvent.type(screen.getByLabelText(/^윗줄/), '  EDITORIAL · 01  ');
+    await userEvent.type(screen.getByLabelText(/^설명/), '   ');
+
+    const body = await save();
+    expect(body.eyebrow).toBe('EDITORIAL · 01');
+    expect(body.subcopy).toBeNull();
+  });
+
+  it('제목은 다듬지 않는다 — 띄어쓰기도 디자인이다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    await userEvent.type(screen.getByLabelText(/^제목/), '  ');
+
+    expect((await save()).headline).toBe('가을 신상  ');
+  });
+
+  it('배경 톤도 고른 값으로 간다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상', tone: 'sand' })]);
+
+    await userEvent.selectOptions(screen.getByLabelText('배경 톤'), 'clay');
+
+    expect((await save()).tone).toBe('clay');
+  });
+
+  it('기간은 한국 시각으로 받아 세계 시각으로 보낸다', async () => {
+    /*
+     * **칸은 시간대를 모른다.** `datetime-local` 은 "2026-10-01 09:00" 같은 글자일
+     * 뿐이라, 읽는 쪽이 어느 시간대로 볼지 정해야 한다. 운영자는 한국 시각으로
+     * 적는다 — 그걸 그대로 UTC 로 읽으면 배너가 **아홉 시간 늦게** 뜬다.
+     */
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    fireEvent.change(screen.getByLabelText(/^시작/), { target: { value: '2026-10-01T09:00' } });
+    fireEvent.change(screen.getByLabelText(/^종료/), { target: { value: '2026-10-31T23:59' } });
+
+    const body = await save();
+    expect(body.startsAt).toBe('2026-10-01T00:00:00.000Z');
+    expect(body.endsAt).toBe('2026-10-31T14:59:00.000Z');
+  });
+
+  it('기간을 비우면 비운 채로 보낸다 — 늘 뜨는 배너다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상', startsAt: '2026-10-01T00:00:00.000Z' })]);
+
+    fireEvent.change(screen.getByLabelText(/^시작/), { target: { value: '' } });
+
+    expect((await save()).startsAt).toBeNull();
+  });
+
+  it('이미 들어 있는 기간은 한국 시각으로 보여 준다 — 적은 것과 같은 수가 보여야 한다', async () => {
+    open([banner({ id: 'b-1', headline: '가을 신상', startsAt: '2026-10-01T00:00:00.000Z' })]);
+
+    expect(screen.getByLabelText(/^시작/)).toHaveValue('2026-10-01T09:00');
+  });
+});
+
+describe('모양이 틀린 200', () => {
+  /*
+   * **제네릭은 컴파일 때까지만 지킨다.** 200 인데 배너가 아닌 몸통이 오면 그대로
+   * 목록에 들어가고, 그 줄을 그리는 자리에서 `headline.trim()` 이 터져 **화면이
+   * 통째로 날아간다** — 오류 문구가 뜨는 것이 아니라 아무것도 안 뜬다.
+   * 이 검사를 쓰다 흉내의 모양을 틀리게 주어 그대로 재현했다.
+   */
+  it('배너가 아닌 몸통은 목록에 넣지 않고 말로 알린다', async () => {
+    vi.stubGlobal('fetch', reply({ ok: true }));
+    open([banner({ id: 'b-1', headline: '가을 신상' })]);
+
+    await userEvent.click(screen.getByRole('button', { name: '내용 저장' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+    expect(screen.getByLabelText(/^제목/)).toHaveValue('가을 신상');
+  });
+
+  it('만들 때도 같다 — 빈 줄이 목록에 끼지 않는다', async () => {
+    vi.stubGlobal('fetch', reply({ ok: true }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '배너 추가' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+    expect(screen.getAllByLabelText(/^제목/)).toHaveLength(2);
+  });
+
+  it('차례를 받을 때도 줄마다 본다', async () => {
+    vi.stubGlobal('fetch', reply({ banners: [{ nope: true }] }));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '1번째 배너를 뒤로' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+    const titles = screen.getAllByLabelText(/^제목/).map((el) => (el as HTMLTextAreaElement).value);
+    expect(titles).toEqual(['가을 신상', '겨울 준비']);
+  });
+});
