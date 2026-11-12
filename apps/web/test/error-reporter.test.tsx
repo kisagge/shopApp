@@ -93,3 +93,95 @@ describe('Error 가 아닌 것이 던져져도', () => {
     expect(() => reportClientError(new Error('원래 오류'), '기본')).not.toThrow();
   });
 });
+
+describe('던져진 값에서 읽을 말을 뽑는 표', () => {
+  /*
+   * **Error 가 아닌 것도 던져진다.** 라이브러리가 문자열을 던지고, 거절이
+   * 숫자로 오고, 객체가 그대로 올라온다. `String()` 하나로 넘기면 "[object
+   * Object]" 나 함수 본문 전체가 메시지로 저장된다 — 저장된 뒤에는 무엇이
+   * 터졌는지 알 길이 없다.
+   *
+   * 갈래마다 다른 길을 타므로 표로 세운다. 객체와 빈 값은 위에서 이미 본다.
+   */
+  it.each([
+    ['문자열', '장바구니를 못 읽었습니다', '장바구니를 못 읽었습니다'],
+    ['숫자', 500, '500'],
+    ['참거짓', false, 'false'],
+    ['아주 큰 수', 9_007_199_254_740_993n, '9007199254740993'],
+  ])('%s 가 던져지면 그 값을 적는다', (_what, thrown, expected) => {
+    reportClientError(thrown, '기본 문구');
+
+    expect(sent()[0].message).toBe(expected);
+  });
+
+  it('함수가 던져지면 이름만 적는다 — 본문 전체가 메시지가 되면 안 된다', () => {
+    function parseCart(): void {}
+    reportClientError(parseCart, '기본 문구');
+
+    expect(sent()[0].message).toBe('parseCart()');
+  });
+
+  it('이름 없는 함수는 그렇다고 적는다', () => {
+    reportClientError(() => {}, '기본 문구');
+
+    // 익명 함수에 이름이 붙는 경우가 있어(변수명 추론) 꼴만 본다
+    expect(sent()[0].message).toMatch(/^[^(]*\(\)$/);
+  });
+
+  it('심볼도 읽을 수 있게 적는다', () => {
+    reportClientError(Symbol('장바구니'), '기본 문구');
+
+    expect(sent()[0].message).toBe('Symbol(장바구니)');
+  });
+
+  it('돌고 도는 객체는 JSON 으로 못 적으니 꼴만 적는다 — 여기서 또 던지면 보고가 보고를 깬다', () => {
+    const circular: Record<string, unknown> = { at: 'cart' };
+    circular['self'] = circular;
+
+    expect(() => reportClientError(circular, '기본 문구')).not.toThrow();
+    expect(sent()[0].message).toBe('[object Object]');
+  });
+
+  it('이름은 Error 일 때만 그 이름을 쓴다 — 아니면 Error 로 적는다', () => {
+    class CartError extends Error {
+      override name = 'CartError';
+    }
+    reportClientError(new CartError('장바구니'), '기본');
+    reportClientError('그냥 글자', '기본');
+
+    expect(sent().map((b: { name: string }) => b.name)).toEqual(['CartError', 'Error']);
+  });
+
+  it('스택은 Error 에만 있다 — 없으면 null 로 보낸다', () => {
+    reportClientError('그냥 글자', '기본');
+
+    expect(sent()[0].stack).toBeNull();
+  });
+
+  it('어느 화면에서 났는지 함께 보낸다 — 누가 겪었는지는 담지 않는다', () => {
+    reportClientError(new Error('터졌다'), '기본');
+
+    const body = sent()[0] as Record<string, unknown>;
+    expect(body.routePath).toBe(window.location.pathname);
+    expect(Object.keys(body).sort()).toEqual(['message', 'name', 'routePath', 'stack']);
+  });
+
+  it('따로 부르는 쪽은 저마다 자기 묶음을 쓴다 — 한 번 보낸 뒤에도 다음 자리는 보낼 수 있다', () => {
+    /*
+     * 창에서 올라오는 오류는 한 묶음을 공유해 같은 것을 한 번만 보내지만,
+     * 화면 경계(error.tsx)처럼 따로 부르는 자리는 그 묶음을 안 받는다.
+     */
+    reportClientError(new Error('같은 오류'), '기본');
+    reportClientError(new Error('같은 오류'), '기본');
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('묶음을 건네면 같은 오류를 한 번만 보낸다', () => {
+    const seen = new Set<string>();
+    reportClientError(new Error('같은 오류'), '기본', seen);
+    reportClientError(new Error('같은 오류'), '기본', seen);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
