@@ -18,6 +18,8 @@ const db = vi.hoisted(() => ({
     upsert: vi.fn<(...a: any[]) => any>(),
     delete: vi.fn<(...a: any[]) => any>(),
   },
+  // 고친 사람을 한 번에 묻는 조회(loadActors)가 쓴다
+  user: { findMany: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
 vi.mock('react', async (orig) => ({ ...(await orig<typeof import('react')>()), cache: <T,>(fn: T) => fn }));
@@ -28,7 +30,8 @@ const getActor = session.getActor;
 const recordAudit = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/audit', () => ({ recordAudit }));
 
-const { saveNotificationTemplate, getNotificationTemplates, TemplateError } = await import('~/lib/notifications/templates');
+const { saveNotificationTemplate, getNotificationTemplates, getAllNotificationTemplates, TemplateError } =
+  await import('~/lib/notifications/templates');
 const { PATCH } = await import('~/app/api/admin/notification-templates/route');
 const { notificationText } = await import('~/lib/i18n/notification');
 
@@ -200,5 +203,114 @@ describe('표가 코드와 맞는다', () => {
     for (const kind of NOTIFICATION_KIND) {
       expect([...found.get(kind)!].sort(), kind).toEqual([...NOTIFICATION_PARAMS[kind]].sort());
     }
+  });
+});
+
+describe('지금 말의 문구 표', () => {
+  it('고친 종류만 담는다 — 없는 종류는 사전의 기본 문구로 읽힌다', async () => {
+    const kind = NOTIFICATION_KIND[0];
+    db.notificationTemplate.findMany.mockResolvedValue([{ kind, body: '고친 문구' }]);
+
+    const table = await getNotificationTemplates('ko');
+
+    expect(table.get(kind)).toBe('고친 문구');
+    expect(table.size).toBe(1);
+  });
+
+  it('모르는 종류가 줄에 있으면 버린다 — 지운 종류의 줄이 남아 있을 수 있다', async () => {
+    /*
+     * 종류는 코드가 쥐고 DB 는 글자로 들고 있다. 코드에서 종류를 지워도 줄은
+     * 남으므로, 걸러 내지 않으면 아무도 안 쓰는 열쇠가 표에 섞인다.
+     */
+    db.notificationTemplate.findMany.mockResolvedValue([
+      { kind: NOTIFICATION_KIND[0], body: '쓰는 문구' },
+      { kind: 'ANCIENT_KIND', body: '옛 문구' },
+    ]);
+
+    const table = await getNotificationTemplates('ko');
+
+    expect([...table.keys()]).toEqual([NOTIFICATION_KIND[0]]);
+  });
+
+  it('그 말의 줄만 묻는다', async () => {
+    db.notificationTemplate.findMany.mockResolvedValue([]);
+
+    await getNotificationTemplates('ja');
+
+    expect(db.notificationTemplate.findMany.mock.calls[0]![0].where).toEqual({ locale: 'ja' });
+  });
+});
+
+describe('운영 화면이 보는 전체 표', () => {
+  /*
+   * **손님에게 나가는 문구가 바뀌었는데 누가 바꿨는지는 없었다.** 그 칸을 붙인
+   * 뒤로도 재는 자리가 없었다 — 고친 사람 이름은 core 의 규칙(actorLabel)을
+   * 따르고, 그 규칙은 보는 사람이 누구인지에 따라 다르게 적는다.
+   */
+  const row = (over: Record<string, unknown> = {}) => ({
+    kind: NOTIFICATION_KIND[0], locale: 'ko', body: '문구',
+    updatedAt: new Date('2026-11-01T00:00:00Z'), updatedBy: 'u-a',
+    ...over,
+  });
+
+  beforeEach(() => {
+    db.user.findMany.mockResolvedValue([
+      { id: 'u-a', name: '장보영', role: 'ADMIN', merchantId: null },
+    ]);
+  });
+
+  it('가맹점은 볼 수 없다 — 손님에게 나가는 글이다', async () => {
+    await expect(getAllNotificationTemplates(merchant)).rejects.toThrow();
+    expect(db.notificationTemplate.findMany).not.toHaveBeenCalled();
+  });
+
+  it('고친 사람을 한 번에 묻는다 — 줄마다 물으면 말 하나에 스무 번이 나간다', async () => {
+    db.notificationTemplate.findMany.mockResolvedValue([
+      row({ locale: 'ko' }), row({ locale: 'en' }), row({ locale: 'ja', updatedBy: 'u-a' }),
+    ]);
+
+    await getAllNotificationTemplates(admin);
+
+    expect(db.user.findMany).toHaveBeenCalledTimes(1);
+    // 같은 사람이 세 줄을 고쳤어도 한 번만 묻는다
+    expect(db.user.findMany.mock.calls[0]![0].where.id.in).toEqual(['u-a']);
+  });
+
+  it('고친 사람의 이름과 역할을 적는다 — 운영진끼리는 누가 바꿨는지 보여야 한다', async () => {
+    db.notificationTemplate.findMany.mockResolvedValue([row()]);
+
+    const rows = await getAllNotificationTemplates(admin);
+
+    expect(rows[0]!.updatedBy).toBe('장보영 · 관리자');
+  });
+
+  it('칸이 비어 있는 옛 줄은 기록 없음이라고 적는다', async () => {
+    db.notificationTemplate.findMany.mockResolvedValue([row({ updatedBy: null })]);
+
+    const rows = await getAllNotificationTemplates(admin);
+
+    expect(rows[0]!.updatedBy).toBe('기록 없음');
+    // 물을 사람이 없으면 아예 묻지 않는다
+    expect(db.user.findMany).not.toHaveBeenCalled();
+  });
+
+  it('지워진 계정이면 그렇다고 적는다 — 빈 칸으로 두면 기록이 없는 것과 섞인다', async () => {
+    db.notificationTemplate.findMany.mockResolvedValue([row({ updatedBy: 'u-gone' })]);
+    db.user.findMany.mockResolvedValue([]);
+
+    const rows = await getAllNotificationTemplates(admin);
+
+    expect(rows[0]!.updatedBy).toBe('탈퇴한 계정');
+  });
+
+  it('나머지 칸은 그대로 넘긴다', async () => {
+    const at = new Date('2026-11-01T00:00:00Z');
+    db.notificationTemplate.findMany.mockResolvedValue([row({ body: '그대로', updatedAt: at })]);
+
+    const rows = await getAllNotificationTemplates(admin);
+
+    expect(rows[0]).toMatchObject({
+      kind: NOTIFICATION_KIND[0], locale: 'ko', body: '그대로', updatedAt: at,
+    });
   });
 });
