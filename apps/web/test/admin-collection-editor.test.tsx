@@ -190,3 +190,89 @@ describe('삭제', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('상품을 담아 저장하기', () => {
+  /*
+   * **순서 자체가 편집이다.** 그래서 담은 목록을 통째로 보낸다 — 하나씩 보내다
+   * 가운데가 실패하면 화면과 저장된 순서가 갈라진다.
+   */
+  const product = { id: 'p-1', slug: 'coat', name: '울 코트', brandName: '무어', imageUrl: null, onDisplay: true };
+
+  const pick = async () => {
+    render(<CollectionEditor initial={[ITEM]} />);
+    await userEvent.type(screen.getByLabelText(/상품 찾기/), '코트');
+    await userEvent.click(screen.getByRole('button', { name: '찾기' }));
+    await userEvent.click(await screen.findByRole('button', { name: '울 코트 담기' }));
+  };
+
+  const search = (then: Response) =>
+    fetchMock.mockImplementation(async (url: string) =>
+      url.includes('/products/search') ? json(200, { products: [product] }) : then,
+    );
+
+  it('담은 상품의 id 만 통째로 보낸다', async () => {
+    search(json(200, { ...ITEM, itemCount: 1 }));
+    await pick();
+
+    await userEvent.click(screen.getByRole('button', { name: '상품 저장' }));
+
+    await waitFor(() => expect(live()).toBe('상품 1개로 저장했습니다.'));
+    const put = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/items'))!;
+    expect((put[1] as RequestInit).method).toBe('PUT');
+    expect(JSON.parse((put[1] as RequestInit).body as string)).toEqual({ productIds: ['p-1'] });
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it('못 저장했으면 줄을 건드리지 않고 까닭을 말한다', async () => {
+    search(json(409, { message: '내려간 상품이 섞여 있습니다.' }));
+    await pick();
+
+    await userEvent.click(screen.getByRole('button', { name: '상품 저장' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('내려간 상품이 섞여 있습니다.'),
+    );
+    expect(live()).toBe('');
+  });
+});
+
+describe('배경 이미지를 바꾸면', () => {
+  it('그 줄을 창구가 준 값으로 갈아 끼우고 알린다', async () => {
+    /*
+     * 올리는 순서 자체는 `image-replace` 가 네 화면 몫으로 본다. 여기서 보는 것은
+     * **끝난 뒤 목록이 그 값을 따라가는가**다 — 안 따라가면 방금 올린 그림이
+     * 새로 고칠 때까지 안 보인다.
+     */
+    const { setStorage } = await import('~/lib/storage');
+    const put = vi.fn(async ({ key }: { key: string }) => ({ url: `https://cdn.test/${key}` }));
+    setStorage({ name: 'fake', put, remove: vi.fn(async () => {}) });
+
+    fetchMock.mockResolvedValue(json(200, { ...ITEM, imageUrl: 'https://cdn.test/new.png', imageAlt: '겨울' }));
+    render(<CollectionEditor initial={[ITEM]} />);
+
+    const file = new File([new Uint8Array([1, 2, 3])], 'bg.png', { type: 'image/png' });
+    await userEvent.upload(screen.getByLabelText(/배경 이미지/), file);
+    await userEvent.click(screen.getByRole('button', { name: '이미지 교체' }));
+
+    await waitFor(() => expect(live()).toBe('배경 이미지를 바꿨습니다.'));
+    // 줄이 창구가 준 값을 따라간다 — 안 따라가면 방금 올린 그림이 새로 고칠 때까지 안 보인다
+    expect(screen.getByAltText('겨울')).toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
+    setStorage(undefined);
+  });
+});
+
+describe('창구가 글로 답하지 않아도', () => {
+  it('네트워크 오류로 오해하지 않는다 — 앞단이 502 HTML 을 줄 수 있다', async () => {
+    /*
+     * 몸통을 읽다 던지면 아래 `catch` 가 받아 **서버가 답했는데 "길이 끊겼다" 고
+     * 적는다.** 읽기를 감싸 두는 까닭이 그것이다.
+     */
+    fetchMock.mockResolvedValue(new Response('<html>502</html>', { status: 502 }));
+    render(<CollectionEditor initial={[ITEM]} />);
+
+    await userEvent.click(screen.getByRole('button', { name: '노출 시작' }));
+
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('처리하지 못했습니다.'));
+  });
+});

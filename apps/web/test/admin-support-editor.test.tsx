@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen, waitFor } from './render';
+import { act, render, screen, waitFor } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import type { SupportPostItem } from '~/app/admin/support/support-editor';
@@ -7,7 +7,27 @@ import type { SupportPostItem } from '~/app/admin/support/support-editor';
 const refresh = vi.hoisted(() => vi.fn());
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 // 편집기는 따로 받아 오는 무거운 조각이다 — 여기서 보는 것은 그 바깥이다
-vi.mock('~/app/admin/support/rich-editor', () => ({ RichEditor: () => <div /> }));
+vi.mock('~/app/admin/support/rich-editor', () => ({
+  /*
+   * 편집기는 따로 받아 오는 무거운 조각이다 — 여기서 보는 것은 그 바깥이다.
+   * 다만 **바꾼 나무가 그대로 실려 가는지**는 봐야 하므로, 흉내가 지금 값을
+   * 적어 두고 바꿀 길 하나를 낸다.
+   */
+  RichEditor: ({ value, onChange }: {
+    value: unknown;
+    onChange: (doc: unknown) => void;
+  }) => (
+    <div>
+      <span data-testid="body-doc">{JSON.stringify(value)}</span>
+      <button
+        type="button"
+        onClick={() => onChange({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '고친 본문' }] }] })}
+      >
+        본문 고치기
+      </button>
+    </div>
+  ),
+}));
 
 const { SupportEditor } = await import('~/app/admin/support/support-editor');
 
@@ -322,5 +342,136 @@ describe('고치기', () => {
 
     expect(await screen.findByText('수정했습니다.')).toBeDefined();
     await waitFor(() => expect(screen.getByRole('heading', { name: '새 글' })).toBeDefined());
+  });
+});
+
+describe('적은 것이 그대로 실려 간다', () => {
+  /*
+   * 칸마다 핸들러가 달려 있는데 **하나도 안 돌고 있었다.** 고정·순서·게시는 손님
+   * 화면의 줄 순서와 노출을 정하는 값이고, 갈래는 FAQ 가 어느 묶음에 들어가는지다.
+   */
+  const sent = () => JSON.parse(writes()[0]![1]!.body as string) as Record<string, unknown>;
+
+  /** 제목 칸은 FAQ 에서 '질문' 이라고 적힌다 — 묻는 글이라 그 말이 맞다 */
+  const fill = async () => {
+    await userEvent.type(screen.getByLabelText(/제목|질문/), '새 공지');
+  };
+
+  it('갈래를 고르면 그 값이 간다', async () => {
+    open();
+    await userEvent.selectOptions(screen.getByLabelText('종류'), 'FAQ');
+    await userEvent.selectOptions(screen.getByLabelText('갈래'), 'EXCHANGE');
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(sent().topic).toBe('EXCHANGE');
+  });
+
+  it('고정을 켜면 그 값이 간다 — 맨 위에 서는 글이다', async () => {
+    open();
+    await fill();
+    await userEvent.click(screen.getByLabelText('목록 맨 위에 고정'));
+    await userEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(sent().pinned).toBe(true);
+  });
+
+  it('순서는 수로 간다 — 글자로 보내면 창구가 튕긴다', async () => {
+    // 순서 칸은 FAQ 에만 있다 — 공지는 그 자리에 고정 칸이 선다
+    open();
+    await userEvent.selectOptions(screen.getByLabelText('종류'), 'FAQ');
+    await fill();
+    const order = screen.getByLabelText(/순서/);
+    await userEvent.clear(order);
+    await userEvent.type(order, '30');
+    await userEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(sent().sortOrder).toBe(30);
+  });
+
+  it('게시를 켜면 초안이 아니라 공개로 간다', async () => {
+    open();
+    await fill();
+    await userEvent.click(screen.getByLabelText('지금 내보내기'));
+    await userEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(sent().published).toBe(true);
+  });
+
+  it('편집기가 바꾼 나무가 그대로 간다', async () => {
+    open();
+    await fill();
+    await userEvent.click(screen.getByRole('button', { name: '본문 고치기' }));
+    await userEvent.click(screen.getByRole('button', { name: '등록' }));
+
+    await waitFor(() => expect(writes()).toHaveLength(1));
+    expect(sent().bodyRich).toMatchObject({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: '고친 본문' }] }],
+    });
+  });
+});
+
+describe('옛 글을 편집기에 올릴 때', () => {
+  type Doc = { content: { content?: { text: string }[] }[] };
+  const docOf = (): Doc => JSON.parse(screen.getByTestId('body-doc').textContent);
+
+  it('나무가 있으면 그것을 쓴다', async () => {
+    const rich = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '나무로 쓴 글' }] }] };
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ post: detail({ bodyRich: rich, body: '평문은 낡았다' }) }), { status: 200 })));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    await waitFor(() => expect(docOf().content[0]!.content![0]!.text).toBe('나무로 쓴 글'));
+  });
+
+  it('나무가 없으면 평문을 줄마다 문단으로 끊는다 — 그대로 두면 저장하는 순간 본문이 사라진다', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () =>
+      new Response(JSON.stringify({ post: detail({ bodyRich: null, body: '첫 줄\n\n셋째 줄' }) }), { status: 200 })));
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+
+    await waitFor(() => expect(docOf().content).toHaveLength(3));
+    const texts = docOf().content.map((p) => p.content?.[0]?.text ?? '');
+    expect(texts).toEqual(['첫 줄', '', '셋째 줄']);
+  });
+});
+
+describe('본문을 받아 오는 동안', () => {
+  it('또 눌러도 두 번 받아 오지 않는다 — 두 글이 섞여 채워지면 엉뚱한 본문을 저장한다', async () => {
+    let give!: (r: Response) => void;
+    const fetchMock = vi.fn(async () => new Promise<Response>((resolve) => { give = resolve; }));
+    vi.stubGlobal('fetch', fetchMock);
+    open();
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+    await userEvent.click(screen.getByRole('button', { name: '교환은 어떻게 하나요? 수정' }));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      give(new Response(JSON.stringify({ post: detail() }), { status: 200 }));
+    });
+  });
+});
+
+describe('고치던 글을 내리면', () => {
+  it('폼을 새 글로 되돌린다 — 없는 글을 고치고 있을 수 없다', async () => {
+    open();
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 수정' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '수정' })).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 내리기' }));
+    await userEvent.click(screen.getByRole('button', { name: '추석 배송 안내 내리기 확인' }));
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '등록' })).toBeInTheDocument());
+    expect(screen.getByLabelText(/제목/)).toHaveValue('');
   });
 });
