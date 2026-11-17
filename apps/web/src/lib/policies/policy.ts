@@ -41,6 +41,11 @@ export interface PolicyRevisionSummary {
   readonly replacedAt: Date;
 }
 
+/*
+ * `bodyRich` 의 `?? null` 은 **지금 닿지 않는다.** 이 칸은 비어도 Prisma 가 `null` 로
+ * 주므로(돌연변이로 없애 봐도 아무도 안 졌다), 셋 다 타입을 위한 다짐이다 — 읽는 쪽이
+ * "없다(null)" 와 "모른다(undefined)" 를 가르지 않아도 되게 한 자리다.
+ */
 const asDoc = (row: {
   kind: PolicyKind; title: string; body: string; bodyRich: unknown; effectiveAt: Date; updatedAt: Date;
 }): PolicyDoc => ({
