@@ -6,6 +6,9 @@ import type { CartQuoteResponse } from '@shop/contract';
 
 const useCartQuote = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/use-cart-quote', () => ({ useCartQuote }));
+
+const track = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
+vi.mock('~/lib/analytics/client', () => ({ track }));
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => (
     <a href={href}>{children}</a>
@@ -45,6 +48,7 @@ beforeEach(() => {
   useCartStore.setState({ items: [] });
   localStorage.clear();
   useCartQuote.mockReset();
+  track.mockClear();
 });
 
 describe('빈 장바구니', () => {
@@ -277,5 +281,117 @@ describe('자동으로 붙은 쿠폰', () => {
     render(<CartView />);
 
     expect(screen.queryByText(/쿠폰 할인/)).toBeNull();
+  });
+});
+
+describe('고르고 지우고 수를 바꾸는 단추들', () => {
+  /*
+   * **단추마다 가게의 동작이 붙어 있는데 하나도 안 돌고 있었다.** 장바구니는
+   * 손님이 돈을 내기 바로 앞이고, 여기서 수가 틀리면 다음 화면의 금액이 전부
+   * 틀린다 — 셈은 서버가 하지만 **무엇을 셈하라고 보낼지**는 이 단추들이 정한다.
+   */
+  const two = () => {
+    useCartStore.setState({
+      items: [item(), item({ variantId: 'v-knit-m', productName: '니트', selected: false })],
+    });
+    useCartQuote.mockReturnValue(ok(quote()));
+    render(<CartView />);
+  };
+
+  const items = () => useCartStore.getState().items;
+
+  it('전체선택을 누르면 모두 골라진다 — 하나라도 빠져 있으면 켜는 쪽이다', async () => {
+    two();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /전체선택/ }));
+
+    expect(items().every((i) => i.selected)).toBe(true);
+  });
+
+  it('다 골라진 상태에서 누르면 모두 풀린다', async () => {
+    useCartStore.setState({ items: [item(), item({ variantId: 'v-knit-m' })] });
+    useCartQuote.mockReturnValue(ok(quote()));
+    render(<CartView />);
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /전체선택/ }));
+
+    expect(items().every((i) => !i.selected)).toBe(true);
+  });
+
+  it('줄의 체크박스는 그 줄만 바꾼다', async () => {
+    two();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '니트 주문 상품으로 선택' }));
+
+    expect(items().find((i) => i.variantId === 'v-knit-m')!.selected).toBe(true);
+    expect(items().find((i) => i.variantId === 'v-coat-s')!.selected).toBe(true);
+  });
+
+  it('선택삭제는 고른 줄만 지운다 — 안 고른 것은 남는다', async () => {
+    two();
+
+    await userEvent.click(screen.getByRole('button', { name: '선택삭제' }));
+
+    expect(items().map((i) => i.variantId)).toEqual(['v-knit-m']);
+  });
+
+  it('수량 단추가 그 줄의 수를 올리고 내린다', async () => {
+    useCartStore.setState({ items: [item({ quantity: 2 })] });
+    useCartQuote.mockReturnValue(ok(quote()));
+    render(<CartView />);
+
+    await userEvent.click(screen.getByRole('button', { name: '수량 늘리기' }));
+    expect(items()[0]!.quantity).toBe(3);
+
+    await userEvent.click(screen.getByRole('button', { name: '수량 줄이기' }));
+    expect(items()[0]!.quantity).toBe(2);
+  });
+});
+
+describe('주문하기 단추', () => {
+  /*
+   * **눌리는 것을 막지 않으므로 핸들러가 지킨다.** `Button` 은 `disabled` 대신
+   * `aria-disabled` 를 쓴다(못 누르는 단추는 초점을 못 받아 왜 못 누르는지
+   * 들리지 않는다) — 살 수 있는 것이 없을 때 눌리면 **빈 주문서로 넘어간다.**
+   */
+  const assign = vi.fn();
+
+  beforeEach(() => {
+    // jsdom 은 주소를 옮기지 못한다 — 옮기려 했는지만 본다
+    Object.defineProperty(window, 'location', {
+      value: { ...window.location, assign },
+      configurable: true,
+    });
+    assign.mockClear();
+  });
+
+  it('살 수 있는 것이 있으면 주문서로 넘어가며 그 걸음을 적는다', async () => {
+    useCartStore.setState({ items: [item()] });
+    useCartQuote.mockReturnValue(ok(quote()));
+    render(<CartView />);
+
+    await userEvent.click(screen.getByRole('button', { name: /주문하기/ }));
+
+    expect(assign).toHaveBeenCalledWith('/checkout');
+    expect(track).toHaveBeenCalledWith('begin_checkout', { itemCount: 1 });
+  });
+
+  it('품절뿐이면 눌려도 아무 데도 안 간다 — 빈 주문서로 넘어가지 않는다', async () => {
+    useCartStore.setState({ items: [item()] });
+    useCartQuote.mockReturnValue(ok(quote({
+      lines: [{ ...quote().lines[0]!, quantity: 0, stock: 0, issue: 'SOLD_OUT' }],
+    })));
+    render(<CartView />);
+
+    // 단추 이름 자체가 왜 못 누르는지 말한다
+    const button = screen.getByRole('button', { name: '주문할 수 있는 상품이 없습니다' });
+    expect(button).toHaveAttribute('aria-disabled', 'true');
+    expect(button).not.toBeDisabled();
+
+    await userEvent.click(button);
+
+    expect(assign).not.toHaveBeenCalled();
+    // 장바구니를 연 걸음(view_cart)은 찍혀 있다 — 주문 걸음만 안 찍힌다
+    expect(track).not.toHaveBeenCalledWith('begin_checkout', expect.anything());
   });
 });
