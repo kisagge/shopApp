@@ -510,3 +510,108 @@ describe('장바구니를 언제 비우는가', () => {
   });
 });
 
+
+describe('결제창을 닫았을 때', () => {
+  /*
+   * **주문은 이미 만들어져 있다.** 창을 닫거나 SDK 를 못 불러오면 결제만 안 된
+   * 것이고, 그 주문은 결제 대기로 남아 다시 걸 수 있다(`repay-button`). 이 갈래가
+   * 없으면 결제 단추가 "보내는 중…" 인 채로 영영 남고 — 아무 말도 없이 — 손님은
+   * 자기 주문이 생겼는지조차 모른다.
+   */
+  const CLIENT_KEY = 'test_ck_abcdefghijklmnopqrstuvwx';
+
+  it('주문 화면으로 보내고 결제가 실패했다고 알린다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', CLIENT_KEY);
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+    openPaymentWindow.mockRejectedValueOnce(new Error('사용자가 창을 닫았다'));
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(push).toHaveBeenCalledExactlyOnceWith('/order/20260909-0000001?payment=failed');
+    vi.unstubAllEnvs();
+  });
+
+  it('잠금을 풀어 준다 — 떠나지 못한 화면이 잠긴 채 남으면 안 된다', async () => {
+    /*
+     * 창이 **열린** 길에서는 잠금을 그대로 두는 것이 맞다(곧 토스로 떠난다).
+     * 창이 안 열린 이 길은 그 화면에 그대로 머무르므로 반대다.
+     */
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', CLIENT_KEY);
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+    openPaymentWindow.mockRejectedValueOnce(new Error('SDK 를 못 불러왔다'));
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(result.current.pending).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it('견적을 다시 받으라고 하지 않는다 — 금액이 달라진 것이 아니다', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', CLIENT_KEY);
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+    openPaymentWindow.mockRejectedValueOnce(new Error('창을 닫았다'));
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    let outcome: { refetchQuote: boolean } | undefined;
+    await act(async () => { outcome = await result.current.place(input([item('v1')])); });
+
+    expect(outcome).toEqual({ refetchQuote: false });
+    vi.unstubAllEnvs();
+  });
+
+  it('비운 장바구니를 되돌리지 않는다 — 주문은 살아 있다', async () => {
+    /*
+     * 남겨 두면 같은 것을 다시 담아 두 번 주문하게 되고, 두 주문이 재고를
+     * 각각 문다. 결제만 실패한 것은 주문이 없는 것이 아니다.
+     */
+    vi.stubEnv('NEXT_PUBLIC_TOSS_CLIENT_KEY', CLIENT_KEY);
+    useCartStore.setState({ items: [item('v1'), item('v2')] });
+    const { result } = renderHook(() => usePlaceOrder('window'), { wrapper });
+    openPaymentWindow.mockRejectedValueOnce(new Error('창을 닫았다'));
+    vi.mocked(fetch).mockResolvedValueOnce(ok({ orderNo: '20260909-0000001', payable: 289_000 }));
+
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(useCartStore.getState().items.map((i) => i.variantId)).toEqual(['v2']);
+    vi.unstubAllEnvs();
+  });
+});
+
+describe('결제 시도를 가리키는 열쇠', () => {
+  /*
+   * `randomUUID` 는 **보안 컨텍스트에서만** 있다. 개발 중 http 로 열어 두면
+   * 없는데, 거기서 터지면 중복을 막으려다 **주문 화면 자체를 못 열게** 만든다.
+   */
+  it('randomUUID 가 없어도 주문을 보낼 수 있다', async () => {
+    const { randomUUID: _randomUUID, ...rest } = crypto;
+    vi.stubGlobal('crypto', { ...rest, getRandomValues: crypto.getRandomValues.bind(crypto) });
+    const { result } = renderHook(() => usePlaceOrder('mock'), { wrapper });
+
+    happyPath();
+    await act(async () => { await result.current.place(input([item('v1')])); });
+
+    expect(bodyOf(0).idempotencyKey).toMatch(/^[0-9a-f]{32}$/);
+    vi.unstubAllGlobals();
+  });
+
+  it('물러난 열쇠도 시도마다 다르다 — 같으면 두 번째 주문이 첫 주문으로 삼켜진다', async () => {
+    const { randomUUID: _randomUUID, ...rest } = crypto;
+    vi.stubGlobal('crypto', { ...rest, getRandomValues: crypto.getRandomValues.bind(crypto) });
+
+    const a = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    happyPath();
+    await act(async () => { await a.result.current.place(input([item('v1')])); });
+    const first = bodyOf(0)['idempotencyKey'];
+
+    vi.mocked(fetch).mockClear();
+    const b = renderHook(() => usePlaceOrder('mock'), { wrapper });
+    happyPath();
+    await act(async () => { await b.result.current.place(input([item('v1')])); });
+
+    expect(first).toMatch(/^[0-9a-f]{32}$/);
+    expect(bodyOf(0)['idempotencyKey']).not.toBe(first);
+    vi.unstubAllGlobals();
+  });
+});

@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { getPaymentGateway, isUsableSecretKey, setPaymentGateway } from '~/lib/payments';
 import { createMockGateway } from '~/lib/payments/mock';
 
@@ -212,5 +212,94 @@ describe('결제 방식을 정하는 자리는 하나다', () => {
     const page = readFileSync(appFile('/checkout'), 'utf8');
     expect(page).toContain('serverPaymentMode');
     expect(page).toContain('paymentMode={');
+  });
+});
+
+describe('창구를 만드는 자리', () => {
+  /*
+   * **조용히 Mock 으로 도는 것이 이 파일의 가장 나쁜 고장이다.** 진짜 키가
+   * 있는데 가짜 창구가 돌아가면 돈이 한 푼도 움직이지 않은 주문이 결제 완료로
+   * 확정된다 — 아무 오류도 없이. 그래서 "어떤 창구를 받았는가" 를 못 박는다.
+   *
+   * 결론을 내는 일은 `paymentMode`(core)가 하고 위에서 전수로 본다. 여기서
+   * 보는 것은 그 결론을 받아 **무엇을 만들어 돌려주는가**다.
+   */
+  const KEEP = { ...process.env };
+  const REAL_KEY = 'test_sk_abcdefghijklmnopqrstuvwxyz01';
+
+  afterEach(() => {
+    process.env = { ...KEEP };
+    setPaymentGateway(null);
+    vi.restoreAllMocks();
+  });
+
+  function env(patch: Record<string, string | undefined>): void {
+    setPaymentGateway(null);
+    for (const [k, v] of Object.entries(patch)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+
+  it('형식까지 통과한 키면 토스 창구를 만든다 — Mock 이 아니다', () => {
+    env({
+      TOSS_SECRET_KEY: REAL_KEY,
+      NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_abcdefghijklmnopqrstuvwx',
+      PAYMENT_GATEWAY: undefined,
+      VERCEL_ENV: undefined,
+      DEMO_PAYMENT: undefined,
+    });
+
+    expect(getPaymentGateway().provider).toBe('toss');
+  });
+
+  it('키가 플레이스홀더면 Mock 으로 떨어지고, 그 사실을 로그에 남긴다', () => {
+    /*
+     * `.env.example` 을 복사해 둔 자리다. 아무 말도 없이 Mock 으로 돌면 실제
+     * 연동을 한 줄 알고 개발하다 승인 뒤에서 처음 어긋난다 — 왜 Mock 인지가
+     * 로그에 남아야 그때 찾을 수 있다.
+     */
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    env({ TOSS_SECRET_KEY: 'test_sk_여기에', NEXT_PUBLIC_TOSS_CLIENT_KEY: undefined, VERCEL_ENV: undefined });
+
+    expect(getPaymentGateway().provider).toBe('mock');
+    expect(warn).toHaveBeenCalledOnce();
+    expect(warn.mock.calls[0]![0]).toContain('TOSS_SECRET_KEY');
+  });
+
+  it('키가 아예 없으면 조용히 Mock 이다 — 알릴 것이 없다', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    env({ TOSS_SECRET_KEY: undefined, NEXT_PUBLIC_TOSS_CLIENT_KEY: undefined, VERCEL_ENV: undefined });
+
+    expect(getPaymentGateway().provider).toBe('mock');
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('한 번 만든 창구를 다시 쓴다 — 요청마다 새로 만들지 않는다', () => {
+    env({ TOSS_SECRET_KEY: undefined, NEXT_PUBLIC_TOSS_CLIENT_KEY: undefined, VERCEL_ENV: undefined });
+
+    expect(getPaymentGateway()).toBe(getPaymentGateway());
+  });
+
+  it('토스 창구도 다시 쓴다', () => {
+    env({
+      TOSS_SECRET_KEY: REAL_KEY,
+      NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_abcdefghijklmnopqrstuvwx',
+      VERCEL_ENV: undefined,
+    });
+
+    expect(getPaymentGateway()).toBe(getPaymentGateway());
+  });
+
+  it('검사가 끼워 넣은 창구가 먼저다 — 환경을 보지 않는다', () => {
+    /*
+     * 승인 뒤를 보는 검사들이 이 손잡이로 가짜 창구를 꽂는다. 환경을 먼저
+     * 보면 그 검사들이 저마다 환경변수를 흉내 내야 한다.
+     */
+    env({ TOSS_SECRET_KEY: REAL_KEY, NEXT_PUBLIC_TOSS_CLIENT_KEY: 'test_ck_abcdefghijklmnopqrstuvwx' });
+    const mine = createMockGateway();
+    setPaymentGateway(mine);
+
+    expect(getPaymentGateway()).toBe(mine);
   });
 });

@@ -578,3 +578,102 @@ describe('배송비 정책', () => {
     expect(quote.isFreeShipping).toBe(true); // 289,000 >= 50,000
   });
 });
+
+describe('쿠폰의 대상', () => {
+  /*
+   * **대상이 어느 칸에 담기느냐로 깎이는 줄이 정해진다.** 상품 대상을 브랜드
+   * 칸에 담으면 그 쿠폰은 아무 줄에도 안 걸리거나 — 더 나쁘게 — 그 브랜드의
+   * 다른 상품까지 깎는다. 돈이 바로 어긋나는 자리인데 세 칸을 나누는 문장이
+   * 전부 안 돌고 있었다.
+   *
+   * 어느 줄에 걸렸는지는 깎인 금액이 말해 준다 — 10% 쿠폰이라 코트에 걸리면
+   * 28,900 원이고 니트에 걸리면 5,000 원이다.
+   */
+  const coat = variant({
+    id: 'v-coat-m',
+    product: {
+      ...variant().product,
+      id: 'p-coat', brandId: 'b-noon', categoryId: 'c-outer',
+    },
+  });
+  const knit = variant({
+    id: 'v-knit-l',
+    product: {
+      ...variant().product,
+      id: 'p-knit', brandId: 'b-other', categoryId: 'c-top',
+      name: '램스울 니트', listPrice: 50_000, salePrice: null,
+    },
+  });
+
+  const targeted = (...targets: { targetType: string; targetId: string }[]) => ({
+    expiresAt: new Date('2026-12-31T00:00:00Z'),
+    coupon: {
+      code: 'TEN', name: '10% 할인', kind: 'PERCENT', value: 0, percent: 10,
+      maxDiscount: null, minimumOrder: 0, targets,
+    },
+  });
+
+  const quote = async () =>
+    quoteCart(
+      {
+        lines: [{ variantId: 'v-coat-m', quantity: 1 }, { variantId: 'v-knit-l', quantity: 1 }],
+        couponCode: 'TEN',
+        isRemoteArea: false,
+      },
+      viewer,
+    );
+
+  beforeEach(() => {
+    findManyVariants.mockResolvedValue([coat, knit]);
+  });
+
+  it.each([
+    ['상품', 'PRODUCT', 'p-coat'],
+    ['브랜드', 'BRAND', 'b-noon'],
+    ['갈래', 'CATEGORY', 'c-outer'],
+  ])('%s 대상이면 그 줄만 깎는다', async (_what, targetType, targetId) => {
+    findFirstUserCoupon.mockResolvedValue(targeted({ targetType, targetId }));
+
+    const q = await quote();
+
+    expect(q.couponDiscount).toBe(28_900);
+  });
+
+  it.each([
+    ['상품', 'PRODUCT', 'p-knit', 5_000],
+    ['브랜드', 'BRAND', 'b-other', 5_000],
+    ['갈래', 'CATEGORY', 'c-top', 5_000],
+  ])('%s 대상이 다른 줄을 가리키면 그 줄이 깎인다', async (_what, targetType, targetId, expected) => {
+    findFirstUserCoupon.mockResolvedValue(targeted({ targetType, targetId }));
+
+    const q = await quote();
+
+    expect(q.couponDiscount).toBe(expected);
+  });
+
+  it('장바구니에 없는 것을 가리키면 한 푼도 깎지 않는다', async () => {
+    findFirstUserCoupon.mockResolvedValue(targeted({ targetType: 'PRODUCT', targetId: 'p-없는것' }));
+
+    const q = await quote();
+
+    expect(q.couponDiscount).toBe(0);
+  });
+
+  it('대상이 여럿이면 하나라도 맞는 줄을 모두 깎는다', async () => {
+    findFirstUserCoupon.mockResolvedValue(
+      targeted({ targetType: 'PRODUCT', targetId: 'p-coat' }, { targetType: 'CATEGORY', targetId: 'c-top' }),
+    );
+
+    const q = await quote();
+
+    expect(q.couponDiscount).toBe(33_900);
+  });
+
+  it('대상이 없으면 장바구니 전체를 깎는다', async () => {
+    findFirstUserCoupon.mockResolvedValue(targeted());
+
+    const q = await quote();
+
+    expect(q.couponDiscount).toBe(33_900);
+  });
+});
