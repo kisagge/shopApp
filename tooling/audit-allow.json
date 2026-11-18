@@ -11,5 +11,11 @@
     "advisories": [
       "GHSA-3g3m-2fjr-6pw4"
     ]
+  },
+  "picomatch": {
+    "note": "**올릴 판이 없다.** 취약 범위가 `<=4.0.7` 인데 4.0.7 이 최신이고 권고의 고친 판 칸이 비어 있다 — overrides 로도 갈 곳이 없다. 들어오는 길은 둘 다 도구다: `vite`·`vitest`(그 밑의 `tinyglobby > fdir`)와 `@typescript-eslint/typescript-estree`. `pnpm why` 가 `@shop/auth` 를 운영 의존으로 비추지만 그것은 `better-auth` 가 vitest 를 **peer 로** 적어 둔 탓이고, better-auth 의 운영 의존 목록에 vitest 는 없다. 우리 소스는 글로브 라이브러리를 아예 부르지 않는다(`apps/web/src`·`packages/*/src` 에 import 가 0개). 터지는 모양은 공격자가 **글로브 무늬**를 넣는 것인데, 우리 무늬는 vitest include·eslint ignores·tailwind content 처럼 우리가 적은 설정에서만 나온다 — 요청으로 들어온 글자가 무늬가 되는 자리가 없다. 고친 판이 나오면 올리고 이 줄은 지운다.",
+    "advisories": [
+      "GHSA-fc5q-39xc-vjpf"
+    ]
   }
 }
