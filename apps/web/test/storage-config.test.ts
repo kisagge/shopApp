@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { readS3Config, StorageError } from '~/lib/storage';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  readS3Config, StorageError, getStorage, setStorage, isStorageConfigured,
+  type StorageAdapter,
+} from '~/lib/storage';
 
 // ProcessEnv 는 NODE_ENV 를 요구한다. 설정 읽기가 보는 것은 S3_* 뿐이다.
 const full: NodeJS.ProcessEnv = {
@@ -72,5 +75,91 @@ describe('스토리지 오류의 상태 코드', () => {
     const error = new StorageError('PUT_FAILED', '올리지 못했습니다');
     expect({ code: error.code, message: error.message, status: error.status })
       .toEqual({ code: 'PUT_FAILED', message: '올리지 못했습니다', status: 502 });
+  });
+});
+
+describe('어느 저장소를 받는가', () => {
+  /*
+   * **설정이 없으면 동작하는 척하지 않는다.** 조용히 성공한 척하면 운영자는
+   * 사진을 올리고 "됐다" 를 보는데 그 파일은 어디에도 없다 — 상품 화면에
+   * 깨진 그림이 남고, 그때는 어느 단계에서 사라졌는지 알 길이 없다.
+   *
+   * 그리고 이 판단이 **올리기 칸을 아예 보일지**까지 정한다
+   * (`isStorageConfigured` — 운영 상품·브랜드 화면, 손님의 문의 사진).
+   */
+  const KEEP = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...KEEP };
+    setStorage(undefined);
+  });
+
+  function env(patch: NodeJS.ProcessEnv | null): void {
+    setStorage(undefined);
+    for (const key of Object.keys(full)) delete process.env[key];
+    if (patch) Object.assign(process.env, patch);
+  }
+
+  it('네 값이 다 있으면 S3 창구를 준다', () => {
+    env(full);
+
+    expect(getStorage().name).toBe('s3');
+  });
+
+  it('설정이 없으면 설정 안 됨 창구를 준다 — 성공한 척하는 창구가 아니다', () => {
+    env(null);
+
+    expect(getStorage().name).toBe('unconfigured');
+  });
+
+  it('반쯤 채운 설정도 설정 안 됨이다 — 모르는 채로 실패하지 않게', () => {
+    env({ NODE_ENV: 'test', S3_BUCKET: 'shop-media' });
+
+    expect(getStorage().name).toBe('unconfigured');
+  });
+
+  it('한 번 고른 창구를 다시 쓴다', () => {
+    env(full);
+
+    expect(getStorage()).toBe(getStorage());
+  });
+
+  it('검사가 갈아 끼운 창구가 먼저다 — 환경을 보지 않는다', () => {
+    env(full);
+    const mine = { name: 'mine', put: vi.fn(), remove: vi.fn() };
+    setStorage(mine);
+
+    expect(getStorage()).toBe(mine);
+  });
+
+  it.each([
+    ['올리기', (s: StorageAdapter) => s.put({ key: 'a.jpg', body: new Uint8Array(), contentType: 'image/jpeg' })],
+    ['지우기', (s: StorageAdapter) => s.remove('a.jpg')],
+  ])('설정이 없으면 %s 를 분명히 거절한다 — 503 이다', async (_what, call) => {
+    env(null);
+
+    await expect(call(getStorage())).rejects.toMatchObject({
+      name: 'StorageError',
+      code: 'NOT_CONFIGURED',
+      status: 503,
+    });
+  });
+
+  it('거절하면서 무엇을 확인해야 하는지 말한다', async () => {
+    /* 열쇠 이름을 적어 주지 않으면 운영자는 어디를 봐야 할지 모른다 */
+    env(null);
+
+    await expect(
+      getStorage().put({ key: 'a.jpg', body: new Uint8Array(), contentType: 'image/jpeg' }),
+    ).rejects.toThrow(/S3_BUCKET/);
+  });
+
+  it.each([
+    ['설정이 있으면', full, true],
+    ['없으면', null, false],
+  ])('%s 올리기 칸을 보일지 그대로 말한다', (_what, patch, expected) => {
+    env(patch);
+
+    expect(isStorageConfigured()).toBe(expected);
   });
 });
