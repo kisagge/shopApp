@@ -372,3 +372,101 @@ describe('판매가와 정가', () => {
     expect(submit()).toBeEnabled();
   });
 });
+
+describe('응답의 모양이 틀렸을 때', () => {
+  /*
+   * **200 인데 JSON 이 아닐 수 있다.** 프록시가 끼면 성공 자리에 HTML 이 오고,
+   * 그때 `json()` 은 던진다 — 감싸지 않으면 그 거절이 통째로 네트워크 오류로
+   * 새서, 저장은 됐는데 "네트워크 오류" 라고 말하는 화면이 된다.
+   */
+  const save = () => userEvent.click(screen.getByRole('button', { name: '변경 사항 저장' }));
+
+  it('실패 응답이 JSON 이 아니어도 우리 문장으로 말한다', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response('<html>Bad Gateway</html>', { status: 502 }));
+    setup();
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('저장하지 못했습니다');
+  });
+
+  it('성공 응답이 JSON 이 아니어도 수정은 그 상품으로 돌아간다', async () => {
+    /* 수정은 돌아갈 주소를 응답에서 읽지 않는다 — 몸이 비어도 갈 곳을 안다 */
+    vi.mocked(fetch).mockResolvedValue(new Response('', { status: 200 }));
+    setup();
+
+    await save();
+
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/admin/products/p-1'));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('거절의 까닭이 없으면 우리 문장으로 채운다', async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({}), { status: 400 }));
+    setup();
+
+    await save();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('저장하지 못했습니다');
+  });
+});
+
+describe('적은 것이 그대로 실려 간다', () => {
+  /*
+   * 칸마다 제 자리에 담기는지는 재 보지 않으면 모른다. 손잡이를 베껴 쓰다 한
+   * 칸이 옆 칸의 열쇠로 적히면 운영자가 적은 상품명이 슬러그 자리에 들어가거나
+   * 그대로 사라진다 — 저장은 되고 아무 오류도 없다.
+   */
+  const body = () =>
+    JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string) as Record<string, unknown>;
+
+  const save = async () => {
+    vi.mocked(fetch).mockResolvedValue(new Response(JSON.stringify({ id: 'p-1' }), { status: 200 }));
+    await userEvent.click(screen.getByRole('button', { name: '변경 사항 저장' }));
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+  };
+
+  it.each([
+    ['상품명', '램스울 니트', 'name'],
+    ['슬러그', 'lambswool-knit', 'slug'],
+    ['상품 설명', '촘촘한 조직', 'description'],
+  ])('%s 칸에 적은 것이 %s 자리로 간다', async (label, typed, key) => {
+    setup();
+    const box = screen.getByLabelText(new RegExp(`^${label}`));
+
+    await userEvent.clear(box);
+    await userEvent.type(box, typed);
+    await save();
+
+    expect(body()[key]).toBe(typed);
+  });
+
+  it('고른 갈래가 그 자리로 간다', async () => {
+    setup('edit', { categories: [...categories, { id: 'c-2', label: '상의 > 니트' }] });
+
+    await userEvent.selectOptions(screen.getByLabelText(/^카테고리/), 'c-2');
+    await save();
+
+    expect(body()['categoryId']).toBe('c-2');
+  });
+
+  it('고른 상태가 그 자리로 간다 — 숨김으로 둔 것이 노출로 가면 안 된다', async () => {
+    setup();
+
+    await userEvent.selectOptions(screen.getByLabelText(/^판매 상태/), 'HIDDEN');
+    await save();
+
+    expect(body()['status']).toBe('HIDDEN');
+  });
+});
+
+describe('취소', () => {
+  it('왔던 자리로 돌아간다 — 적은 것을 보내지 않는다', async () => {
+    setup();
+
+    await userEvent.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(back).toHaveBeenCalledOnce();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});

@@ -73,3 +73,110 @@ describe('재고 내려받기 · 일괄 수정', () => {
     expect(fetchMock.mock.calls[0]![0]).toBe('/api/admin/products/stock/export');
   });
 });
+
+/**
+ * **실패가 조용하면 운영자는 올린 줄 안다.**
+ *
+ * 이 자리는 재고를 한 번에 수백 줄 고치는 곳이다. 거절이든 끊김이든 말이
+ * 없으면 운영자는 창을 닫고 가 버리고, 그날의 재고는 CSV 와 다른 값으로 남는다
+ * — 품절 아닌 것이 품절로 보이거나, 없는 물건이 팔린다.
+ */
+describe('올리기가 실패하면', () => {
+  const upload = async () => {
+    await userEvent.upload(
+      screen.getByLabelText('재고 CSV 파일'),
+      new File(['SKU,재고\r\n'], 'stock.csv', { type: 'text/csv' }),
+    );
+    await userEvent.click(screen.getByRole('button', { name: '재고 올리기' }));
+  };
+
+  it('창구가 거절하면 그 까닭을 그대로 옮긴다', async () => {
+    fetchMock.mockResolvedValue(json(400, { message: '첫 줄의 머리글이 다릅니다.' }));
+    render(<StockBulkActions canWrite />);
+
+    await upload();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('첫 줄의 머리글이 다릅니다.');
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it('까닭을 안 주면 우리 문장으로 말한다 — 빈 경고를 띄우지 않는다', async () => {
+    fetchMock.mockResolvedValue(json(500, {}));
+    render(<StockBulkActions canWrite />);
+
+    await upload();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('재고를 올리지 못했습니다');
+  });
+
+  it('응답이 JSON 이 아니어도 말한다 — 502 가 HTML 을 주는 날이다', async () => {
+    fetchMock.mockResolvedValue(new Response('<html>Bad Gateway</html>', { status: 502 }));
+    render(<StockBulkActions canWrite />);
+
+    await upload();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('재고를 올리지 못했습니다');
+  });
+
+  it('길이 끊기면 그렇다고 말한다', async () => {
+    fetchMock.mockRejectedValue(new Error('offline'));
+    render(<StockBulkActions canWrite />);
+
+    await upload();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류');
+  });
+
+  it('실패한 뒤에도 단추가 다시 눌린다 — 고쳐서 바로 올릴 수 있어야 한다', async () => {
+    fetchMock.mockRejectedValue(new Error('offline'));
+    render(<StockBulkActions canWrite />);
+
+    await upload();
+
+    await waitFor(() => expect(screen.getByRole('button', { name: '재고 올리기' })).toBeEnabled());
+  });
+
+  it('실패하면 앞선 결과를 치운다 — 지난 성공이 남아 "됐다" 로 읽힌다', async () => {
+    fetchMock.mockResolvedValueOnce(json(200, { updated: 2, unchanged: 0, skipped: 0, failures: [] }));
+    render(<StockBulkActions canWrite />);
+    await upload();
+    expect(await screen.findByText(/2개 수정/)).toBeInTheDocument();
+
+    fetchMock.mockRejectedValueOnce(new Error('offline'));
+    await upload();
+
+    await waitFor(() => expect(screen.queryByText(/2개 수정/)).toBeNull());
+  });
+});
+
+describe('내려받기가 실패하면', () => {
+  const download = () => userEvent.click(screen.getByRole('button', { name: '재고 CSV 내려받기' }));
+
+  it('창구가 거절하면 그 까닭을 옮긴다', async () => {
+    fetchMock.mockResolvedValue(json(403, { message: '권한이 없습니다.' }));
+    render(<StockBulkActions canWrite />);
+
+    await download();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('권한이 없습니다.');
+  });
+
+  it('빈 파일을 내려주지 않는다 — 거절을 파일로 저장하면 운영자는 그것이 재고라고 믿는다', async () => {
+    fetchMock.mockResolvedValue(json(500, {}));
+    render(<StockBulkActions canWrite />);
+
+    await download();
+
+    await screen.findByRole('alert');
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+  });
+
+  it('길이 끊기면 그렇다고 말한다', async () => {
+    fetchMock.mockRejectedValue(new Error('offline'));
+    render(<StockBulkActions canWrite />);
+
+    await download();
+
+    expect((await screen.findByRole('alert')).textContent).toContain('네트워크 오류');
+  });
+});

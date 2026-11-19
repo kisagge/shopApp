@@ -299,6 +299,28 @@ test('쿠폰 대상도 같은 창구를 쓴다', async ({ page }) => {
 
   // 찾은 것이 하나라도 떠야 대상 지정을 할 수 있다. 결과는 체크박스로 나온다.
   await expect(page.getByRole('checkbox', { name: /코트/ }).first()).toBeVisible();
+
+  /*
+   * **그 Enter 가 쿠폰을 발행하지는 않았다.** 이 칸은 쿠폰 폼 안의 글자 칸이라,
+   * 브라우저는 Enter 로 그 폼을 보낸다 — 막지 않으면 상품을 찾으려던 누름이
+   * 코드도 이름도 비어 있는 쿠폰을 창구로 보내고, 운영자는 영문 모를 빨간
+   * 글씨를 본다. 막는 자리는 `coupon-form` 의 onKeyDown 이고 **단위 검사로는
+   * 잴 수 없다** — jsdom 은 그 암묵적 제출을 하지 않는다.
+   *
+   * 화면의 경고를 세지 않고 **창구로 간 요청**을 본다. 이 화면에는 다른 경고
+   * 자리가 셋이나 있어서(목록·지급·찾기) 경고 수로는 이 일을 가릴 수 없다.
+   */
+  const creates: string[] = [];
+  page.on('request', (r) => {
+    if (r.method() === 'POST' && new URL(r.url()).pathname === '/api/admin/coupons') {
+      creates.push(r.url());
+    }
+  });
+
+  await page.locator('#product-q').press('Enter');
+  await expect(page.getByRole('checkbox', { name: /코트/ }).first()).toBeVisible();
+
+  expect(creates, 'Enter 가 반쯤 적힌 쿠폰을 발행했다').toEqual([]);
 });
 
 test('주문 관리에서 모든 상태를 걸러 볼 수 있다', async ({ page }) => {

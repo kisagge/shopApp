@@ -289,3 +289,109 @@ describe('만들 때', () => {
     await waitFor(() => expect(h.onError).toHaveBeenCalledWith('네트워크 오류로 만들지 못했습니다.'));
   });
 });
+
+describe('상품 검색의 Enter', () => {
+  /*
+   * **이 칸은 쿠폰 폼 안에 있다.** 글자 칸에서 Enter 를 누르면 브라우저가 그
+   * 폼을 보내므로, 막지 않으면 상품을 찾으려던 누름이 **반쯤 적힌 쿠폰을
+   * 발행한다** — 코드도 이름도 비어 있는 채로 창구에 간다.
+   */
+  const urls = () => vi.mocked(fetch).mock.calls.map((c) => (c[0] as string | URL).toString());
+
+  it('Enter 는 찾기만 한다 — 쿠폰을 발행하지 않는다', async () => {
+    open();
+
+    await userEvent.type(screen.getByLabelText('상품 검색'), '코트{Enter}');
+
+    await waitFor(() => expect(screen.getByLabelText('레더 코트')).toBeDefined());
+    expect(urls().every((u) => u.includes('/search'))).toBe(true);
+    expect(urls().some((u) => u.endsWith('/api/admin/coupons'))).toBe(false);
+  });
+
+  it('찾는 말이 적혀 있지 않으면 Enter 로도 찾지 않는다', async () => {
+    open();
+
+    const box = screen.getByLabelText('상품 검색');
+    await userEvent.click(box);
+    await userEvent.keyboard('{Enter}');
+
+    expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('코드를 만들어 주는 단추', () => {
+  /*
+   * 운영자가 코드를 손으로 지으면 `WELCOME` 처럼 짐작되는 것이 된다 — 받지
+   * 않은 사람이 코드만 알면 쓸 수 있는 쿠폰은 아니지만(발급을 봐야 한다),
+   * 같은 코드를 두 번 지어 창구에서 거절당하는 일은 잦다.
+   */
+  const codeBox = () => screen.getByLabelText<HTMLInputElement>(/^코드/);
+
+  it('누르면 코드 칸을 채운다', async () => {
+    open();
+    expect(codeBox().value).toBe('');
+
+    await userEvent.click(screen.getByRole('button', { name: '생성' }));
+
+    expect(codeBox().value).toMatch(/^[0-9A-Z]{8}$/);
+  });
+
+  it('누를 때마다 다른 코드다', async () => {
+    open();
+    const button = screen.getByRole('button', { name: '생성' });
+
+    await userEvent.click(button);
+    const first = codeBox().value;
+    await userEvent.click(button);
+
+    expect(codeBox().value).not.toBe(first);
+  });
+
+  it('손으로 적은 소문자는 대문자로 올린다 — 코드는 한 모양으로만 쓴다', async () => {
+    open();
+
+    await userEvent.type(codeBox(), 'winter10');
+
+    expect(codeBox().value).toBe('WINTER10');
+  });
+});
+
+describe('할인 방식을 고르면', () => {
+  it('금액 쿠폰은 금액 칸을, 정률 쿠폰은 비율 칸을 내놓는다', async () => {
+    open();
+
+    await userEvent.click(screen.getByRole('radio', { name: '정액 할인' }));
+    expect(screen.getByLabelText(/^할인 금액/)).toBeDefined();
+    expect(screen.queryByLabelText(/^할인율/)).toBeNull();
+
+    await userEvent.click(screen.getByRole('radio', { name: '정률 할인' }));
+    expect(screen.getByLabelText(/^할인율/)).toBeDefined();
+    expect(screen.queryByLabelText(/^할인 금액/)).toBeNull();
+  });
+});
+
+describe('카테고리 대상', () => {
+  /*
+   * **상위 분류를 고를 수 없게 해 두었다**(말단만 내려온다). 고르면 저장도
+   * 발급도 되는데 어떤 상품에도 안 붙기 때문이다 — 그래서 여기서 보는 것은
+   * 고른 것이 칩으로 서고 이름으로 보이는가다(날것의 id 가 보이면 운영자는
+   * 자기가 무엇을 골랐는지 모른다).
+   */
+  it('고르면 이름으로 칩이 선다', async () => {
+    open();
+
+    await userEvent.click(screen.getByRole('checkbox', { name: '아우터' }));
+
+    expect(screen.getByRole('button', { name: /아우터/ })).toBeDefined();
+  });
+
+  it('다시 누르면 대상에서 빠진다', async () => {
+    open();
+    const box = screen.getByRole('checkbox', { name: '아우터' });
+
+    await userEvent.click(box);
+    await userEvent.click(box);
+
+    expect(box).not.toBeChecked();
+  });
+});

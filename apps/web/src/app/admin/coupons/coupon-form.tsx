@@ -357,6 +357,12 @@ export function CouponForm({
               id="product-q"
               value={productQuery}
               onChange={(e) => setProductQuery(e.target.value)}
+              /*
+               * **이 칸은 쿠폰 폼 안에 있다.** 막지 않으면 브라우저가 Enter 로 그 폼을
+               * 보내서, 상품을 찾으려던 누름이 코드도 이름도 비어 있는 쿠폰을 창구로
+               * 보낸다. jsdom 은 그 암묵적 제출을 하지 않아 단위 검사로는 이 줄을 잴 수
+               * 없다 — 재는 자리는 e2e(`admin.spec.ts` 의 "쿠폰 대상도 같은 창구를 쓴다")다.
+               */
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
                   e.preventDefault();

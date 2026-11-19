@@ -242,3 +242,107 @@ describe('저장하기 전에 거르는 것', () => {
     expect(saveButton()).toBeEnabled();
   });
 });
+
+describe('기간은 한국 시각으로 적고 읽는다', () => {
+  /*
+   * **datetime-local 입력에는 시간대가 없다.** 운영자는 한국 시각으로 적고
+   * 저장되는 값은 UTC ISO 다. 그 사이의 아홉 시간을 한쪽에서만 더하거나
+   * 빼면 **기획전이 전날 오후에 뜨거나 하루 늦게 닫힌다** — 세일 시작 시각이
+   * 어긋나는 종류의 고장이고, 화면에는 아무 경고도 없다.
+   */
+  const saveButton = () => screen.getByRole('button', { name: '내용 저장' });
+  const startInput = () => screen.getByLabelText<HTMLInputElement>(/^시작/);
+  const endInput = () => screen.getByLabelText<HTMLInputElement>(/^종료/);
+
+  it('저장된 UTC 를 한국 시각으로 펼쳐 보여 준다', () => {
+    /* 2026-11-30T15:00Z = 한국의 12월 1일 자정 — 운영자가 적은 그 값이다 */
+    open({ startsAt: '2026-11-30T15:00:00.000Z', endsAt: '2026-12-25T14:59:00.000Z' });
+
+    expect(startInput().value).toBe('2026-12-01T00:00');
+    expect(endInput().value).toBe('2026-12-25T23:59');
+  });
+
+  it('적은 한국 시각을 UTC 로 되돌려 보낸다', async () => {
+    const h = open();
+
+    fireEvent.change(startInput(), { target: { value: '2026-12-01T00:00' } });
+    fireEvent.change(endInput(), { target: { value: '2026-12-25T23:59' } });
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startsAt: '2026-11-30T15:00:00.000Z',
+        endsAt: '2026-12-25T14:59:00.000Z',
+      }),
+    );
+  });
+
+  it('펼쳐 보인 값을 그대로 저장하면 같은 시각이다 — 열고 닫기만 해도 기간이 밀리면 안 된다', async () => {
+    /*
+     * 가장 조용한 고장이다. 다른 칸 하나를 고치려고 카드를 열어 저장만 해도
+     * 기간이 아홉 시간씩 밀려 간다.
+     */
+    const h = open({ startsAt: '2026-11-30T15:00:00.000Z', endsAt: '2026-12-25T14:59:00.000Z' });
+
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        startsAt: '2026-11-30T15:00:00.000Z',
+        endsAt: '2026-12-25T14:59:00.000Z',
+      }),
+    );
+  });
+
+  it('비어 있으면 빈 칸으로 보이고 비운 채로 저장된다 — 기간 없는 기획전은 늘 뜬다', async () => {
+    const h = open({ startsAt: null, endsAt: null });
+
+    expect(startInput().value).toBe('');
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ startsAt: null, endsAt: null }));
+  });
+});
+
+describe('적은 것이 그대로 실려 간다', () => {
+  /*
+   * **칸마다 제 자리에 담기는지는 재 보지 않으면 모른다.** 손잡이를 베껴 쓰다
+   * 한 칸이 옆 칸의 열쇠로 적히면, 운영자가 적은 부제가 설명 자리에 들어가거나
+   * 아예 사라진다 — 저장은 되고 아무 오류도 없다.
+   */
+  const saveButton = () => screen.getByRole('button', { name: '내용 저장' });
+
+  it.each([
+    ['제목', '겨울 기획전', 'title'],
+    ['주소', 'winter-outer', 'slug'],
+    ['부제 (선택)', '추위를 견디는 옷', 'subtitle'],
+    ['설명 (선택)', '울과 캐시미어', 'description'],
+  ])('%s 칸에 적은 것이 %s 자리로 간다', async (label, typed, key) => {
+    const h = open();
+
+    fireEvent.change(screen.getByLabelText(new RegExp(`^${label.replace(/[()]/g, '\\$&')}`)), {
+      target: { value: typed },
+    });
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ [key]: typed }));
+  });
+
+  it('주소의 앞뒤 공백은 떼어 보낸다 — 주소에 공백이 섞이면 그 기획전은 열리지 않는다', async () => {
+    const h = open();
+
+    fireEvent.change(screen.getByLabelText(/^주소/), { target: { value: '  winter  ' } });
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ slug: 'winter' }));
+  });
+
+  it('고른 색을 그대로 보낸다', async () => {
+    const h = open({ tone: 'sand' });
+
+    fireEvent.change(screen.getByLabelText(/^배경 톤/), { target: { value: 'clay' } });
+    await userEvent.click(saveButton());
+
+    expect(h.onSave).toHaveBeenCalledWith(expect.objectContaining({ tone: 'clay' }));
+  });
+});
