@@ -18,6 +18,17 @@ vi.mock('@shop/db', () => ({ prisma: db, Prisma: {} }));
 const notifyLateDepositFound = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/notifications/late-deposit', () => ({ notifyLateDepositFound }));
 
+/*
+ * **입금이 확인됐다는 안내.** 여기서 볼 것은 **언제 부르는가** 다 — 메일 문안과
+ * 알림함 기록은 그쪽 검사가 본다(`order-mail`·`deliver-notice`). 보내는 자리를
+ * 흉내 내되 말·금액을 읽는 함수(orderLocale·shipToLine)는 그대로 쓴다.
+ */
+const deliverOrderNotice = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/orders/notify', async (orig) => ({
+  ...(await orig<typeof import('~/lib/orders/notify')>()),
+  deliverOrderNotice,
+}));
+
 const { applyDeposit } = await import('~/lib/payments/deposit');
 
 const gateway = (over: Partial<PaymentGateway> = {}): PaymentGateway => ({
@@ -43,7 +54,8 @@ const payment = (over: Record<string, unknown> = {}) => ({
     locale: 'ko', payable: 289_000, recipient: '데모', postalCode: '04524',
     address1: '서울 중구 세종대로 110', address2: null,
     items: [{ productName: '울 코트', optionLabel: 'M / 블랙', quantity: 1, unitPrice: 289_000 }],
-    user: { email: 'demo@plain.test', name: '데모 고객' },
+    // 조회가 id 까지 읽는다 — 알림함에 남기려면 누구의 것인지 알아야 한다
+    user: { id: 'u-1', email: 'demo@plain.test', name: '데모 고객' },
   },
   ...over,
 });
@@ -248,5 +260,105 @@ describe('취소한 주문에 들어온 입금', () => {
     await applyDeposit('pk_1', g);
 
     expect(db.payment.updateMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **돈을 보낸 사람에게 그 사실을 알린다.**
+ *
+ * 이 길에는 검사가 둘이나 있었는데(여기와 `toss-webhook`) **안내를 아무도
+ * 보지 않았다.** 그 한 줄을 지워도 전부 초록이다 — 그리고 사라지는 것은
+ * 손님이 계좌로 돈을 보낸 뒤 받는 유일한 확인이다. 안 오면 입금이 안 된
+ * 줄 알고 다시 보내거나 전화를 한다.
+ *
+ * 안내는 메일과 알림함 둘을 함께 내보낸다(`deliverOrderNotice`).
+ */
+describe('입금 확인 안내', () => {
+  it('입금이 확인되면 그 주문의 구매자에게 한 번 알린다', async () => {
+    await applyDeposit('pk_1', gateway());
+
+    expect(deliverOrderNotice).toHaveBeenCalledOnce();
+    const [kind, input] = deliverOrderNotice.mock.calls[0]!;
+    expect(kind).toBe('deposited');
+    expect(input).toMatchObject({
+      userId: 'u-1',
+      to: 'demo@plain.test',
+      buyerName: '데모 고객',
+      orderNo: '20260903-0000001',
+    });
+  });
+
+  it('주문이 들고 있던 말로 보낸다 — 입금한 순간의 말을 알 길이 여기엔 없다', async () => {
+    db.payment.findUnique.mockResolvedValue(payment({
+      order: { ...payment().order, locale: 'ja' },
+    }));
+
+    await applyDeposit('pk_1', gateway());
+
+    expect(deliverOrderNotice.mock.calls[0]![1]).toMatchObject({ locale: 'ja' });
+  });
+
+  it('주문서에 적힌 금액과 줄, 보낼 곳을 함께 싣는다', async () => {
+    await applyDeposit('pk_1', gateway());
+
+    const input = deliverOrderNotice.mock.calls[0]![1];
+    expect(input.payable).toBe(289_000);
+    expect(input.items).toHaveLength(1);
+    expect(input.shipTo).toContain('서울 중구 세종대로 110');
+  });
+
+  it.each([
+    ['아직 입금 전이면', 'WAITING_FOR_DEPOSIT' as const, 289_000],
+    ['금액이 모자라면', 'DONE' as const, 1_000],
+    ['금액이 넘치면', 'DONE' as const, 500_000],
+  ])('%s 알리지 않는다', async (_what, status, amount) => {
+    const g = gateway({
+      inquire: vi.fn<(...a: any[]) => any>(async () => ({
+        paymentKey: 'pk_1', approvalNo: null, method: 'VIRTUAL_ACCOUNT' as const,
+        status, amount, approvedAt: new Date(), virtualAccount: null, raw: {},
+      })),
+    });
+
+    await applyDeposit('pk_1', g);
+
+    expect(deliverOrderNotice).not.toHaveBeenCalled();
+  });
+
+  it('우리 결제가 아니면 알리지 않는다', async () => {
+    db.payment.findUnique.mockResolvedValue(null);
+
+    await applyDeposit('pk_unknown', gateway());
+
+    expect(deliverOrderNotice).not.toHaveBeenCalled();
+  });
+
+  it('이미 반영된 입금이면 다시 알리지 않는다 — 웹훅은 여러 번 온다', async () => {
+    db.payment.findUnique.mockResolvedValue(payment({ status: 'DONE' }));
+
+    await applyDeposit('pk_1', gateway());
+
+    expect(deliverOrderNotice).not.toHaveBeenCalled();
+  });
+
+  it('경합에서 다른 처리가 먼저 반영했으면 알리지 않는다', async () => {
+    /*
+     * **예전에는 트랜잭션 안에서만 빠져나가고 바깥은 그대로 돌았다** — 같은
+     * 매출이 두 번 찍힐 수 있었다. 안내도 같은 자리에 있으므로 같은 모양으로
+     * 두 번 갈 수 있었다: 돈을 한 번 보낸 사람이 확인 메일을 두 통 받는다.
+     */
+    db.order.updateMany.mockResolvedValue({ count: 0 });
+
+    const result = await applyDeposit('pk_1', gateway());
+
+    expect(result.applied).toBe(false);
+    expect(deliverOrderNotice).not.toHaveBeenCalled();
+    expect(db.eventLog.createMany).not.toHaveBeenCalled();
+  });
+
+  it('매출 기록과 짝이다 — 둘 중 하나만 남는 입금은 없다', async () => {
+    await applyDeposit('pk_1', gateway());
+
+    expect(db.eventLog.createMany).toHaveBeenCalled();
+    expect(deliverOrderNotice).toHaveBeenCalled();
   });
 });
