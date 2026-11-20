@@ -24,6 +24,12 @@ const db = vi.hoisted(() => ({
   // 알림함에도 남는다 — 흉내에 이 표가 없으면 기록이 조용히 삼켜진다(record 가 삼킨다)
   notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 1 })) },
   notificationTemplate: { findMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve([])) },
+  /*
+   * **메일 문구도 표에서 읽는다.** 이 표가 흉내에 없으면 조회가 터지고 발송은 기본
+   * 문구로 물러난다(`getMailWording` 가 삼킨다) — 그러면 "운영자가 고친 문구로
+   * 나간다" 를 재는 자리가 사라진다. 로그에 줄만 남고 검사는 초록이었다.
+   */
+  mailTemplate: { findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)) },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
@@ -174,5 +180,81 @@ describe('알림함에도 남는다', () => {
 
     await expect(confirm(gw)).rejects.toThrow();
     expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **운영자가 고친 문구가 실제로 나가는가.**
+ *
+ * 문구를 고치는 화면과 저장 창구에는 검사가 있고(`mail-template-form`·
+ * `notification-templates`), 문구를 고르는 규칙에도 있다(`mail-templates`의
+ * `wordOf`). 그런데 **발송이 그 표를 읽는지**는 아무도 보지 않았다 — 흉내에
+ * 표가 없어 조회가 터지고, 발송은 조용히 기본 문구로 물러났다. 고친 문구가
+ * 영영 안 쓰이게 되어도 로그에 한 줄 남을 뿐이다.
+ */
+describe('고친 메일 문구', () => {
+  const template = (over: Record<string, unknown> = {}) => ({
+    subject: 'PLAIN · 주문 {orderNo} 결제 완료', heading: null, lead: null, ...over,
+  });
+
+  it('고친 문구가 있으면 그 제목으로 나간다', async () => {
+    db.mailTemplate.findUnique.mockResolvedValue(template());
+
+    await confirm(gateway());
+
+    expect(sent().subject).toBe('PLAIN · 주문 20260906-1234567 결제 완료');
+  });
+
+  it('그 주문의 말로 찾는다 — 영어 주문에 한국어 문구를 쓰지 않는다', async () => {
+    db.mailTemplate.findUnique.mockResolvedValue(null);
+
+    await confirm(gateway());
+
+    expect(db.mailTemplate.findUnique.mock.calls[0]![0].where).toEqual({
+      kind_locale: { kind: 'ORDER_PAID', locale: 'en' },
+    });
+  });
+
+  it('고친 문구가 없으면 사전의 기본 문구로 나간다', async () => {
+    db.mailTemplate.findUnique.mockResolvedValue(null);
+
+    await confirm(gateway());
+
+    expect(sent().subject).toContain('20260906-1234567');
+    expect(sent().subject).not.toContain('{orderNo}');
+  });
+
+  it('한 칸만 고쳐 두면 그 칸만 바뀐다 — 나머지는 기본 문구다', async () => {
+    db.mailTemplate.findUnique.mockResolvedValue(template({ subject: '결제가 끝났습니다' }));
+
+    await confirm(gateway());
+
+    expect(sent().subject).toBe('결제가 끝났습니다');
+    // 본문은 그대로 사전에서 온다 — 주문번호와 금액이 들어 있어야 대조할 수 있다
+    expect(sent().text).toContain('20260906-1234567');
+  });
+
+  it('끼울 값이 없는 문구는 쓰지 않는다 — {name} 이 글자로 받은편지함에 뜨면 안 된다', async () => {
+    /*
+     * 자리값 이름은 아스키만 자리값으로 본다(`/\{(\w+)\}/`). 한글 이름은 애초에
+     * 자리값이 아니라 그냥 글자이므로, 여기서 보는 것은 **아는 이름인데 값이
+     * 없는 경우**다 — 옛 알림처럼 값이 빠진 자리를 글자로 내보내지 않는다.
+     */
+    db.mailTemplate.findUnique.mockResolvedValue(template({ subject: '{customerName} 님 결제 완료' }));
+
+    await confirm(gateway());
+
+    expect(sent().subject).not.toContain('{customerName}');
+    expect(sent().subject).toContain('20260906-1234567');
+  });
+
+  it('문구 표를 못 읽어도 메일은 나간다 — 기본 문구로 물러난다', async () => {
+    /* 삼키는 것이 의도다. 문구 하나 때문에 결제 안내를 못 보내면 안 된다 */
+    db.mailTemplate.findUnique.mockRejectedValue(new Error('표가 없다'));
+
+    await confirm(gateway());
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(sent().subject).toContain('20260906-1234567');
   });
 });

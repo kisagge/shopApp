@@ -13,6 +13,15 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  /*
+   * **승인 뒤에 붙는 일이 읽는 표들.** 흉내에 없으면 조회가 터지고 그 일들이
+   * 조용히 삼켜진다 — 알림함 기록도, 고친 메일 문구도 없던 일이 되고 로그에
+   * 줄만 남는다(검사는 초록이다). 승인·전이를 보는 이 파일에서 그 일까지
+   * 단정하지는 않지만(`order-mail-send` 가 본다), **삼켜진 채로 두지도 않는다.**
+   */
+  notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 1 })) },
+  notificationTemplate: { findMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve([])) },
+  mailTemplate: { findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)) },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));
