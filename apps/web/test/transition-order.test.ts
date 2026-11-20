@@ -15,6 +15,14 @@ vi.mock('@shop/db', () => ({ prisma: db }));
 const markNoticesDone = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
 vi.mock('~/lib/notifications/record', () => ({ markNoticesDone }));
 
+/*
+ * 배송 알림. 여기서 볼 것은 **언제 부르는가** 다 — 무엇을 보내는지는 그쪽
+ * 검사가 본다(`shipment-notice`). 흉내를 두지 않으면 그 함수가 `prisma.user`
+ * 를 찾다 터지고 제 오류를 삼켜, 이 파일에서는 **배선이 없어도 전부 초록**이었다.
+ */
+const notifyShipmentStage = vi.hoisted(() => vi.fn<(...a: any[]) => any>(() => Promise.resolve()));
+vi.mock('~/lib/orders/notify-shipment', () => ({ notifyShipmentStage }));
+
 const { transitionOrder, TransitionError } = await import('~/lib/admin/transition-order');
 
 const admin: Actor = { id: 'u-admin', role: 'ADMIN', merchantId: null };
@@ -23,11 +31,13 @@ const merchantB: Actor = { id: 'u-b', role: 'MERCHANT', merchantId: 'm-b' };
 const customer: Actor = { id: 'u-c', role: 'CUSTOMER', merchantId: null };
 
 /** 두 가맹점 상품이 섞인 주문 */
+/* 조회가 읽는 칸을 그대로 갖춘다 — 빠지면 그 값이 undefined 로 흘러간다 */
 const mixedOrder = (status = 'PAID') => ({
   id: 'o-1', orderNo: '20260831-1234567', status,
+  userId: 'u-buyer', rewardPoints: 2890,
   items: [
-    { id: 'i-1', status, merchantId: 'm-a' },
-    { id: 'i-2', status, merchantId: 'm-b' },
+    { id: 'i-1', status, merchantId: 'm-a', canceledAt: null },
+    { id: 'i-2', status, merchantId: 'm-b', canceledAt: null },
   ],
 });
 
@@ -397,5 +407,124 @@ describe('배송지 변경 알림 닫기', () => {
   it('취소는 이 함수가 받지 않는다', async () => {
     await expect(transitionOrder('20260831-1234567', 'CANCELLED', admin))
       .rejects.toMatchObject({ code: 'USE_CANCEL' });
+  });
+});
+
+/**
+ * **보냈다 · 도착했다는 소식.**
+ *
+ * 사는 사람이 가장 기다리는 소식이고, 예전에는 알림함에만 남겼다가 메일까지
+ * 붙인 자리다. 그런데 **상태를 옮기는 쪽이 그것을 부르는지**는 아무도 보지
+ * 않았다 — 이 파일의 흉내에 `user` 표가 없어 알림이 통째로 삼켜졌고, 그래서
+ * 그 한 줄을 지워도 여기 검사는 전부 초록이었다.
+ */
+describe('배송 소식을 보내는 때', () => {
+  const allAt = (status: string) =>
+    tx.orderItem.findMany.mockResolvedValue([{ status }, { status }]);
+
+  it('주문이 출고로 움직이면 손님에게 알린다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    allAt('SHIPPED');
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', admin);
+
+    expect(notifyShipmentStage).toHaveBeenCalledExactlyOnceWith({
+      orderNo: '20260831-1234567',
+      userId: 'u-buyer',
+      stage: 'SHIPPED',
+    });
+  });
+
+  it('도착으로 움직이면 도착으로 알린다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('SHIPPED'));
+    allAt('DELIVERED');
+
+    await transitionOrder('20260831-1234567', 'DELIVERED', admin);
+
+    expect(notifyShipmentStage).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ stage: 'DELIVERED' }),
+    );
+  });
+
+  it('줄만 옮기고 주문이 안 움직이면 알리지 않는다 — 아직 못 받은 물건이 있다', async () => {
+    /*
+     * 섞인 주문에서 한 가맹점만 출고한 때다. 여기서 "발송했습니다" 가 가면
+     * 손님은 전부 떠난 줄 알고 기다리다 하나를 못 받는다.
+     */
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    tx.orderItem.findMany.mockResolvedValue([{ status: 'PREPARING' }, { status: 'SHIPPED' }]);
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', merchantA);
+
+    expect(notifyShipmentStage).not.toHaveBeenCalled();
+  });
+
+  it('이미 출고된 주문에 남은 줄이 따라와도 다시 알리지 않는다', async () => {
+    /*
+     * 섞인 주문에서 A 가 먼저 출고해 주문이 이미 배송중인데, B 가 뒤늦게 자기
+     * 줄을 출고하는 경우다. 줄은 모두 출고에 닿지만 **주문은 움직이지 않는다** —
+     * 여기서 또 보내면 손님은 "발송했습니다" 를 두 번 받고 물건이 두 개 오는
+     * 줄 안다.
+     */
+    db.order.findFirst.mockResolvedValue({
+      ...mixedOrder('SHIPPED'),
+      items: [
+        { id: 'i-1', status: 'SHIPPED', merchantId: 'm-a', canceledAt: null },
+        { id: 'i-2', status: 'PREPARING', merchantId: 'm-b', canceledAt: null },
+      ],
+    });
+    allAt('SHIPPED');
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', merchantB);
+
+    expect(notifyShipmentStage).not.toHaveBeenCalled();
+  });
+
+  it('배송과 무관한 전이에서는 알리지 않는다', async () => {
+    allAt('PREPARING');
+
+    await transitionOrder('20260831-1234567', 'PREPARING', admin);
+
+    expect(notifyShipmentStage).not.toHaveBeenCalled();
+  });
+
+  it('거절된 전이에서는 알리지 않는다', async () => {
+    await expect(
+      transitionOrder('20260831-1234567', 'PREPARING', customer),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+    expect(notifyShipmentStage).not.toHaveBeenCalled();
+  });
+
+  it('경합에서 다른 처리가 먼저 옮겼으면 알리지 않는다', async () => {
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    allAt('SHIPPED');
+    tx.order.updateMany.mockResolvedValue({ count: 0 });
+
+    /* 조건부 UPDATE 가 0건이면 이미 처리된 것이다 — 트랜잭션이 거기서 끝난다 */
+    await expect(
+      transitionOrder('20260831-1234567', 'SHIPPED', admin),
+    ).rejects.toMatchObject({ code: 'ALREADY_PROCESSED' });
+
+    expect(notifyShipmentStage).not.toHaveBeenCalled();
+  });
+
+  it('상태를 옮긴 뒤에 알린다 — 알림 하나 때문에 사람이 한 처리를 무르지 않는다', async () => {
+    /* 트랜잭션 안에 넣으면 알림 실패가 상태 변경까지 되돌린다 */
+    const order: string[] = [];
+    tx.order.updateMany.mockImplementation(() => {
+      order.push('move');
+      return Promise.resolve({ count: 1 });
+    });
+    notifyShipmentStage.mockImplementation(() => {
+      order.push('notify');
+      return Promise.resolve();
+    });
+    db.order.findFirst.mockResolvedValue(mixedOrder('PREPARING'));
+    allAt('SHIPPED');
+
+    await transitionOrder('20260831-1234567', 'SHIPPED', admin);
+
+    expect(order).toEqual(['move', 'notify']);
   });
 });
