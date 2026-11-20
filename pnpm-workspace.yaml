@@ -48,3 +48,12 @@ overrides:
   # vitest 가 받는 범위(^8.0.0)에 8.2.4 가 드는데도 `pnpm update vite` 는 8.2.2 에 머물렀다 —
   # 전이 의존은 잠금 파일의 결정을 그대로 쓴다. 그래서 판을 여기서 적는다.
   vite: '^8.2.4'
+  # Schema.TemplateLiteral 이 만드는 정규식의 ReDoS(GHSA-7589-6fvf-x4pw). 3.22.1 에서 고쳐졌다.
+  # 들어오는 길은 `prisma > @prisma/config` 하나뿐인데 **@prisma/config 가 3.20.0 을 정확한 판으로
+  # 못 박아** pnpm update 로는 안 움직인다(vite 와 같은 모양이다). 7.x 의 끝이 7.10.1 이고 그 위는
+  # 8 RC 라 상류를 올려서 풀 수도 없다.
+  #
+  # 그래도 면제로 두지 않는다 — 이 길이 도는 자리는 Prisma CLI 뿐이고, 그 CLI 는 **게이트가 실제로
+  # 밟는다**(prisma generate · migrate deploy). 올려서 깨지면 게이트가 먼저 말해 준다. 허용 목록의
+  # glob·minimatch 를 두고 보는 까닭이 "확인할 자리가 없다" 였으니, 여기는 반대 경우다.
+  effect: '^3.22.1'
