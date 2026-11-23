@@ -468,3 +468,153 @@ describe('교환 상품 발송', () => {
     });
   });
 });
+
+/**
+ * **끊긴 길과 모양이 틀린 200.**
+ *
+ * 여섯 창구가 저마다 두 겹으로 막는다 — `json()` 을 감싸고, 그물 밖의 실패를
+ * 잡는다. 그런데 **네 자리에서 그 두 겹이 한 번도 안 돌았다**(커버리지가 짚어
+ * 줬다). 운영자가 눌렀는데 아무 말이 없으면 다시 누른다. 같은 창구에 두 번
+ * 가는 것이 반품·환불 자리에서 무슨 뜻인지는 더 적을 것이 없다.
+ *
+ * 그리고 **감싸지 않으면 성공 응답이 거절로 둔갑한다** — 200 인데 본문이 비면
+ * `json()` 이 던지고, 그 거절이 밖의 catch 로 새서 "네트워크 오류" 가 뜬다.
+ * 처리는 됐는데 안 됐다고 말하는 화면이다.
+ */
+describe('끊기거나 모양이 틀리면', () => {
+  const offline = () => fetchMock.mockRejectedValue(new Error('offline'));
+  const html = () => fetchMock.mockResolvedValue(new Response('<html>502</html>', { status: 502 }));
+  const emptyOk = () => fetchMock.mockResolvedValue(new Response('', { status: 200 }));
+
+  describe('승인·반려', () => {
+    const open = () => render(<ReturnActions orderNo={ORDER_NO} />);
+
+    it('창구에 닿지 못하면 그렇다고 말한다', async () => {
+      offline();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: '반품 승인' }));
+
+      await waitFor(() => expect(alert()).toContain('네트워크'));
+    });
+
+    it('거절이 JSON 이 아니어도 우리 문구로 말한다', async () => {
+      html();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: '반품 승인' }));
+
+      await waitFor(() => expect(alert()).toContain('처리하지 못했습니다'));
+    });
+
+    it('성공 응답의 본문이 비어도 성공으로 본다 — 200 을 거절로 바꾸지 않는다', async () => {
+      emptyOk();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: '반품 승인' }));
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+      expect(screen.queryByRole('alert')).toBeNull();
+    });
+
+    it('끊긴 뒤에도 다시 누를 수 있다', async () => {
+      offline();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: '반품 승인' }));
+
+      await waitFor(() => expect(screen.getByRole('button', { name: '반품 승인' })).toBeEnabled());
+    });
+  });
+
+  describe('회수 확인 · 환불', () => {
+    const open = () => render(<CompleteReturnButton orderNo={ORDER_NO} preview={null} received />);
+
+    it('창구에 닿지 못하면 그렇다고 말한다', async () => {
+      offline();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: /환불/ }));
+
+      await waitFor(() => expect(alert()).toContain('네트워크'));
+    });
+
+    it('거절이 JSON 이 아니어도 환불 쪽 문구를 쓴다', async () => {
+      html();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: /환불/ }));
+
+      await waitFor(() => expect(alert()).toBeTruthy());
+    });
+
+    it('본문이 비면 돌려준 금액을 0원으로 적지 않는다', async () => {
+      /*
+       * **돈은 나갔는데 안 나갔다고 읽히는 말**이 가장 나쁘다. 얼마인지 모르면
+       * 숫자를 지어내지 말고 끝났다고만 말한다 — 0원은 "환불이 안 됐다" 로 읽혀
+       * 운영자가 다시 누르거나 위로 올린다.
+       */
+      emptyOk();
+      open();
+
+      await userEvent.click(screen.getByRole('button', { name: /환불/ }));
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+      expect(screen.queryByText(/0원을 돌려줬습니다/)).toBeNull();
+      expect(screen.getByText('환불했습니다.')).toBeInTheDocument();
+    });
+  });
+
+  describe('물건 도착 확인', () => {
+    it('거절이 JSON 이 아니어도 확인 쪽 문구를 쓴다', async () => {
+      html();
+      render(<ReceiveReturnButton orderNo={ORDER_NO} />);
+
+      await userEvent.click(screen.getByRole('button', { name: '물건 도착 확인' }));
+
+      await waitFor(() => expect(alert()).toBeTruthy());
+      expect(router.replace).not.toHaveBeenCalled();
+    });
+
+    it('성공 응답의 본문이 비어도 주소에 끝난 것을 싣는다', async () => {
+      emptyOk();
+      render(<ReceiveReturnButton orderNo={ORDER_NO} />);
+
+      await userEvent.click(screen.getByRole('button', { name: '물건 도착 확인' }));
+
+      await waitFor(() => expect(router.replace).toHaveBeenCalled());
+    });
+  });
+
+  describe('교환 상품 발송', () => {
+    const fill = async () => {
+      render(<ShipExchangeForm orderNo={ORDER_NO} />);
+      await userEvent.type(screen.getByLabelText(/송장/), '1234567890');
+      await userEvent.click(screen.getByRole('button', { name: /발송/ }));
+    };
+
+    it('창구에 닿지 못하면 그렇다고 말한다', async () => {
+      offline();
+
+      await fill();
+
+      await waitFor(() => expect(alert()).toContain('네트워크'));
+    });
+
+    it('거절이 JSON 이 아니어도 교환 쪽 문구를 쓴다', async () => {
+      html();
+
+      await fill();
+
+      await waitFor(() => expect(alert()).toBeTruthy());
+    });
+
+    it('성공 응답의 본문이 비어도 끝난 것으로 본다', async () => {
+      emptyOk();
+
+      await fill();
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+    });
+  });
+});

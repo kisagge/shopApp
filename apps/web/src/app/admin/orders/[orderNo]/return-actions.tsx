@@ -239,7 +239,17 @@ export function CompleteReturnButton({
         setError(result.message ?? '환불하지 못했습니다.');
         return;
       }
-      setStatus(`${format(won(result.refunded ?? 0))}원을 돌려줬습니다.`);
+      /*
+       * **모르는 금액을 0원이라고 말하지 않는다.** 창구가 200 을 주고도 본문을 못 읽는 날이
+       * 있는데(프록시가 끼거나 빈 몸), 그때 `?? 0` 으로 떨어뜨리면 **"0원을 돌려줬습니다"**
+       * 가 뜬다 — 돈은 나갔는데 안 나갔다고 읽히는 말이라 운영자가 다시 누르거나 올린다.
+       * 숫자를 모르면 숫자를 말하지 않는다.
+       */
+      setStatus(
+        typeof result.refunded === 'number'
+          ? `${format(won(result.refunded))}원을 돌려줬습니다.`
+          : '환불했습니다.',
+      );
       router.refresh();
     } catch {
       setError('네트워크 오류로 처리하지 못했습니다.');
