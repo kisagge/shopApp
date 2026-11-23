@@ -12,6 +12,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "mutate": "node tooling/mutate.mjs",
     "db:up": "docker compose -f tooling/docker-compose.yml up -d",
     "db:down": "docker compose -f tooling/docker-compose.yml down",
     "db:migrate": "pnpm --filter @shop/db exec prisma migrate dev && pnpm --filter @shop/db run generate",

@@ -76,3 +76,7 @@ packages/*/.claude/
 .claude/skills/
 
 
+
+# 돌연변이 목록은 한 덩이를 판별할 때만 쓰고 남기지 않는다 — 소스가 바뀌면
+# `from` 이 안 맞아 그대로 썩는다. 판별 결과는 커밋 메시지에 적는다.
+tooling/mutations/*.json
