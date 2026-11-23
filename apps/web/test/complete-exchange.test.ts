@@ -18,6 +18,13 @@ const tx = vi.hoisted(() => ({
 }));
 const db = vi.hoisted(() => ({
   order: { findFirst: vi.fn<(...a: any[]) => any>() },
+  /*
+   * 처리하고 나면 "반품 신청이 들어왔다" 를 닫는다(`clearReturnRequested`) — 그 자리가
+   * 남은 신청 수를 센다. 흉내에 없으면 조회가 터지고 제 오류를 삼켜, 로그에 줄만 남는다.
+   * 닫는 일 자체는 그쪽 검사가 본다(`return-request`·`console-work-notices`).
+   */
+  returnRequest: { count: vi.fn<(...a: any[]) => any>(() => Promise.resolve(0)) },
+  notification: { updateMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 0 })) },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));

@@ -10,7 +10,11 @@ vi.mock('~/lib/storage', async (importOriginal) => ({
   getStorage: () => storage,
 }));
 const db = vi.hoisted(() => ({
-  inquiry: { create: vi.fn<(...a: any[]) => any>() },
+  /* 만든 뒤 답할 사람에게 알린다 — 그 자리가 이 문의를 다시 읽는다(`notifyInquiryReceived`) */
+  inquiry: {
+    create: vi.fn<(...a: any[]) => any>(),
+    findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)),
+  },
   product: { findFirst: vi.fn<(...a: any[]) => any>() },
 }));
 vi.mock('@shop/db', () => ({ prisma: db }));

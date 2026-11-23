@@ -37,6 +37,12 @@ const db = vi.hoisted(() => ({
     findFirst: vi.fn<(...a: any[]) => any>(),
     // 품절에 막히면 버려진 주문을 찾아본다 — 그 조회가 여기로 온다
     findMany: vi.fn<(...a: any[]) => any>(),
+    /*
+     * 푼 주문의 주인에게는 취소를 알린다(`notifyAfterSale`) — 그 자리가 주문을 다시
+     * 읽는다. 흉내에 없으면 알림이 터지고 제 오류를 삼켜 로그에 줄만 남는다.
+     * 알리는 일 자체는 `release-holds` 검사가 본다.
+     */
+    findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)),
   },
   productVariant: { findMany: vi.fn<(...a: any[]) => any>() },
   userCoupon: { findFirst: vi.fn<(...a: any[]) => any>() },

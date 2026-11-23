@@ -142,6 +142,9 @@ describe('재고 부족 알림을 닫기', () => {
    * 알림도 그 한 통이다 — 임박만 세면 정작 지금 팔 수 없는 옵션을 두고 알림이 닫힌다.
    */
   it('품절과 임박을 함께 센다 — 대시보드와 같은 경계다', async () => {
+    /* 세고 나면 그 가게 사람들을 묻는다 — 안 주면 거기서 터지고 로그에 줄만 남는다 */
+    user.findMany.mockResolvedValue([{ id: 'u-1' }]);
+
     await clearLowStockDone('m-1');
 
     const or = product.count.mock.calls[0]![0].where.OR as { variants: { some: { stock: unknown } } }[];

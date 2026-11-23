@@ -7,6 +7,10 @@ const db = vi.hoisted(() => ({
   },
   // 표시는 조건부 UPDATE … RETURNING 로 한다
   $queryRaw: vi.fn<(...a: any[]) => any>(),
+  /* 메일과 함께 알림함에도 남긴다 — 남기는 일 자체는 `restock` 검사가 본다 */
+  notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 1 })) },
+  /* 문안은 고친 문구가 있으면 그것을 쓴다 — 고르는 규칙은 `order-mail-send` 가 본다 */
+  mailTemplate: { findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)) },
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: (parts: unknown[]) => parts } }));
 

@@ -33,6 +33,17 @@ const db = vi.hoisted(() => ({
   orderRefund: { aggregate: read.aggregate },
   $transaction: vi.fn<(...a: any[]) => any>(),
 }));
+/*
+ * **오류함 싱크가 읽는 표.** 장부가 어긋나면 보고가 나가는데(`reportLedgerMismatch`),
+ * 그 보고를 DB 에 쌓는 싱크가 이 표를 찾는다. 흉내에 없으면 싱크가 터지고 제 오류를
+ * 삼켜 로그에 줄만 남는다 — 보고가 나갔다는 사실은 콘솔 싱크로 이미 재고 있다("수동 대사").
+ */
+const errorGroup = vi.hoisted(() => ({
+  findUnique: vi.fn<(...a: any[]) => any>(() => Promise.resolve(null)),
+  create: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ id: 'eg-1' })),
+  update: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ id: 'eg-1' })),
+}));
+Object.assign(db, { errorGroup });
 vi.mock('@shop/db', () => ({ prisma: db }));
 
 const recordServerEvent = vi.hoisted(() => vi.fn<(...a: any[]) => any>());
