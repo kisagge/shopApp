@@ -19,6 +19,22 @@ describe('checkTemplate', () => {
     expect(checkTemplate('COUPON_ISSUED', '{stock}개 남음')).toEqual([{ kind: 'UNKNOWN_PLACEHOLDER', names: ['stock'] }]);
   });
 
+  /**
+   * **한국어 운영 화면에서 할 만한 실수다** — 자리값을 `{고객명}` 처럼 우리말로 적는 것.
+   *
+   * 그대로 저장되면 받는 사람의 편지함에 `{고객명}` 이 글자로 뜬다. 지금은 막히는데,
+   * **막히는 까닭이 우연이다**: 자리값 무늬가 아스키만 자리값으로 보므로(`/\{(\w+)\}/`)
+   * 우리말 이름은 자리값으로 안 잡히고, 그래서 중괄호가 남아 짝 검사에 걸린다.
+   *
+   * 이름(BROKEN_BRACE)은 사실과 조금 다르지만 **막힌다는 것이 중요하다.** 무늬를
+   * 우리말까지 보도록 넓히면 이름이 UNKNOWN_PLACEHOLDER 로 바뀌는데 그때도 막힌다 —
+   * 그래서 여기서는 **어느 쪽이든 문제로 잡힌다**까지만 못 박는다.
+   */
+  it('우리말로 적은 자리값은 어떤 이름으로든 막는다 — 편지함에 글자로 뜨면 안 된다', () => {
+    expect(checkTemplate('ORDER_SHIPPED', '{고객명} 님, 출고했어요')).not.toEqual([]);
+    expect(checkTemplate('ORDER_SHIPPED', '{주문번호} 출고')).not.toEqual([]);
+  });
+
   it('닫지 않은 중괄호와 빈 문구, 너무 긴 문구를 잡는다', () => {
     expect(checkTemplate('ORDER_SHIPPED', '주문 {orderNo 출고')).toEqual([{ kind: 'BROKEN_BRACE' }]);
     expect(checkTemplate('ORDER_SHIPPED', '주문 orderNo} 출고')).toEqual([{ kind: 'BROKEN_BRACE' }]);
