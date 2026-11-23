@@ -11,6 +11,11 @@ const db = vi.hoisted(() => ({
   },
   // 표시는 조건부 UPDATE … RETURNING 로 한다 — 누가 이겼는지 알아야 그 사람에게만 보낸다
   $queryRaw: vi.fn<(...a: any[]) => any>(),
+  /*
+   * **알림함에도 남긴다.** 이 표가 흉내에 없으면 기록이 터지고 `recordNotifications`
+   * 가 삼킨다 — 메일만 보고 있던 동안 알림함 쪽은 한 번도 돌지 않았다.
+   */
+  notification: { createMany: vi.fn<(...a: any[]) => any>(() => Promise.resolve({ count: 1 })) },
 }));
 vi.mock('@shop/db', () => ({ prisma: db, Prisma: { join: (parts: unknown[]) => parts } }));
 
@@ -127,12 +132,14 @@ describe('발송', () => {
   };
   const pendingRow = (product: Record<string, unknown> = {}) => ({
     id: 'r-1', userId: 'u-1', variantId: 'v-1',
-    user: { email: 'a@plain.test' },
+    // 조회가 말까지 읽는다 — 받는 사람의 말로 쓴다
+    user: { email: 'a@plain.test', locale: 'ko' },
     variant: { label: '블랙 / M', product: { ...onDisplay, ...product } },
   });
   const pending = [pendingRow()];
 
-  const readsPending = (rows: { id: string }[]) => {
+  /* **온전한 줄만 받는다** — 칸이 빠진 줄을 넘기면 조회가 주지 않는 모양을 재게 된다 */
+  const readsPending = (rows: ReturnType<typeof pendingRow>[]) => {
     lastPending = rows;
     db.restockNotification.findMany.mockResolvedValue(rows);
   };
@@ -228,7 +235,7 @@ describe('발송', () => {
   it('다른 실행이 먼저 가져간 사람에게는 보내지 않는다', async () => {
     readsPending([
       pending[0]!,
-      { ...pendingRow(), id: 'r-2', userId: 'u-2', user: { email: 'b@plain.test' } },
+      { ...pendingRow(), id: 'r-2', userId: 'u-2', user: { email: 'b@plain.test', locale: 'ko' } },
     ]);
     // 첫 줄은 다른 실행이 이미 표시했다 — 이긴 줄만 돌아온다
     db.$queryRaw.mockResolvedValue([{ id: 'r-2' }]);
@@ -278,5 +285,96 @@ describe('발송', () => {
 
     // allSettled 로 감싸 두어 한 경로의 실패가 전체를 깨지 않는다
     expect(r.notified).toBe(1);
+  });
+});
+
+/**
+ * **알림함에도 남긴다.**
+ *
+ * 메일은 놓치기 쉽고 스팸함으로도 간다 — 다시 들어온 사람이 무슨 일이 있었는지
+ * 볼 자리가 있어야 한다. 그런데 이 파일의 흉내에 `notification` 표가 없어서
+ * 기록이 통째로 삼켜졌고(`recordNotifications` 가 삼킨다), **그 자리가 비어도
+ * 메일 검사는 전부 초록**이었다. 손님이 "알림 받기" 를 눌러 둔 자리라
+ * 약속한 것을 안 보내는 모양이 된다.
+ */
+describe('재입고를 알림함에도 남긴다', () => {
+  const onDisplay = {
+    name: '울 코트', slug: 'wool-coat', status: 'ACTIVE', deletedAt: null,
+    publishedAt: new Date('2026-07-01'), brand: { merchant: { status: 'APPROVED' } },
+  };
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: 'r-1', userId: 'u-1', variantId: 'v-1',
+    user: { email: 'a@plain.test', locale: 'ko' },
+    variant: { label: '블랙 / M', product: onDisplay },
+    ...over,
+  });
+
+  const recorded = () => db.notification.createMany.mock.calls[0]?.[0].data as
+    | { userId: string; kind: string; params: Record<string, string>; linkPath: string }[]
+    | undefined;
+
+  beforeEach(() => {
+    db.restockNotification.findMany.mockResolvedValue([row()]);
+    db.$queryRaw.mockResolvedValue([{ id: 'r-1' }]);
+  });
+
+  it('메일과 함께 그 사람의 알림함에 남긴다', async () => {
+    await notifyRestocked(['v-1']);
+
+    expect(recorded()).toEqual([{
+      userId: 'u-1',
+      kind: 'RESTOCKED',
+      params: { productName: '울 코트', optionLabel: '블랙 / M' },
+      linkPath: '/product/wool-coat',
+    }]);
+  });
+
+  it('누르면 그 상품으로 간다 — 재입고 알림을 받고 하는 일이 그것이다', async () => {
+    await notifyRestocked(['v-1']);
+
+    expect(recorded()![0]!.linkPath).toBe('/product/wool-coat');
+  });
+
+  it('어느 옵션인지 적는다 — 한 상품에 여러 옵션을 걸어 두는 사람이 있다', async () => {
+    db.restockNotification.findMany.mockResolvedValue([
+      row({ variant: { label: '오트 / L', product: onDisplay } }),
+    ]);
+
+    await notifyRestocked(['v-1']);
+
+    expect(recorded()![0]!.params.optionLabel).toBe('오트 / L');
+  });
+
+  it('기다리는 사람마다 한 줄씩 남긴다', async () => {
+    db.restockNotification.findMany.mockResolvedValue([
+      row(),
+      row({ id: 'r-2', userId: 'u-2', user: { email: 'b@plain.test', locale: 'en' } }),
+    ]);
+    db.$queryRaw.mockResolvedValue([{ id: 'r-1' }, { id: 'r-2' }]);
+
+    await notifyRestocked(['v-1']);
+
+    expect(recorded()!.map((n) => n.userId)).toEqual(['u-1', 'u-2']);
+  });
+
+  it('기다리는 사람이 없으면 아무것도 남기지 않는다', async () => {
+    db.restockNotification.findMany.mockResolvedValue([]);
+
+    await notifyRestocked(['v-1']);
+
+    expect(db.notification.createMany).not.toHaveBeenCalled();
+  });
+
+  it('표시를 못 잡은 사람에게는 남기지 않는다 — 같은 사람에게 두 번 가지 않는다', async () => {
+    /* 보내기 전에 먼저 표시하고, 그 경합에서 이긴 줄에만 보낸다 */
+    db.restockNotification.findMany.mockResolvedValue([
+      row(),
+      row({ id: 'r-2', userId: 'u-2', user: { email: 'b@plain.test', locale: 'ko' } }),
+    ]);
+    db.$queryRaw.mockResolvedValue([{ id: 'r-2' }]);
+
+    await notifyRestocked(['v-1']);
+
+    expect(recorded()!.map((n) => n.userId)).toEqual(['u-2']);
   });
 });
