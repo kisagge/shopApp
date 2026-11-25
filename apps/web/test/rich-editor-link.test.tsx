@@ -276,3 +276,83 @@ describe('링크 줄', () => {
     expect(linkRow()).toHaveValue('https://exa');
   });
 });
+
+/**
+ * **단추를 실제로 눌러 본다.**
+ *
+ * 도구 모음의 모양과 눌린 상태는 위에서 본다 — 그런데 **누르는 검사가 없었다.**
+ * 베껴 쓰다 기울임이 `toggleBold` 로 묶이면 모양은 그대로고, 눌린 상태도
+ * `isActive` 를 읽으니 멀쩡해 보이고, 어휘 그물도 통과한다. 운영자가 기울임을
+ * 누르고 굵은 글씨를 얻은 뒤에야 안다.
+ *
+ * 꾸밈(굵게·기울임·취소선·코드)은 고른 글이 없으면 나무가 바뀌지 않으므로
+ * **눌린 상태**로 본다 — 엉뚱한 단추가 켜지면 그 자리에서 드러난다.
+ * 덩이(글머리·번호·인용)는 지금 줄을 바꾸므로 **나온 나무**로 본다.
+ */
+describe('단추를 누르면', () => {
+  const pressed = (label: string) => button(label).getAttribute('aria-pressed');
+
+  it.each([
+    ['굵게', ['기울임', '취소선', '코드']],
+    ['기울임', ['굵게', '취소선', '코드']],
+    ['취소선', ['굵게', '기울임', '코드']],
+    ['코드', ['굵게', '기울임', '취소선']],
+  ])('%s 를 누르면 그것만 켜진다', async (label, others) => {
+    editor();
+
+    await userEvent.click(button(label));
+
+    expect(pressed(label), `${label} 이 안 켜졌다`).toBe('true');
+    for (const other of others) {
+      expect(pressed(other), `${label} 을 눌렀는데 ${other} 가 켜졌다`).toBe('false');
+    }
+  });
+
+  it('다시 누르면 꺼진다 — 한 번 켜면 되돌릴 길이 있어야 한다', async () => {
+    editor();
+
+    await userEvent.click(button('굵게'));
+    await userEvent.click(button('굵게'));
+
+    expect(pressed('굵게')).toBe('false');
+  });
+
+  const lastDoc = () => onChange.mock.calls.at(-1)![0];
+  const kinds = (d: RichTextDoc) => d.content.map((node) => node.type);
+
+  it.each([
+    ['글머리', 'bulletList'],
+    ['번호', 'orderedList'],
+    ['인용', 'blockquote'],
+  ])('%s 를 누르면 그 줄이 %s 가 된다', async (label, kind) => {
+    editor();
+
+    await userEvent.click(button(label));
+
+    expect(kinds(lastDoc())).toContain(kind);
+  });
+
+  it('덩이를 다시 누르면 목록이 아니게 된다 — 한 번 켜면 되돌릴 길이 있어야 한다', async () => {
+    /*
+     * **문단 수는 세지 않는다.** 되돌린 뒤 빈 문단이 하나 더 남기도 하는데, 그
+     * 가름은 우리 사슬이 아니라 tiptap 의 몫이다(우리가 더하는 수는 "제목이면
+     * 문단으로" 하나뿐이다). 여기서 지킬 것은 **목록이 풀리고 글이 남는 것**이고,
+     * 진짜 브라우저에서의 모양은 e2e(`rich-editor.spec`)가 본다.
+     */
+    editor(doc('지키고 싶은 글'));
+
+    await userEvent.click(button('글머리'));
+    await userEvent.click(button('글머리'));
+
+    expect(kinds(lastDoc())).not.toContain('bulletList');
+    expect(JSON.stringify(lastDoc())).toContain('지키고 싶은 글');
+  });
+
+  it('덩이를 바꿔도 글은 그대로다 — 모양을 바꾸려다 글을 잃지 않는다', async () => {
+    editor(doc('지키고 싶은 글'));
+
+    await userEvent.click(button('인용'));
+
+    expect(JSON.stringify(lastDoc())).toContain('지키고 싶은 글');
+  });
+});
