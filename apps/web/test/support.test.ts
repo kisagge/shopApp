@@ -18,7 +18,8 @@ vi.mock('~/lib/cache', () => cache);
 const {
   getFaq, getNotices, getAdminSupportPosts, getAdminSupportPost,
 } = await import('~/lib/queries/support');
-const { createSupportPost, updateSupportPost } = await import('~/lib/admin/manage-support');
+const { createSupportPost, updateSupportPost, deleteSupportPost } =
+  await import('~/lib/admin/manage-support');
 
 const admin: Actor = { id: 'u-a', role: 'ADMIN', merchantId: null };
 const merchant: Actor = { id: 'u-m', role: 'MERCHANT', merchantId: 'm-1' };
@@ -245,5 +246,132 @@ describe('게시일', () => {
     db.supportPost.findFirst.mockResolvedValue(null);
     expect(await updateSupportPost(admin, 'nope', input)).toBeNull();
     expect(db.supportPost.update).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * **공지를 고치는 일.**
+ *
+ * 읽는 쪽과 권한은 위에서 본다. 비어 있던 것은 **쓰는 규칙들**이고, 그중 하나는
+ * 읽은 사람에게 그대로 보인다 — 게시일을 다시 찍으면 오타 하나 고친 공지가
+ * 목록 맨 위로 올라와 **새 공지로 읽힌다.**
+ */
+describe('공지를 쓰고 고치기', () => {
+  const input = (over: Record<string, unknown> = {}) => ({
+    kind: 'NOTICE' as const,
+    title: '점검 안내',
+    bodyRich: doc('새벽 2시부터 30분간 점검합니다.'),
+    pinned: false,
+    sortOrder: 0,
+    published: true,
+    ...over,
+  });
+
+  const created = () => db.supportPost.create.mock.calls[0]![0].data as Record<string, unknown>;
+  const updated = () => db.supportPost.update.mock.calls[0]![0].data as Record<string, unknown>;
+
+  it('처음 내보낼 때 게시일을 찍는다', async () => {
+    await createSupportPost(admin, input());
+
+    expect(created()['publishedAt']).toBeInstanceOf(Date);
+  });
+
+  it('초안으로 두면 게시일이 없다 — 날짜가 있으면 손님 화면에 선다', async () => {
+    await createSupportPost(admin, input({ published: false }));
+
+    expect(created()['publishedAt']).toBeNull();
+  });
+
+  it('이미 내보낸 글을 고칠 때 게시일을 다시 찍지 않는다', async () => {
+    /*
+     * **오타 하나 고쳤다고 공지가 목록 맨 위로 다시 올라오면 안 된다.** 읽은
+     * 사람이 새 공지인 줄 알고 다시 읽고, 정말 새 공지가 왔을 때는 둔해진다.
+     */
+    const first = new Date('2026-10-01T00:00:00Z');
+    db.supportPost.findFirst.mockResolvedValue({
+      id: 'p-1', kind: 'NOTICE', title: '옛 제목', publishedAt: first,
+    });
+
+    await updateSupportPost(admin, 'p-1', input({ title: '점검 안내(오타 고침)' }));
+
+    expect(updated()['publishedAt']).toEqual(first);
+  });
+
+  it('초안이던 글을 내보내면 그때 날짜를 찍는다', async () => {
+    db.supportPost.findFirst.mockResolvedValue({
+      id: 'p-1', kind: 'NOTICE', title: '초안', publishedAt: null,
+    });
+
+    await updateSupportPost(admin, 'p-1', input({ published: true }));
+
+    expect(updated()['publishedAt']).toBeInstanceOf(Date);
+  });
+
+  it('내보낸 글을 초안으로 내리면 날짜를 지운다', async () => {
+    db.supportPost.findFirst.mockResolvedValue({
+      id: 'p-1', kind: 'NOTICE', title: '공지', publishedAt: new Date('2026-10-01'),
+    });
+
+    await updateSupportPost(admin, 'p-1', input({ published: false }));
+
+    expect(updated()['publishedAt']).toBeNull();
+  });
+
+  it('평문은 서버가 본문에서 뽑는다 — 화면이 둘 다 보내면 어느 날 서로 다른 말을 한다', async () => {
+    await createSupportPost(admin, input({ bodyRich: doc('새벽 2시부터 점검합니다.') }));
+
+    expect(created()['body']).toContain('새벽 2시부터 점검합니다.');
+  });
+
+  it('갈래를 안 적으면 비워 둔다 — 공지에는 갈래가 없다', async () => {
+    await createSupportPost(admin, input());
+
+    expect(created()['topic']).toBeNull();
+  });
+
+  it('없는 글은 고칠 수 없다 — 화면이 빈 폼을 열지 않게 분명히 거절한다', async () => {
+    db.supportPost.findFirst.mockResolvedValue(null);
+
+    expect(await updateSupportPost(admin, 'p-없음', input())).toBeNull();
+    expect(db.supportPost.update).not.toHaveBeenCalled();
+  });
+
+  it('가맹점은 고칠 수도 없다 — 막히면 DB 를 건드리지 않는다', async () => {
+    await expect(updateSupportPost(merchant, 'p-1', input())).rejects.toThrow(ForbiddenError);
+
+    expect(db.supportPost.findFirst).not.toHaveBeenCalled();
+    expect(db.supportPost.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('공지 지우기', () => {
+  /*
+   * **표시만 한다.** 공지는 무엇을 언제 알렸는지가 나중에 근거가 되는 글이라,
+   * 지웠다고 흔적까지 없애면 그때 무슨 안내가 나갔는지 확인할 수 없다.
+   */
+  it('줄을 지우지 않고 지운 때를 적는다', async () => {
+    db.supportPost.findFirst.mockResolvedValue({ id: 'p-1', kind: 'NOTICE', title: '공지' });
+
+    expect(await deleteSupportPost(admin, 'p-1')).toBe(true);
+    expect(db.supportPost.update.mock.calls[0]![0].data['deletedAt']).toBeInstanceOf(Date);
+  });
+
+  it('없는 글이면 거짓을 돌려준다 — 두 번 눌러도 터지지 않는다', async () => {
+    db.supportPost.findFirst.mockResolvedValue(null);
+
+    expect(await deleteSupportPost(admin, 'p-없음')).toBe(false);
+    expect(db.supportPost.update).not.toHaveBeenCalled();
+  });
+
+  it('이미 지운 글은 다시 지우지 않는다 — 지운 때가 덮이면 언제 내렸는지 잃는다', async () => {
+    await deleteSupportPost(admin, 'p-1');
+
+    expect(db.supportPost.findFirst.mock.calls[0]![0].where).toMatchObject({ deletedAt: null });
+  });
+
+  it('가맹점은 지울 수 없다', async () => {
+    await expect(deleteSupportPost(merchant, 'p-1')).rejects.toThrow(ForbiddenError);
+
+    expect(db.supportPost.findFirst).not.toHaveBeenCalled();
   });
 });
