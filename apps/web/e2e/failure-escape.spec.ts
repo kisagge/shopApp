@@ -205,3 +205,58 @@ test('찜하기가 실패하면 하트가 되돌아오고, 그 자리에 이유�
   await expect(page.getByRole('button', { name: /찜하기$/ }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: /찜 해제$/ })).toHaveCount(0);
 });
+
+/**
+ * **갇히는 자리는 패널 안에도 있다.**
+ *
+ * 옵션 바꾸기는 누르면 그 자리에서 목록을 불러온다. 못 불러오면 상태가 `error` 로
+ * 가는데 — 문제는 **거기서 나올 수 있는가** 다. 배송지 결함이 정확히 그 모양이었다:
+ * 오류를 그리는 코드는 있었고 그 위의 이른 반환이 가로막아 닿지 못했으며, 빠져나갈
+ * 단추도 그 아래에 있었다.
+ *
+ * 여기서는 닫는 길이 **여는 단추 자신**이다. 그 구조가 바뀌면(패널 안으로 닫기를
+ * 옮기는 등) 못 불러온 사람은 갈 곳이 없어진다.
+ */
+test('장바구니에서 옵션 목록을 못 불러오면 말하고, 그 자리에서 닫을 수 있다', async ({ page }) => {
+  await addFirstProductToCart(page);
+  await page.goto('/cart');
+  await ready(page);
+
+  const change = page.getByRole('button', { name: /옵션 바꾸기|옵션 변경/ }).first();
+  await expect(change).toBeVisible();
+
+  /*
+   * **그 패널 안만 본다.** 장바구니에는 다른 경고 자리가 있어서 화면 전체의
+   * `alert` 를 세면 이 패널이 무엇을 말하는지 가릴 수 없다(처음에 그렇게 적어
+   * 한 번 졌다). 단추가 `aria-controls` 로 제 패널을 가리키므로 그것으로 집는다.
+   */
+  const panelId = await change.getAttribute('aria-controls');
+  expect(panelId, '단추가 제 패널을 가리키지 않는다 — 낭독기도 그 짝을 못 찾는다').toBeTruthy();
+  const panel = page.locator(`#${panelId}`);
+
+  await breakOnce(page, '**/api/cart/options**');
+  await change.click();
+
+  // 못 불러왔다고 말한다 — "불러오는 중" 에서 멈추지 않는다
+  await expect(panel.getByRole('alert')).toBeVisible();
+  await expect(panel.getByText('불러오는 중')).toHaveCount(0);
+
+  // 같은 단추로 닫힌다 — 갇히지 않는다
+  await change.click();
+  await expect(change).toHaveAttribute('aria-expanded', 'false');
+
+  /*
+   * 한 번만 깨뜨렸으므로 다시 열면 이번에는 목록이 온다 — 한 번의 실패가 그 줄을
+   * 영영 못 고치게 만들지 않는다.
+   */
+  await change.click();
+  await expect(panel.getByRole('alert')).toHaveCount(0);
+});
+
+/*
+ * **주문 취소의 실패 길은 여기 두지 않았다.** 이 명세의 계정에는 주문이 없고(장바구니·
+ * 배송지·문의를 보는 계정이다), 만들려면 결제까지 밟아야 한다 — 한 단정을 위해 e2e 를
+ * 30초 더 쓰는 셈이다. 남의 명세 계정을 빌리면 둘이 공유 상태로 엮여 이 파일이 싸우는
+ * 그 흔들림을 들여온다. 그 자리는 단위 검사가 본다(`cancel-order-button` —
+ * "길이 끊기면 말하고, 다시 누를 수 있게 돌려놓는다").
+ */
