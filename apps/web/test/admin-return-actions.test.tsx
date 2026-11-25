@@ -91,6 +91,21 @@ describe('승인 철회 — 승인한 신청을 무른다', () => {
     expect(sent()).toEqual({ action: 'WITHDRAW', rejectReason: '기한 안에 물건이 오지 않았습니다.' });
   });
 
+  it('그만두기를 누르면 단추로 돌아오고 아무것도 보내지 않는다', async () => {
+    /*
+     * 이 폼은 **승인한 신청을 무르는** 자리다. 빠져나가는 단추가 깨지면 운영자는
+     * 보내거나 새로 고치는 두 길밖에 없고, 그 상태에서 "일단 눌러 보자" 가 된다.
+     */
+    render(<WithdrawReturnButton orderNo={ORDER_NO} />);
+    await userEvent.click(screen.getByRole('button', { name: '승인 철회' }));
+
+    await userEvent.click(screen.getByRole('button', { name: '그만두기' }));
+
+    expect(screen.getByRole('button', { name: '승인 철회' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/사유/)).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('성공하면 폼이 닫히고 화면을 다시 그린다', async () => {
     render(<WithdrawReturnButton orderNo={ORDER_NO} />);
     await userEvent.click(screen.getByRole('button', { name: '승인 철회' }));

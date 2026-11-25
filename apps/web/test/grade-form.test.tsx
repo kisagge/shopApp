@@ -96,3 +96,29 @@ describe('보내기', () => {
     expect(screen.getByText(/적립률이 함께 올라갑니다/)).toBeTruthy();
   });
 });
+
+/**
+ * **되돌아가는 길은 잠기지 않는다.**
+ *
+ * 소스에 그렇게 적혀 있는데(보내는 중에도 마음을 바꿀 수 있어야 한다) **그
+ * 단추를 누르는 검사가 없었다.** 그리고 닫을 때 초점을 단추로 돌려주는 규칙도
+ * 있다 — 예전에는 취소를 누르면 초점이 사라진 폼과 함께 문서 처음으로 떨어졌다.
+ */
+describe('물었다가 그만두면', () => {
+  it('폼이 닫히고 아무것도 보내지 않는다', async () => {
+    const user = await open();
+
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByLabelText('사유')).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('초점을 여는 단추로 돌려준다 — 문서 처음으로 떨어지지 않게', async () => {
+    const user = await open();
+
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: /등급/ })).toHaveFocus();
+  });
+});

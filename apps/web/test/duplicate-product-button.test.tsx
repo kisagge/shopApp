@@ -28,6 +28,22 @@ describe('상품 복제 단추', () => {
     expect(note).toContain('재고는 0');
   });
 
+  it('취소를 누르면 묻기 전으로 돌아오고 아무것도 보내지 않는다', async () => {
+    /*
+     * 확인 단계에서 빠져나가는 단추를 아무도 안 누르고 있었다. 깨지면 운영자는
+     * **만들거나 새로 고치는 두 길**밖에 없고, 임시저장 사본이 쌓인다.
+     */
+    const user = userEvent.setup();
+    render(<DuplicateProductButton productId="p-1" />);
+    await user.click(screen.getByRole('button', { name: '복제' }));
+
+    await user.click(screen.getByRole('button', { name: '취소' }));
+
+    expect(screen.getByRole('button', { name: '복제' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '사본 만들기' })).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('만들어지면 사본 화면으로 간다', async () => {
     fetchMock.mockResolvedValue(Response.json({ id: 'p-copy' }, { status: 201 }));
     const user = userEvent.setup();

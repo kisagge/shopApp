@@ -104,3 +104,40 @@ describe('포인트 조정 폼', () => {
     expect(refresh).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * **물었다가 그만두는 길.**
+ *
+ * 확인 단계는 "정말 보낼까" 를 묻는 자리다. 그런데 **빠져나가는 단추를 아무도
+ * 누르지 않았다** — 거기 묶인 손잡이가 깨지면 운영자는 보내거나 새로 고치는 두
+ * 길밖에 없고, 돈이 걸린 자리에서 "일단 보내 보자" 가 된다.
+ */
+describe('확인 단계에서 그만두면', () => {
+  /* 확인 단계까지 간다 — 칸을 채우고 '확인' 을 누르면 확인 단추가 선다 */
+  const toConfirm = async (user: ReturnType<typeof userEvent.setup>) => {
+    await user.type(screen.getByLabelText('포인트'), '1000');
+    await user.type(screen.getByLabelText('사유'), '고객 보상');
+    await user.click(screen.getByRole('button', { name: '확인' }));
+  };
+
+  it('고치기를 누르면 폼으로 돌아오고 아무것도 보내지 않는다', async () => {
+    const user = setup();
+    await toConfirm(user);
+
+    await user.click(screen.getByRole('button', { name: '고치기' }));
+
+    expect(screen.queryByRole('button', { name: '지급하기' })).toBeNull();
+    expect(screen.getByRole('button', { name: '확인' })).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('적어 둔 값은 남는다 — 다시 적게 하지 않는다', async () => {
+    const user = setup();
+    await toConfirm(user);
+
+    await user.click(screen.getByRole('button', { name: '고치기' }));
+
+    expect(screen.getByLabelText('사유')).toHaveValue('고객 보상');
+    expect(screen.getByLabelText('포인트')).toHaveValue(1000);
+  });
+});

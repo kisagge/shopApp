@@ -166,6 +166,20 @@ describe('갈래 만들기', () => {
     expect(bodyOf()).toEqual({ name: '머플러', slug: 'muffler', parentId: 'knit' });
   });
 
+  it('취소하면 폼이 닫히고 아무것도 보내지 않는다', async () => {
+    /*
+     * 적다가 그만두는 것은 흔한 일이다. 빠져나가는 단추가 깨지면 **만들거나
+     * 새로 고치는 두 길**밖에 없고, 매대의 생김새를 정하는 화면에서 그렇다.
+     */
+    open();
+    const form = await fill('니트 아래 갈래 추가');
+
+    await userEvent.click(within(form).getByRole('button', { name: '취소' }));
+
+    expect(screen.queryByRole('form', { name: '니트 아래 갈래 추가' })).toBeNull();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it('최상위는 부모 없이 보낸다', async () => {
     open();
 
