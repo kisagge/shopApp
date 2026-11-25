@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { render, screen } from './render';
+import { render, screen, waitFor } from './render';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { MAX_COLLECTION_ITEMS } from '@shop/core';
@@ -66,6 +66,20 @@ describe('상품 찾기', () => {
   });
 
   /* 열자마자 전체 명단이 뜨면 고르는 화면이 아니라 명단을 훑는 화면이 된다 */
+  it('엔터로도 찾는다 — 글자를 적고 손이 거기로 간다', async () => {
+    /*
+     * 단추만 받으면 적고 엔터를 누른 사람에게는 아무 일도 안 일어난다. 같은 모양의
+     * 쿠폰 대상 찾기가 그 자리를 폼 제출까지 막아야 했던 것과 달리, 여기 카드에는
+     * 폼이 없다 — 그래서 여기서 볼 것은 **찾는가** 하나다.
+     */
+    open();
+    await userEvent.type(screen.getByLabelText('상품 찾기'), '코트{Enter}');
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledOnce());
+    const [url] = vi.mocked(fetch).mock.calls[0]!;
+    expect((url as string | URL).toString()).toContain('q=%EC%BD%94%ED%8A%B8');
+  });
+
   it('빈 말로는 찾지 않는다', async () => {
     open();
 

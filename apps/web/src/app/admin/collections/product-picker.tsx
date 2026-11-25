@@ -73,6 +73,12 @@ export function ProductPicker({
     }
   }
 
+  /*
+   * **눌러서는 닿지 않는 가드다.** 담기 단추는 이미 담겼거나 한도를 채우면 진짜로
+   * 비활성이고(`disabled`), 옮기기도 끝에서 그렇다 — 그래서 이 이른 반환들은 화면이
+   * 아니라 **코드가 직접 부를 때의 보루**다(목록을 손보는 길이 늘면 그때 값을 한다).
+   * 돌연변이로 없애 봐도 아무도 안 진다. 지우지 말 것.
+   */
   function add(product: PickedProduct) {
     if (list.some((p) => p.id === product.id)) return;
     if (list.length >= MAX_COLLECTION_ITEMS) return;
@@ -173,7 +179,16 @@ export function ProductPicker({
             onChange={(e) => setTerm(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                // 이 칸은 폼 안에 있다 — 엔터로 화면이 통째로 보내지지 않게 막는다
+                /*
+                 * **엔터로도 찾는다.** 글자를 적고 손이 엔터로 가는 것이 자연스러운
+                 * 자리인데, 막아 두지 않으면 아무 일도 안 일어난다.
+                 *
+                 * `preventDefault` 는 **지금은 막을 폼이 없다** — 이 조각을 세우는
+                 * 기획전 카드에는 `<form>` 이 없다. 같은 모양의 쿠폰 대상 찾기는
+                 * 폼 안에 있어서 거기서는 꼭 필요하고(엔터가 반쯤 적힌 쿠폰을 발행했다),
+                 * 여기 주석은 그 자리에서 베껴 와 사실과 달랐다. 담긴 상품 편집이
+                 * 폼 안으로 들어가는 날을 위해 남겨 두되, **지키는 것은 그날의 일**이다.
+                 */
                 e.preventDefault();
                 void search();
               }
