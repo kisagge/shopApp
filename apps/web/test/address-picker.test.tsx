@@ -169,6 +169,40 @@ describe('고른 주소를 쓸 때', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/addresses/a-1', { method: 'PATCH' });
   });
 
+  /*
+   * **다른 주소를 골라 본 적이 없었다.** 흉내가 늘 한 건만 돌려주어, 들어올 때
+   * 받은 `currentId` 가 그대로 실려 간다 — 라디오의 손잡이가 엉뚱하게 묶여도
+   * (늘 첫 건을 고르거나, 아무것도 안 하거나) 위의 검사는 통과한다. 그러면
+   * **주문이 손님이 고른 곳이 아닌 데로 간다.** 배송지는 되돌리기 어려운 종류다.
+   */
+  it('다른 주소를 고르면 그 주소로 바꾸고 넘긴다', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ addresses: [saved(), saved({ id: 'a-2', recipient: '김둘째', isDefault: false, label: '회사' })] }),
+    );
+    open();
+
+    await user.click(await screen.findByRole('radio', { name: /김둘째/ }));
+    await user.click(screen.getByRole('button', { name: '이 주소로 배송받기' }));
+
+    await waitFor(() => expect(onPicked).toHaveBeenCalledWith(expect.objectContaining({ id: 'a-2' })));
+    expect(fetchMock).toHaveBeenCalledWith('/api/addresses/a-2', { method: 'PATCH' });
+  });
+
+  it('고른 것만 체크된다 — 둘이 함께 켜져 있으면 어디로 가는지 알 수 없다', async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ addresses: [saved(), saved({ id: 'a-2', recipient: '김둘째', isDefault: false })] }),
+    );
+    open();
+
+    const second = await screen.findByRole('radio', { name: /김둘째/ });
+    await user.click(second);
+
+    expect(second).toBeChecked();
+    expect(screen.getByRole('radio', { name: /홍길동/ })).not.toBeChecked();
+  });
+
   it('거절되면 그 말을 하고 목록은 남는다 — 고른 것을 잃지 않는다', async () => {
     const user = userEvent.setup();
     open();

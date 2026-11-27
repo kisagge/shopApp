@@ -62,6 +62,23 @@ describe('보내기', () => {
     });
   });
 
+  it('연락 이메일을 고쳐 적으면 그 주소로 보낸다', async () => {
+    /*
+     * **미리 채워진 값만 재고 있었다**(로그인 계정의 이메일). 그 칸을 고쳐 적어
+     * 본 적이 없으므로 손잡이가 엉뚱한 칸에 묶여도 위의 "적은 값을 그대로
+     * 보낸다" 는 통과한다. 그러면 **심사 결과가 닿지 않는 주소로 간다** —
+     * 신청한 쪽은 기다리기만 한다.
+     */
+    setup();
+    await fill();
+    await userEvent.clear(field('이메일'));
+    await userEvent.type(field('이메일'), 'shop@moor.test');
+    await userEvent.click(screen.getByRole('button', { name: '입점 신청' }));
+
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body))
+      .toMatchObject({ contactEmail: 'shop@moor.test', name: '무어' });
+  });
+
   it('성공하면 화면을 다시 읽는다 — 같은 주소가 현황으로 바뀐다', async () => {
     setup();
     await fill();

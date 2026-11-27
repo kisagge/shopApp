@@ -86,6 +86,28 @@ describe('폼 열기', () => {
 });
 
 describe('저장', () => {
+  it('요청사항을 고쳐 적으면 그 말이 간다', async () => {
+    /*
+     * **미리 채워진 요청사항만 실려 가고 있었다.** 그 칸을 고쳐 적어 본 적이
+     * 없으므로 손잡이가 엉뚱한 칸에 묶여도 아래의 "요청사항도 함께 싣는다" 는
+     * 통과한다. 그러면 **기사에게 손님이 적지 않은 말이 간다** — 문 앞에 두라고
+     * 적었는데 전화하라는 말이 가는 식이다.
+     */
+    fetchMock.mockResolvedValue(Response.json({ orderNo: '20260901-0000001', shippingDelta: 0 }));
+    const user = setup();
+    const form = await openForm(user);
+
+    const memo = within(form).getByLabelText(/배송 요청사항/);
+    await user.clear(memo);
+    await user.type(memo, '부재 시 경비실에 맡겨 주세요');
+    await user.click(within(form).getByRole('button', { name: '배송지 저장' }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    // 화면의 상태는 memo 지만 창구로는 deliveryMemo 로 간다
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body))
+      .toMatchObject({ deliveryMemo: '부재 시 경비실에 맡겨 주세요', recipient: '장보영' });
+  });
+
   it('PATCH 로 보내고, 요청사항도 함께 싣는다', async () => {
     fetchMock.mockResolvedValue(Response.json({ orderNo: '20260901-0000001', shippingDelta: 0 }));
     const user = setup();

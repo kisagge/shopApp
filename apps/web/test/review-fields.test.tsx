@@ -232,6 +232,25 @@ describe('사이즈 감상', () => {
     expect(fit).toBeTruthy();
   });
 
+  /*
+   * **누가 눌러 본 적이 없었다** — 위의 검사들은 `onChange={() => {}}` 로 그려
+   * 두고 모양만 본다. 손잡이가 늘 첫 값을 넘기면 손님이 "커요" 를 골랐는데
+   * **"작아요" 가 기록된다.** 다른 손님이 사이즈를 고를 때 보는 그 값이다.
+   *
+   * 라벨을 손으로 적지 않고 그려진 순서로 집는다 — SIZE_FIT 의 순서가 그대로다.
+   */
+  it('누르면 그 값을 그대로 넘긴다', async () => {
+    const onChange = vi.fn();
+    render(<SizeFitField value="" onChange={onChange} />);
+    const radios = screen.getAllByRole('radio');
+
+    for (const [index, fit] of [...SIZE_FIT].entries()) {
+      await userEvent.click(radios[index]!);
+      expect(onChange).toHaveBeenLastCalledWith(fit);
+    }
+    expect(onChange).toHaveBeenCalledTimes(SIZE_FIT.length);
+  });
+
   it('사람의 말로 적는다', () => {
     render(<SizeFitField value="" onChange={() => {}} />);
 

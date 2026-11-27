@@ -40,6 +40,34 @@ describe('문의 작성', () => {
     expect(JSON.parse(fetchMock.mock.calls[0]![1].body).isPrivate).toBe(false);
   });
 
+  it('비공개로 체크하면 비공개로 보낸다', async () => {
+    /*
+     * **기본값만 재고 있었다.** 그 칸을 눌러 본 적이 없으므로 손잡이가 뒤집혀
+     * 있어도(또는 늘 false 를 담아도) 위의 "기본은 공개다" 는 통과한다. 그러면
+     * 손님은 **나와 판매자만 본다고 믿고 적은 글이 매대에 걸린다** — 되돌릴 수
+     * 없는 종류다.
+     */
+    render(<InquiryForm productId="p-1" />);
+
+    await userEvent.click(screen.getByRole('checkbox'));
+    await userEvent.type(screen.getByRole('textbox'), '사이즈 문의드립니다');
+    await userEvent.click(screen.getByRole('button', { name: '문의 남기기' }));
+
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).isPrivate).toBe(true);
+  });
+
+  it('다시 누르면 공개로 돌아온다', async () => {
+    render(<InquiryForm productId="p-1" />);
+    const box = screen.getByRole('checkbox');
+
+    await userEvent.click(box);
+    await userEvent.click(box);
+    await userEvent.type(screen.getByRole('textbox'), '사이즈 문의드립니다');
+    await userEvent.click(screen.getByRole('button', { name: '문의 남기기' }));
+
+    expect(JSON.parse(fetchMock.mock.calls[0]![1].body).isPrivate).toBe(false);
+  });
+
   it('비공개가 무엇인지 옆에서 말해 준다', () => {
     render(<InquiryForm productId="p-1" />);
     expect(screen.getByText(/나와 판매자만 볼 수 있습니다/)).toBeDefined();
