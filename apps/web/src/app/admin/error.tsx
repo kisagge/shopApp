@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Button } from '@shop/ui';
 import { useT } from '~/lib/i18n/client';
+import { reportClientError } from '~/components/error-reporter';
 
 /**
  * 운영 화면 하나가 깨졌을 때.
@@ -30,7 +31,21 @@ export default function AdminError({
   const t = useT();
 
   useEffect(() => {
+    /*
+     * **운영 화면이 깨진 것도 원장에 남긴다.**
+     *
+     * 콘솔에만 적고 있었다. 손님 쪽 경계는 같은 자리에서 원장으로 보내고, 그
+     * 까닭도 적혀 있다 — 서버 오류는 instrumentation 이 받지만 **브라우저에서
+     * 난 것은 우리가 보내지 않으면 아무도 모르고**, React 가 잡은 오류는
+     * window 의 error 까지 올라오지 않아 ErrorReporter 도 못 듣는다. 그 사정은
+     * 운영 화면에서도 똑같은데 여기만 빠져 있었다(왜 빼는지 적힌 데도 없었다).
+     *
+     * 빠져 있으면 운영진이 "이 화면이 안 열린다" 고 말해 줄 때까지 아무 기록이
+     * 없다. 손님 쪽과 달리 **운영진은 적게 쓰고 넘어가는 일이 많아** 그 말을
+     * 안 하면 끝이다.
+     */
     console.error('[admin-error]', error.digest ?? '(digest 없음)', error);
+    reportClientError(error, '운영 화면을 그리다 오류가 났습니다');
   }, [error]);
 
   return (
