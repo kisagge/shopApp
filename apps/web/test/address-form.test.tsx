@@ -172,6 +172,50 @@ describe('주소 검색', () => {
     await waitFor(() => expect(screen.getByLabelText(/상세 주소/)).toHaveFocus());
   });
 
+  /*
+   * **위젯이 스스로 닫히는 길.** 우리 닫기 단추가 아니라 위젯 안에서 닫을 때
+   * (뒤로·바깥 클릭) SDK 가 알려 주는 자리다. 이 길을 밟아 본 적이 없었다 —
+   * 끊기면 위젯은 사라졌는데 폼은 **검색 중인 채로 남아** 단추가 "검색 닫기" 로
+   * 머물고, 초점도 돌아오지 않는다.
+   */
+  it('위젯이 스스로 닫히면 폼도 닫고 초점을 돌려준다', async () => {
+    openPostcodeSearch.mockImplementation(async (_box, _onComplete, onClose) => {
+      onClose();
+    });
+    const user = open();
+
+    await user.click(screen.getByRole('button', { name: '주소 검색' }));
+
+    const button = await screen.findByRole('button', { name: '주소 검색' });
+    expect(button.getAttribute('aria-expanded')).toBe('false');
+    await waitFor(() => expect(button).toHaveFocus());
+  });
+
+  /*
+   * **열지 못하는 길.** 광고 차단기나 사내 네트워크가 SDK 를 막는다 —
+   * 손 입력은 그대로 되므로 거기로 떨어뜨린다. 이 길도 밟아 본 적이 없었다.
+   * 끊기면 **눌러도 아무 일이 없는 단추**만 남고, 왜 안 되는지 어디에도 없다.
+   */
+  it('열지 못하면 까닭을 말하고 손 입력으로 떨어뜨린다', async () => {
+    openPostcodeSearch.mockRejectedValue(new Error('차단됨'));
+    const user = open();
+
+    await user.click(screen.getByRole('button', { name: '주소 검색' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('alert'))
+        .toHaveTextContent('주소 검색을 불러오지 못했습니다. 우편번호와 주소를 직접 입력해 주세요.'));
+    // 다시 눌러 볼 단추를 남겨 두지 않는다 — 눌러도 안 되는 단추는 거짓말이다
+    expect(screen.queryByRole('button', { name: '주소 검색' })).toBeNull();
+    /*
+     * **빈 검색 자리도 치운다.** 그 영역은 `searchable` 이 아니라 `searching` 으로
+     * 그려지므로, 단추만 거두면 420px 짜리 빈 칸이 닫기 단추와 함께 남는다 —
+     * "직접 입력해 주세요" 라고 말하면서 그 위에 빈 상자를 세워 두는 셈이다.
+     */
+    expect(screen.queryByRole('region', { name: '주소 검색' })).toBeNull();
+    expect(screen.getByLabelText(/우편번호/)).toBeEnabled();
+  });
+
   /** 안 돌려주면 키보드 사용자는 문서 맨 위로 튕겨 나가 처음부터 다시 내려와야 한다 */
   it('닫으면 열었던 단추로 초점을 돌려준다', async () => {
     const user = open();
