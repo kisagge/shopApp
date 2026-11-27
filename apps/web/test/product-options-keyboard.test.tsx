@@ -36,9 +36,19 @@ const product = {
   ],
 } as never;
 
+/*
+ * **손잡이 안에서 터진 예외는 검사 실패로 보이지 않는다.** vitest 는 그것을
+ * `Unhandled Errors` 로 따로 적고 `Tests` 줄은 그대로 "통과" 다. 담기 가드를
+ * 떼어 보면 정확히 그 모양이 된다(`lineOf(null)` 이 터진다) — 그래서 세어서
+ * 단정한다. 떠도는 거절을 잡을 때와 같은 방법이다.
+ */
+const escaped: unknown[] = [];
+window.addEventListener('error', (event) => void escaped.push(event.error));
+
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async () => Response.json({})));
   useCartStore.setState({ items: [] });
+  escaped.length = 0;
 });
 
 const group = (name: string) => screen.getByRole('radiogroup', { name });
@@ -98,6 +108,63 @@ describe('키보드로 옵션 고르기', () => {
     // XL 을 골라 둔 채라 색 이름도 그 사이즈 기준으로 품절을 말한다
     expect(document.activeElement).toBe(within(group('색상')).getByRole('radio', { name: '아이보리 품절' }));
     await waitFor(() => expect(status()).toContain('아이보리 / XL 은(는) 품절입니다.'));
+  });
+
+  /*
+   * **＋ 는 눌러 봤고 − 는 아무도 안 눌렀다.** 손님이 매일 누르는 자리인데,
+   * 줄이기가 엉뚱하게 묶여도(늘리기로, 또는 0 까지 내려가게) 위의 검사들은
+   * 그대로 통과한다. 0 으로 담기면 돈 한 푼 안 받고 주문이 서는 셈이다.
+   */
+  it('수량을 줄일 수 있고, 1 아래로는 내려가지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<ProductOptions product={product} loggedIn restockOn={[]} />);
+    await user.click(within(group('색상')).getByRole('radio', { name: '블랙' }));
+    await user.click(within(group('사이즈')).getByRole('radio', { name: 'M' }));
+
+    const increase = screen.getByRole('button', { name: '수량 늘리기' });
+    const decrease = screen.getByRole('button', { name: '수량 줄이기' });
+    await user.click(increase);
+    await user.click(increase);
+    expect(screen.getByLabelText('수량 3개')).toBeTruthy();
+
+    await user.click(decrease);
+    expect(screen.getByLabelText('수량 2개')).toBeTruthy();
+
+    // 계속 눌러도 1 에서 멈춘다 — 0 개를 담을 수는 없다
+    for (let i = 0; i < 4; i += 1) await user.click(decrease);
+    expect(screen.getByLabelText('수량 1개')).toBeTruthy();
+
+    await user.click(screen.getByRole('button', { name: '장바구니 담기' }));
+    expect(useCartStore.getState().items).toEqual([expect.objectContaining({ quantity: 1 })]);
+  });
+
+  /*
+   * **못 누르는 단추를 눌러 본 적이 없었다.** 이 저장소는 `disabled` 대신
+   * `aria-disabled` 를 쓰기로 정했는데(이유를 들을 자리를 남기려고) 그러면
+   * **클릭은 그대로 들어온다** — 막는 것은 손잡이 안의 가드 한 줄뿐이다.
+   * 그 줄이 사라지면 옵션을 안 고른 채 눌러도 담기가 돌아간다.
+   */
+  it('옵션을 고르기 전에 담기를 눌러도 아무것도 담기지 않는다', async () => {
+    const user = userEvent.setup();
+    render(<ProductOptions product={product} loggedIn restockOn={[]} />);
+    const add = screen.getByRole('button', { name: '장바구니 담기' });
+    expect(add).toHaveAttribute('aria-disabled', 'true');
+
+    await user.click(add);
+
+    expect(useCartStore.getState().items).toEqual([]);
+    expect(escaped).toEqual([]);
+  });
+
+  it('한 벌만 고른 채 담기를 눌러도 담기지 않는다 — 조합이 아직 없다', async () => {
+    const user = userEvent.setup();
+    render(<ProductOptions product={product} loggedIn restockOn={[]} />);
+    await user.click(within(group('색상')).getByRole('radio', { name: '블랙' }));
+
+    await user.click(screen.getByRole('button', { name: '장바구니 담기' }));
+
+    expect(useCartStore.getState().items).toEqual([]);
+    expect(escaped).toEqual([]);
   });
 
   it('수량을 올려 두고 재고가 적은 옵션으로 옮기면 그 재고까지만 담긴다', async () => {

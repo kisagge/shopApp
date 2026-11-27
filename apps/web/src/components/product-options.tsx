@@ -118,6 +118,12 @@ export function ProductOptions({
           <div className="flex items-center rounded-sm border border-[var(--border-strong)] bg-[var(--bg)]">
             <button
               type="button" aria-label={t('cart.decrease')}
+              /*
+               * **1 아래로 내려가지 않는 것은 여기와 shownQuantity 둘이 막는다.**
+               * 그릴 때 한 번 더 자르므로(위의 Math.max) 이 자리의 조임을 떼어
+               * 내도 화면과 담기는 그대로다 — 돌연변이로 판별하면 살아남는다.
+               * 떼지 않는 까닭은 상태에 0 이나 음수를 담아 두지 않기 위해서다.
+               */
               onClick={() => setQuantity(Math.max(1, shownQuantity - 1))}
               className="flex h-9 w-9 items-center justify-center text-[var(--fg-secondary)]"
             >
@@ -186,6 +192,17 @@ export function ProductOptions({
            */
           aria-describedby={canAdd ? undefined : 'add-blocked'}
           onClick={() => {
+            /*
+             * **`aria-disabled` 는 클릭을 막지 않는다** — 막는 것은 이 한 줄이다.
+             * 떼어 내면 옵션을 고르기 전에 눌러도 `lineOf(null)` 이 터진다.
+             * 그 예외는 손잡이 안에서 나므로 검사 실패로도 안 보인다(검사가
+             * 터진 것을 세어서 단정한다 — product-options-keyboard).
+             *
+             * `!canAdd` 쪽은 **닿을 수 없다.** 이 단추는 고른 것이 없거나 재고가
+             * 있을 때만 그려지고(품절이면 위에서 재입고 알림이 그 자리를 대신한다)
+             * 그러면 `!selected` 가 먼저 잡는다. 돌연변이로 떼어 보면 살아남는다.
+             * 그래도 두는 까닭은 옆의 구매하기와 같은 모양을 지키기 위해서다.
+             */
             if (!canAdd || !selected) return;
             add(lineOf(selected), shownQuantity);
             track('add_to_cart', {
