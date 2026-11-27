@@ -125,6 +125,35 @@ describe('저장할 때', () => {
     });
   });
 
+  it('시행일을 고쳐 적으면 그 날로 보낸다', async () => {
+    /*
+     * **이 칸을 고쳐 적어 본 적이 없었다.** 초기값이 그대로 실려 가므로 손잡이가
+     * 엉뚱한 칸에 묶여도 위의 "제목·시행일·본문을 보낸다" 는 통과한다 — 그러면
+     * 약관이 **효력을 갖는 날**이 운영자가 적은 날과 달라지고, 그 어긋남은
+     * 분쟁에서야 드러난다.
+     */
+    open();
+
+    const day = screen.getByLabelText(/^시행일/);
+    await userEvent.clear(day);
+    await userEvent.type(day, '2026-12-01');
+    await userEvent.click(save());
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string))
+      .toMatchObject({ effectiveOn: '2026-12-01', title: '개인정보처리방침' });
+  });
+
+  it('앞날로 적는 것을 막지 않는다 — 손님 화면이 "며칠 뒤부터" 라고 안내한다', async () => {
+    open();
+
+    const day = screen.getByLabelText(/^시행일/);
+    await userEvent.clear(day);
+    await userEvent.type(day, '2030-01-01');
+
+    expect(save()).toBeEnabled();
+  });
+
   it('덮어쓰기가 아니라는 것을 단추 곁에 적는다', () => {
     open();
 

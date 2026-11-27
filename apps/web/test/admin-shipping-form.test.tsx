@@ -149,6 +149,33 @@ describe('보냈을 때', () => {
       .toEqual({ baseFee: 2500, freeThreshold: 50000, remoteSurcharge: 3000 });
   });
 
+  it('도서산간 추가금을 고쳐 적으면 그 값으로 간다', async () => {
+    /*
+     * **세 값 중 이 칸만 고쳐 적어 본 적이 없었다.** 초기값이 그대로 실려 가므로
+     * 손잡이가 엉뚱한 칸에 묶여도 "세 값을 함께 보낸다" 는 통과한다 — 그러면
+     * 제주에 보내는 손님이 내는 돈이 운영자가 적은 값과 달라진다.
+     */
+    open();
+
+    await retype('제주·도서산간 추가 배송비', '5000');
+    await userEvent.click(save());
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string))
+      .toMatchObject({ remoteSurcharge: 5000, baseFee: 3000 });
+  });
+
+  it('도서산간 추가금을 0 으로 적으면 0 으로 간다 — 추가금 없는 섬도 있다', async () => {
+    open();
+
+    await retype('제주·도서산간 추가 배송비', '0');
+    await userEvent.click(save());
+
+    await waitFor(() => expect(fetch).toHaveBeenCalled());
+    expect(JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string))
+      .toMatchObject({ remoteSurcharge: 0 });
+  });
+
   /** 빈 칸은 null 로 보낸다 — 0 과 다른 뜻이다 */
   it('무료 기준을 비우면 null 로 보낸다', async () => {
     open();
