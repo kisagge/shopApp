@@ -193,8 +193,8 @@ pnpm db:migrate           # 마이그레이션 생성 + 적용 + 클라이언트
 | **백 로직** | `packages/*/test`, `apps/web/test/*-api.test.ts` | 금액 계산, 주문 상태 전이, 매출 인식, 권한 정책, 이벤트 퍼널, 입력 검증, enum 정합성 |
 
 ```
-core 1,738 · web 7,529 · contract 389 · ui 136 · auth 103 · i18n 39 · db 77 · native 31 · mail 7
-e2e 990 (Playwright, 95 파일)
+core 1,738 · web 7,531 · contract 389 · ui 136 · auth 103 · i18n 39 · db 77 · native 31 · mail 7
+e2e 991 (Playwright, 96 파일)
 ```
 
 **그 "기계로 셌다" 는 이름으로 센 것이었다.** 이 저장소는 상수나 함수 이름을 적지 않고 덮는

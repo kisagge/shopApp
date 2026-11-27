@@ -54,6 +54,7 @@ const USERS: SeedUser[] = [
   { email: SEED_ACCOUNT.pointAdjustTarget, name: '포인트 검사 손님', role: 'CUSTOMER', phone: '010-0000-2002' },
   { email: SEED_ACCOUNT.addressEditor, name: '배송지 검사 손님', role: 'CUSTOMER', phone: '010-0000-2003' },
   { email: SEED_ACCOUNT.couponCollector, name: '쿠폰 검사 손님', role: 'CUSTOMER', phone: '010-0000-2004' },
+  { email: SEED_ACCOUNT.couponGrantTarget, name: '쿠폰 지급 검사 손님', role: 'CUSTOMER', phone: '010-0000-2007' },
 
   ...CART_ACCOUNTS.map((key, i) => ({
     email: SEED_ACCOUNT[key],

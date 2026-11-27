@@ -171,7 +171,7 @@ describe('만들기 폼을 여는 때', () => {
     expect(screen.getByRole('button', { name: '새 쿠폰 만들기' })).toBeInTheDocument();
   });
 
-  it('만들어지면 맨 앞에 끼우고 폼을 닫고 알린다', async () => {
+  it('만들어지면 폼을 닫고 알리고, 목록은 다시 읽어 온다', async () => {
     const created = row({ id: 'c-2', code: 'WELCOME10', name: '웰컴 쿠폰' });
     fetchMock.mockResolvedValue(json(200, { coupon: created }));
     board();
@@ -186,9 +186,12 @@ describe('만들기 폼을 여는 때', () => {
 
     await waitFor(() => expect(live()).toBe('웰컴 쿠폰 쿠폰을 만들었습니다.'));
     expect(screen.getByRole('button', { name: '새 쿠폰 만들기' })).toBeInTheDocument();
-    // 새 줄이 맨 앞이다 — 방금 만든 것을 찾아 내려가지 않게
-    const names = screen.getAllByRole('row').slice(1).map((r) => r.textContent ?? '');
-    expect(names[0]).toContain('웰컴 쿠폰');
+    /*
+     * **만든 줄을 손으로 끼우지 않는다.** 전에는 응답의 줄을 목록 상태의 맨 앞에
+     * 밀어 넣었는데, 그 상태가 서버를 가려 **발급 수처럼 서버에서만 바뀌는 값이
+     * 영원히 낡았다**(coupon-board 의 주석). 지금은 다시 읽어 온다 — 순서도
+     * 서버가 정한다(listCoupons 가 만든 시각 역순으로 준다).
+     */
     expect(refresh).toHaveBeenCalled();
   });
 });

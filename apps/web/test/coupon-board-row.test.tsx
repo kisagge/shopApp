@@ -5,14 +5,21 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { CouponRow } from '~/app/admin/coupons/types';
 
 /**
- * 쿠폰 목록은 **서버가 돌려준 줄을 그대로 세운다** — 중지·재개 뒤에도, 만든 직후에도.
+ * 쿠폰 목록은 **서버가 준 줄만 그린다** — 중지·재개 뒤에는 다시 읽어 온다.
  *
- * 목록을 다시 읽지 않고 그 자리만 바꿔 끼우기 때문에, 응답이 들고 오지 않은 칸은 **그 줄에서만**
- * 사라진다. 다시 불러오면 멀쩡해지니 보고도 믿기 어렵다. 대상 칸을 새로 적게 되었으니 세 자리
- * (목록·만들기·고치기)가 같은 모양을 내놓는지 여기서 한 번 더 못 박는다.
+ * 전에는 목록을 상태로 베껴 두고 그 자리만 응답으로 바꿔 끼웠다. 그래서 응답이 들고 오지 않은
+ * 칸은 **그 줄에서만** 사라졌고, 다시 불러오면 멀쩡해지니 보고도 믿기 어려웠다 — 이 파일이 그
+ * 자리를 지키고 있었다. 그런데 그 거울에는 더 나쁜 면이 있었다: **서버에서만 바뀌는 값은 영원히
+ * 낡는다.** 쿠폰을 쥐어 주면 발급 수가 늘지만 표는 계속 `0 / 50` 이었다(coupon-grant-admin 이
+ * 그 자리를 밟는다).
+ *
+ * 거울을 지웠으니 **응답이 칸을 빠뜨려 줄이 비는 고장은 있을 수 없다** — 그릴 것은 서버가 준
+ * 목록뿐이다. 그래서 여기서 지키는 것이 바뀐다: 바꾼 뒤에 **다시 읽는지**, 그리고 서버가 준 줄의
+ * 대상 칸을 그대로 그리는지.
  */
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
 
 const { CouponBoard } = await import('~/app/admin/coupons/coupon-board');
 
@@ -36,8 +43,8 @@ beforeEach(() => {
 const target = () =>
   within(screen.getByRole('row', { name: /가을 쿠폰/ })).getAllByRole('cell')[2]!;
 
-describe('중지한 뒤에도', () => {
-  it('대상 칸이 비지 않는다', async () => {
+describe('중지하면', () => {
+  it('바뀐 줄을 서버에서 다시 읽는다 — 손에 든 값으로 갈아 끼우지 않는다', async () => {
     fetchMock.mockResolvedValue(
       Response.json({ coupon: { ...row(), isActive: false, status: 'INACTIVE' } }),
     );
@@ -46,22 +53,40 @@ describe('중지한 뒤에도', () => {
 
     await user.click(screen.getByRole('button', { name: '가을 쿠폰 쿠폰 중지' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: '가을 쿠폰 쿠폰 재개' })).toBeInTheDocument());
-    expect(target().textContent).toContain('울 코트');
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    // 말은 그 자리에서 한다 — 다시 읽는 동안 아무 말도 없으면 눌렸는지 알 수 없다
+    expect(screen.getByText('가을 쿠폰 쿠폰을 중지했습니다. 이미 받은 사람은 계속 쓸 수 있습니다.')).toBeTruthy();
   });
 
-  /** 상위 분류에 걸린 쿠폰은 중지해도 여전히 상위 분류에 걸려 있다 — 경고가 따라가야 한다 */
-  it('붙는 상품이 없다는 경고도 따라간다', async () => {
-    const dead = row({ targets: [{ type: 'CATEGORY', name: '아우터', dead: true }] });
-    fetchMock.mockResolvedValue(
-      Response.json({ coupon: { ...dead, isActive: false, status: 'INACTIVE' } }),
-    );
+  it('모양이 틀린 200 은 성공으로 보지 않는다', async () => {
+    /*
+     * 그려 쓰지는 않지만 응답의 모양은 여전히 본다. 창구가 200 과 함께 엉뚱한
+     * 몸을 주면(막은 자리를 HTML 로 돌려주는 식) **바뀌지 않았는데 바뀌었다고
+     * 말하게 된다** — 그 뒤 다시 읽어도 그대로이니 운영자는 두 번 누른다.
+     */
+    fetchMock.mockResolvedValue(Response.json({ ok: true }));
     const user = userEvent.setup();
-    render(<CouponBoard initial={[dead]} brands={[]} categories={[]} />);
+    render(<CouponBoard initial={[row()]} brands={[]} categories={[]} />);
 
     await user.click(screen.getByRole('button', { name: '가을 쿠폰 쿠폰 중지' }));
 
-    await waitFor(() => expect(screen.getByRole('button', { name: '가을 쿠폰 쿠폰 재개' })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('바꾸지 못했습니다.'));
+    expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe('서버가 준 줄을', () => {
+  it('대상 칸까지 그대로 그린다', () => {
+    render(<CouponBoard initial={[row()]} brands={[]} categories={[]} />);
+
+    expect(target().textContent).toContain('울 코트');
+  });
+
+  /** 상위 분류에 걸린 쿠폰에는 붙는 상품이 없다 — 그 경고가 줄에 보여야 한다 */
+  it('붙는 상품이 없다는 경고도 함께 그린다', () => {
+    const dead = row({ targets: [{ type: 'CATEGORY', name: '아우터', dead: true }] });
+    render(<CouponBoard initial={[dead]} brands={[]} categories={[]} />);
+
     expect(target().textContent).toContain('붙는 상품 없음');
   });
 });

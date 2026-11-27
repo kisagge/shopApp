@@ -121,6 +121,16 @@ export const SEED_ACCOUNT = {
   couponCollector: 'coupon-download@plain.test',
 
   /**
+   * 운영진이 지급 창구에서 쿠폰을 **손으로 쥐어 주는** 상대 — coupon-grant-admin.
+   *
+   * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 받는 쪽 화면은 coupon-download 가 보고,
+   * 여기서 보는 것은 운영 쪽 창구이므로 이 계정으로 로그인할 일이 없다 — 찾고, 고르고, 받았는지만
+   * 확인한다. 쿠폰함을 보는 손님(couponCollector)과 나눠 쓰지 않는 까닭은, 거기 쿠폰이 하나 더
+   * 늘면 그 명세가 보던 목록이 달라지기 때문이다.
+   */
+  couponGrantTarget: 'coupon-grant@plain.test',
+
+  /**
    * 운영진이 이용 정지했다가 푼다 — user-suspension-admin.
    *
    * **저장된 세션을 만들지 않는다**(STATE_FILE 에 없다). 정지하면 세션이 지워지므로 미리 만든 세션은
